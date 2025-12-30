@@ -300,14 +300,28 @@ class UserService {
       await _firestore.collection('users').doc(userId).delete();
       await _firestore.collection('wallets').doc(userId).delete();
 
-      // Delete storage files
+      // Delete storage files (best effort - continue deletion even if these fail)
       try {
         await _storage.ref().child('profile_photos').child('$userId.jpg').delete();
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        // Only ignore 'object-not-found' errors - file may not exist
+        if (e.code != 'object-not-found') {
+          // Log unexpected storage errors but continue with account deletion
+          // ignore: avoid_print
+          print('Warning: Failed to delete profile photo during account deletion: ${e.code} - ${e.message}');
+        }
+      }
 
       try {
         await _storage.ref().child('kyc_documents').child(userId).delete();
-      } catch (_) {}
+      } on FirebaseException catch (e) {
+        // Only ignore 'object-not-found' errors - folder may not exist
+        if (e.code != 'object-not-found') {
+          // Log unexpected storage errors but continue with account deletion
+          // ignore: avoid_print
+          print('Warning: Failed to delete KYC documents during account deletion: ${e.code} - ${e.message}');
+        }
+      }
 
       // Delete Firebase Auth account
       await _auth.currentUser?.delete();
