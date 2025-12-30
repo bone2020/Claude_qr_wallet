@@ -64,7 +64,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     if (value == null || value.isEmpty) {
       return AppStrings.errorFieldRequired;
     }
-    if (value.length < 10) {
+    // African phone numbers vary: 7-11 digits depending on country
+    // Ghana: 9 digits, Nigeria: 10 digits, Kenya: 9 digits, etc.
+    if (value.length < 7 || value.length > 11) {
       return AppStrings.errorInvalidPhone;
     }
     return null;
