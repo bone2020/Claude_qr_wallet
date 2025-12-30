@@ -289,7 +289,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const OrDivider(text: AppStrings.orLogInWith),
         const SizedBox(height: AppDimensions.spaceLG),
         SocialLoginRow(
-          onGooglePressed: _handleGoogleLogin,
+          onGooglePressed: () => _handleGoogleLogin(),
           onApplePressed: _handleAppleLogin,
         ),
       ],

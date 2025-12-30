@@ -393,7 +393,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         const OrDivider(text: AppStrings.orSignUpWith),
         const SizedBox(height: AppDimensions.spaceLG),
         SocialLoginRow(
-          onGooglePressed: _handleGoogleSignUp,
+          onGooglePressed: () => _handleGoogleSignUp(),
           onApplePressed: _handleAppleSignUp,
         ),
       ],
