@@ -1,33 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/auth_provider.dart';
 
 /// User profile screen
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _darkMode = true;
   bool _biometricEnabled = true;
-
-  // Mock user data - replace with actual data
-  final String _userName = 'John Doe';
-  final String _email = 'john.doe@email.com';
-  final String _phone = '+234 803 123 4567';
-  final String? _profilePhoto = null;
 
   void _handleLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
@@ -39,17 +35,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               AppStrings.cancel,
               style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
             ),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Implement logout
-              context.go(AppRoutes.welcome);
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              // Sign out using the auth provider
+              await ref.read(authNotifierProvider.notifier).signOut();
+              if (mounted) {
+                context.go(AppRoutes.welcome);
+              }
             },
             child: Text(
               AppStrings.logOut,
@@ -63,6 +62,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get real user data from provider
+    final user = ref.watch(currentUserProvider);
+    final userName = user?.fullName ?? 'User';
+    final email = user?.email ?? '';
+    final phone = user?.phoneNumber ?? '';
+    final profilePhoto = user?.profilePhotoUrl;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -75,7 +81,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             // Profile Header
-            _buildProfileHeader()
+            _buildProfileHeader(
+              userName: userName,
+              email: email,
+              phone: phone,
+              profilePhoto: profilePhoto,
+            )
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.1, end: 0, duration: 400.ms),
@@ -202,7 +213,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader({
+    required String userName,
+    required String email,
+    required String phone,
+    String? profilePhoto,
+  }) {
+    // Generate initials from name
+    String initials = 'U';
+    if (userName.isNotEmpty) {
+      final parts = userName.split(' ');
+      if (parts.length >= 2) {
+        initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      } else {
+        initials = userName[0].toUpperCase();
+      }
+    }
+
     return Column(
       children: [
         // Avatar
@@ -217,16 +244,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 2,
             ),
           ),
-          child: _profilePhoto != null
+          child: profilePhoto != null
               ? ClipOval(
                   child: Image.network(
-                    _profilePhoto!,
+                    profilePhoto,
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Center(
+                      child: Text(
+                        initials,
+                        style: AppTextStyles.displaySmall(color: AppColors.primary),
+                      ),
+                    ),
                   ),
                 )
               : Center(
                   child: Text(
-                    _userName.split(' ').map((e) => e[0]).take(2).join().toUpperCase(),
+                    initials,
                     style: AppTextStyles.displaySmall(color: AppColors.primary),
                   ),
                 ),
@@ -236,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Name
         Text(
-          _userName,
+          userName,
           style: AppTextStyles.headlineMedium(),
         ),
 
@@ -244,7 +277,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Email
         Text(
-          _email,
+          email,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
 
@@ -252,7 +285,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // Phone
         Text(
-          _phone,
+          phone,
           style: AppTextStyles.bodySmall(color: AppColors.textTertiaryDark),
         ),
       ],
