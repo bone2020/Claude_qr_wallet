@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "123632722078",
+    "project_id": "qr-wallet-1993",
+    "storage_bucket": "qr-wallet-1993.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123632722078:android:34d26d8cb7235f3a7a5b8f",
+        "android_client_info": {
+          "package_name": "com.qr_wallet_1993"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "123632722078-anucrdujoflnf5ciuu1lgorg35t747ao.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.qr_wallet_1993",
+            "certificate_hash": "e8505f07a91de43fdbe042b848afb73a03b7cc93"
+          }
+        },
+        {
+          "client_id": "123632722078-19518pab71vnede2399ldvd1ul1dm5sk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB961nijBwZ0vrgULyERZUtDNI2-hhQRRY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "123632722078-19518pab71vnede2399ldvd1ul1dm5sk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "123632722078-s76fdji8pd68ed0tlvlbn911k6eiqfen.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.qrwallet1993"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

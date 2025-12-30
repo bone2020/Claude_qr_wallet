@@ -1,0 +1,70 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isValidSize(maxSize) {
+      return request.resource.size < maxSize;
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidImageType() {
+      return request.resource.contentType == 'image/jpeg' 
+        || request.resource.contentType == 'image/png'
+        || request.resource.contentType == 'image/webp';
+    }
+    
+    // Profile photos
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() 
+        && isOwner(userId)
+        && isImage()
+        && isValidImageType()
+        && isValidSize(5 * 1024 * 1024);
+    }
+    
+    // KYC documents
+    match /kyc_documents/{userId}/{fileName} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if isAuthenticated() 
+        && isOwner(userId)
+        && isImage()
+        && isValidImageType()
+        && isValidSize(10 * 1024 * 1024);
+      allow delete: if false;
+    }
+    
+    // QR codes
+    match /qr_codes/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() 
+        && isOwner(userId)
+        && isImage()
+        && isValidSize(1 * 1024 * 1024);
+    }
+    
+    // Receipts
+    match /receipts/{userId}/{transactionId}/{fileName} {
+      allow read: if isAuthenticated() && isOwner(userId);
+      allow write: if false;
+    }
+    
+    // App assets (public)
+    match /app_assets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
