@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/social_login_button.dart';
 
 /// Login screen for existing users
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -53,13 +55,26 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual login logic with Firebase
-      await Future.delayed(const Duration(seconds: 2));
+      // Call the auth provider to sign in with Firebase
+      final result = await ref.read(authNotifierProvider.notifier).signIn(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
       if (!mounted) return;
 
-      // Navigate to main screen
-      context.go(AppRoutes.main);
+      if (result.success) {
+        // Navigate to main screen
+        context.go(AppRoutes.main);
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Login failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -75,12 +90,41 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleGoogleLogin() {
-    // TODO: Implement Google login
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      if (!mounted) return;
+
+      if (result.success) {
+        context.go(AppRoutes.main);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Google login failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _handleAppleLogin() {
-    // TODO: Implement Apple login
+    // TODO: Implement Apple login (requires Apple Developer account setup)
   }
 
   void _handleForgotPassword() {

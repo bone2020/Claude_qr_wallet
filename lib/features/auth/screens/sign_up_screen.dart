@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/social_login_button.dart';
 
 /// Sign up screen for new user registration
-class SignUpScreen extends StatefulWidget {
+class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  ConsumerState<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -102,20 +104,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual sign up logic with Firebase
-      await Future.delayed(const Duration(seconds: 2));
+      // Call the auth provider to sign up with Firebase
+      final result = await ref.read(authNotifierProvider.notifier).signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+      );
 
       if (!mounted) return;
 
-      // Navigate to OTP verification
-      context.push(
-        AppRoutes.otpVerification,
-        extra: {
-          'phoneNumber': _phoneController.text,
-          'email': _emailController.text,
-          'isPhoneVerification': true,
-        },
-      );
+      if (result.success) {
+        // Navigate to OTP verification for phone verification
+        context.push(
+          AppRoutes.otpVerification,
+          extra: {
+            'phoneNumber': _phoneController.text,
+            'email': _emailController.text,
+            'isPhoneVerification': true,
+          },
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Sign up failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -131,12 +148,47 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  void _handleGoogleSignUp() {
-    // TODO: Implement Google sign up
+  Future<void> _handleGoogleSignUp() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+
+      if (!mounted) return;
+
+      if (result.success) {
+        if (result.isNewUser) {
+          // New user - navigate to KYC
+          context.go(AppRoutes.kyc);
+        } else {
+          // Existing user - navigate to home
+          context.go(AppRoutes.home);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Google sign up failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _handleAppleSignUp() {
-    // TODO: Implement Apple sign up
+    // TODO: Implement Apple sign up (requires Apple Developer account setup)
   }
 
   @override
