@@ -83,6 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             phoneNumber: extras?['phoneNumber'] ?? '',
             email: extras?['email'] ?? '',
             isPhoneVerification: extras?['isPhoneVerification'] ?? true,
+            verificationId: extras?['verificationId'],
           );
         },
       ),

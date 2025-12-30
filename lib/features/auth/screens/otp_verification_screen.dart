@@ -1,41 +1,124 @@
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/auth_provider.dart';
 
 /// OTP verification screen for phone/email verification
-class OtpVerificationScreen extends StatefulWidget {
+class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String phoneNumber;
   final String email;
   final bool isPhoneVerification;
+  final String? verificationId;
 
   const OtpVerificationScreen({
     super.key,
     required this.phoneNumber,
     required this.email,
     this.isPhoneVerification = true,
+    this.verificationId,
   });
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
+class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   final _focusNode = FocusNode();
 
   bool _isLoading = false;
+  bool _isSendingOtp = false;
   int _resendSeconds = 60;
   Timer? _resendTimer;
+  String? _verificationId;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _startResendTimer();
+    _verificationId = widget.verificationId;
+    // If no verification ID provided, trigger OTP send
+    if (_verificationId == null && widget.isPhoneVerification) {
+      _sendOtp();
+    } else {
+      _startResendTimer();
+    }
+  }
+
+  Future<void> _sendOtp() async {
+    if (_isSendingOtp) return;
+
+    setState(() {
+      _isSendingOtp = true;
+      _errorMessage = null;
+    });
+
+    final authService = ref.read(authServiceProvider);
+
+    await authService.sendOtp(
+      phoneNumber: widget.phoneNumber,
+      onCodeSent: (verificationId) {
+        if (mounted) {
+          setState(() {
+            _verificationId = verificationId;
+            _isSendingOtp = false;
+          });
+          _startResendTimer();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verification code sent'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = error;
+            _isSendingOtp = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      },
+      onAutoVerify: (PhoneAuthCredential credential) async {
+        // Auto-verification (Android only) - automatically verify
+        if (mounted) {
+          setState(() => _isLoading = true);
+          try {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await user.linkWithCredential(credential);
+              if (mounted) {
+                context.go(AppRoutes.kyc);
+              }
+            }
+          } catch (e) {
+            if (mounted) {
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(e.toString()),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          }
+        }
+      },
+    );
   }
 
   @override
@@ -86,16 +169,38 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
 
+    if (_verificationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification session expired. Please request a new code.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual OTP verification
-      await Future.delayed(const Duration(seconds: 2));
+      final authService = ref.read(authServiceProvider);
+      final result = await authService.verifyOtp(
+        verificationId: _verificationId!,
+        otp: _otpController.text,
+      );
 
       if (!mounted) return;
 
-      // If phone verified, proceed to KYC or home
-      context.go(AppRoutes.kyc);
+      if (result.success) {
+        // Phone verified successfully, proceed to KYC
+        context.go(AppRoutes.kyc);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Verification failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -114,15 +219,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   Future<void> _resendCode() async {
     if (_resendSeconds > 0) return;
 
-    // TODO: Implement resend OTP logic
-    _startResendTimer();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Verification code sent'),
-        backgroundColor: AppColors.success,
-      ),
-    );
+    // Trigger OTP send again
+    await _sendOtp();
   }
 
   @override
