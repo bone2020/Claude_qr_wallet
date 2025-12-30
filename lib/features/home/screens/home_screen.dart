@@ -1,79 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/wallet_provider.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/quick_action_button.dart';
 import '../widgets/transaction_tile.dart';
 
 /// Home screen with balance, quick actions, and recent transactions
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  String _getTransactionType(dynamic type) {
+    if (type is String) return type;
+    return type.toString().split('.').last;
+  }
 
-class _HomeScreenState extends State<HomeScreen> {
-  bool _balanceHidden = false;
-
-  // Mock data - replace with actual data from providers
-  final double _balance = 125750.00;
-  final String _currency = '₦';
-  final String _userName = 'John';
-  final String _walletId = 'QRW-8472-9103';
-
-  final List<Map<String, dynamic>> _recentTransactions = [
-    {
-      'id': '1',
-      'name': 'Sarah Johnson',
-      'type': 'receive',
-      'amount': 15000.0,
-      'date': DateTime.now().subtract(const Duration(hours: 2)),
-      'status': 'completed',
-    },
-    {
-      'id': '2',
-      'name': 'Netflix Subscription',
-      'type': 'send',
-      'amount': 4500.0,
-      'date': DateTime.now().subtract(const Duration(days: 1)),
-      'status': 'completed',
-    },
-    {
-      'id': '3',
-      'name': 'Bank Deposit',
-      'type': 'deposit',
-      'amount': 50000.0,
-      'date': DateTime.now().subtract(const Duration(days: 2)),
-      'status': 'completed',
-    },
-    {
-      'id': '4',
-      'name': 'Michael Obi',
-      'type': 'send',
-      'amount': 7500.0,
-      'date': DateTime.now().subtract(const Duration(days: 3)),
-      'status': 'pending',
-    },
-  ];
-
-  void _toggleBalanceVisibility() {
-    setState(() => _balanceHidden = !_balanceHidden);
+  String _getTransactionStatus(dynamic status) {
+    if (status is String) return status;
+    return status.toString().split('.').last;
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get real data from providers
+    final user = ref.watch(currentUserProvider);
+    final walletState = ref.watch(walletNotifierProvider);
+    final recentTransactions = ref.watch(recentTransactionsProvider);
+
+    final userName = user?.fullName?.split(' ').first ?? 'User';
+    final balance = walletState.balance;
+    final currency = walletState.currencySymbol;
+    final walletId = walletState.walletId;
+    final balanceHidden = walletState.balanceHidden;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            // TODO: Refresh balance and transactions
-            await Future.delayed(const Duration(seconds: 1));
+            // Refresh balance and transactions from Firebase
+            await ref.read(walletNotifierProvider.notifier).refreshWallet();
+            await ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
           },
           color: AppColors.primary,
           child: SingleChildScrollView(
@@ -85,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: AppDimensions.spaceSM),
 
                 // Header with greeting
-                _buildHeader()
+                _buildHeader(context, userName)
                     .animate()
                     .fadeIn(duration: 400.ms)
                     .slideX(begin: -0.1, end: 0, duration: 400.ms),
@@ -94,11 +67,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 // Balance Card
                 BalanceCard(
-                  balance: _balance,
-                  currency: _currency,
-                  isHidden: _balanceHidden,
-                  walletId: _walletId,
-                  onToggleVisibility: _toggleBalanceVisibility,
+                  balance: balance,
+                  currency: currency,
+                  isHidden: balanceHidden,
+                  walletId: walletId,
+                  onToggleVisibility: () {
+                    ref.read(walletNotifierProvider.notifier).toggleBalanceVisibility();
+                  },
                 )
                     .animate()
                     .fadeIn(delay: 100.ms, duration: 400.ms)
@@ -107,14 +82,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: AppDimensions.spaceXL),
 
                 // Quick Actions
-                _buildQuickActions()
+                _buildQuickActions(context)
                     .animate()
                     .fadeIn(delay: 200.ms, duration: 400.ms),
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 
                 // Recent Transactions
-                _buildRecentTransactions()
+                _buildRecentTransactions(context, recentTransactions, currency)
                     .animate()
                     .fadeIn(delay: 300.ms, duration: 400.ms),
 
@@ -127,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context, String userName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -135,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hello, $_userName 👋',
+              'Hello, $userName 👋',
               style: AppTextStyles.headlineLarge(),
             ),
             const SizedBox(height: 2),
@@ -168,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
@@ -200,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildRecentTransactions() {
+  Widget _buildRecentTransactions(BuildContext context, List<dynamic> transactions, String currency) {
     return Column(
       children: [
         Row(
@@ -222,27 +197,27 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         const SizedBox(height: AppDimensions.spaceSM),
-        if (_recentTransactions.isEmpty)
+        if (transactions.isEmpty)
           _buildEmptyTransactions()
         else
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _recentTransactions.length,
+            itemCount: transactions.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppDimensions.spaceSM),
             itemBuilder: (context, index) {
-              final transaction = _recentTransactions[index];
+              final transaction = transactions[index];
               return TransactionTile(
-                name: transaction['name'],
-                type: transaction['type'],
-                amount: transaction['amount'],
-                currency: _currency,
-                date: transaction['date'],
-                status: transaction['status'],
+                name: transaction.recipientName ?? transaction.senderName ?? 'Unknown',
+                type: _getTransactionType(transaction.type),
+                amount: transaction.amount,
+                currency: currency,
+                date: transaction.createdAt,
+                status: _getTransactionStatus(transaction.status),
                 onTap: () {
                   context.push(
                     AppRoutes.transactionDetails,
-                    extra: transaction['id'],
+                    extra: transaction.id,
                   );
                 },
               );
