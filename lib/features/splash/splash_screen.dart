@@ -1,19 +1,21 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/router/app_router.dart';
 
 /// Splash screen shown on app launch
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -26,9 +28,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
     if (!mounted) return;
 
-    // TODO: Check if user is logged in
-    // For now, navigate to welcome screen
-    context.go(AppRoutes.welcome);
+    // Check if user is logged in
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null) {
+      // User is logged in, navigate to main screen
+      context.go(AppRoutes.main);
+    } else {
+      // User is not logged in, navigate to welcome screen
+      context.go(AppRoutes.welcome);
+    }
   }
 
   @override
