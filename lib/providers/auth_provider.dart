@@ -101,14 +101,18 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     required String password,
     required String fullName,
     required String phoneNumber,
+    String? countryCode,
+    String? currencyCode,
   }) async {
     state = state.copyWith(authState: AuthState.loading);
-    
+
     final result = await _authService.signUpWithEmail(
       email: email,
       password: password,
       fullName: fullName,
       phoneNumber: phoneNumber,
+      countryCode: countryCode,
+      currencyCode: currencyCode,
     );
 
     if (result.success && result.user != null) {

@@ -138,25 +138,57 @@ class WalletModel {
   /// Get remaining monthly limit
   double get remainingMonthlyLimit => monthlyLimit - monthlySpent;
 
-  /// Get currency symbol
+  /// Get currency symbol for African and common currencies
   String get currencySymbol {
-    switch (currency) {
-      case 'NGN':
-        return '₦';
-      case 'GHS':
-        return 'GH₵';
-      case 'KES':
-        return 'KSh';
-      case 'ZAR':
-        return 'R';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      default:
-        return currency;
-    }
+    const currencySymbols = {
+      // African currencies
+      'NGN': '₦',      // Nigerian Naira
+      'GHS': 'GH₵',    // Ghanaian Cedi
+      'KES': 'KSh',    // Kenyan Shilling
+      'ZAR': 'R',      // South African Rand
+      'EGP': 'E£',     // Egyptian Pound
+      'TZS': 'TSh',    // Tanzanian Shilling
+      'UGX': 'USh',    // Ugandan Shilling
+      'RWF': 'FRw',    // Rwandan Franc
+      'ETB': 'Br',     // Ethiopian Birr
+      'MAD': 'DH',     // Moroccan Dirham
+      'DZD': 'DA',     // Algerian Dinar
+      'TND': 'DT',     // Tunisian Dinar
+      'XAF': 'FCFA',   // Central African CFA Franc
+      'XOF': 'CFA',    // West African CFA Franc
+      'ZWL': 'Z\$',    // Zimbabwean Dollar
+      'ZMW': 'ZK',     // Zambian Kwacha
+      'BWP': 'P',      // Botswana Pula
+      'NAD': 'N\$',    // Namibian Dollar
+      'MZN': 'MT',     // Mozambican Metical
+      'AOA': 'Kz',     // Angolan Kwanza
+      'CDF': 'FC',     // Congolese Franc
+      'SDG': 'SDG',    // Sudanese Pound
+      'LYD': 'LD',     // Libyan Dinar
+      'MUR': 'Rs',     // Mauritian Rupee
+      'MWK': 'MK',     // Malawian Kwacha
+      'SLL': 'Le',     // Sierra Leonean Leone
+      'LRD': 'L\$',    // Liberian Dollar
+      'GMD': 'D',      // Gambian Dalasi
+      'GNF': 'FG',     // Guinean Franc
+      'BIF': 'FBu',    // Burundian Franc
+      'ERN': 'Nfk',    // Eritrean Nakfa
+      'DJF': 'Fdj',    // Djiboutian Franc
+      'SOS': 'Sh.So.', // Somali Shilling
+      'SSP': 'SSP',    // South Sudanese Pound
+      'LSL': 'L',      // Lesotho Loti
+      'SZL': 'E',      // Swazi Lilangeni
+      'MGA': 'Ar',     // Malagasy Ariary
+      'SCR': 'Rs',     // Seychellois Rupee
+      'KMF': 'CF',     // Comorian Franc
+      'MRU': 'UM',     // Mauritanian Ouguiya
+      'CVE': '\$',     // Cape Verdean Escudo
+      'STN': 'Db',     // Sao Tome and Principe Dobra
+      // Common international currencies
+      'USD': '\$',
+      'EUR': '€',
+      'GBP': '£',
+    };
+    return currencySymbols[currency] ?? currency;
   }
 }

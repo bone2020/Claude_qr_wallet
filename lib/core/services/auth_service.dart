@@ -32,6 +32,8 @@ class AuthService {
     required String password,
     required String fullName,
     required String phoneNumber,
+    String? countryCode,
+    String? currencyCode,
   }) async {
     try {
       // Create user in Firebase Auth
@@ -58,16 +60,19 @@ class AuthService {
         email: email,
         phoneNumber: phoneNumber,
         walletId: walletId,
+        country: countryCode ?? 'NG',
+        currency: currencyCode ?? 'NGN',
         createdAt: DateTime.now(),
       );
 
       await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
 
-      // Create wallet document
+      // Create wallet document with user's currency
       final walletModel = WalletModel(
         id: user.uid,
         walletId: walletId,
         userId: user.uid,
+        currency: currencyCode ?? 'NGN',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );

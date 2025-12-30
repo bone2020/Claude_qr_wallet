@@ -27,6 +27,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   bool _agreedToTerms = false;
   bool _isLoading = false;
+  AfricanCountry _selectedCountry = AfricanCountries.defaultCountry;
 
   @override
   void dispose() {
@@ -103,13 +104,18 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
     setState(() => _isLoading = true);
 
+    // Build full phone number with country code
+    final fullPhoneNumber = '${_selectedCountry.dialCode}${_phoneController.text.trim()}';
+
     try {
       // Call the auth provider to sign up with Firebase
       final result = await ref.read(authNotifierProvider.notifier).signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: _fullNameController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: fullPhoneNumber,
+        countryCode: _selectedCountry.code,
+        currencyCode: _selectedCountry.currencyCode,
       );
 
       if (!mounted) return;
@@ -119,7 +125,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         context.push(
           AppRoutes.otpVerification,
           extra: {
-            'phoneNumber': _phoneController.text,
+            'phoneNumber': fullPhoneNumber,
             'email': _emailController.text,
             'isPhoneVerification': true,
           },
@@ -301,6 +307,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         PhoneTextField(
           controller: _phoneController,
           validator: _validatePhone,
+          initialCountry: _selectedCountry,
+          onCountryChanged: (country) {
+            setState(() => _selectedCountry = country);
+          },
         ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
 
         const SizedBox(height: AppDimensions.spaceMD),
