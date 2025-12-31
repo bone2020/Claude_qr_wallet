@@ -43,50 +43,37 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   String? _validateFullName(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
-    if (value.split(' ').length < 2) {
-      return 'Please enter your full name';
-    }
+    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
+    if (value.split(' ').length < 2) return 'Please enter your full name';
     return null;
   }
 
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
+    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
-      return AppStrings.errorInvalidEmail;
-    }
+    if (!emailRegex.hasMatch(value)) return AppStrings.errorInvalidEmail;
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
+    if (value.length < 9) return AppStrings.errorInvalidPhone;
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
-    if (value.length < 8) {
-      return AppStrings.errorPasswordWeak;
-    }
+    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
+    if (value.length < 8) return AppStrings.errorPasswordWeak;
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
-    if (value != _passwordController.text) {
-      return AppStrings.errorPasswordMismatch;
-    }
+    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
+    if (value != _passwordController.text) return AppStrings.errorPasswordMismatch;
     return null;
   }
 
-  /// Get full phone number with country code
-  String get _fullPhoneNumber {
-    return '${_selectedCountry.dialCode}${_phoneController.text}';
-  }
+  String get _fullPhoneNumber => '${_selectedCountry.dialCode}${_phoneController.text}';
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
@@ -103,7 +90,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Call Firebase Auth through the provider
       final authNotifier = ref.read(authNotifierProvider.notifier);
       final result = await authNotifier.signUp(
         email: _emailController.text.trim(),
@@ -115,7 +101,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppStrings.successAccountCreated),
@@ -123,8 +108,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           ),
         );
 
-        // Navigate to OTP verification screen
-        // The OTP screen will send verification code and then navigate to KYC
+        // Navigate to OTP verification
         context.push(
           AppRoutes.otpVerification,
           extra: {
@@ -134,7 +118,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           },
         );
       } else {
-        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result.error ?? AppStrings.errorGeneric),
@@ -151,9 +134,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -163,14 +144,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     try {
       final authNotifier = ref.read(authNotifierProvider.notifier);
       final result = await authNotifier.signInWithGoogle();
-
       if (!mounted) return;
 
       if (result.success) {
-        // For Google sign-in, user already has verified email
-        // Check if user needs to complete profile/KYC
-        // For now, send to KYC to complete profile
-        context.go(AppRoutes.kyc);
+        context.go(AppRoutes.kyc); // complete profile/KYC
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -188,9 +165,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -245,9 +220,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 // Subtitle
                 Text(
                   AppStrings.signUpSubtitle,
-                  style: AppTextStyles.bodyLarge(
-                    color: AppColors.textSecondaryDark,
-                  ),
+                  style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
                 )
                     .animate()
                     .fadeIn(duration: 400.ms, delay: 200.ms)
@@ -255,15 +228,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 
-                // Full Name Field
+                // Full Name
                 CustomTextField(
                   controller: _fullNameController,
                   label: AppStrings.fullName,
                   hintText: AppStrings.fullNameHint,
-                  prefixIcon: const Icon(
-                    Icons.person_outline,
-                    color: AppColors.textSecondaryDark,
-                  ),
+                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.textSecondaryDark),
                   validator: _validateFullName,
                   textInputAction: TextInputAction.next,
                 )
@@ -273,15 +243,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceMD),
 
-                // Email Field
+                // Email
                 CustomTextField(
                   controller: _emailController,
                   label: AppStrings.email,
                   hintText: AppStrings.emailHint,
-                  prefixIcon: const Icon(
-                    Icons.email_outlined,
-                    color: AppColors.textSecondaryDark,
-                  ),
+                  prefixIcon: const Icon(Icons.email_outlined, color: AppColors.textSecondaryDark),
                   keyboardType: TextInputType.emailAddress,
                   validator: _validateEmail,
                   textInputAction: TextInputAction.next,
@@ -292,15 +259,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceMD),
 
-                // Phone Field with Country Picker
+                // Phone
                 PhoneInputField(
                   key: _phoneFieldKey,
                   controller: _phoneController,
                   label: AppStrings.phoneNumber,
                   initialCountry: _selectedCountry,
-                  onCountryChanged: (country) {
-                    setState(() => _selectedCountry = country);
-                  },
+                  validator: _validatePhone,
+                  onCountryChanged: (country) => setState(() => _selectedCountry = country),
                   textInputAction: TextInputAction.next,
                 )
                     .animate()
@@ -309,15 +275,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceMD),
 
-                // Password Field
+                // Password
                 CustomTextField(
                   controller: _passwordController,
                   label: AppStrings.password,
                   hintText: AppStrings.passwordHint,
-                  prefixIcon: const Icon(
-                    Icons.lock_outline,
-                    color: AppColors.textSecondaryDark,
-                  ),
+                  prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondaryDark),
                   obscureText: true,
                   validator: _validatePassword,
                   textInputAction: TextInputAction.next,
@@ -328,15 +291,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceMD),
 
-                // Confirm Password Field
+                // Confirm Password
                 CustomTextField(
                   controller: _confirmPasswordController,
                   label: AppStrings.confirmPassword,
                   hintText: AppStrings.confirmPasswordHint,
-                  prefixIcon: const Icon(
-                    Icons.lock_outline,
-                    color: AppColors.textSecondaryDark,
-                  ),
+                  prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondaryDark),
                   obscureText: true,
                   validator: _validateConfirmPassword,
                   textInputAction: TextInputAction.done,
@@ -348,7 +308,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceMD),
 
-                // Terms Checkbox
+                // Terms
                 Row(
                   children: [
                     SizedBox(
@@ -356,14 +316,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       height: 24,
                       child: Checkbox(
                         value: _agreedToTerms,
-                        onChanged: (value) {
-                          setState(() => _agreedToTerms = value ?? false);
-                        },
+                        onChanged: (value) => setState(() => _agreedToTerms = value ?? false),
                         activeColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppDimensions.radiusXS),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusXS)),
                       ),
                     ),
                     const SizedBox(width: AppDimensions.spaceXS),
@@ -371,15 +326,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       child: Text.rich(
                         TextSpan(
                           text: '${AppStrings.termsAgreement} ',
-                          style: AppTextStyles.bodySmall(
-                            color: AppColors.textSecondaryDark,
-                          ),
+                          style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                           children: [
                             TextSpan(
                               text: AppStrings.termsAndPrivacy,
-                              style: AppTextStyles.bodySmall(
-                                color: AppColors.primary,
-                              ),
+                              style: AppTextStyles.bodySmall(color: AppColors.primary),
                             ),
                           ],
                         ),
@@ -402,10 +353,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.backgroundDark,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppDimensions.radiusMD),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD)),
                       elevation: 0,
                     ),
                     child: _isLoading
@@ -414,17 +362,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.backgroundDark,
-                              ),
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.backgroundDark),
                             ),
                           )
-                        : Text(
-                            AppStrings.signUp,
-                            style: AppTextStyles.labelLarge(
-                              color: AppColors.backgroundDark,
-                            ),
-                          ),
+                        : Text(AppStrings.signUp, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
                   ),
                 )
                     .animate()
@@ -433,14 +374,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceXL),
 
-                // Or Divider
+                // Divider
                 OrDivider(text: AppStrings.orSignUpWith)
                     .animate()
                     .fadeIn(duration: 400.ms, delay: 1000.ms),
 
                 const SizedBox(height: AppDimensions.spaceLG),
 
-                // Social Login Buttons
+                // Social Login
                 SocialLoginRow(
                   onGooglePressed: _handleGoogleSignUp,
                   onApplePressed: _handleAppleSignUp,
@@ -457,20 +398,13 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   child: Text.rich(
                     TextSpan(
                       text: '${AppStrings.alreadyHaveAccount} ',
-                      style: AppTextStyles.bodyMedium(
-                        color: AppColors.textSecondaryDark,
-                      ),
+                      style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                       children: [
                         WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
                           child: GestureDetector(
                             onTap: () => context.push(AppRoutes.login),
-                            child: Text(
-                              AppStrings.logIn,
-                              style: AppTextStyles.bodyMedium(
-                                color: AppColors.primary,
-                              ),
-                            ),
+                            child: Text(AppStrings.logIn, style: AppTextStyles.bodyMedium(color: AppColors.primary)),
                           ),
                         ),
                       ],
