@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -376,8 +378,8 @@ class _KycScreenState extends State<KycScreen> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-                    child: Image.network(
-                      image.path,
+                    child: Image.file(
+                      File(image.path),
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,
@@ -501,8 +503,8 @@ class _KycScreenState extends State<KycScreen> {
             child: _profilePhoto != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-                    child: Image.network(
-                      _profilePhoto!.path,
+                    child: Image.file(
+                      File(_profilePhoto!.path),
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,

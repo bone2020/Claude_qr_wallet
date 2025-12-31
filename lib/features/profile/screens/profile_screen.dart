@@ -219,14 +219,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String phone,
     String? profilePhoto,
   }) {
-    // Generate initials from name
+    // Generate initials from name safely
     String initials = 'U';
     if (userName.isNotEmpty) {
-      final parts = userName.split(' ');
-      if (parts.length >= 2) {
+      final parts = userName.split(' ').where((p) => p.isNotEmpty).toList();
+      if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
         initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-      } else {
-        initials = userName[0].toUpperCase();
+      } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        initials = parts[0][0].toUpperCase();
       }
     }
 

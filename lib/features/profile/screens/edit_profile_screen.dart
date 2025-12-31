@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -220,8 +222,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 child: _newPhoto != null
                     ? ClipOval(
-                        child: Image.network(
-                          _newPhoto!.path,
+                        child: Image.file(
+                          File(_newPhoto!.path),
                           fit: BoxFit.cover,
                           width: 120,
                           height: 120,

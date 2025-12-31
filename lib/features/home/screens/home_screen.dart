@@ -26,6 +26,13 @@ class HomeScreen extends ConsumerWidget {
     return status.toString().split('.').last;
   }
 
+  /// Safely extract first name from full name
+  String _getFirstName(String? fullName) {
+    if (fullName == null || fullName.isEmpty) return 'User';
+    final parts = fullName.split(' ');
+    return parts.isNotEmpty ? parts.first : 'User';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get real data from providers
@@ -33,7 +40,7 @@ class HomeScreen extends ConsumerWidget {
     final walletState = ref.watch(walletNotifierProvider);
     final recentTransactions = ref.watch(recentTransactionsProvider);
 
-    final userName = user?.fullName?.split(' ').first ?? 'User';
+    final userName = _getFirstName(user?.fullName);
     final balance = walletState.balance;
     final currency = walletState.currencySymbol;
     final walletId = walletState.walletId;

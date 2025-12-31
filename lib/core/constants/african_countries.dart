@@ -521,20 +521,19 @@ class AfricanCountries {
 
   /// Get country by ISO code
   static AfricanCountry? getByCode(String code) {
-    try {
-      return all.firstWhere((c) => c.code == code.toUpperCase());
-    } catch (e) {
-      return null;
+    final upperCode = code.toUpperCase();
+    for (final country in all) {
+      if (country.code == upperCode) return country;
     }
+    return null;
   }
 
   /// Get country by dial code
   static AfricanCountry? getByDialCode(String dialCode) {
-    try {
-      return all.firstWhere((c) => c.dialCode == dialCode);
-    } catch (e) {
-      return null;
+    for (final country in all) {
+      if (country.dialCode == dialCode) return country;
     }
+    return null;
   }
 
   /// Default country (Nigeria)
