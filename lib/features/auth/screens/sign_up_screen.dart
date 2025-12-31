@@ -30,7 +30,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   bool _agreedToTerms = false;
   bool _isLoading = false;
   CountryCode _selectedCountry = AfricanCountryCodes.defaultCountry;
-  final _phoneFieldKey = GlobalKey<PhoneInputFieldState>();
 
   @override
   void dispose() {
@@ -303,7 +302,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
         // Phone Number with Country Picker
         PhoneInputField(
-          key: _phoneFieldKey,
           controller: _phoneController,
           label: AppStrings.phoneNumber,
           validator: _validatePhone,
