@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/wallet_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
 /// Confirm send screen showing transaction summary
-class ConfirmSendScreen extends StatefulWidget {
+class ConfirmSendScreen extends ConsumerStatefulWidget {
   final String recipientWalletId;
   final String recipientName;
   final double amount;
@@ -24,10 +26,10 @@ class ConfirmSendScreen extends StatefulWidget {
   });
 
   @override
-  State<ConfirmSendScreen> createState() => _ConfirmSendScreenState();
+  ConsumerState<ConfirmSendScreen> createState() => _ConfirmSendScreenState();
 }
 
-class _ConfirmSendScreenState extends State<ConfirmSendScreen> {
+class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   final _amountController = TextEditingController();
   bool _isLoading = false;
   
@@ -75,13 +77,31 @@ class _ConfirmSendScreenState extends State<ConfirmSendScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement actual send transaction
-      await Future.delayed(const Duration(seconds: 2));
+      // Get wallet service and send money
+      final walletService = ref.read(walletServiceProvider);
+      final result = await walletService.sendMoney(
+        recipientWalletId: widget.recipientWalletId,
+        amount: _amount,
+        note: widget.note,
+      );
 
       if (!mounted) return;
 
-      // Show success dialog
-      _showSuccessDialog();
+      if (result.success) {
+        // Refresh wallet and transactions
+        ref.read(walletNotifierProvider.notifier).refreshWallet();
+        ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+
+        // Show success dialog
+        _showSuccessDialog();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Transaction failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

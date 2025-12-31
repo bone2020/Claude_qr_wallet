@@ -167,9 +167,7 @@ class HomeScreen extends ConsumerWidget {
         QuickActionButton(
           icon: Iconsax.add_circle,
           label: AppStrings.addMoney,
-          onTap: () {
-            // TODO: Navigate to add money screen
-          },
+          onTap: () => context.push(AppRoutes.addMoney),
         ),
         QuickActionButton(
           icon: Iconsax.money_send,

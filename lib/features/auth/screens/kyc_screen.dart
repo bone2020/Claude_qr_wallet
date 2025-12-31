@@ -2,21 +2,24 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/user_service.dart';
+import '../../../providers/auth_provider.dart';
 
 /// KYC screen for identity verification
-class KycScreen extends StatefulWidget {
+class KycScreen extends ConsumerStatefulWidget {
   const KycScreen({super.key});
 
   @override
-  State<KycScreen> createState() => _KycScreenState();
+  ConsumerState<KycScreen> createState() => _KycScreenState();
 }
 
-class _KycScreenState extends State<KycScreen> {
+class _KycScreenState extends ConsumerState<KycScreen> {
   final _imagePicker = ImagePicker();
 
   String? _selectedIdType;
@@ -165,14 +168,28 @@ class _KycScreenState extends State<KycScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Upload images to Firebase Storage and save KYC data
-      // TODO: Integrate with Smile ID for verification
-      await Future.delayed(const Duration(seconds: 2));
+      // Upload KYC documents to Firebase Storage
+      final userService = UserService();
+      final result = await userService.uploadKycDocuments(
+        idFront: File(_idFrontImage!.path),
+        idBack: _idBackImage != null ? File(_idBackImage!.path) : null,
+        idType: _selectedIdType!,
+        dateOfBirth: _dateOfBirth!,
+        selfie: _profilePhoto != null ? File(_profilePhoto!.path) : null,
+      );
 
       if (!mounted) return;
 
-      // Navigate to main screen
-      context.go(AppRoutes.main);
+      if (result.success) {
+        // Update local user state if user data was returned
+        if (result.user != null) {
+          ref.read(authNotifierProvider.notifier).updateUser(result.user!);
+        }
+        // Navigate to main screen
+        context.go(AppRoutes.main);
+      } else {
+        _showError(result.error ?? 'Failed to upload KYC documents');
+      }
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString());

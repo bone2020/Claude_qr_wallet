@@ -18,6 +18,7 @@ import '../../features/transactions/screens/transactions_screen.dart';
 import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
+import '../../features/wallet/screens/add_money_screen.dart';
 
 /// Route names
 class AppRoutes {
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String scanQr = '/scan-qr';
   static const String confirmSend = '/confirm-send';
   static const String receiveMoney = '/receive-money';
+  static const String addMoney = '/add-money';
   static const String transactions = '/transactions';
   static const String transactionDetails = '/transaction-details';
   static const String profile = '/profile';
@@ -136,6 +138,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.receiveMoney,
         name: 'receiveMoney',
         builder: (context, state) => const ReceiveMoneyScreen(),
+      ),
+
+      // Add Money Screen
+      GoRoute(
+        path: AppRoutes.addMoney,
+        name: 'addMoney',
+        builder: (context, state) => const AddMoneyScreen(),
       ),
 
       // Transaction Details Screen
