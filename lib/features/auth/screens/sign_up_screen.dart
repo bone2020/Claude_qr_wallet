@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../widgets/country_codes.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/phone_input_field.dart';
 import '../widgets/social_login_button.dart';
 
 /// Sign up screen for new user registration
@@ -27,7 +29,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   bool _agreedToTerms = false;
   bool _isLoading = false;
-  AfricanCountry _selectedCountry = AfricanCountries.defaultCountry;
+  CountryCode _selectedCountry = AfricanCountryCodes.defaultCountry;
+  final _phoneFieldKey = GlobalKey<PhoneInputFieldState>();
 
   @override
   void dispose() {
@@ -61,15 +64,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
-    // African phone numbers vary: 7-11 digits depending on country
-    // Ghana: 9 digits, Nigeria: 10 digits, Kenya: 9 digits, etc.
-    if (value.length < 7 || value.length > 11) {
-      return AppStrings.errorInvalidPhone;
-    }
-    return null;
+    // Use country-specific validation from the selected country
+    return _selectedCountry.getValidationError(value ?? '');
   }
 
   String? _validatePassword(String? value) {
@@ -305,14 +301,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
         const SizedBox(height: AppDimensions.spaceMD),
 
-        // Phone Number
-        PhoneTextField(
+        // Phone Number with Country Picker
+        PhoneInputField(
+          key: _phoneFieldKey,
           controller: _phoneController,
+          label: AppStrings.phoneNumber,
           validator: _validatePhone,
           initialCountry: _selectedCountry,
           onCountryChanged: (country) {
             setState(() => _selectedCountry = country);
           },
+          textInputAction: TextInputAction.next,
         ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
 
         const SizedBox(height: AppDimensions.spaceMD),
