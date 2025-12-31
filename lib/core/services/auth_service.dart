@@ -1,7 +1,11 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:convert';
 import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models/user_model.dart';
 import '../../models/wallet_model.dart';
@@ -185,6 +189,105 @@ class AuthService {
 
         return AuthResult.success(userModel, isNewUser: true);
       }
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_getAuthErrorMessage(e.code));
+    } catch (e) {
+      return AuthResult.failure(e.toString());
+    }
+  }
+
+  // ============================================================
+  // APPLE SIGN IN
+  // ============================================================
+
+  /// Generate a random string for nonce
+  String _generateNonce([int length = 32]) {
+    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  /// Returns the sha256 hash of [input] in hex notation.
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  /// Sign in with Apple
+  Future<AuthResult> signInWithApple() async {
+    try {
+      // Generate nonce for security
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
+
+      // Request Apple sign in
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+
+      // Create OAuth credential
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      // Sign in to Firebase with the credential
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      final user = userCredential.user;
+
+      if (user == null) {
+        return AuthResult.failure('Failed to sign in with Apple');
+      }
+
+      // Check if user exists in Firestore
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+      if (userDoc.exists) {
+        // Existing user
+        final userModel = UserModel.fromJson(userDoc.data()!);
+        return AuthResult.success(userModel);
+      } else {
+        // New user - create documents
+        final walletId = _generateWalletId();
+
+        // Apple may not return name on subsequent sign-ins, so we use what we have
+        final fullName = appleCredential.givenName != null && appleCredential.familyName != null
+            ? '${appleCredential.givenName} ${appleCredential.familyName}'
+            : user.displayName ?? 'User';
+
+        final userModel = UserModel(
+          id: user.uid,
+          fullName: fullName,
+          email: user.email ?? appleCredential.email ?? '',
+          phoneNumber: user.phoneNumber ?? '',
+          walletId: walletId,
+          createdAt: DateTime.now(),
+        );
+
+        await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+
+        final walletModel = WalletModel(
+          id: user.uid,
+          walletId: walletId,
+          userId: user.uid,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+
+        await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+
+        return AuthResult.success(userModel, isNewUser: true);
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return AuthResult.failure('Apple sign in cancelled');
+      }
+      return AuthResult.failure('Apple sign in failed: ${e.message}');
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {

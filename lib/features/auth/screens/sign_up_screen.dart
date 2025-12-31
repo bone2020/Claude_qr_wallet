@@ -190,8 +190,43 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
-  void _handleAppleSignUp() {
-    // TODO: Implement Apple sign up (requires Apple Developer account setup)
+  Future<void> _handleAppleSignUp() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ref.read(authNotifierProvider.notifier).signInWithApple();
+
+      if (!mounted) return;
+
+      if (result.success) {
+        if (result.isNewUser) {
+          // New user - navigate to KYC
+          context.go(AppRoutes.kyc);
+        } else {
+          // Existing user - navigate to home
+          context.go(AppRoutes.home);
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Apple sign in failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -403,7 +438,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         const SizedBox(height: AppDimensions.spaceLG),
         SocialLoginRow(
           onGooglePressed: () => _handleGoogleSignUp(),
-          onApplePressed: _handleAppleSignUp,
+          onApplePressed: () => _handleAppleSignUp(),
         ),
       ],
     );

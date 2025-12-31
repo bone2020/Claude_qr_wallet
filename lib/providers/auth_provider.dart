@@ -150,8 +150,24 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
   /// Sign in with Google
   Future<AuthResult> signInWithGoogle() async {
     state = state.copyWith(authState: AuthState.loading);
-    
+
     final result = await _authService.signInWithGoogle();
+
+    if (result.success && result.user != null) {
+      await _localStorage.saveUser(result.user!);
+      state = AuthStateData.authenticated(result.user!);
+    } else {
+      state = state.copyWith(authState: AuthState.unauthenticated);
+    }
+
+    return result;
+  }
+
+  /// Sign in with Apple
+  Future<AuthResult> signInWithApple() async {
+    state = state.copyWith(authState: AuthState.loading);
+
+    final result = await _authService.signInWithApple();
 
     if (result.success && result.user != null) {
       await _localStorage.saveUser(result.user!);

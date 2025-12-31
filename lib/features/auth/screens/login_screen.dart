@@ -123,8 +123,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _handleAppleLogin() {
-    // TODO: Implement Apple login (requires Apple Developer account setup)
+  Future<void> _handleAppleLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ref.read(authNotifierProvider.notifier).signInWithApple();
+
+      if (!mounted) return;
+
+      if (result.success) {
+        context.go(AppRoutes.home);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error ?? 'Apple sign in failed'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _handleForgotPassword() {
@@ -290,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         const SizedBox(height: AppDimensions.spaceLG),
         SocialLoginRow(
           onGooglePressed: () => _handleGoogleLogin(),
-          onApplePressed: _handleAppleLogin,
+          onApplePressed: () => _handleAppleLogin(),
         ),
       ],
     );
