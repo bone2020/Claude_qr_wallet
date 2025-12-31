@@ -7,6 +7,8 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
+import '../widgets/phone_input_field.dart';
+import '../widgets/country_codes.dart';
 import '../widgets/social_login_button.dart';
 
 /// Sign up screen for new user registration
@@ -24,10 +26,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _phoneFieldKey = GlobalKey<PhoneInputFieldState>();
 
   bool _agreedToTerms = false;
   bool _isLoading = false;
-  AfricanCountry _selectedCountry = AfricanCountries.defaultCountry;
+  CountryCode _selectedCountry = AfricanCountryCodes.defaultCountry;
 
   @override
   void dispose() {
@@ -60,16 +63,6 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     return null;
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
-    }
-    if (value.length < 10) {
-      return AppStrings.errorInvalidPhone;
-    }
-    return null;
-  }
-
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return AppStrings.errorFieldRequired;
@@ -90,6 +83,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     return null;
   }
 
+  /// Get full phone number with country code
+  String get _fullPhoneNumber {
+    return '${_selectedCountry.dialCode}${_phoneController.text}';
+  }
+
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
@@ -104,29 +102,34 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
     setState(() => _isLoading = true);
 
-    // Build full phone number with country code
-    final fullPhoneNumber = '${_selectedCountry.dialCode}${_phoneController.text.trim()}';
-
     try {
-      // Call the auth provider to sign up with Firebase
-      final result = await ref.read(authNotifierProvider.notifier).signUp(
+      // Call Firebase Auth through the provider
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final result = await authNotifier.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: _fullNameController.text.trim(),
-        phoneNumber: fullPhoneNumber,
-        countryCode: _selectedCountry.code,
-        currencyCode: _selectedCountry.currencyCode,
+        phoneNumber: _fullPhoneNumber,
       );
 
       if (!mounted) return;
 
       if (result.success) {
-        // Navigate to OTP verification for phone verification
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppStrings.successAccountCreated),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Navigate to OTP verification screen
+        // The OTP screen will send verification code and then navigate to KYC
         context.push(
           AppRoutes.otpVerification,
           extra: {
-            'phoneNumber': fullPhoneNumber,
-            'email': _emailController.text,
+            'phoneNumber': _fullPhoneNumber,
+            'email': _emailController.text.trim(),
             'isPhoneVerification': true,
           },
         );
@@ -134,7 +137,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Sign up failed'),
+            content: Text(result.error ?? AppStrings.errorGeneric),
             backgroundColor: AppColors.error,
           ),
         );
@@ -158,18 +161,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final result = await ref.read(authNotifierProvider.notifier).signInWithGoogle();
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final result = await authNotifier.signInWithGoogle();
 
       if (!mounted) return;
 
       if (result.success) {
-        if (result.isNewUser) {
-          // New user - navigate to KYC
-          context.go(AppRoutes.kyc);
-        } else {
-          // Existing user - navigate to home
-          context.go(AppRoutes.home);
-        }
+        // For Google sign-in, user already has verified email
+        // Check if user needs to complete profile/KYC
+        // For now, send to KYC to complete profile
+        context.go(AppRoutes.kyc);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -194,7 +195,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   void _handleAppleSignUp() {
-    // TODO: Implement Apple sign up (requires Apple Developer account setup)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Apple Sign In coming soon'),
+        backgroundColor: AppColors.warning,
+      ),
+    );
   }
 
   @override
@@ -211,219 +217,272 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               children: [
                 const SizedBox(height: AppDimensions.spaceLG),
 
-                // Header
-                _buildHeader()
+                // Back Button
+                IconButton(
+                  onPressed: () => context.pop(),
+                  icon: const Icon(Icons.arrow_back_ios),
+                  color: AppColors.textPrimaryDark,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                )
                     .animate()
                     .fadeIn(duration: 400.ms)
-                    .slideY(begin: -0.2, end: 0, duration: 400.ms),
+                    .slideX(begin: -0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceXL),
+
+                // Title
+                Text(
+                  AppStrings.createAccount,
+                  style: AppTextStyles.displaySmall(),
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 100.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceXS),
+
+                // Subtitle
+                Text(
+                  AppStrings.signUpSubtitle,
+                  style: AppTextStyles.bodyLarge(
+                    color: AppColors.textSecondaryDark,
+                  ),
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 200.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 
-                // Form Fields
-                _buildFormFields(),
+                // Full Name Field
+                CustomTextField(
+                  controller: _fullNameController,
+                  label: AppStrings.fullName,
+                  hintText: AppStrings.fullNameHint,
+                  prefixIcon: const Icon(
+                    Icons.person_outline,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                  validator: _validateFullName,
+                  textInputAction: TextInputAction.next,
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 300.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
 
-                const SizedBox(height: AppDimensions.spaceLG),
+                const SizedBox(height: AppDimensions.spaceMD),
+
+                // Email Field
+                CustomTextField(
+                  controller: _emailController,
+                  label: AppStrings.email,
+                  hintText: AppStrings.emailHint,
+                  prefixIcon: const Icon(
+                    Icons.email_outlined,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: _validateEmail,
+                  textInputAction: TextInputAction.next,
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 400.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceMD),
+
+                // Phone Field with Country Picker
+                PhoneInputField(
+                  key: _phoneFieldKey,
+                  controller: _phoneController,
+                  label: AppStrings.phoneNumber,
+                  initialCountry: _selectedCountry,
+                  onCountryChanged: (country) {
+                    setState(() => _selectedCountry = country);
+                  },
+                  textInputAction: TextInputAction.next,
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 500.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceMD),
+
+                // Password Field
+                CustomTextField(
+                  controller: _passwordController,
+                  label: AppStrings.password,
+                  hintText: AppStrings.passwordHint,
+                  prefixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                  obscureText: true,
+                  validator: _validatePassword,
+                  textInputAction: TextInputAction.next,
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 600.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceMD),
+
+                // Confirm Password Field
+                CustomTextField(
+                  controller: _confirmPasswordController,
+                  label: AppStrings.confirmPassword,
+                  hintText: AppStrings.confirmPasswordHint,
+                  prefixIcon: const Icon(
+                    Icons.lock_outline,
+                    color: AppColors.textSecondaryDark,
+                  ),
+                  obscureText: true,
+                  validator: _validateConfirmPassword,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _handleSignUp(),
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 700.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+
+                const SizedBox(height: AppDimensions.spaceMD),
 
                 // Terms Checkbox
-                _buildTermsCheckbox()
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: Checkbox(
+                        value: _agreedToTerms,
+                        onChanged: (value) {
+                          setState(() => _agreedToTerms = value ?? false);
+                        },
+                        activeColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusXS),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppDimensions.spaceXS),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          text: '${AppStrings.termsAgreement} ',
+                          style: AppTextStyles.bodySmall(
+                            color: AppColors.textSecondaryDark,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: AppStrings.termsAndPrivacy,
+                              style: AppTextStyles.bodySmall(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                )
                     .animate()
-                    .fadeIn(delay: 500.ms, duration: 400.ms),
+                    .fadeIn(duration: 400.ms, delay: 800.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
 
                 const SizedBox(height: AppDimensions.spaceXL),
 
                 // Sign Up Button
-                _buildSignUpButton()
+                SizedBox(
+                  width: double.infinity,
+                  height: AppDimensions.buttonHeightLG,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _handleSignUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.backgroundDark,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusMD),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.backgroundDark,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            AppStrings.signUp,
+                            style: AppTextStyles.labelLarge(
+                              color: AppColors.backgroundDark,
+                            ),
+                          ),
+                  ),
+                )
                     .animate()
-                    .fadeIn(delay: 600.ms, duration: 400.ms)
-                    .slideY(begin: 0.2, end: 0, delay: 600.ms, duration: 400.ms),
+                    .fadeIn(duration: 400.ms, delay: 900.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
 
                 const SizedBox(height: AppDimensions.spaceXL),
 
-                // Social Login
-                _buildSocialLogin()
+                // Or Divider
+                OrDivider(text: AppStrings.orSignUpWith)
                     .animate()
-                    .fadeIn(delay: 700.ms, duration: 400.ms),
+                    .fadeIn(duration: 400.ms, delay: 1000.ms),
+
+                const SizedBox(height: AppDimensions.spaceLG),
+
+                // Social Login Buttons
+                SocialLoginRow(
+                  onGooglePressed: _handleGoogleSignUp,
+                  onApplePressed: _handleAppleSignUp,
+                  isGoogleLoading: _isLoading,
+                )
+                    .animate()
+                    .fadeIn(duration: 400.ms, delay: 1100.ms)
+                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 
-                // Login Link
-                _buildLoginLink()
+                // Already have account
+                Center(
+                  child: Text.rich(
+                    TextSpan(
+                      text: '${AppStrings.alreadyHaveAccount} ',
+                      style: AppTextStyles.bodyMedium(
+                        color: AppColors.textSecondaryDark,
+                      ),
+                      children: [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: GestureDetector(
+                            onTap: () => context.push(AppRoutes.login),
+                            child: Text(
+                              AppStrings.logIn,
+                              style: AppTextStyles.bodyMedium(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
                     .animate()
-                    .fadeIn(delay: 800.ms, duration: 400.ms),
+                    .fadeIn(duration: 400.ms, delay: 1200.ms),
 
                 const SizedBox(height: AppDimensions.spaceLG),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.signUp,
-          style: AppTextStyles.displaySmall(),
-        ),
-        const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          AppStrings.signUpSubtitle,
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFormFields() {
-    return Column(
-      children: [
-        // Full Name
-        CustomTextField(
-          label: AppStrings.fullName,
-          hintText: AppStrings.fullNameHint,
-          controller: _fullNameController,
-          keyboardType: TextInputType.name,
-          textInputAction: TextInputAction.next,
-          validator: _validateFullName,
-        ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
-
-        const SizedBox(height: AppDimensions.spaceMD),
-
-        // Email
-        CustomTextField(
-          hintText: AppStrings.emailHint,
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          validator: _validateEmail,
-        ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
-
-        const SizedBox(height: AppDimensions.spaceMD),
-
-        // Phone Number
-        PhoneTextField(
-          controller: _phoneController,
-          validator: _validatePhone,
-          initialCountry: _selectedCountry,
-          onCountryChanged: (country) {
-            setState(() => _selectedCountry = country);
-          },
-        ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
-
-        const SizedBox(height: AppDimensions.spaceMD),
-
-        // Password
-        PasswordTextField(
-          controller: _passwordController,
-          hintText: AppStrings.passwordHint,
-          textInputAction: TextInputAction.next,
-          validator: _validatePassword,
-        ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
-
-        const SizedBox(height: AppDimensions.spaceMD),
-
-        // Confirm Password
-        PasswordTextField(
-          controller: _confirmPasswordController,
-          hintText: AppStrings.confirmPasswordHint,
-          textInputAction: TextInputAction.done,
-          validator: _validateConfirmPassword,
-        ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
-      ],
-    );
-  }
-
-  Widget _buildTermsCheckbox() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 24,
-          height: 24,
-          child: Checkbox(
-            value: _agreedToTerms,
-            onChanged: (value) {
-              setState(() => _agreedToTerms = value ?? false);
-            },
-          ),
-        ),
-        const SizedBox(width: AppDimensions.spaceXS),
-        Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() => _agreedToTerms = !_agreedToTerms);
-            },
-            child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-                children: [
-                  const TextSpan(text: '${AppStrings.termsAgreement} '),
-                  TextSpan(
-                    text: AppStrings.termsAndPrivacy,
-                    style: AppTextStyles.bodyMedium(color: AppColors.primary),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSignUpButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: AppDimensions.buttonHeightLG,
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _handleSignUp,
-        child: _isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.backgroundDark,
-                ),
-              )
-            : Text(
-                AppStrings.signUp,
-                style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildSocialLogin() {
-    return Column(
-      children: [
-        const OrDivider(text: AppStrings.orSignUpWith),
-        const SizedBox(height: AppDimensions.spaceLG),
-        SocialLoginRow(
-          onGooglePressed: () => _handleGoogleSignUp(),
-          onApplePressed: _handleAppleSignUp,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoginLink() {
-    return Center(
-      child: GestureDetector(
-        onTap: () => context.go(AppRoutes.login),
-        child: RichText(
-          text: TextSpan(
-            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-            children: [
-              const TextSpan(text: '${AppStrings.alreadyHaveAccount} '),
-              TextSpan(
-                text: AppStrings.logIn,
-                style: AppTextStyles.bodyMedium(color: AppColors.primary),
-              ),
-            ],
           ),
         ),
       ),
