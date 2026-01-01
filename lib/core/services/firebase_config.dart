@@ -1,8 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
-/// Firebase configuration options
-/// These values are from your Firebase project: qr-wallet-1993
+/// Firebase configuration options for qr-wallet-1993
 class FirebaseConfig {
   FirebaseConfig._();
 
@@ -33,11 +32,10 @@ class FirebaseConfig {
   }
 
   // ============================================================
-  // FIREBASE CONFIGURATION VALUES FROM qr-wallet-1993
+  // FIREBASE CONFIGURATION - qr-wallet-1993
   // ============================================================
 
-  /// Android Firebase options
-  /// Values from: google-services.json
+  /// Android Firebase options (from google-services.json)
   static const FirebaseOptions _androidOptions = FirebaseOptions(
     apiKey: 'AIzaSyB961nijBwZ0vrgULyERZUtDNI2-hhQRRY',
     appId: '1:123632722078:android:34d26d8cb7235f3a7a5b8f',
@@ -47,11 +45,10 @@ class FirebaseConfig {
   );
 
   /// iOS Firebase options
-  /// Values from: GoogleService-Info.plist
-  /// NOTE: Update these with values from your iOS plist file
+  /// TODO: Update with values from GoogleService-Info.plist when you add iOS
   static const FirebaseOptions _iosOptions = FirebaseOptions(
-    apiKey: 'AIzaSyB961nijBwZ0vrgULyERZUtDNI2-hhQRRY', // Update with iOS API key
-    appId: '1:123632722078:ios:YOUR_IOS_APP_ID', // Update with iOS app ID
+    apiKey: 'AIzaSyB961nijBwZ0vrgULyERZUtDNI2-hhQRRY',
+    appId: '1:123632722078:ios:YOUR_IOS_APP_ID',
     messagingSenderId: '123632722078',
     projectId: 'qr-wallet-1993',
     storageBucket: 'qr-wallet-1993.firebasestorage.app',

@@ -8,7 +8,7 @@ import 'country_codes.dart';
 class PhoneInputField extends StatefulWidget {
   final TextEditingController? controller;
   final String? Function(String?)? validator;
-  final void Function(String fullNumber, CountryCode country)? onChanged;
+  final void Function(String fullNumber)? onChanged;
   final void Function(CountryCode)? onCountryChanged;
   final CountryCode? initialCountry;
   final String? label;
@@ -32,32 +32,16 @@ class PhoneInputField extends StatefulWidget {
   });
 
   @override
-  State<PhoneInputField> createState() => PhoneInputFieldState();
+  State<PhoneInputField> createState() => _PhoneInputFieldState();
 }
 
-class PhoneInputFieldState extends State<PhoneInputField> {
+class _PhoneInputFieldState extends State<PhoneInputField> {
   late CountryCode _selectedCountry;
 
   @override
   void initState() {
     super.initState();
     _selectedCountry = widget.initialCountry ?? AfricanCountryCodes.defaultCountry;
-  }
-
-  /// Get the selected country
-  CountryCode get selectedCountry => _selectedCountry;
-
-  /// Get full phone number with country code
-  String get fullPhoneNumber {
-    return '${_selectedCountry.dialCode}${widget.controller?.text ?? ''}';
-  }
-
-  /// Validate the phone number
-  String? validatePhone(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Phone number is required';
-    }
-    return _selectedCountry.getValidationError(value);
   }
 
   void _showCountryPicker() {
@@ -84,8 +68,13 @@ class PhoneInputFieldState extends State<PhoneInputField> {
 
   void _notifyChange() {
     if (widget.onChanged != null && widget.controller != null) {
-      widget.onChanged!(fullPhoneNumber, _selectedCountry);
+      final fullNumber = '${_selectedCountry.dialCode}${widget.controller!.text}';
+      widget.onChanged!(fullNumber);
     }
+  }
+
+  String get fullPhoneNumber {
+    return '${_selectedCountry.dialCode}${widget.controller?.text ?? ''}';
   }
 
   @override
@@ -107,16 +96,16 @@ class PhoneInputFieldState extends State<PhoneInputField> {
           focusNode: widget.focusNode,
           textInputAction: widget.textInputAction,
           onFieldSubmitted: widget.onFieldSubmitted,
-          validator: widget.validator ?? validatePhone,
+          validator: widget.validator,
           onChanged: (_) => _notifyChange(),
           style: AppTextStyles.inputText(),
           cursorColor: AppColors.primary,
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(_selectedCountry.maxLength),
+            LengthLimitingTextInputFormatter(15),
           ],
           decoration: InputDecoration(
-            hintText: 'Enter ${_selectedCountry.minLength}-${_selectedCountry.maxLength} digits',
+            hintText: 'Enter phone number',
             hintStyle: AppTextStyles.inputHint(),
             prefixIcon: GestureDetector(
               onTap: widget.enabled ? _showCountryPicker : null,
@@ -185,7 +174,15 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
 
   void _filterCountries(String query) {
     setState(() {
-      _filteredCountries = AfricanCountryCodes.search(query);
+      if (query.isEmpty) {
+        _filteredCountries = AfricanCountryCodes.countries;
+      } else {
+        _filteredCountries = AfricanCountryCodes.countries
+            .where((country) =>
+                country.name.toLowerCase().contains(query.toLowerCase()) ||
+                country.dialCode.contains(query))
+            .toList();
+      }
     });
   }
 
@@ -272,12 +269,6 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
                       color: isSelected
                           ? AppColors.primary
                           : AppColors.textPrimaryDark,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${country.minLength}-${country.maxLength} digits',
-                    style: AppTextStyles.caption(
-                      color: AppColors.textTertiaryDark,
                     ),
                   ),
                   trailing: Row(
