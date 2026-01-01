@@ -34,6 +34,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
     super.dispose();
   }
 
+  String get _currencySymbol => ref.read(walletNotifierProvider).currencySymbol;
+
   String? _validateAmount(String? value) {
     if (value == null || value.isEmpty) {
       return 'Please enter an amount';
@@ -43,10 +45,10 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
       return 'Please enter a valid amount';
     }
     if (amount < 100) {
-      return 'Minimum amount is ${AppStrings.currencySymbol}100';
+      return 'Minimum amount is ${_currencySymbol}100';
     }
     if (amount > 5000000) {
-      return 'Maximum amount is ${AppStrings.currencySymbol}5,000,000';
+      return 'Maximum amount is ${_currencySymbol}5,000,000';
     }
     return null;
   }
@@ -80,7 +82,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
       if (result.success) {
         // Payment completed successfully
         ref.read(walletNotifierProvider.notifier).refreshWallet();
-        _showSuccess('${AppStrings.currencySymbol}${amount.toStringAsFixed(2)} added to your wallet');
+        _showSuccess('$_currencySymbol${amount.toStringAsFixed(2)} added to your wallet');
         context.pop();
       } else if (result.pending) {
         // Payment is pending (popup shown)
@@ -200,7 +202,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                AppStrings.currencySymbol,
+                _currencySymbol,
                 style: AppTextStyles.displayMedium(color: AppColors.primary),
               ),
               const SizedBox(width: AppDimensions.spaceSM),
@@ -255,7 +257,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
                   border: Border.all(color: AppColors.inputBorderDark),
                 ),
                 child: Text(
-                  '${AppStrings.currencySymbol}${_formatAmount(amount)}',
+                  '$_currencySymbol${_formatAmount(amount)}',
                   style: AppTextStyles.bodyMedium(),
                 ),
               ),
