@@ -19,6 +19,7 @@ import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
+import '../../features/settings/screens/currency_selector_screen.dart';
 
 /// Route names
 class AppRoutes {
@@ -35,6 +36,7 @@ class AppRoutes {
   static const String confirmSend = '/confirm-send';
   static const String receiveMoney = '/receive-money';
   static const String addMoney = '/add-money';
+  static const String currencySelector = '/currency-selector';
   static const String transactions = '/transactions';
   static const String transactionDetails = '/transaction-details';
   static const String profile = '/profile';
@@ -145,6 +147,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.addMoney,
         name: 'addMoney',
         builder: (context, state) => const AddMoneyScreen(),
+      ),
+
+      // Currency Selector Screen
+      GoRoute(
+        path: AppRoutes.currencySelector,
+        name: 'currencySelector',
+        builder: (context, state) => const CurrencySelectorScreen(),
       ),
 
       // Transaction Details Screen

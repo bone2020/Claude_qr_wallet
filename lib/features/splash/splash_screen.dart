@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/router/app_router.dart';
+import '../../providers/currency_provider.dart';
 
 /// Splash screen shown on app launch
 class SplashScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser != null) {
+      // Load user's currency preference
+      await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
+      if (!mounted) return;
+
       // User is logged in, navigate to main screen
       context.go(AppRoutes.main);
     } else {

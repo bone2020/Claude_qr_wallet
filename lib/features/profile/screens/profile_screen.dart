@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/currency_provider.dart';
 
 /// User profile screen
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -149,6 +150,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _buildSection(
               title: 'Preferences',
               children: [
+                _buildCurrencyMenuItem(ref),
                 _buildSwitchItem(
                   icon: Iconsax.moon,
                   title: AppStrings.darkMode,
@@ -406,6 +408,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             inactiveTrackColor: AppColors.inputBorderDark,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCurrencyMenuItem(WidgetRef ref) {
+    final currencyState = ref.watch(currencyNotifierProvider);
+    final currency = currencyState.currency;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.currencySelector),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+        child: Padding(
+          padding: const EdgeInsets.all(AppDimensions.spaceMD),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.inputBackgroundDark,
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                ),
+                child: Center(
+                  child: Text(
+                    currency.flag,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppDimensions.spaceMD),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Currency',
+                      style: AppTextStyles.bodyMedium(),
+                    ),
+                    Text(
+                      '${currency.name} (${currency.symbol})',
+                      style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textTertiaryDark,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

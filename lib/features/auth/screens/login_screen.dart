@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/currency_provider.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/social_login_button.dart';
 
@@ -64,6 +65,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        // Load user's currency preference
+        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
+        if (!mounted) return;
+
         // Navigate to main screen
         context.go(AppRoutes.main);
       } else {
@@ -99,6 +105,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        // Load user's currency preference
+        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
+        if (!mounted) return;
+
         context.go(AppRoutes.main);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -132,7 +143,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        context.go(AppRoutes.home);
+        // Load user's currency preference
+        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
+        if (!mounted) return;
+
+        context.go(AppRoutes.main);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
