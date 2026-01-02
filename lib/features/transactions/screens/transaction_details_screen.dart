@@ -7,7 +7,9 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../models/transaction_model.dart';
 import '../../../providers/currency_provider.dart';
+import '../../../providers/wallet_provider.dart';
 
 /// Transaction details screen
 class TransactionDetailsScreen extends ConsumerWidget {
@@ -17,50 +19,6 @@ class TransactionDetailsScreen extends ConsumerWidget {
     super.key,
     required this.transactionId,
   });
-
-  // Mock data - replace with actual data lookup
-  Map<String, dynamic> _getTransaction(String currencySymbol) => {
-        'id': transactionId,
-        'reference': 'TXN-${DateTime.now().millisecondsSinceEpoch}',
-        'name': 'Sarah Johnson',
-        'walletId': 'QRW-1234-5678',
-        'type': 'receive',
-        'amount': 15000.0,
-        'fee': 0.0,
-        'currency': currencySymbol,
-        'date': DateTime.now().subtract(const Duration(hours: 2)),
-        'status': 'completed',
-        'note': 'Payment for lunch',
-      };
-
-  bool _isCredit(Map<String, dynamic> transaction) =>
-      transaction['type'] == 'receive' || transaction['type'] == 'deposit';
-
-  Color _getStatusColor(Map<String, dynamic> transaction) {
-    switch (transaction['status']) {
-      case 'completed':
-        return AppColors.success;
-      case 'pending':
-        return AppColors.warning;
-      case 'failed':
-        return AppColors.error;
-      default:
-        return AppColors.textSecondaryDark;
-    }
-  }
-
-  IconData _getStatusIcon(Map<String, dynamic> transaction) {
-    switch (transaction['status']) {
-      case 'completed':
-        return Icons.check_circle;
-      case 'pending':
-        return Icons.access_time;
-      case 'failed':
-        return Icons.cancel;
-      default:
-        return Icons.help;
-    }
-  }
 
   String _formatAmount(double amount) {
     final parts = amount.toStringAsFixed(2).split('.');
@@ -82,13 +40,88 @@ class TransactionDetailsScreen extends ConsumerWidget {
     );
   }
 
+  Color _getStatusColor(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.completed:
+        return AppColors.success;
+      case TransactionStatus.pending:
+        return AppColors.warning;
+      case TransactionStatus.failed:
+        return AppColors.error;
+      case TransactionStatus.cancelled:
+        return AppColors.textSecondaryDark;
+    }
+  }
+
+  IconData _getStatusIcon(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.completed:
+        return Icons.check_circle;
+      case TransactionStatus.pending:
+        return Icons.access_time;
+      case TransactionStatus.failed:
+        return Icons.cancel;
+      case TransactionStatus.cancelled:
+        return Icons.block;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currencySymbol = ref.watch(currencyNotifierProvider).currency.symbol;
-    final transaction = _getTransaction(currencySymbol);
-    final isCredit = _isCredit(transaction);
-    final statusColor = _getStatusColor(transaction);
-    final statusIcon = _getStatusIcon(transaction);
+    final walletId = ref.watch(walletNotifierProvider).walletId;
+    final transactionsState = ref.watch(transactionsNotifierProvider);
+
+    // Find the transaction by ID
+    final TransactionModel? transaction = transactionsState.transactions
+        .cast<TransactionModel?>()
+        .firstWhere(
+          (t) => t?.id == transactionId,
+          orElse: () => null,
+        );
+
+    // Handle transaction not found
+    if (transaction == null) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        appBar: AppBar(
+          backgroundColor: AppColors.backgroundDark,
+          leading: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          ),
+          title: Text(
+            AppStrings.transactionDetails,
+            style: AppTextStyles.headlineMedium(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 64,
+                color: AppColors.textTertiaryDark,
+              ),
+              const SizedBox(height: AppDimensions.spaceMD),
+              Text(
+                'Transaction not found',
+                style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final isCredit = transaction.isCredit(walletId);
+    final statusColor = _getStatusColor(transaction.status);
+    final statusIcon = _getStatusIcon(transaction.status);
+    final counterpartyName = transaction.getCounterpartyName(walletId);
+    final counterpartyWalletId = isCredit
+        ? transaction.senderWalletId
+        : transaction.receiverWalletId;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -108,7 +141,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         child: Column(
           children: [
             // Amount Card
-            _buildAmountCard(transaction, isCredit)
+            _buildAmountCard(transaction, isCredit, currencySymbol)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.1, end: 0, duration: 400.ms),
@@ -116,16 +149,21 @@ class TransactionDetailsScreen extends ConsumerWidget {
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Status
-            _buildStatusBadge(transaction, statusColor, statusIcon)
+            _buildStatusBadge(transaction.status, statusColor, statusIcon)
                 .animate()
                 .fadeIn(delay: 100.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Details Card
-            _buildDetailsCard(context, transaction, isCredit)
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms),
+            _buildDetailsCard(
+              context,
+              transaction,
+              isCredit,
+              counterpartyName,
+              counterpartyWalletId,
+              currencySymbol,
+            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
           ],
@@ -134,10 +172,8 @@ class TransactionDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAmountCard(Map<String, dynamic> transaction, bool isCredit) {
-    final amount = transaction['amount'] as double;
-    final currency = transaction['currency'] as String;
-
+  Widget _buildAmountCard(
+      TransactionModel transaction, bool isCredit, String currencySymbol) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceXL),
@@ -177,13 +213,13 @@ class TransactionDetailsScreen extends ConsumerWidget {
                 ),
               ),
               Text(
-                currency,
+                currencySymbol,
                 style: AppTextStyles.displaySmall(
                   color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
               Text(
-                _formatAmount(amount),
+                _formatAmount(transaction.amount),
                 style: AppTextStyles.displayMedium(
                   color: isCredit ? AppColors.success : AppColors.error,
                 ),
@@ -204,7 +240,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildStatusBadge(
-      Map<String, dynamic> transaction, Color statusColor, IconData statusIcon) {
+      TransactionStatus status, Color statusColor, IconData statusIcon) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.spaceMD,
@@ -224,7 +260,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            transaction['status'].toString().toUpperCase(),
+            status.name.toUpperCase(),
             style: AppTextStyles.labelSmall(color: statusColor),
           ),
         ],
@@ -233,9 +269,13 @@ class TransactionDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildDetailsCard(
-      BuildContext context, Map<String, dynamic> transaction, bool isCredit) {
-    final date = transaction['date'] as DateTime;
-
+    BuildContext context,
+    TransactionModel transaction,
+    bool isCredit,
+    String counterpartyName,
+    String counterpartyWalletId,
+    String currencySymbol,
+  ) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceLG),
       decoration: BoxDecoration(
@@ -247,8 +287,8 @@ class TransactionDetailsScreen extends ConsumerWidget {
           // From/To
           _buildDetailRow(
             label: isCredit ? AppStrings.from : AppStrings.to,
-            value: transaction['name'],
-            subtitle: transaction['walletId'],
+            value: counterpartyName,
+            subtitle: counterpartyWalletId,
           ),
 
           _buildDivider(),
@@ -256,8 +296,8 @@ class TransactionDetailsScreen extends ConsumerWidget {
           // Date & Time
           _buildDetailRow(
             label: AppStrings.date,
-            value: DateFormat('MMM d, yyyy').format(date),
-            subtitle: DateFormat.jm().format(date),
+            value: DateFormat('MMM d, yyyy').format(transaction.createdAt),
+            subtitle: DateFormat.jm().format(transaction.createdAt),
           ),
 
           _buildDivider(),
@@ -265,10 +305,10 @@ class TransactionDetailsScreen extends ConsumerWidget {
           // Transaction ID
           _buildDetailRow(
             label: AppStrings.transactionId,
-            value: transaction['reference'],
+            value: transaction.reference ?? transaction.id,
             onTap: () => _copyToClipboard(
               context,
-              transaction['reference'],
+              transaction.reference ?? transaction.id,
               'Transaction ID',
             ),
             trailing: const Icon(
@@ -279,22 +319,30 @@ class TransactionDetailsScreen extends ConsumerWidget {
           ),
 
           // Note (if present)
-          if (transaction['note'] != null &&
-              transaction['note'].toString().isNotEmpty) ...[
+          if (transaction.note != null && transaction.note!.isNotEmpty) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.note,
-              value: transaction['note'],
+              value: transaction.note!,
             ),
           ],
 
           // Fee (if present)
-          if ((transaction['fee'] as double) > 0) ...[
+          if (transaction.fee > 0) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.transactionFee,
-              value:
-                  '${transaction['currency']}${_formatAmount(transaction['fee'])}',
+              value: '$currencySymbol${_formatAmount(transaction.fee)}',
+            ),
+          ],
+
+          // Failure reason (if failed)
+          if (transaction.status == TransactionStatus.failed &&
+              transaction.failureReason != null) ...[
+            _buildDivider(),
+            _buildDetailRow(
+              label: 'Failure Reason',
+              value: transaction.failureReason!,
             ),
           ],
         ],

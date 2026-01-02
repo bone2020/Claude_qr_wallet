@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/wallet_provider.dart';
 
 /// Receive money screen with QR code display
-class ReceiveMoneyScreen extends StatelessWidget {
+class ReceiveMoneyScreen extends ConsumerWidget {
   const ReceiveMoneyScreen({super.key});
 
-  // Mock data - replace with actual user data
-  static const String _walletId = 'QRW-8472-9103';
-  static const String _userName = 'John Doe';
-
-  String get _qrData => 'qrwallet://pay?id=$_walletId&name=${Uri.encodeComponent(_userName)}';
-
-  void _copyWalletId(BuildContext context) {
-    Clipboard.setData(const ClipboardData(text: _walletId));
+  void _copyWalletId(BuildContext context, String walletId) {
+    Clipboard.setData(ClipboardData(text: walletId));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(AppStrings.walletIdCopied),
@@ -49,7 +46,15 @@ class ReceiveMoneyScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get real data from providers
+    final walletId = ref.watch(walletNotifierProvider).walletId;
+    final user = ref.watch(userProvider);
+    final userName = user?.fullName ?? 'User';
+
+    // Generate QR data with real values
+    final qrData = 'qrwallet://pay?id=$walletId&name=${Uri.encodeComponent(userName)}';
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -68,7 +73,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
               const Spacer(),
 
               // QR Code Card
-              _buildQrCodeCard(context)
+              _buildQrCodeCard(context, qrData, userName)
                   .animate()
                   .fadeIn(duration: 500.ms)
                   .scale(
@@ -81,7 +86,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
               const SizedBox(height: AppDimensions.spaceXXL),
 
               // Wallet ID
-              _buildWalletIdCard(context)
+              _buildWalletIdCard(context, walletId)
                   .animate()
                   .fadeIn(delay: 200.ms, duration: 400.ms)
                   .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
@@ -101,7 +106,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQrCodeCard(BuildContext context) {
+  Widget _buildQrCodeCard(BuildContext context, String qrData, String userName) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceXL),
       decoration: BoxDecoration(
@@ -119,7 +124,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
         children: [
           // QR Code
           QrImageView(
-            data: _qrData,
+            data: qrData,
             version: QrVersions.auto,
             size: AppDimensions.qrCodeSize,
             backgroundColor: Colors.white,
@@ -141,7 +146,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
 
           // User Name
           Text(
-            _userName,
+            userName,
             style: AppTextStyles.headlineMedium(color: AppColors.backgroundDark),
           ),
 
@@ -156,9 +161,9 @@ class ReceiveMoneyScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWalletIdCard(BuildContext context) {
+  Widget _buildWalletIdCard(BuildContext context, String walletId) {
     return GestureDetector(
-      onTap: () => _copyWalletId(context),
+      onTap: () => _copyWalletId(context, walletId),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.spaceLG,
@@ -181,7 +186,7 @@ class ReceiveMoneyScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _walletId,
+                  walletId.isNotEmpty ? walletId : 'Loading...',
                   style: AppTextStyles.bodyLarge(color: AppColors.primary),
                 ),
               ],

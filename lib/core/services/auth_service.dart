@@ -55,7 +55,7 @@ class AuthService {
       await user.updateDisplayName(fullName);
 
       // Generate unique wallet ID
-      final walletId = _generateWalletId();
+      final walletId = await _generateUniqueWalletId();
 
       // Create user document in Firestore
       final userModel = UserModel(
@@ -163,7 +163,7 @@ class AuthService {
         return AuthResult.success(userModel);
       } else {
         // New user - create documents
-        final walletId = _generateWalletId();
+        final walletId = await _generateUniqueWalletId();
 
         final userModel = UserModel(
           id: user.uid,
@@ -253,7 +253,7 @@ class AuthService {
         return AuthResult.success(userModel);
       } else {
         // New user - create documents
-        final walletId = _generateWalletId();
+        final walletId = await _generateUniqueWalletId();
 
         // Apple may not return name on subsequent sign-ins, so we use what we have
         final fullName = appleCredential.givenName != null && appleCredential.familyName != null
@@ -424,12 +424,28 @@ class AuthService {
   // HELPER METHODS
   // ============================================================
 
-  /// Generate unique wallet ID
-  String _generateWalletId() {
-    final random = Random();
-    final part1 = random.nextInt(9000) + 1000;
-    final part2 = random.nextInt(9000) + 1000;
-    return 'QRW-$part1-$part2';
+  /// Generate unique wallet ID with Firestore uniqueness check
+  Future<String> _generateUniqueWalletId() async {
+    String walletId;
+    bool exists = true;
+
+    while (exists) {
+      final random = Random.secure();
+      final part1 = random.nextInt(90000) + 10000;  // 5 digits: 10000-99999
+      final part2 = random.nextInt(90000) + 10000;  // 5 digits: 10000-99999
+      walletId = 'QRW-$part1-$part2';
+
+      // Check if wallet ID already exists in Firestore
+      final querySnapshot = await _firestore
+          .collection('wallets')
+          .where('walletId', isEqualTo: walletId)
+          .limit(1)
+          .get();
+
+      exists = querySnapshot.docs.isNotEmpty;
+    }
+
+    return walletId;
   }
 
   /// Get user-friendly error message
