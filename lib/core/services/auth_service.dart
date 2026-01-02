@@ -426,14 +426,11 @@ class AuthService {
 
   /// Generate unique wallet ID with Firestore uniqueness check
   Future<String> _generateUniqueWalletId() async {
-    String walletId;
-    bool exists = true;
-
-    while (exists) {
+    while (true) {
       final random = Random.secure();
       final part1 = random.nextInt(90000) + 10000;  // 5 digits: 10000-99999
       final part2 = random.nextInt(90000) + 10000;  // 5 digits: 10000-99999
-      walletId = 'QRW-$part1-$part2';
+      final walletId = 'QRW-$part1-$part2';
 
       // Check if wallet ID already exists in Firestore
       final querySnapshot = await _firestore
@@ -442,10 +439,11 @@ class AuthService {
           .limit(1)
           .get();
 
-      exists = querySnapshot.docs.isNotEmpty;
+      // Return if unique, otherwise loop again
+      if (querySnapshot.docs.isEmpty) {
+        return walletId;
+      }
     }
-
-    return walletId;
   }
 
   /// Get user-friendly error message

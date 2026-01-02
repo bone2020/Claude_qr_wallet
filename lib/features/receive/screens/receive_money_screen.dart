@@ -49,7 +49,7 @@ class ReceiveMoneyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Get real data from providers
     final walletId = ref.watch(walletNotifierProvider).walletId;
-    final user = ref.watch(userProvider);
+    final user = ref.watch(currentUserProvider);
     final userName = user?.fullName ?? 'User';
 
     // Generate QR data with real values
