@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/services/currency_service.dart';
 import '../core/services/services.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
@@ -47,8 +48,8 @@ class WalletState {
 
   double get balance => wallet?.balance ?? 0.0;
   String get walletId => wallet?.walletId ?? '';
-  String get currency => wallet?.currency ?? 'NGN';
-  String get currencySymbol => wallet?.currencySymbol ?? '₦';
+  String get currency => wallet?.currency ?? CurrencyService.defaultCurrency.code;
+  String get currencySymbol => wallet?.currencySymbol ?? CurrencyService.defaultCurrency.symbol;
 }
 
 /// Wallet notifier

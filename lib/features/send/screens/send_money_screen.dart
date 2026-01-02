@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/currency_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
 /// Send money screen
-class SendMoneyScreen extends StatefulWidget {
+class SendMoneyScreen extends ConsumerStatefulWidget {
   const SendMoneyScreen({super.key});
 
   @override
-  State<SendMoneyScreen> createState() => _SendMoneyScreenState();
+  ConsumerState<SendMoneyScreen> createState() => _SendMoneyScreenState();
 }
 
-class _SendMoneyScreenState extends State<SendMoneyScreen> {
+class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _walletIdController = TextEditingController();
   final _amountController = TextEditingController();
@@ -206,7 +208,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         prefixIcon: Padding(
                           padding: const EdgeInsets.all(AppDimensions.spaceMD),
                           child: Text(
-                            '₦',
+                            ref.watch(currencyNotifierProvider).currency.symbol,
                             style: AppTextStyles.headlineMedium(color: AppColors.primary),
                           ),
                         ),

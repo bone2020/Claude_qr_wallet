@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
@@ -34,11 +35,11 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _isLoading = false;
   
   // Mock fee calculation
-  double get _fee => (_amount * 0.01).clamp(10, 100); // 1% fee, min ₦10, max ₦100
+  double get _fee => (_amount * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
   double get _amount => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
   double get _total => _amount + _fee;
-  
-  final String _currency = '₦';
+
+  String get _currency => ref.watch(currencyNotifierProvider).currency.symbol;
 
   @override
   void initState() {

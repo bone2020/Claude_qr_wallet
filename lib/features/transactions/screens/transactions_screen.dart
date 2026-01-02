@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/currency_provider.dart';
 import '../../home/widgets/transaction_tile.dart';
 
 /// Transactions history screen
-class TransactionsScreen extends StatefulWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
 
   @override
-  State<TransactionsScreen> createState() => _TransactionsScreenState();
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends State<TransactionsScreen>
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
-  final String _currency = '₦';
 
   // Mock data - replace with actual data from providers
   final List<Map<String, dynamic>> _allTransactions = [
@@ -165,7 +165,7 @@ class _TransactionsScreenState extends State<TransactionsScreen>
             name: transaction['name'],
             type: transaction['type'],
             amount: transaction['amount'],
-            currency: _currency,
+            currency: ref.watch(currencyNotifierProvider).currency.symbol,
             date: transaction['date'],
             status: transaction['status'],
             onTap: () {

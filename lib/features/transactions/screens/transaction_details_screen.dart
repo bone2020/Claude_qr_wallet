@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../providers/currency_provider.dart';
 
 /// Transaction details screen
-class TransactionDetailsScreen extends StatelessWidget {
+class TransactionDetailsScreen extends ConsumerWidget {
   final String transactionId;
 
   const TransactionDetailsScreen({
@@ -17,7 +19,7 @@ class TransactionDetailsScreen extends StatelessWidget {
   });
 
   // Mock data - replace with actual data lookup
-  Map<String, dynamic> get _transaction => {
+  Map<String, dynamic> _getTransaction(String currencySymbol) => {
         'id': transactionId,
         'reference': 'TXN-${DateTime.now().millisecondsSinceEpoch}',
         'name': 'Sarah Johnson',
@@ -25,17 +27,17 @@ class TransactionDetailsScreen extends StatelessWidget {
         'type': 'receive',
         'amount': 15000.0,
         'fee': 0.0,
-        'currency': '₦',
+        'currency': currencySymbol,
         'date': DateTime.now().subtract(const Duration(hours: 2)),
         'status': 'completed',
         'note': 'Payment for lunch',
       };
 
-  bool get _isCredit =>
-      _transaction['type'] == 'receive' || _transaction['type'] == 'deposit';
+  bool _isCredit(Map<String, dynamic> transaction) =>
+      transaction['type'] == 'receive' || transaction['type'] == 'deposit';
 
-  Color get _statusColor {
-    switch (_transaction['status']) {
+  Color _getStatusColor(Map<String, dynamic> transaction) {
+    switch (transaction['status']) {
       case 'completed':
         return AppColors.success;
       case 'pending':
@@ -47,8 +49,8 @@ class TransactionDetailsScreen extends StatelessWidget {
     }
   }
 
-  IconData get _statusIcon {
-    switch (_transaction['status']) {
+  IconData _getStatusIcon(Map<String, dynamic> transaction) {
+    switch (transaction['status']) {
       case 'completed':
         return Icons.check_circle;
       case 'pending':
@@ -81,7 +83,13 @@ class TransactionDetailsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencySymbol = ref.watch(currencyNotifierProvider).currency.symbol;
+    final transaction = _getTransaction(currencySymbol);
+    final isCredit = _isCredit(transaction);
+    final statusColor = _getStatusColor(transaction);
+    final statusIcon = _getStatusIcon(transaction);
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -100,7 +108,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         child: Column(
           children: [
             // Amount Card
-            _buildAmountCard()
+            _buildAmountCard(transaction, isCredit)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.1, end: 0, duration: 400.ms),
@@ -108,14 +116,14 @@ class TransactionDetailsScreen extends StatelessWidget {
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Status
-            _buildStatusBadge()
+            _buildStatusBadge(transaction, statusColor, statusIcon)
                 .animate()
                 .fadeIn(delay: 100.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Details Card
-            _buildDetailsCard(context)
+            _buildDetailsCard(context, transaction, isCredit)
                 .animate()
                 .fadeIn(delay: 200.ms, duration: 400.ms),
 
@@ -126,9 +134,9 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAmountCard() {
-    final amount = _transaction['amount'] as double;
-    final currency = _transaction['currency'] as String;
+  Widget _buildAmountCard(Map<String, dynamic> transaction, bool isCredit) {
+    final amount = transaction['amount'] as double;
+    final currency = transaction['currency'] as String;
 
     return Container(
       width: double.infinity,
@@ -144,13 +152,13 @@ class TransactionDetailsScreen extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: (_isCredit ? AppColors.success : AppColors.error)
+              color: (isCredit ? AppColors.success : AppColors.error)
                   .withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _isCredit ? Iconsax.arrow_down : Iconsax.arrow_up_2,
-              color: _isCredit ? AppColors.success : AppColors.error,
+              isCredit ? Iconsax.arrow_down : Iconsax.arrow_up_2,
+              color: isCredit ? AppColors.success : AppColors.error,
               size: 32,
             ),
           ),
@@ -163,21 +171,21 @@ class TransactionDetailsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isCredit ? '+' : '-',
+                isCredit ? '+' : '-',
                 style: AppTextStyles.displaySmall(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
               Text(
                 currency,
                 style: AppTextStyles.displaySmall(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
               Text(
                 _formatAmount(amount),
                 style: AppTextStyles.displayMedium(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
             ],
@@ -187,7 +195,7 @@ class TransactionDetailsScreen extends StatelessWidget {
 
           // Transaction type label
           Text(
-            _isCredit ? AppStrings.received : AppStrings.sent,
+            isCredit ? AppStrings.received : AppStrings.sent,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -195,36 +203,38 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge() {
+  Widget _buildStatusBadge(
+      Map<String, dynamic> transaction, Color statusColor, IconData statusIcon) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.spaceMD,
         vertical: AppDimensions.spaceXS,
       ),
       decoration: BoxDecoration(
-        color: _statusColor.withOpacity(0.1),
+        color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            _statusIcon,
+            statusIcon,
             size: 16,
-            color: _statusColor,
+            color: statusColor,
           ),
           const SizedBox(width: 6),
           Text(
-            _transaction['status'].toString().toUpperCase(),
-            style: AppTextStyles.labelSmall(color: _statusColor),
+            transaction['status'].toString().toUpperCase(),
+            style: AppTextStyles.labelSmall(color: statusColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailsCard(BuildContext context) {
-    final date = _transaction['date'] as DateTime;
+  Widget _buildDetailsCard(
+      BuildContext context, Map<String, dynamic> transaction, bool isCredit) {
+    final date = transaction['date'] as DateTime;
 
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceLG),
@@ -236,9 +246,9 @@ class TransactionDetailsScreen extends StatelessWidget {
         children: [
           // From/To
           _buildDetailRow(
-            label: _isCredit ? AppStrings.from : AppStrings.to,
-            value: _transaction['name'],
-            subtitle: _transaction['walletId'],
+            label: isCredit ? AppStrings.from : AppStrings.to,
+            value: transaction['name'],
+            subtitle: transaction['walletId'],
           ),
 
           _buildDivider(),
@@ -255,10 +265,10 @@ class TransactionDetailsScreen extends StatelessWidget {
           // Transaction ID
           _buildDetailRow(
             label: AppStrings.transactionId,
-            value: _transaction['reference'],
+            value: transaction['reference'],
             onTap: () => _copyToClipboard(
               context,
-              _transaction['reference'],
+              transaction['reference'],
               'Transaction ID',
             ),
             trailing: const Icon(
@@ -269,22 +279,22 @@ class TransactionDetailsScreen extends StatelessWidget {
           ),
 
           // Note (if present)
-          if (_transaction['note'] != null &&
-              _transaction['note'].toString().isNotEmpty) ...[
+          if (transaction['note'] != null &&
+              transaction['note'].toString().isNotEmpty) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.note,
-              value: _transaction['note'],
+              value: transaction['note'],
             ),
           ],
 
           // Fee (if present)
-          if ((_transaction['fee'] as double) > 0) ...[
+          if ((transaction['fee'] as double) > 0) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.transactionFee,
               value:
-                  '${_transaction['currency']}${_formatAmount(_transaction['fee'])}',
+                  '${transaction['currency']}${_formatAmount(transaction['fee'])}',
             ),
           ],
         ],
