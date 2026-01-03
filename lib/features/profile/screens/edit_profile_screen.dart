@@ -42,7 +42,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (user != null) {
       _fullNameController.text = user.fullName;
       _emailController.text = user.email;
-      _phoneController.text = user.phone ?? '';
+      _phoneController.text = user.phoneNumber;
       _currentPhotoUrl = user.profilePhotoUrl;
     }
   }
