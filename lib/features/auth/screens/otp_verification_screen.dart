@@ -230,6 +230,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
+          child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -271,7 +272,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                   .animate()
                   .fadeIn(delay: 300.ms, duration: 400.ms),
 
-              const Spacer(),
+              const SizedBox(height: AppDimensions.space4XL),
 
               // Verify Button
               _buildVerifyButton()
@@ -282,6 +283,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               const SizedBox(height: AppDimensions.spaceXXL),
             ],
           ),
+        ),
         ),
       ),
     );
