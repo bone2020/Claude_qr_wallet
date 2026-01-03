@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -9,8 +10,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../providers/auth_provider.dart';
@@ -58,23 +59,20 @@ Or scan my QR code in the app.
     setState(() => _isDownloading = true);
 
     try {
-      // Request storage permission (for Android)
-      if (await Permission.storage.isDenied) {
-        final status = await Permission.storage.request();
-        if (!status.isGranted) {
-          // Try photos permission for newer Android/iOS
-          final photosStatus = await Permission.photos.request();
-          if (!photosStatus.isGranted) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Storage permission required to save QR code'),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-            }
-            return;
+      // Check gallery access using Gal
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Storage permission required to save QR code'),
+                backgroundColor: AppColors.error,
+              ),
+            );
           }
+          return;
         }
       }
 
@@ -85,29 +83,25 @@ Or scan my QR code in the app.
       );
 
       if (imageBytes != null) {
-        // Save to gallery
-        final result = await ImageGallerySaver.saveImage(
-          imageBytes,
-          quality: 100,
-          name: 'qr_wallet_${DateTime.now().millisecondsSinceEpoch}',
-        );
+        // Save to temp file first
+        final tempDir = await getTemporaryDirectory();
+        final fileName = 'qr_wallet_${DateTime.now().millisecondsSinceEpoch}.png';
+        final tempFile = File('${tempDir.path}/$fileName');
+        await tempFile.writeAsBytes(imageBytes);
+
+        // Save to gallery using Gal
+        await Gal.putImage(tempFile.path);
+
+        // Clean up temp file
+        await tempFile.delete();
 
         if (mounted) {
-          if (result['isSuccess'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('QR code saved to gallery!'),
-                backgroundColor: AppColors.success,
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to save QR code'),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR code saved to gallery!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
         }
       }
     } catch (e) {
