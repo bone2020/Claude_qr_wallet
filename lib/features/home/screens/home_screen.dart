@@ -213,7 +213,7 @@ class HomeScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final transaction = transactions[index];
               return TransactionTile(
-                name: transaction.recipientName ?? transaction.senderName ?? 'Unknown',
+                name: transaction.receiverName ?? transaction.senderName ?? 'Unknown',
                 type: _getTransactionType(transaction.type),
                 amount: transaction.amount,
                 currency: currency,
