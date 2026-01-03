@@ -132,7 +132,19 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     final walletId = ref.watch(walletNotifierProvider).walletId;
 
     if (transactions.isEmpty) {
-      return _buildEmptyState(filter);
+      return RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+        },
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: _buildEmptyState(filter),
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(

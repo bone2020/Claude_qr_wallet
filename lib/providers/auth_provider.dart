@@ -95,6 +95,11 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     }
   }
 
+  /// Refresh user data from server
+  Future<void> refreshUser() async {
+    await _loadUserData();
+  }
+
   /// Sign up with email
   Future<AuthResult> signUp({
     required String email,

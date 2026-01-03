@@ -1,29 +1,51 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../providers/auth_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
 /// Edit profile screen
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _fullNameController = TextEditingController(text: 'John Doe');
-  final _emailController = TextEditingController(text: 'john.doe@email.com');
-  final _phoneController = TextEditingController(text: '8031234567');
+  final _fullNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
 
   final _imagePicker = ImagePicker();
   XFile? _newPhoto;
   bool _isLoading = false;
+  String? _currentPhotoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserData();
+  }
+
+  void _loadCurrentUserData() {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      _fullNameController.text = user.fullName;
+      _emailController.text = user.email;
+      _phoneController.text = user.phone ?? '';
+      _currentPhotoUrl = user.profilePhotoUrl;
+    }
+  }
 
   @override
   void dispose() {
@@ -97,14 +119,62 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  Future<String?> _uploadProfilePhoto(String userId) async {
+    if (_newPhoto == null) return _currentPhotoUrl;
+
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_photos')
+          .child('$userId.jpg');
+
+      final uploadTask = await storageRef.putFile(
+        File(_newPhoto!.path),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      return await uploadTask.ref.getDownloadURL();
+    } catch (e) {
+      debugPrint('Error uploading photo: $e');
+      return _currentPhotoUrl;
+    }
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Implement profile update
-      await Future.delayed(const Duration(seconds: 2));
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Upload new photo if selected
+      String? photoUrl = _currentPhotoUrl;
+      if (_newPhoto != null) {
+        photoUrl = await _uploadProfilePhoto(firebaseUser.uid);
+      }
+
+      // Update display name in Firebase Auth
+      await firebaseUser.updateDisplayName(_fullNameController.text.trim());
+      if (photoUrl != null) {
+        await firebaseUser.updatePhotoURL(photoUrl);
+      }
+
+      // Update user document in Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .update({
+        'fullName': _fullNameController.text.trim(),
+        if (photoUrl != null) 'profilePhotoUrl': photoUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Refresh auth state
+      ref.read(authNotifierProvider.notifier).refreshUser();
 
       if (!mounted) return;
 
@@ -120,7 +190,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text('Error updating profile: $e'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -133,6 +203,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final initials = user?.fullName.isNotEmpty == true
+        ? user!.fullName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+        : 'U';
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -154,7 +229,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: Column(
                     children: [
                       // Profile Photo
-                      _buildPhotoSection(),
+                      _buildPhotoSection(initials),
 
                       const SizedBox(height: AppDimensions.spaceXXL),
 
@@ -202,7 +277,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildPhotoSection() {
+  Widget _buildPhotoSection(String initials) {
     return GestureDetector(
       onTap: _pickImage,
       child: Column(
@@ -220,17 +295,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     width: 2,
                   ),
                 ),
-                child: _newPhoto != null
-                    ? ClipOval(
-                        child: Image.file(
-                          File(_newPhoto!.path),
-                          fit: BoxFit.cover,
-                          width: 120,
-                          height: 120,
-                          errorBuilder: (_, __, ___) => _buildDefaultAvatar(),
-                        ),
-                      )
-                    : _buildDefaultAvatar(),
+                child: _buildAvatarContent(initials),
               ),
               Positioned(
                 bottom: 0,
@@ -265,10 +330,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildDefaultAvatar() {
+  Widget _buildAvatarContent(String initials) {
+    // Show new photo if selected
+    if (_newPhoto != null) {
+      return ClipOval(
+        child: Image.file(
+          File(_newPhoto!.path),
+          fit: BoxFit.cover,
+          width: 120,
+          height: 120,
+          errorBuilder: (_, __, ___) => _buildDefaultAvatar(initials),
+        ),
+      );
+    }
+
+    // Show current photo if exists
+    if (_currentPhotoUrl != null && _currentPhotoUrl!.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          _currentPhotoUrl!,
+          fit: BoxFit.cover,
+          width: 120,
+          height: 120,
+          errorBuilder: (_, __, ___) => _buildDefaultAvatar(initials),
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // Show default avatar with initials
+    return _buildDefaultAvatar(initials);
+  }
+
+  Widget _buildDefaultAvatar(String initials) {
     return Center(
       child: Text(
-        'JD',
+        initials,
         style: AppTextStyles.displaySmall(color: AppColors.primary),
       ),
     );

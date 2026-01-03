@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -5,16 +7,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// Receive money screen with QR code display
-class ReceiveMoneyScreen extends ConsumerWidget {
+class ReceiveMoneyScreen extends ConsumerStatefulWidget {
   const ReceiveMoneyScreen({super.key});
 
-  void _copyWalletId(BuildContext context, String walletId) {
+  @override
+  ConsumerState<ReceiveMoneyScreen> createState() => _ReceiveMoneyScreenState();
+}
+
+class _ReceiveMoneyScreenState extends ConsumerState<ReceiveMoneyScreen> {
+  final ScreenshotController _screenshotController = ScreenshotController();
+  bool _isDownloading = false;
+
+  void _copyWalletId(String walletId) {
     Clipboard.setData(ClipboardData(text: walletId));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -25,28 +39,95 @@ class ReceiveMoneyScreen extends ConsumerWidget {
     );
   }
 
-  void _shareQrCode(BuildContext context) {
-    // TODO: Implement share functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Share feature coming soon'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  void _shareQrCode(String walletId, String userName) {
+    final shareText = '''
+Send me money on QR Wallet!
+
+Name: $userName
+Wallet ID: $walletId
+
+Or scan my QR code in the app.
+''';
+
+    Share.share(shareText, subject: 'My QR Wallet ID');
   }
 
-  void _downloadQrCode(BuildContext context) {
-    // TODO: Implement download functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Download feature coming soon'),
-        backgroundColor: AppColors.info,
-      ),
-    );
+  Future<void> _downloadQrCode() async {
+    if (_isDownloading) return;
+
+    setState(() => _isDownloading = true);
+
+    try {
+      // Request storage permission (for Android)
+      if (await Permission.storage.isDenied) {
+        final status = await Permission.storage.request();
+        if (!status.isGranted) {
+          // Try photos permission for newer Android/iOS
+          final photosStatus = await Permission.photos.request();
+          if (!photosStatus.isGranted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Storage permission required to save QR code'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+            return;
+          }
+        }
+      }
+
+      // Capture QR code as image
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        pixelRatio: 3.0,
+        delay: const Duration(milliseconds: 10),
+      );
+
+      if (imageBytes != null) {
+        // Save to gallery
+        final result = await ImageGallerySaver.saveImage(
+          imageBytes,
+          quality: 100,
+          name: 'qr_wallet_${DateTime.now().millisecondsSinceEpoch}',
+        );
+
+        if (mounted) {
+          if (result['isSuccess'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('QR code saved to gallery!'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to save QR code'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving QR code: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     // Get real data from providers
     final walletId = ref.watch(walletNotifierProvider).walletId;
     final user = ref.watch(currentUserProvider);
@@ -72,8 +153,11 @@ class ReceiveMoneyScreen extends ConsumerWidget {
             children: [
               const Spacer(),
 
-              // QR Code Card
-              _buildQrCodeCard(context, qrData, userName)
+              // QR Code Card (wrapped with Screenshot)
+              Screenshot(
+                controller: _screenshotController,
+                child: _buildQrCodeCard(qrData, userName),
+              )
                   .animate()
                   .fadeIn(duration: 500.ms)
                   .scale(
@@ -86,7 +170,7 @@ class ReceiveMoneyScreen extends ConsumerWidget {
               const SizedBox(height: AppDimensions.spaceXXL),
 
               // Wallet ID
-              _buildWalletIdCard(context, walletId)
+              _buildWalletIdCard(walletId)
                   .animate()
                   .fadeIn(delay: 200.ms, duration: 400.ms)
                   .slideY(begin: 0.2, end: 0, delay: 200.ms, duration: 400.ms),
@@ -94,7 +178,7 @@ class ReceiveMoneyScreen extends ConsumerWidget {
               const Spacer(),
 
               // Action Buttons
-              _buildActionButtons(context)
+              _buildActionButtons(walletId, userName)
                   .animate()
                   .fadeIn(delay: 400.ms, duration: 400.ms),
 
@@ -106,7 +190,7 @@ class ReceiveMoneyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQrCodeCard(BuildContext context, String qrData, String userName) {
+  Widget _buildQrCodeCard(String qrData, String userName) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceXL),
       decoration: BoxDecoration(
@@ -136,10 +220,6 @@ class ReceiveMoneyScreen extends ConsumerWidget {
               dataModuleShape: QrDataModuleShape.square,
               color: AppColors.backgroundDark,
             ),
-            embeddedImage: null, // TODO: Add logo if desired
-            embeddedImageStyle: const QrEmbeddedImageStyle(
-              size: Size(40, 40),
-            ),
           ),
 
           const SizedBox(height: AppDimensions.spaceLG),
@@ -161,9 +241,9 @@ class ReceiveMoneyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWalletIdCard(BuildContext context, String walletId) {
+  Widget _buildWalletIdCard(String walletId) {
     return GestureDetector(
-      onTap: () => _copyWalletId(context, walletId),
+      onTap: () => _copyWalletId(walletId),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.spaceLG,
@@ -210,12 +290,12 @@ class ReceiveMoneyScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButtons(BuildContext context) {
+  Widget _buildActionButtons(String walletId, String userName) {
     return Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () => _shareQrCode(context),
+            onPressed: () => _shareQrCode(walletId, userName),
             icon: const Icon(Iconsax.share, size: 20),
             label: Text(AppStrings.shareQrCode),
             style: OutlinedButton.styleFrom(
@@ -228,9 +308,18 @@ class ReceiveMoneyScreen extends ConsumerWidget {
         const SizedBox(width: AppDimensions.spaceMD),
         Expanded(
           child: ElevatedButton.icon(
-            onPressed: () => _downloadQrCode(context),
-            icon: const Icon(Iconsax.document_download, size: 20),
-            label: Text(AppStrings.downloadQrCode),
+            onPressed: _isDownloading ? null : _downloadQrCode,
+            icon: _isDownloading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.backgroundDark,
+                    ),
+                  )
+                : const Icon(Iconsax.document_download, size: 20),
+            label: Text(_isDownloading ? 'Saving...' : AppStrings.downloadQrCode),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
             ),
