@@ -53,6 +53,26 @@ class TransactionDetailsScreen extends ConsumerWidget {
     }
   }
 
+  String _getCurrencySymbol(String? currency) {
+    if (currency == null) return '';
+    const symbols = {
+      'NGN': '₦',
+      'GHS': 'GH₵',
+      'KES': 'KSh',
+      'ZAR': 'R',
+      'USD': '\$',
+      'GBP': '£',
+      'EUR': '€',
+    };
+    return symbols[currency] ?? currency;
+  }
+
+  bool _hasConversion(TransactionModel transaction) {
+    return transaction.senderCurrency != null &&
+        transaction.receiverCurrency != null &&
+        transaction.senderCurrency != transaction.receiverCurrency;
+  }
+
   IconData _getStatusIcon(TransactionStatus status) {
     switch (status) {
       case TransactionStatus.completed:
@@ -336,6 +356,12 @@ class TransactionDetailsScreen extends ConsumerWidget {
             ),
           ],
 
+          // Currency conversion info (if different currencies)
+          if (_hasConversion(transaction)) ...[
+            _buildDivider(),
+            _buildConversionInfo(transaction),
+          ],
+
           // Failure reason (if failed)
           if (transaction.status == TransactionStatus.failed &&
               transaction.failureReason != null) ...[
@@ -343,6 +369,72 @@ class TransactionDetailsScreen extends ConsumerWidget {
             _buildDetailRow(
               label: 'Failure Reason',
               value: transaction.failureReason!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversionInfo(TransactionModel transaction) {
+    final senderSymbol = _getCurrencySymbol(transaction.senderCurrency);
+    final receiverSymbol = _getCurrencySymbol(transaction.receiverCurrency);
+
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.spaceMD),
+      decoration: BoxDecoration(
+        color: AppColors.info.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Currency Conversion',
+            style: AppTextStyles.labelMedium(color: AppColors.info),
+          ),
+          const SizedBox(height: AppDimensions.spaceSM),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Original Amount',
+                style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+              ),
+              Text(
+                '$senderSymbol${_formatAmount(transaction.amount)}',
+                style: AppTextStyles.bodyMedium(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spaceXS),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Converted Amount',
+                style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+              ),
+              Text(
+                '$receiverSymbol${_formatAmount(transaction.convertedAmount ?? 0)}',
+                style: AppTextStyles.bodyMedium(color: AppColors.info),
+              ),
+            ],
+          ),
+          if (transaction.exchangeRate != null) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Exchange Rate',
+                  style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+                ),
+                Text(
+                  '1 ${transaction.senderCurrency} = ${transaction.exchangeRate!.toStringAsFixed(2)} ${transaction.receiverCurrency}',
+                  style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
+                ),
+              ],
             ),
           ],
         ],

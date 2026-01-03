@@ -131,6 +131,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             recipientName: extras?['recipientName'] ?? '',
             amount: extras?['amount'] ?? 0.0,
             note: extras?['note'],
+            recipientCurrency: extras?['recipientCurrency'],
+            recipientCurrencySymbol: extras?['recipientCurrencySymbol'],
           );
         },
       ),

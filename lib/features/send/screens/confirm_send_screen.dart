@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/exchange_rate_service.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
@@ -17,6 +18,8 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
   final String recipientName;
   final double amount;
   final String? note;
+  final String? recipientCurrency;
+  final String? recipientCurrencySymbol;
 
   const ConfirmSendScreen({
     super.key,
@@ -24,6 +27,8 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
     required this.recipientName,
     required this.amount,
     this.note,
+    this.recipientCurrency,
+    this.recipientCurrencySymbol,
   });
 
   @override
@@ -33,13 +38,37 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
 class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   final _amountController = TextEditingController();
   bool _isLoading = false;
-  
+
   // Mock fee calculation
   double get _fee => (_amount * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
   double get _amount => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
   double get _total => _amount + _fee;
 
   String get _currency => ref.watch(currencyNotifierProvider).currency.symbol;
+  String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
+
+  // Currency conversion
+  bool get _needsConversion {
+    final recipientCurrency = widget.recipientCurrency;
+    return recipientCurrency != null && recipientCurrency != _currencyCode;
+  }
+
+  double? get _convertedAmount {
+    if (!_needsConversion || widget.recipientCurrency == null) return null;
+    return ExchangeRateService.convert(
+      amount: _amount,
+      fromCurrency: _currencyCode,
+      toCurrency: widget.recipientCurrency!,
+    );
+  }
+
+  double? get _exchangeRate {
+    if (!_needsConversion || widget.recipientCurrency == null) return null;
+    return ExchangeRateService.getExchangeRate(
+      fromCurrency: _currencyCode,
+      toCurrency: widget.recipientCurrency!,
+    );
+  }
 
   @override
   void initState() {
@@ -359,6 +388,47 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             AppStrings.totalAmount,
             '$_currency${_formatAmount(_total)}',
             isTotal: true,
+          ),
+          // Show conversion info if currencies are different
+          if (_needsConversion && _convertedAmount != null) ...[
+            const SizedBox(height: AppDimensions.spaceMD),
+            _buildConversionInfo(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversionInfo() {
+    final recipientSymbol = widget.recipientCurrencySymbol ?? widget.recipientCurrency ?? '';
+    final rate = _exchangeRate ?? 0;
+
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.spaceMD),
+      decoration: BoxDecoration(
+        color: AppColors.info.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        border: Border.all(color: AppColors.info.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recipient receives:',
+                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+              ),
+              Text(
+                '$recipientSymbol${_formatAmount(_convertedAmount!)}',
+                style: AppTextStyles.bodyLarge(color: AppColors.info),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spaceXS),
+          Text(
+            '1 $_currencyCode = ${rate.toStringAsFixed(2)} ${widget.recipientCurrency}',
+            style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
           ),
         ],
       ),

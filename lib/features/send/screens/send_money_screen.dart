@@ -29,6 +29,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
   bool _isLookingUp = false;
   String? _recipientName;
   String? _recipientWalletId;
+  String? _recipientCurrency;
+  String? _recipientCurrencySymbol;
   String? _lookupError;
 
   @override
@@ -68,6 +70,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
       setState(() {
         _recipientName = null;
         _recipientWalletId = null;
+        _recipientCurrency = null;
+        _recipientCurrencySymbol = null;
         _lookupError = null;
       });
       return;
@@ -87,12 +91,16 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
         setState(() {
           _recipientName = result.fullName;
           _recipientWalletId = result.walletId;
+          _recipientCurrency = result.currency;
+          _recipientCurrencySymbol = result.currencySymbol;
           _isLookingUp = false;
         });
       } else {
         setState(() {
           _recipientName = null;
           _recipientWalletId = null;
+          _recipientCurrency = null;
+          _recipientCurrencySymbol = null;
           _lookupError = 'Wallet not found';
           _isLookingUp = false;
         });
@@ -102,6 +110,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
       setState(() {
         _recipientName = null;
         _recipientWalletId = null;
+        _recipientCurrency = null;
+        _recipientCurrencySymbol = null;
         _lookupError = 'Error looking up wallet';
         _isLookingUp = false;
       });
@@ -136,6 +146,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
           'recipientName': _recipientName,
           'amount': amount,
           'note': _noteController.text.isNotEmpty ? _noteController.text : null,
+          'recipientCurrency': _recipientCurrency,
+          'recipientCurrencySymbol': _recipientCurrencySymbol,
         },
       );
     } catch (e) {
