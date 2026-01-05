@@ -36,10 +36,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (currentUser != null) {
       try {
+        // Reload user to get latest emailVerified status
+        await currentUser.reload();
+        final refreshedUser = FirebaseAuth.instance.currentUser;
+
+        if (refreshedUser == null) {
+          context.go(AppRoutes.welcome);
+          return;
+        }
+
+        // Check if email is verified
+        if (!refreshedUser.emailVerified) {
+          // User hasn't verified email - go to email verification screen
+          context.go(AppRoutes.otpVerification, extra: {
+            'email': refreshedUser.email ?? '',
+            'isEmailVerification': true,
+          });
+          return;
+        }
+
         // Fetch user document from Firestore
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
-            .doc(currentUser.uid)
+            .doc(refreshedUser.uid)
             .get();
 
         if (!mounted) return;
@@ -47,7 +66,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // Check if user document exists
         if (!userDoc.exists) {
           // User exists in Auth but not in Firestore (incomplete signup)
-          // Sign them out and send to welcome screen
           await FirebaseAuth.instance.signOut();
           if (!mounted) return;
           context.go(AppRoutes.welcome);
@@ -56,17 +74,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         // Parse user data
         final userData = UserModel.fromJson(userDoc.data()!);
-
-        // Check if phone is verified
-        if (!userData.isVerified) {
-          // User hasn't completed phone verification
-          context.go(AppRoutes.otpVerification, extra: {
-            'phoneNumber': userData.phoneNumber,
-            'email': userData.email,
-            'isPhoneVerification': true,
-          });
-          return;
-        }
 
         // Check if KYC is completed
         if (!userData.kycCompleted) {

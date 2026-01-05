@@ -105,20 +105,23 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        // Send email verification
+        await authNotifier.sendEmailVerification();
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppStrings.successAccountCreated),
+          const SnackBar(
+            content: Text('Account created! Please verify your email.'),
             backgroundColor: AppColors.success,
           ),
         );
 
-        // Navigate to OTP verification
+        // Navigate to email verification screen
         context.push(
           AppRoutes.otpVerification,
           extra: {
-            'phoneNumber': _fullPhoneNumber,
             'email': _emailController.text.trim(),
-            'isPhoneVerification': true,
+            'phoneNumber': _fullPhoneNumber,
+            'isEmailVerification': true,
           },
         );
       } else {

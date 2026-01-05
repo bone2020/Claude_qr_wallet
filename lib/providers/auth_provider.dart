@@ -197,6 +197,26 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     state = AuthStateData.authenticated(user);
     _localStorage.saveUser(user);
   }
+
+  /// Send email verification to current user
+  Future<AuthResult> sendEmailVerification() async {
+    return await _authService.sendEmailVerification();
+  }
+
+  /// Check if email is verified
+  Future<bool> checkEmailVerified() async {
+    return await _authService.checkEmailVerified();
+  }
+
+  /// Mark email as verified in Firestore
+  Future<AuthResult> markEmailVerified() async {
+    final result = await _authService.markEmailVerified();
+    if (result.success && result.user != null) {
+      state = state.copyWith(user: result.user);
+      await _localStorage.saveUser(result.user!);
+    }
+    return result;
+  }
 }
 
 /// Auth state data

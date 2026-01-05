@@ -77,17 +77,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // OTP Verification Screen
+      // OTP/Email Verification Screen
       GoRoute(
         path: AppRoutes.otpVerification,
         name: 'otpVerification',
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return OtpVerificationScreen(
-            phoneNumber: extras?['phoneNumber'] ?? '',
             email: extras?['email'] ?? '',
-            isPhoneVerification: extras?['isPhoneVerification'] ?? true,
-            verificationId: extras?['verificationId'],
+            phoneNumber: extras?['phoneNumber'],
+            isEmailVerification: extras?['isEmailVerification'] ?? true,
           );
         },
       ),

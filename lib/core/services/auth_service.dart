@@ -367,6 +367,75 @@ class AuthService {
   }
 
   // ============================================================
+  // EMAIL VERIFICATION
+  // ============================================================
+
+  /// Send email verification link to current user
+  Future<AuthResult> sendEmailVerification() async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure('No user logged in');
+      }
+
+      if (user.emailVerified) {
+        return AuthResult.success(null); // Already verified
+      }
+
+      await user.sendEmailVerification();
+      return AuthResult.success(null);
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_getAuthErrorMessage(e.code));
+    } catch (e) {
+      return AuthResult.failure(e.toString());
+    }
+  }
+
+  /// Check if current user's email is verified
+  /// Returns true if verified, false otherwise
+  Future<bool> checkEmailVerified() async {
+    try {
+      final user = currentUser;
+      if (user == null) return false;
+
+      // Reload user to get latest emailVerified status
+      await user.reload();
+
+      // Get fresh instance after reload
+      final refreshedUser = _auth.currentUser;
+      return refreshedUser?.emailVerified ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Update user's verified status in Firestore after email verification
+  Future<AuthResult> markEmailVerified() async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure('No user logged in');
+      }
+
+      // Update Firestore
+      await _firestore.collection('users').doc(user.uid).update({
+        'isVerified': true,
+      });
+
+      // Return updated user
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userModel = UserModel.fromJson(userDoc.data()!);
+        return AuthResult.success(userModel);
+      }
+
+      return AuthResult.success(null);
+    } catch (e) {
+      return AuthResult.failure(e.toString());
+    }
+  }
+
+  // ============================================================
   // PASSWORD MANAGEMENT
   // ============================================================
 
