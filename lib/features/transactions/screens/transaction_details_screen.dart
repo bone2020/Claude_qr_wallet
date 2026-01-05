@@ -1,64 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../models/transaction_model.dart';
+import '../../../providers/currency_provider.dart';
+import '../../../providers/wallet_provider.dart';
 
 /// Transaction details screen
-class TransactionDetailsScreen extends StatelessWidget {
+class TransactionDetailsScreen extends ConsumerWidget {
   final String transactionId;
 
   const TransactionDetailsScreen({
     super.key,
     required this.transactionId,
   });
-
-  // Mock data - replace with actual data lookup
-  Map<String, dynamic> get _transaction => {
-        'id': transactionId,
-        'reference': 'TXN-${DateTime.now().millisecondsSinceEpoch}',
-        'name': 'Sarah Johnson',
-        'walletId': 'QRW-1234-5678',
-        'type': 'receive',
-        'amount': 15000.0,
-        'fee': 0.0,
-        'currency': '₦',
-        'date': DateTime.now().subtract(const Duration(hours: 2)),
-        'status': 'completed',
-        'note': 'Payment for lunch',
-      };
-
-  bool get _isCredit =>
-      _transaction['type'] == 'receive' || _transaction['type'] == 'deposit';
-
-  Color get _statusColor {
-    switch (_transaction['status']) {
-      case 'completed':
-        return AppColors.success;
-      case 'pending':
-        return AppColors.warning;
-      case 'failed':
-        return AppColors.error;
-      default:
-        return AppColors.textSecondaryDark;
-    }
-  }
-
-  IconData get _statusIcon {
-    switch (_transaction['status']) {
-      case 'completed':
-        return Icons.check_circle;
-      case 'pending':
-        return Icons.access_time;
-      case 'failed':
-        return Icons.cancel;
-      default:
-        return Icons.help;
-    }
-  }
 
   String _formatAmount(double amount) {
     final parts = amount.toStringAsFixed(2).split('.');
@@ -80,8 +40,109 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
+  Color _getStatusColor(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.completed:
+        return AppColors.success;
+      case TransactionStatus.pending:
+        return AppColors.warning;
+      case TransactionStatus.failed:
+        return AppColors.error;
+      case TransactionStatus.cancelled:
+        return AppColors.textSecondaryDark;
+    }
+  }
+
+  String _getCurrencySymbol(String? currency) {
+    if (currency == null) return '';
+    const symbols = {
+      'NGN': '₦',
+      'GHS': 'GH₵',
+      'KES': 'KSh',
+      'ZAR': 'R',
+      'USD': '\$',
+      'GBP': '£',
+      'EUR': '€',
+    };
+    return symbols[currency] ?? currency;
+  }
+
+  bool _hasConversion(TransactionModel transaction) {
+    return transaction.senderCurrency != null &&
+        transaction.receiverCurrency != null &&
+        transaction.senderCurrency != transaction.receiverCurrency;
+  }
+
+  IconData _getStatusIcon(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.completed:
+        return Icons.check_circle;
+      case TransactionStatus.pending:
+        return Icons.access_time;
+      case TransactionStatus.failed:
+        return Icons.cancel;
+      case TransactionStatus.cancelled:
+        return Icons.block;
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currencySymbol = ref.watch(currencyNotifierProvider).currency.symbol;
+    final walletId = ref.watch(walletNotifierProvider).walletId;
+    final transactionsState = ref.watch(transactionsNotifierProvider);
+
+    // Find the transaction by ID
+    final TransactionModel? transaction = transactionsState.transactions
+        .cast<TransactionModel?>()
+        .firstWhere(
+          (t) => t?.id == transactionId,
+          orElse: () => null,
+        );
+
+    // Handle transaction not found
+    if (transaction == null) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        appBar: AppBar(
+          backgroundColor: AppColors.backgroundDark,
+          leading: IconButton(
+            onPressed: () => context.pop(),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          ),
+          title: Text(
+            AppStrings.transactionDetails,
+            style: AppTextStyles.headlineMedium(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 64,
+                color: AppColors.textTertiaryDark,
+              ),
+              const SizedBox(height: AppDimensions.spaceMD),
+              Text(
+                'Transaction not found',
+                style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final isCredit = transaction.isCredit(walletId);
+    final statusColor = _getStatusColor(transaction.status);
+    final statusIcon = _getStatusIcon(transaction.status);
+    final counterpartyName = transaction.getCounterpartyName(walletId);
+    final counterpartyWalletId = isCredit
+        ? transaction.senderWalletId
+        : transaction.receiverWalletId;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -100,7 +161,7 @@ class TransactionDetailsScreen extends StatelessWidget {
         child: Column(
           children: [
             // Amount Card
-            _buildAmountCard()
+            _buildAmountCard(transaction, isCredit, currencySymbol)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.1, end: 0, duration: 400.ms),
@@ -108,16 +169,21 @@ class TransactionDetailsScreen extends StatelessWidget {
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Status
-            _buildStatusBadge()
+            _buildStatusBadge(transaction.status, statusColor, statusIcon)
                 .animate()
                 .fadeIn(delay: 100.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceXL),
 
             // Details Card
-            _buildDetailsCard(context)
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms),
+            _buildDetailsCard(
+              context,
+              transaction,
+              isCredit,
+              counterpartyName,
+              counterpartyWalletId,
+              currencySymbol,
+            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
           ],
@@ -126,10 +192,8 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAmountCard() {
-    final amount = _transaction['amount'] as double;
-    final currency = _transaction['currency'] as String;
-
+  Widget _buildAmountCard(
+      TransactionModel transaction, bool isCredit, String currencySymbol) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceXL),
@@ -144,13 +208,13 @@ class TransactionDetailsScreen extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: (_isCredit ? AppColors.success : AppColors.error)
+              color: (isCredit ? AppColors.success : AppColors.error)
                   .withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _isCredit ? Iconsax.arrow_down : Iconsax.arrow_up_2,
-              color: _isCredit ? AppColors.success : AppColors.error,
+              isCredit ? Iconsax.arrow_down : Iconsax.arrow_up_2,
+              color: isCredit ? AppColors.success : AppColors.error,
               size: 32,
             ),
           ),
@@ -163,21 +227,21 @@ class TransactionDetailsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isCredit ? '+' : '-',
+                isCredit ? '+' : '-',
                 style: AppTextStyles.displaySmall(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
               Text(
-                currency,
+                currencySymbol,
                 style: AppTextStyles.displaySmall(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
               Text(
-                _formatAmount(amount),
+                _formatAmount(transaction.amount),
                 style: AppTextStyles.displayMedium(
-                  color: _isCredit ? AppColors.success : AppColors.error,
+                  color: isCredit ? AppColors.success : AppColors.error,
                 ),
               ),
             ],
@@ -187,7 +251,7 @@ class TransactionDetailsScreen extends StatelessWidget {
 
           // Transaction type label
           Text(
-            _isCredit ? AppStrings.received : AppStrings.sent,
+            isCredit ? AppStrings.received : AppStrings.sent,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -195,37 +259,43 @@ class TransactionDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge() {
+  Widget _buildStatusBadge(
+      TransactionStatus status, Color statusColor, IconData statusIcon) {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.spaceMD,
         vertical: AppDimensions.spaceXS,
       ),
       decoration: BoxDecoration(
-        color: _statusColor.withOpacity(0.1),
+        color: statusColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            _statusIcon,
+            statusIcon,
             size: 16,
-            color: _statusColor,
+            color: statusColor,
           ),
           const SizedBox(width: 6),
           Text(
-            _transaction['status'].toString().toUpperCase(),
-            style: AppTextStyles.labelSmall(color: _statusColor),
+            status.name.toUpperCase(),
+            style: AppTextStyles.labelSmall(color: statusColor),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDetailsCard(BuildContext context) {
-    final date = _transaction['date'] as DateTime;
-
+  Widget _buildDetailsCard(
+    BuildContext context,
+    TransactionModel transaction,
+    bool isCredit,
+    String counterpartyName,
+    String counterpartyWalletId,
+    String currencySymbol,
+  ) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceLG),
       decoration: BoxDecoration(
@@ -236,9 +306,9 @@ class TransactionDetailsScreen extends StatelessWidget {
         children: [
           // From/To
           _buildDetailRow(
-            label: _isCredit ? AppStrings.from : AppStrings.to,
-            value: _transaction['name'],
-            subtitle: _transaction['walletId'],
+            label: isCredit ? AppStrings.from : AppStrings.to,
+            value: counterpartyName,
+            subtitle: counterpartyWalletId,
           ),
 
           _buildDivider(),
@@ -246,8 +316,8 @@ class TransactionDetailsScreen extends StatelessWidget {
           // Date & Time
           _buildDetailRow(
             label: AppStrings.date,
-            value: DateFormat('MMM d, yyyy').format(date),
-            subtitle: DateFormat.jm().format(date),
+            value: DateFormat('MMM d, yyyy').format(transaction.createdAt),
+            subtitle: DateFormat.jm().format(transaction.createdAt),
           ),
 
           _buildDivider(),
@@ -255,10 +325,10 @@ class TransactionDetailsScreen extends StatelessWidget {
           // Transaction ID
           _buildDetailRow(
             label: AppStrings.transactionId,
-            value: _transaction['reference'],
+            value: transaction.reference ?? transaction.id,
             onTap: () => _copyToClipboard(
               context,
-              _transaction['reference'],
+              transaction.reference ?? transaction.id,
               'Transaction ID',
             ),
             trailing: const Icon(
@@ -269,22 +339,102 @@ class TransactionDetailsScreen extends StatelessWidget {
           ),
 
           // Note (if present)
-          if (_transaction['note'] != null &&
-              _transaction['note'].toString().isNotEmpty) ...[
+          if (transaction.note != null && transaction.note!.isNotEmpty) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.note,
-              value: _transaction['note'],
+              value: transaction.note!,
             ),
           ],
 
           // Fee (if present)
-          if ((_transaction['fee'] as double) > 0) ...[
+          if (transaction.fee > 0) ...[
             _buildDivider(),
             _buildDetailRow(
               label: AppStrings.transactionFee,
-              value:
-                  '${_transaction['currency']}${_formatAmount(_transaction['fee'])}',
+              value: '$currencySymbol${_formatAmount(transaction.fee)}',
+            ),
+          ],
+
+          // Currency conversion info (if different currencies)
+          if (_hasConversion(transaction)) ...[
+            _buildDivider(),
+            _buildConversionInfo(transaction),
+          ],
+
+          // Failure reason (if failed)
+          if (transaction.status == TransactionStatus.failed &&
+              transaction.failureReason != null) ...[
+            _buildDivider(),
+            _buildDetailRow(
+              label: 'Failure Reason',
+              value: transaction.failureReason!,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConversionInfo(TransactionModel transaction) {
+    final senderSymbol = _getCurrencySymbol(transaction.senderCurrency);
+    final receiverSymbol = _getCurrencySymbol(transaction.receiverCurrency);
+
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.spaceMD),
+      decoration: BoxDecoration(
+        color: AppColors.info.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Currency Conversion',
+            style: AppTextStyles.labelMedium(color: AppColors.info),
+          ),
+          const SizedBox(height: AppDimensions.spaceSM),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Original Amount',
+                style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+              ),
+              Text(
+                '$senderSymbol${_formatAmount(transaction.amount)}',
+                style: AppTextStyles.bodyMedium(),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spaceXS),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Converted Amount',
+                style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+              ),
+              Text(
+                '$receiverSymbol${_formatAmount(transaction.convertedAmount ?? 0)}',
+                style: AppTextStyles.bodyMedium(color: AppColors.info),
+              ),
+            ],
+          ),
+          if (transaction.exchangeRate != null) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Exchange Rate',
+                  style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+                ),
+                Text(
+                  '1 ${transaction.senderCurrency} = ${transaction.exchangeRate!.toStringAsFixed(2)} ${transaction.receiverCurrency}',
+                  style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
+                ),
+              ],
             ),
           ],
         ],

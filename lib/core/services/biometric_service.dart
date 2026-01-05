@@ -122,9 +122,10 @@ class BiometricService {
   Future<BiometricResult> authenticateForTransaction({
     required double amount,
     required String recipient,
+    required String currencySymbol,
   }) async {
     return authenticate(
-      reason: 'Confirm payment of ₦${amount.toStringAsFixed(2)} to $recipient',
+      reason: 'Confirm payment of $currencySymbol${amount.toStringAsFixed(2)} to $recipient',
       biometricOnly: true,
     );
   }

@@ -6,6 +6,7 @@ class AppStrings {
   // ============ APP ============
   static const String appName = 'QR Wallet';
   static const String appTagline = 'Seamless payments, anywhere';
+  static const String currencySymbol = '₦'; // Default currency symbol (Nigerian Naira)
 
   // ============ SPLASH ============
   static const String getStarted = 'Get Started';

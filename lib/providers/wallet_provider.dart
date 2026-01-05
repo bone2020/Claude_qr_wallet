@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/services/currency_service.dart';
+import '../core/services/exchange_rate_service.dart';
 import '../core/services/services.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
@@ -47,8 +49,8 @@ class WalletState {
 
   double get balance => wallet?.balance ?? 0.0;
   String get walletId => wallet?.walletId ?? '';
-  String get currency => wallet?.currency ?? 'NGN';
-  String get currencySymbol => wallet?.currencySymbol ?? '₦';
+  String get currency => wallet?.currency ?? CurrencyService.defaultCurrency.code;
+  String get currencySymbol => wallet?.currencySymbol ?? CurrencyService.defaultCurrency.symbol;
 }
 
 /// Wallet notifier
@@ -269,7 +271,11 @@ final recentTransactionsProvider = Provider<List<TransactionModel>>((ref) {
 class SendMoneyState {
   final String? recipientWalletId;
   final String? recipientName;
+  final String? recipientCurrency;
+  final String? recipientCurrencySymbol;
   final double amount;
+  final double? convertedAmount;
+  final double? exchangeRate;
   final String? note;
   final bool isLoading;
   final bool isLookingUp;
@@ -279,7 +285,11 @@ class SendMoneyState {
   SendMoneyState({
     this.recipientWalletId,
     this.recipientName,
+    this.recipientCurrency,
+    this.recipientCurrencySymbol,
     this.amount = 0,
+    this.convertedAmount,
+    this.exchangeRate,
     this.note,
     this.isLoading = false,
     this.isLookingUp = false,
@@ -290,7 +300,11 @@ class SendMoneyState {
   SendMoneyState copyWith({
     String? recipientWalletId,
     String? recipientName,
+    String? recipientCurrency,
+    String? recipientCurrencySymbol,
     double? amount,
+    double? convertedAmount,
+    double? exchangeRate,
     String? note,
     bool? isLoading,
     bool? isLookingUp,
@@ -300,7 +314,11 @@ class SendMoneyState {
     return SendMoneyState(
       recipientWalletId: recipientWalletId ?? this.recipientWalletId,
       recipientName: recipientName ?? this.recipientName,
+      recipientCurrency: recipientCurrency ?? this.recipientCurrency,
+      recipientCurrencySymbol: recipientCurrencySymbol ?? this.recipientCurrencySymbol,
       amount: amount ?? this.amount,
+      convertedAmount: convertedAmount ?? this.convertedAmount,
+      exchangeRate: exchangeRate ?? this.exchangeRate,
       note: note ?? this.note,
       isLoading: isLoading ?? this.isLoading,
       isLookingUp: isLookingUp ?? this.isLookingUp,
@@ -312,6 +330,8 @@ class SendMoneyState {
   double get fee => (amount * 0.01).clamp(10, 100);
   double get total => amount + fee;
 
+  bool get needsConversion => recipientCurrency != null && exchangeRate != null && exchangeRate != 1.0;
+
   void clear() {}
 }
 
@@ -322,7 +342,7 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
   SendMoneyNotifier(this._walletService) : super(SendMoneyState());
 
   /// Lookup recipient by wallet ID
-  Future<void> lookupRecipient(String walletId) async {
+  Future<void> lookupRecipient(String walletId, {String? senderCurrency}) async {
     if (walletId.length < 10) {
       state = state.copyWith(recipientName: null);
       return;
@@ -333,9 +353,24 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
     try {
       final result = await _walletService.lookupWallet(walletId);
       if (result.found) {
+        double? exchangeRate;
+
+        // Calculate exchange rate if sender currency is provided
+        if (senderCurrency != null && result.currency != null) {
+          if (ExchangeRateService.needsConversion(senderCurrency, result.currency!)) {
+            exchangeRate = ExchangeRateService.getExchangeRate(
+              fromCurrency: senderCurrency,
+              toCurrency: result.currency!,
+            );
+          }
+        }
+
         state = state.copyWith(
           recipientWalletId: result.walletId,
           recipientName: result.fullName,
+          recipientCurrency: result.currency,
+          recipientCurrencySymbol: result.currencySymbol,
+          exchangeRate: exchangeRate,
           isLookingUp: false,
         );
       } else {
@@ -354,10 +389,14 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
   void setRecipient({
     required String walletId,
     required String name,
+    String? currency,
+    String? currencySymbol,
   }) {
     state = state.copyWith(
       recipientWalletId: walletId,
       recipientName: name,
+      recipientCurrency: currency,
+      recipientCurrencySymbol: currencySymbol,
     );
   }
 

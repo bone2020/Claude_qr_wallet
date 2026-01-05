@@ -1,29 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/currency_provider.dart';
+import '../../../providers/wallet_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
 /// Send money screen
-class SendMoneyScreen extends StatefulWidget {
+class SendMoneyScreen extends ConsumerStatefulWidget {
   const SendMoneyScreen({super.key});
 
   @override
-  State<SendMoneyScreen> createState() => _SendMoneyScreenState();
+  ConsumerState<SendMoneyScreen> createState() => _SendMoneyScreenState();
 }
 
-class _SendMoneyScreenState extends State<SendMoneyScreen> {
+class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _walletIdController = TextEditingController();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isLookingUp = false;
   String? _recipientName;
+  String? _recipientWalletId;
+  String? _recipientCurrency;
+  String? _recipientCurrencySymbol;
+  String? _lookupError;
 
   @override
   void dispose() {
@@ -55,25 +63,78 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   Future<void> _lookupRecipient() async {
-    if (_walletIdController.text.length < 10) return;
+    final walletId = _walletIdController.text.trim();
 
-    // TODO: Implement wallet ID lookup
-    await Future.delayed(const Duration(milliseconds: 500));
-    
+    // Clear previous lookup if wallet ID is too short
+    if (walletId.length < 10) {
+      setState(() {
+        _recipientName = null;
+        _recipientWalletId = null;
+        _recipientCurrency = null;
+        _recipientCurrencySymbol = null;
+        _lookupError = null;
+      });
+      return;
+    }
+
     setState(() {
-      _recipientName = 'Sarah Johnson'; // Mock data
+      _isLookingUp = true;
+      _lookupError = null;
     });
+
+    try {
+      final result = await ref.read(walletNotifierProvider.notifier).lookupWallet(walletId);
+
+      if (!mounted) return;
+
+      if (result.found) {
+        setState(() {
+          _recipientName = result.fullName;
+          _recipientWalletId = result.walletId;
+          _recipientCurrency = result.currency;
+          _recipientCurrencySymbol = result.currencySymbol;
+          _isLookingUp = false;
+        });
+      } else {
+        setState(() {
+          _recipientName = null;
+          _recipientWalletId = null;
+          _recipientCurrency = null;
+          _recipientCurrencySymbol = null;
+          _lookupError = 'Wallet not found';
+          _isLookingUp = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _recipientName = null;
+        _recipientWalletId = null;
+        _recipientCurrency = null;
+        _recipientCurrencySymbol = null;
+        _lookupError = 'Error looking up wallet';
+        _isLookingUp = false;
+      });
+    }
   }
 
   Future<void> _handleContinue() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Ensure recipient has been verified
+    if (_recipientWalletId == null || _recipientName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid wallet ID'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // TODO: Validate recipient exists
-      await Future.delayed(const Duration(seconds: 1));
-
       if (!mounted) return;
 
       final amount = double.parse(_amountController.text.replaceAll(',', ''));
@@ -81,10 +142,12 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       context.push(
         AppRoutes.confirmSend,
         extra: {
-          'recipientWalletId': _walletIdController.text,
-          'recipientName': _recipientName ?? 'Unknown',
+          'recipientWalletId': _recipientWalletId,
+          'recipientName': _recipientName,
           'amount': amount,
           'note': _noteController.text.isNotEmpty ? _noteController.text : null,
+          'recipientCurrency': _recipientCurrency,
+          'recipientCurrencySymbol': _recipientCurrencySymbol,
         },
       );
     } catch (e) {
@@ -160,8 +223,31 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         textInputAction: TextInputAction.next,
                       ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
-                      // Recipient Name
-                      if (_recipientName != null) ...[
+                      // Loading indicator during lookup
+                      if (_isLookingUp) ...[
+                        const SizedBox(height: AppDimensions.spaceXS),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Looking up wallet...',
+                              style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      // Recipient Name (found)
+                      if (_recipientName != null && !_isLookingUp) ...[
                         const SizedBox(height: AppDimensions.spaceXS),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -190,6 +276,36 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         ),
                       ],
 
+                      // Lookup error
+                      if (_lookupError != null && !_isLookingUp) ...[
+                        const SizedBox(height: AppDimensions.spaceXS),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDimensions.spaceSM,
+                            vertical: AppDimensions.spaceXS,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 14,
+                                color: AppColors.error,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _lookupError!,
+                                style: AppTextStyles.bodySmall(color: AppColors.error),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: AppDimensions.spaceLG),
 
                       // Amount Input
@@ -206,7 +322,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         prefixIcon: Padding(
                           padding: const EdgeInsets.all(AppDimensions.spaceMD),
                           child: Text(
-                            '₦',
+                            ref.watch(currencyNotifierProvider).currency.symbol,
                             style: AppTextStyles.headlineMedium(color: AppColors.primary),
                           ),
                         ),

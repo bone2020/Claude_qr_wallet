@@ -1,84 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../models/transaction_model.dart';
+import '../../../providers/currency_provider.dart';
+import '../../../providers/wallet_provider.dart';
 import '../../home/widgets/transaction_tile.dart';
 
 /// Transactions history screen
-class TransactionsScreen extends StatefulWidget {
+class TransactionsScreen extends ConsumerStatefulWidget {
   const TransactionsScreen({super.key});
 
   @override
-  State<TransactionsScreen> createState() => _TransactionsScreenState();
+  ConsumerState<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
-class _TransactionsScreenState extends State<TransactionsScreen>
+class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
-  final String _currency = '₦';
-
-  // Mock data - replace with actual data from providers
-  final List<Map<String, dynamic>> _allTransactions = [
-    {
-      'id': '1',
-      'name': 'Sarah Johnson',
-      'type': 'receive',
-      'amount': 15000.0,
-      'date': DateTime.now().subtract(const Duration(hours: 2)),
-      'status': 'completed',
-    },
-    {
-      'id': '2',
-      'name': 'Netflix Subscription',
-      'type': 'send',
-      'amount': 4500.0,
-      'date': DateTime.now().subtract(const Duration(days: 1)),
-      'status': 'completed',
-    },
-    {
-      'id': '3',
-      'name': 'Bank Deposit',
-      'type': 'deposit',
-      'amount': 50000.0,
-      'date': DateTime.now().subtract(const Duration(days: 2)),
-      'status': 'completed',
-    },
-    {
-      'id': '4',
-      'name': 'Michael Obi',
-      'type': 'send',
-      'amount': 7500.0,
-      'date': DateTime.now().subtract(const Duration(days: 3)),
-      'status': 'pending',
-    },
-    {
-      'id': '5',
-      'name': 'Amaka Store',
-      'type': 'send',
-      'amount': 12500.0,
-      'date': DateTime.now().subtract(const Duration(days: 4)),
-      'status': 'completed',
-    },
-    {
-      'id': '6',
-      'name': 'John Okafor',
-      'type': 'receive',
-      'amount': 25000.0,
-      'date': DateTime.now().subtract(const Duration(days: 5)),
-      'status': 'completed',
-    },
-    {
-      'id': '7',
-      'name': 'Uber Ride',
-      'type': 'send',
-      'amount': 2500.0,
-      'date': DateTime.now().subtract(const Duration(days: 6)),
-      'status': 'failed',
-    },
-  ];
 
   @override
   void initState() {
@@ -92,23 +34,61 @@ class _TransactionsScreenState extends State<TransactionsScreen>
     super.dispose();
   }
 
-  List<Map<String, dynamic>> _getFilteredTransactions(String filter) {
+  List<TransactionModel> _getFilteredTransactions(
+    List<TransactionModel> allTransactions,
+    String filter,
+  ) {
     switch (filter) {
       case 'sent':
-        return _allTransactions.where((t) => t['type'] == 'send').toList();
+        return allTransactions
+            .where((t) => t.type == TransactionType.send)
+            .toList();
       case 'received':
-        return _allTransactions
-            .where((t) => t['type'] == 'receive' || t['type'] == 'deposit')
+        return allTransactions
+            .where((t) =>
+                t.type == TransactionType.receive ||
+                t.type == TransactionType.deposit)
             .toList();
       case 'pending':
-        return _allTransactions.where((t) => t['status'] == 'pending').toList();
+        return allTransactions
+            .where((t) => t.status == TransactionStatus.pending)
+            .toList();
       default:
-        return _allTransactions;
+        return allTransactions;
+    }
+  }
+
+  String _getTransactionTypeString(TransactionType type) {
+    switch (type) {
+      case TransactionType.send:
+        return 'send';
+      case TransactionType.receive:
+        return 'receive';
+      case TransactionType.deposit:
+        return 'deposit';
+      case TransactionType.withdraw:
+        return 'withdraw';
+    }
+  }
+
+  String _getTransactionStatusString(TransactionStatus status) {
+    switch (status) {
+      case TransactionStatus.pending:
+        return 'pending';
+      case TransactionStatus.completed:
+        return 'completed';
+      case TransactionStatus.failed:
+        return 'failed';
+      case TransactionStatus.cancelled:
+        return 'cancelled';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final transactionsState = ref.watch(transactionsNotifierProvider);
+    final isLoading = transactionsState.isLoading;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
@@ -130,29 +110,46 @@ class _TransactionsScreenState extends State<TransactionsScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildTransactionList('all'),
-          _buildTransactionList('sent'),
-          _buildTransactionList('received'),
-          _buildTransactionList('pending'),
-        ],
-      ),
+      body: isLoading && transactionsState.transactions.isEmpty
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildTransactionList('all', transactionsState.transactions),
+                _buildTransactionList('sent', transactionsState.transactions),
+                _buildTransactionList('received', transactionsState.transactions),
+                _buildTransactionList('pending', transactionsState.transactions),
+              ],
+            ),
     );
   }
 
-  Widget _buildTransactionList(String filter) {
-    final transactions = _getFilteredTransactions(filter);
+  Widget _buildTransactionList(String filter, List<TransactionModel> allTransactions) {
+    final transactions = _getFilteredTransactions(allTransactions, filter);
+    final currencySymbol = ref.watch(currencyNotifierProvider).currency.symbol;
+    final walletId = ref.watch(walletNotifierProvider).walletId;
 
     if (transactions.isEmpty) {
-      return _buildEmptyState(filter);
+      return RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+        },
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: _buildEmptyState(filter),
+          ),
+        ),
+      );
     }
 
     return RefreshIndicator(
       onRefresh: () async {
-        // TODO: Refresh transactions
-        await Future.delayed(const Duration(seconds: 1));
+        await ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
       },
       color: AppColors.primary,
       child: ListView.separated(
@@ -161,17 +158,20 @@ class _TransactionsScreenState extends State<TransactionsScreen>
         separatorBuilder: (_, __) => const SizedBox(height: AppDimensions.spaceSM),
         itemBuilder: (context, index) {
           final transaction = transactions[index];
+          final isCredit = transaction.isCredit(walletId);
+          final counterpartyName = transaction.getCounterpartyName(walletId);
+
           return TransactionTile(
-            name: transaction['name'],
-            type: transaction['type'],
-            amount: transaction['amount'],
-            currency: _currency,
-            date: transaction['date'],
-            status: transaction['status'],
+            name: counterpartyName,
+            type: _getTransactionTypeString(transaction.type),
+            amount: transaction.amount,
+            currency: currencySymbol,
+            date: transaction.createdAt,
+            status: _getTransactionStatusString(transaction.status),
             onTap: () {
               context.push(
                 AppRoutes.transactionDetails,
-                extra: transaction['id'],
+                extra: transaction.id,
               );
             },
           ).animate().fadeIn(

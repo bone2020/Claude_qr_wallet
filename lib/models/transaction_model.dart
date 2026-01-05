@@ -76,6 +76,18 @@ class TransactionModel {
   @HiveField(14)
   final String? failureReason;
 
+  @HiveField(15)
+  final String? senderCurrency;
+
+  @HiveField(16)
+  final String? receiverCurrency;
+
+  @HiveField(17)
+  final double? convertedAmount;
+
+  @HiveField(18)
+  final double? exchangeRate;
+
   TransactionModel({
     required this.id,
     required this.senderWalletId,
@@ -92,6 +104,10 @@ class TransactionModel {
     this.completedAt,
     this.reference,
     this.failureReason,
+    this.senderCurrency,
+    this.receiverCurrency,
+    this.convertedAmount,
+    this.exchangeRate,
   });
 
   /// Create transaction from Firestore document
@@ -120,6 +136,10 @@ class TransactionModel {
           : null,
       reference: json['reference'] as String?,
       failureReason: json['failureReason'] as String?,
+      senderCurrency: json['senderCurrency'] as String?,
+      receiverCurrency: json['receiverCurrency'] as String?,
+      convertedAmount: (json['convertedAmount'] as num?)?.toDouble(),
+      exchangeRate: (json['exchangeRate'] as num?)?.toDouble(),
     );
   }
 
@@ -141,6 +161,10 @@ class TransactionModel {
       'completedAt': completedAt?.toIso8601String(),
       'reference': reference,
       'failureReason': failureReason,
+      'senderCurrency': senderCurrency,
+      'receiverCurrency': receiverCurrency,
+      'convertedAmount': convertedAmount,
+      'exchangeRate': exchangeRate,
     };
   }
 
@@ -161,6 +185,10 @@ class TransactionModel {
     DateTime? completedAt,
     String? reference,
     String? failureReason,
+    String? senderCurrency,
+    String? receiverCurrency,
+    double? convertedAmount,
+    double? exchangeRate,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -178,6 +206,10 @@ class TransactionModel {
       completedAt: completedAt ?? this.completedAt,
       reference: reference ?? this.reference,
       failureReason: failureReason ?? this.failureReason,
+      senderCurrency: senderCurrency ?? this.senderCurrency,
+      receiverCurrency: receiverCurrency ?? this.receiverCurrency,
+      convertedAmount: convertedAmount ?? this.convertedAmount,
+      exchangeRate: exchangeRate ?? this.exchangeRate,
     );
   }
 

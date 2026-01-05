@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/wallet_provider.dart';
 
 /// QR code scanner screen
-class ScanQrScreen extends StatefulWidget {
+class ScanQrScreen extends ConsumerStatefulWidget {
   const ScanQrScreen({super.key});
 
   @override
-  State<ScanQrScreen> createState() => _ScanQrScreenState();
+  ConsumerState<ScanQrScreen> createState() => _ScanQrScreenState();
 }
 
-class _ScanQrScreenState extends State<ScanQrScreen> {
+class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   final MobileScannerController _scannerController = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
@@ -45,12 +47,12 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
     _processQrCode(code);
   }
 
-  void _processQrCode(String code) {
+  Future<void> _processQrCode(String code) async {
     try {
       // Parse the QR code
       // Expected format: qrwallet://pay?id=WALLET_ID&name=NAME
       final uri = Uri.parse(code);
-      
+
       String? walletId;
       String? name;
 
@@ -63,6 +65,23 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
       }
 
       if (walletId != null && walletId.isNotEmpty) {
+        // Look up wallet to get currency info
+        String? recipientCurrency;
+        String? recipientCurrencySymbol;
+
+        try {
+          final result = await ref.read(walletNotifierProvider.notifier).lookupWallet(walletId);
+          if (result.found) {
+            name = result.fullName ?? name;
+            recipientCurrency = result.currency;
+            recipientCurrencySymbol = result.currencySymbol;
+          }
+        } catch (_) {
+          // Continue with navigation even if lookup fails
+        }
+
+        if (!mounted) return;
+
         // Navigate to confirm send screen
         context.pushReplacement(
           AppRoutes.confirmSend,
@@ -72,6 +91,8 @@ class _ScanQrScreenState extends State<ScanQrScreen> {
             'amount': 0.0,
             'note': null,
             'fromScan': true,
+            'recipientCurrency': recipientCurrency,
+            'recipientCurrencySymbol': recipientCurrencySymbol,
           },
         );
       } else {

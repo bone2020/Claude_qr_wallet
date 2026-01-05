@@ -32,11 +32,27 @@ class PhoneInputField extends StatefulWidget {
   });
 
   @override
-  State<PhoneInputField> createState() => _PhoneInputFieldState();
+  State<PhoneInputField> createState() => PhoneInputFieldState();
 }
 
-class _PhoneInputFieldState extends State<PhoneInputField> {
+class PhoneInputFieldState extends State<PhoneInputField> {
   late CountryCode _selectedCountry;
+
+  /// Get the selected country
+  CountryCode get selectedCountry => _selectedCountry;
+
+  /// Get full phone number with country code
+  String get fullPhoneNumber {
+    return '${_selectedCountry.dialCode}${widget.controller?.text ?? ''}';
+  }
+
+  /// Validate the phone number
+  String? validatePhone(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Phone number is required';
+    }
+    return _selectedCountry.getValidationError(value);
+  }
 
   @override
   void initState() {

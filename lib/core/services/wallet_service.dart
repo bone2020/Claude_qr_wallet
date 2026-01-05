@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
 
 import '../../models/models.dart';
+import 'exchange_rate_service.dart';
 
 /// Wallet service handling all wallet and transaction operations
 class WalletService {
@@ -70,16 +71,32 @@ class WalletService {
       }
 
       final user = UserModel.fromJson(userDoc.data()!);
+      final currency = wallet.currency;
 
       return WalletLookupResult.found(
         walletId: wallet.walletId,
         userId: wallet.userId,
         fullName: user.fullName,
         profilePhotoUrl: user.profilePhotoUrl,
+        currency: currency,
+        currencySymbol: _getCurrencySymbol(currency),
       );
     } catch (e) {
       throw WalletException('Failed to lookup wallet: $e');
     }
+  }
+
+  String _getCurrencySymbol(String currency) {
+    const symbols = {
+      'NGN': '₦',
+      'GHS': 'GH₵',
+      'KES': 'KSh',
+      'ZAR': 'R',
+      'USD': '\$',
+      'GBP': '£',
+      'EUR': '€',
+    };
+    return symbols[currency] ?? currency;
   }
 
   // ============================================================
@@ -155,8 +172,30 @@ class WalletService {
           ? UserModel.fromJson(recipientUserDoc.data()!).fullName
           : 'Unknown';
 
-      // Calculate fee (1% with min ₦10, max ₦100)
+      // Calculate fee (1% with min 10, max 100 in sender's currency)
       final fee = (amount * 0.01).clamp(10.0, 100.0);
+
+      // Get currencies
+      final senderCurrency = senderWallet.currency;
+      final recipientCurrency = recipientWallet.currency;
+
+      // Calculate conversion if needed
+      double amountToCredit = amount;
+      double? exchangeRate;
+      double? convertedAmount;
+
+      if (ExchangeRateService.needsConversion(senderCurrency, recipientCurrency)) {
+        exchangeRate = ExchangeRateService.getExchangeRate(
+          fromCurrency: senderCurrency,
+          toCurrency: recipientCurrency,
+        );
+        convertedAmount = ExchangeRateService.convert(
+          amount: amount,
+          fromCurrency: senderCurrency,
+          toCurrency: recipientCurrency,
+        );
+        amountToCredit = convertedAmount;
+      }
 
       // Create transaction record
       final transactionId = _generateTransactionId();
@@ -170,19 +209,23 @@ class WalletService {
         receiverName: recipientName,
         amount: amount,
         fee: fee,
-        currency: senderWallet.currency,
+        currency: senderCurrency,
         type: TransactionType.send,
         status: TransactionStatus.completed,
         note: note,
         createdAt: now,
         completedAt: now,
         reference: 'TXN-${now.millisecondsSinceEpoch}',
+        senderCurrency: senderCurrency,
+        receiverCurrency: recipientCurrency,
+        convertedAmount: convertedAmount,
+        exchangeRate: exchangeRate,
       );
 
       // Execute transaction in a batch
       final batch = _firestore.batch();
 
-      // Deduct from sender (amount + fee)
+      // Deduct from sender (amount + fee in sender's currency)
       batch.update(
         _firestore.collection('wallets').doc(_userId),
         {
@@ -193,11 +236,11 @@ class WalletService {
         },
       );
 
-      // Add to recipient
+      // Add to recipient (converted amount in recipient's currency)
       batch.update(
         recipientWalletDoc.reference,
         {
-          'balance': FieldValue.increment(amount),
+          'balance': FieldValue.increment(amountToCredit),
           'updatedAt': now.toIso8601String(),
         },
       );
@@ -400,6 +443,8 @@ class WalletLookupResult {
   final String? userId;
   final String? fullName;
   final String? profilePhotoUrl;
+  final String? currency;
+  final String? currencySymbol;
 
   WalletLookupResult._({
     required this.found,
@@ -407,6 +452,8 @@ class WalletLookupResult {
     this.userId,
     this.fullName,
     this.profilePhotoUrl,
+    this.currency,
+    this.currencySymbol,
   });
 
   factory WalletLookupResult.found({
@@ -414,6 +461,8 @@ class WalletLookupResult {
     required String userId,
     required String fullName,
     String? profilePhotoUrl,
+    required String currency,
+    required String currencySymbol,
   }) {
     return WalletLookupResult._(
       found: true,
@@ -421,6 +470,8 @@ class WalletLookupResult {
       userId: userId,
       fullName: fullName,
       profilePhotoUrl: profilePhotoUrl,
+      currency: currency,
+      currencySymbol: currencySymbol,
     );
   }
 

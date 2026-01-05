@@ -5,3 +5,4 @@ export 'user_service.dart';
 export 'payment_service.dart';
 export 'local_storage_service.dart';
 export 'biometric_service.dart';
+export 'currency_service.dart';
