@@ -44,10 +44,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   void initState() {
     super.initState();
     _verificationId = widget.verificationId;
-    // If no verification ID provided, trigger OTP send
-    if (_verificationId == null && widget.isPhoneVerification) {
-      _sendOtp();
-    } else {
+    // Don't auto-send OTP - let user trigger it manually to avoid iOS reCAPTCHA crash
+    if (_verificationId != null) {
       _startResendTimer();
     }
   }
@@ -254,31 +252,39 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
               const SizedBox(height: AppDimensions.space4XL),
 
-              // OTP Input
-              _buildOtpInput()
-                  .animate()
-                  .fadeIn(delay: 200.ms, duration: 400.ms)
-                  .scale(
-                    begin: const Offset(0.95, 0.95),
-                    end: const Offset(1, 1),
-                    delay: 200.ms,
-                    duration: 400.ms,
-                  ),
+              // Show Send Code button if no verification ID yet
+              if (_verificationId == null) ...[
+                _buildSendCodeButton()
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: 400.ms),
+                const SizedBox(height: AppDimensions.spaceXXL),
+              ] else ...[
+                // OTP Input
+                _buildOtpInput()
+                    .animate()
+                    .fadeIn(delay: 200.ms, duration: 400.ms)
+                    .scale(
+                      begin: const Offset(0.95, 0.95),
+                      end: const Offset(1, 1),
+                      delay: 200.ms,
+                      duration: 400.ms,
+                    ),
 
-              const SizedBox(height: AppDimensions.spaceXXL),
+                const SizedBox(height: AppDimensions.spaceXXL),
 
-              // Resend Code
-              _buildResendCode()
-                  .animate()
-                  .fadeIn(delay: 300.ms, duration: 400.ms),
+                // Resend Code
+                _buildResendCode()
+                    .animate()
+                    .fadeIn(delay: 300.ms, duration: 400.ms),
 
-              const SizedBox(height: AppDimensions.space4XL),
+                const SizedBox(height: AppDimensions.space4XL),
 
-              // Verify Button
-              _buildVerifyButton()
-                  .animate()
-                  .fadeIn(delay: 400.ms, duration: 400.ms)
-                  .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 400.ms),
+                // Verify Button
+                _buildVerifyButton()
+                    .animate()
+                    .fadeIn(delay: 400.ms, duration: 400.ms)
+                    .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 400.ms),
+              ],
 
               const SizedBox(height: AppDimensions.spaceXXL),
             ],
@@ -294,15 +300,40 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppStrings.enterOtp,
+          _verificationId == null ? 'Verify Phone' : AppStrings.enterOtp,
           style: AppTextStyles.displaySmall(),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         Text(
-          '${AppStrings.otpSentTo}\n$_maskedContact',
+          _verificationId == null
+              ? 'Tap the button below to send a verification code to\n$_maskedContact'
+              : '${AppStrings.otpSentTo}\n$_maskedContact',
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
       ],
+    );
+  }
+
+  Widget _buildSendCodeButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: AppDimensions.buttonHeightLG,
+      child: ElevatedButton(
+        onPressed: _isSendingOtp ? null : _sendOtp,
+        child: _isSendingOtp
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.backgroundDark,
+                ),
+              )
+            : Text(
+                'Send Verification Code',
+                style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
+              ),
+      ),
     );
   }
 
