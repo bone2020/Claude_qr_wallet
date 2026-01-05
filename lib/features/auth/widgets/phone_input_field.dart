@@ -51,7 +51,13 @@ class PhoneInputFieldState extends State<PhoneInputField> {
     if (value == null || value.isEmpty) {
       return 'Phone number is required';
     }
-    return _selectedCountry.getValidationError(value);
+    if (value.length < 7) {
+      return 'Phone number is too short';
+    }
+    if (value.length > 15) {
+      return 'Phone number is too long';
+    }
+    return null;
   }
 
   @override
@@ -87,10 +93,6 @@ class PhoneInputFieldState extends State<PhoneInputField> {
       final fullNumber = '${_selectedCountry.dialCode}${widget.controller!.text}';
       widget.onChanged!(fullNumber);
     }
-  }
-
-  String get fullPhoneNumber {
-    return '${_selectedCountry.dialCode}${widget.controller?.text ?? ''}';
   }
 
   @override
