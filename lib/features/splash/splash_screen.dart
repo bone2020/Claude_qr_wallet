@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/constants.dart';
 import '../../core/router/app_router.dart';
+import '../../core/services/exchange_rate_service.dart';
 import '../../providers/currency_provider.dart';
 import '../../models/user_model.dart';
 
@@ -84,6 +85,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         // Load user's currency preference
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
+        // Preload exchange rates
+        await ExchangeRateService.preloadRates();
 
         if (!mounted) return;
 

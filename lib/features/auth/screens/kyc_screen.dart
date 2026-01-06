@@ -10,6 +10,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/user_service.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/currency_provider.dart';
 
 /// KYC screen for identity verification
 class KycScreen extends ConsumerStatefulWidget {
@@ -185,6 +186,8 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         if (result.user != null) {
           ref.read(authNotifierProvider.notifier).updateUser(result.user!);
         }
+        // Load user's currency before navigating
+        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
         // Navigate to main screen
         context.go(AppRoutes.main);
       } else {
@@ -209,7 +212,9 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     );
   }
 
-  void _handleSkip() {
+  Future<void> _handleSkip() async {
+    // Load user's currency before navigating
+    await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
     // Navigate to main screen without KYC
     context.go(AppRoutes.main);
   }
