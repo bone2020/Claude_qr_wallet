@@ -49,56 +49,75 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
 
   Future<void> _processQrCode(String code) async {
     try {
-      // Parse the QR code
-      // Expected format: qrwallet://pay?id=WALLET_ID&name=NAME
-      final uri = Uri.parse(code);
-
       String? walletId;
       String? name;
+      double? amount;
+      String? currency;
+      String? note;
 
-      if (uri.scheme == 'qrwallet' && uri.host == 'pay') {
+      // Parse QR code
+      final uri = Uri.tryParse(code);
+      if (uri != null && uri.scheme == 'qrwallet' && uri.host == 'pay') {
+        // New format: qrwallet://pay?id=WALLET_ID&name=NAME&amount=50.00&currency=GHS&note=Description
         walletId = uri.queryParameters['id'];
         name = uri.queryParameters['name'];
+
+        // Parse amount if present
+        final amountStr = uri.queryParameters['amount'];
+        if (amountStr != null) {
+          amount = double.tryParse(amountStr);
+        }
+
+        currency = uri.queryParameters['currency'];
+        note = uri.queryParameters['note'];
+
+        // Decode URL-encoded values
+        if (name != null) {
+          name = Uri.decodeComponent(name);
+        }
+        if (note != null) {
+          note = Uri.decodeComponent(note);
+        }
       } else {
         // Fallback: treat the entire code as wallet ID
         walletId = code;
       }
 
-      if (walletId != null && walletId.isNotEmpty) {
-        // Look up wallet to get currency info
-        String? recipientCurrency;
-        String? recipientCurrencySymbol;
-
-        try {
-          final result = await ref.read(walletNotifierProvider.notifier).lookupWallet(walletId);
-          if (result.found) {
-            name = result.fullName ?? name;
-            recipientCurrency = result.currency;
-            recipientCurrencySymbol = result.currencySymbol;
-          }
-        } catch (_) {
-          // Continue with navigation even if lookup fails
-        }
-
-        if (!mounted) return;
-
-        // Navigate to confirm send screen
-        context.pushReplacement(
-          AppRoutes.confirmSend,
-          extra: {
-            'recipientWalletId': walletId,
-            'recipientName': name ?? 'Unknown',
-            'amount': 0.0,
-            'note': null,
-            'fromScan': true,
-            'recipientCurrency': recipientCurrency,
-            'recipientCurrencySymbol': recipientCurrencySymbol,
-          },
-        );
-      } else {
-        _showError('Invalid QR code');
-        setState(() => _isProcessing = false);
+      if (walletId == null || walletId.isEmpty) {
+        throw Exception('Invalid QR code');
       }
+
+      // Look up wallet to verify and get details
+      String? recipientCurrency = currency;
+      String? recipientCurrencySymbol;
+
+      try {
+        final result = await ref.read(walletNotifierProvider.notifier).lookupWallet(walletId);
+        if (result.found) {
+          name = name ?? result.fullName ?? 'Unknown';
+          recipientCurrency = recipientCurrency ?? result.currency;
+          recipientCurrencySymbol = result.currencySymbol;
+        }
+      } catch (_) {
+        // Continue with navigation even if lookup fails
+      }
+
+      if (!mounted) return;
+
+      // Navigate to confirm send screen with all data
+      context.pushReplacement(
+        AppRoutes.confirmSend,
+        extra: {
+          'recipientWalletId': walletId,
+          'recipientName': name ?? 'Unknown',
+          'amount': amount ?? 0.0,
+          'note': note,
+          'fromScan': true,
+          'amountLocked': amount != null && amount > 0,
+          'recipientCurrency': recipientCurrency,
+          'recipientCurrencySymbol': recipientCurrencySymbol,
+        },
+      );
     } catch (e) {
       _showError('Could not read QR code');
       setState(() => _isProcessing = false);

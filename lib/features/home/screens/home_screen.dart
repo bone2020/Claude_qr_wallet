@@ -170,11 +170,9 @@ class HomeScreen extends ConsumerWidget {
           onTap: () => context.push(AppRoutes.addMoney),
         ),
         QuickActionButton(
-          icon: Iconsax.money_send,
-          label: AppStrings.withdraw,
-          onTap: () {
-            // TODO: Navigate to withdraw screen
-          },
+          icon: Iconsax.receipt_2,
+          label: 'Request',
+          onTap: () => context.push(AppRoutes.requestPayment),
         ),
       ],
     );

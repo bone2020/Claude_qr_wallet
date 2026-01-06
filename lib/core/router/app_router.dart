@@ -14,6 +14,7 @@ import '../../features/send/screens/send_money_screen.dart';
 import '../../features/send/screens/scan_qr_screen.dart';
 import '../../features/send/screens/confirm_send_screen.dart';
 import '../../features/receive/screens/receive_money_screen.dart';
+import '../../features/receive/screens/request_payment_screen.dart';
 import '../../features/transactions/screens/transactions_screen.dart';
 import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
@@ -35,6 +36,7 @@ class AppRoutes {
   static const String scanQr = '/scan-qr';
   static const String confirmSend = '/confirm-send';
   static const String receiveMoney = '/receive-money';
+  static const String requestPayment = '/request-payment';
   static const String addMoney = '/add-money';
   static const String currencySelector = '/currency-selector';
   static const String transactions = '/transactions';
@@ -130,6 +132,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             recipientName: extras?['recipientName'] ?? '',
             amount: extras?['amount'] ?? 0.0,
             note: extras?['note'],
+            fromScan: extras?['fromScan'] ?? false,
+            amountLocked: extras?['amountLocked'] ?? false,
             recipientCurrency: extras?['recipientCurrency'],
             recipientCurrencySymbol: extras?['recipientCurrencySymbol'],
           );
@@ -141,6 +145,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.receiveMoney,
         name: 'receiveMoney',
         builder: (context, state) => const ReceiveMoneyScreen(),
+      ),
+
+      // Request Payment Screen (Merchant QR)
+      GoRoute(
+        path: AppRoutes.requestPayment,
+        name: 'requestPayment',
+        builder: (context, state) => const RequestPaymentScreen(),
       ),
 
       // Add Money Screen

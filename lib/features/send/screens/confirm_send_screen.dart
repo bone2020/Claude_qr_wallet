@@ -18,6 +18,8 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
   final String recipientName;
   final double amount;
   final String? note;
+  final bool fromScan;
+  final bool amountLocked;
   final String? recipientCurrency;
   final String? recipientCurrencySymbol;
 
@@ -27,6 +29,8 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
     required this.recipientName,
     required this.amount,
     this.note,
+    this.fromScan = false,
+    this.amountLocked = false,
     this.recipientCurrency,
     this.recipientCurrencySymbol,
   });
@@ -74,7 +78,10 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   void initState() {
     super.initState();
     if (widget.amount > 0) {
-      _amountController.text = widget.amount.toStringAsFixed(0);
+      // Use 2 decimal places for locked amounts (from merchant QR), otherwise whole numbers
+      _amountController.text = widget.amountLocked
+          ? widget.amount.toStringAsFixed(2)
+          : widget.amount.toStringAsFixed(0);
     }
   }
 
@@ -228,6 +235,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
                 child: Column(
                   children: [
+                    // Payment Request Banner (if from merchant QR)
+                    if (widget.amountLocked && widget.note != null && widget.note!.isNotEmpty) ...[
+                      _buildPaymentRequestBanner()
+                          .animate()
+                          .fadeIn(duration: 400.ms),
+                      const SizedBox(height: AppDimensions.spaceMD),
+                    ],
+
                     // Recipient Card
                     _buildRecipientCard()
                         .animate()
@@ -316,13 +331,54 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     );
   }
 
+  Widget _buildPaymentRequestBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppDimensions.spaceMD),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.receipt_long, color: AppColors.primary),
+          const SizedBox(width: AppDimensions.spaceSM),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Payment Request',
+                  style: AppTextStyles.labelMedium(color: AppColors.primary),
+                ),
+                Text(
+                  widget.note!,
+                  style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAmountInput() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          AppStrings.amount,
-          style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+        Row(
+          children: [
+            Text(
+              AppStrings.amount,
+              style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+            ),
+            if (widget.amountLocked) ...[
+              const SizedBox(width: AppDimensions.spaceXS),
+              const Icon(Icons.lock, size: 14, color: AppColors.textTertiaryDark),
+            ],
+          ],
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         Container(
@@ -331,9 +387,15 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             vertical: AppDimensions.spaceMD,
           ),
           decoration: BoxDecoration(
-            color: AppColors.surfaceDark,
+            color: widget.amountLocked
+                ? AppColors.surfaceDark.withOpacity(0.5)
+                : AppColors.surfaceDark,
             borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
-            border: Border.all(color: AppColors.inputBorderDark),
+            border: Border.all(
+              color: widget.amountLocked
+                  ? AppColors.primary.withOpacity(0.3)
+                  : AppColors.inputBorderDark,
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -347,6 +409,8 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 child: TextField(
                   controller: _amountController,
                   keyboardType: TextInputType.number,
+                  readOnly: widget.amountLocked,
+                  enabled: !widget.amountLocked,
                   style: AppTextStyles.displaySmall(),
                   decoration: InputDecoration(
                     border: InputBorder.none,
@@ -361,6 +425,8 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                   onChanged: (_) => setState(() {}),
                 ),
               ),
+              if (widget.amountLocked)
+                const Icon(Icons.lock, color: AppColors.textTertiaryDark, size: 20),
             ],
           ),
         ),
