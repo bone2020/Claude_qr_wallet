@@ -179,7 +179,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,7 +254,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                   ),
                 ).animate().fadeIn(duration: 300.ms),
 
-              const Spacer(),
+              const SizedBox(height: AppDimensions.spaceXL),
 
               // Resend Email
               _buildResendEmail()

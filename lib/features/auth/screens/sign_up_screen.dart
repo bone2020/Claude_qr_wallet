@@ -100,6 +100,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         password: _passwordController.text,
         fullName: _fullNameController.text.trim(),
         phoneNumber: _fullPhoneNumber,
+        countryCode: _selectedCountry.code,
+        currencyCode: _selectedCountry.currency,
       );
 
       if (!mounted) return;
