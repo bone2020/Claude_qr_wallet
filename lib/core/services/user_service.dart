@@ -183,7 +183,7 @@ class UserService {
 
       // Update user's KYC status
       await _firestore.collection('users').doc(_userId).update({
-        'kycCompleted': false, // Will be true after manual/automated verification
+        'kycCompleted': true,
         'dateOfBirth': dateOfBirth.toIso8601String(),
       });
 
