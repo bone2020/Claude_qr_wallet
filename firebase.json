@@ -1,1 +1,43 @@
-{"storage":{"rules":"storage.rules"},"firestore":{"database":"(default)","location":"africa-south1","rules":"firestore.rules","indexes":"firestore.indexes.json"},"flutter":{"platforms":{"android":{"default":{"projectId":"qr-wallet-1993","appId":"1:123632722078:android:34d26d8cb7235f3a7a5b8f","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"qr-wallet-1993","appId":"1:123632722078:ios:76d444f3d26ad5417a5b8f","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"qr-wallet-1993","configurations":{"android":"1:123632722078:android:34d26d8cb7235f3a7a5b8f","ios":"1:123632722078:ios:76d444f3d26ad5417a5b8f"}}}}}}
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs18"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "africa-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "qr-wallet-1993",
+          "appId": "1:123632722078:android:34d26d8cb7235f3a7a5b8f",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "qr-wallet-1993",
+          "appId": "1:123632722078:ios:76d444f3d26ad5417a5b8f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "qr-wallet-1993",
+          "configurations": {
+            "android": "1:123632722078:android:34d26d8cb7235f3a7a5b8f",
+            "ios": "1:123632722078:ios:76d444f3d26ad5417a5b8f"
+          }
+        }
+      }
+    }
+  }
+}
