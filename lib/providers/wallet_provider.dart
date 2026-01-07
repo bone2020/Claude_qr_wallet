@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/services/currency_service.dart';
@@ -57,6 +59,7 @@ class WalletState {
 class WalletNotifier extends StateNotifier<WalletState> {
   final WalletService _walletService;
   final LocalStorageService _localStorage;
+  StreamSubscription<WalletModel?>? _walletSubscription;
 
   WalletNotifier(this._walletService, this._localStorage) : super(WalletState()) {
     _init();
@@ -78,6 +81,25 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
     // Fetch fresh data
     await refreshWallet();
+
+    // Subscribe to real-time wallet updates
+    _walletSubscription = _walletService.watchWallet().listen(
+      (wallet) {
+        if (wallet != null) {
+          state = state.copyWith(wallet: wallet, isLoading: false, error: null);
+          _localStorage.saveWallet(wallet);
+        }
+      },
+      onError: (error) {
+        state = state.copyWith(error: error.toString());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _walletSubscription?.cancel();
+    super.dispose();
   }
 
   /// Refresh wallet data from server
@@ -203,6 +225,7 @@ enum TransactionFilter { all, sent, received, pending }
 class TransactionsNotifier extends StateNotifier<TransactionsState> {
   final WalletService _walletService;
   final LocalStorageService _localStorage;
+  StreamSubscription<List<TransactionModel>>? _transactionsSubscription;
 
   TransactionsNotifier(this._walletService, this._localStorage)
       : super(TransactionsState()) {
@@ -218,6 +241,23 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
 
     // Fetch fresh data
     await refreshTransactions();
+
+    // Subscribe to real-time transaction updates
+    _transactionsSubscription = _walletService.watchTransactions(limit: 50).listen(
+      (transactions) {
+        state = state.copyWith(transactions: transactions, isLoading: false, error: null);
+        _localStorage.saveTransactions(transactions);
+      },
+      onError: (error) {
+        state = state.copyWith(error: error.toString());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _transactionsSubscription?.cancel();
+    super.dispose();
   }
 
   /// Refresh transactions from server
