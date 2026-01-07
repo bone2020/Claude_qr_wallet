@@ -151,28 +151,50 @@ class HomeScreen extends ConsumerWidget {
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return Column(
       children: [
-        QuickActionButton(
-          icon: Iconsax.send_2,
-          label: AppStrings.send,
-          onTap: () => context.push(AppRoutes.sendMoney),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            QuickActionButton(
+              icon: Iconsax.send_2,
+              label: AppStrings.send,
+              onTap: () => context.push(AppRoutes.sendMoney),
+            ),
+            QuickActionButton(
+              icon: Iconsax.receive_square_2,
+              label: AppStrings.receive,
+              onTap: () => context.push(AppRoutes.receiveMoney),
+            ),
+            QuickActionButton(
+              icon: Iconsax.add_circle,
+              label: AppStrings.addMoney,
+              onTap: () => context.push(AppRoutes.addMoney),
+            ),
+            QuickActionButton(
+              icon: Iconsax.money_send,
+              label: 'Withdraw',
+              onTap: () => context.push(AppRoutes.withdraw),
+            ),
+          ],
         ),
-        QuickActionButton(
-          icon: Iconsax.receive_square_2,
-          label: AppStrings.receive,
-          onTap: () => context.push(AppRoutes.receiveMoney),
-        ),
-        QuickActionButton(
-          icon: Iconsax.add_circle,
-          label: AppStrings.addMoney,
-          onTap: () => context.push(AppRoutes.addMoney),
-        ),
-        QuickActionButton(
-          icon: Iconsax.receipt_2,
-          label: 'Request',
-          onTap: () => context.push(AppRoutes.requestPayment),
+        const SizedBox(height: AppDimensions.spaceMD),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            QuickActionButton(
+              icon: Iconsax.scan_barcode,
+              label: 'Scan',
+              onTap: () => context.push(AppRoutes.scanQr),
+            ),
+            QuickActionButton(
+              icon: Iconsax.receipt_2,
+              label: 'Request',
+              onTap: () => context.push(AppRoutes.requestPayment),
+            ),
+            const SizedBox(width: 64), // Placeholder for alignment
+            const SizedBox(width: 64), // Placeholder for alignment
+          ],
         ),
       ],
     );

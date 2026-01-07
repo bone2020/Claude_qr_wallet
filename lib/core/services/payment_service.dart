@@ -1,26 +1,60 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_paystack_plus/flutter_paystack_plus.dart';
 import 'dart:math';
 
 import 'wallet_service.dart';
 
-/// Payment service handling Paystack integration
+/// Payment service handling Paystack integration via Cloud Functions
 class PaymentService {
   final WalletService _walletService = WalletService();
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   // ============================================================
   // PAYSTACK CONFIGURATION
   // ============================================================
 
-  /// Paystack public key - Replace with your actual key
+  /// Paystack public key - safe to include in client
   static const String _publicKey = 'pk_test_your_public_key_here';
 
-  /// Paystack secret key (for server-side operations)
-  /// NOTE: Never use secret key in client app - use backend API
-  static const String _secretKey = 'sk_test_your_secret_key_here';
+  // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 
   // ============================================================
-  // PAYMENT OPERATIONS
+  // PAYMENT VERIFICATION (Server-side via Cloud Function)
+  // ============================================================
+
+  /// Verify payment with server
+  Future<PaymentVerificationResult> verifyPayment(String reference) async {
+    try {
+      final callable = _functions.httpsCallable('verifyPayment');
+      final result = await callable.call({'reference': reference});
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return PaymentVerificationResult(
+          success: true,
+          reference: reference,
+          amount: (data['amount'] as num?)?.toDouble() ?? 0,
+        );
+      } else {
+        return PaymentVerificationResult(
+          success: false,
+          reference: reference,
+          error: data['error'] ?? 'Verification failed',
+        );
+      }
+    } catch (e) {
+      return PaymentVerificationResult(
+        success: false,
+        reference: reference,
+        error: e.toString(),
+      );
+    }
+  }
+
+  // ============================================================
+  // ADD MONEY OPERATIONS
   // ============================================================
 
   /// Initialize payment for adding money to wallet
@@ -28,36 +62,40 @@ class PaymentService {
     required BuildContext context,
     required String email,
     required double amount,
-    String? metadata,
+    required String userId,
+    String? currency,
   }) async {
     try {
-      // Convert amount to kobo (Paystack uses smallest currency unit)
-      final amountInKobo = (amount * 100).round();
-
-      // Generate unique reference
+      final currencyCode = currency ?? 'NGN';
+      // Convert amount to smallest unit (kobo for NGN, pesewas for GHS, etc.)
+      final amountInSmallestUnit = (amount * 100).round();
       final reference = _generateReference();
 
-      // Show Paystack checkout
       await FlutterPaystackPlus.openPaystackPopup(
         publicKey: _publicKey,
         customerEmail: email,
-        amount: amountInKobo.toString(),
+        amount: amountInSmallestUnit.toString(),
         reference: reference,
-        currency: 'NGN',
+        currency: currencyCode,
+        metadata: {
+          'userId': userId,
+          'custom_fields': [
+            {
+              'display_name': 'User ID',
+              'variable_name': 'user_id',
+              'value': userId
+            },
+          ],
+        },
         onClosed: () {
-          // User closed the popup without completing payment
+          // User closed without completing
         },
         onSuccess: () async {
-          // Payment successful - verify and credit wallet
-          final verificationResult = await _verifyPayment(reference);
-          
+          // Verify payment with server
+          final verificationResult = await verifyPayment(reference);
           if (verificationResult.success) {
-            // Credit wallet
-            await _walletService.addMoney(
-              amount: amount,
-              paymentReference: reference,
-              bankName: 'Card Payment',
-            );
+            // Refresh wallet to show new balance
+            await _walletService.refreshWallet();
           }
         },
         context: context,
@@ -65,175 +103,65 @@ class PaymentService {
 
       return PaymentResult.pending(reference);
     } catch (e) {
-      return PaymentResult.failure('Payment initialization failed: $e');
-    }
-  }
-
-  /// Alternative: Charge card directly (for saved cards)
-  Future<PaymentResult> chargeCard({
-    required String email,
-    required double amount,
-    required String cardNumber,
-    required String cvv,
-    required int expiryMonth,
-    required int expiryYear,
-  }) async {
-    try {
-      // NOTE: In production, card charging should be done server-side
-      // This is just a placeholder showing the flow
-
-      final reference = _generateReference();
-      final amountInKobo = (amount * 100).round();
-
-      // In real implementation:
-      // 1. Send card details to your backend
-      // 2. Backend calls Paystack Charge API
-      // 3. Handle OTP/PIN/3DS if required
-      // 4. Return result
-
-      return PaymentResult.pending(reference);
-    } catch (e) {
-      return PaymentResult.failure('Card charge failed: $e');
-    }
-  }
-
-  /// Verify payment status
-  Future<PaymentVerificationResult> _verifyPayment(String reference) async {
-    try {
-      // NOTE: Payment verification should be done server-side
-      // Your backend should:
-      // 1. Call Paystack Verify Transaction API
-      // 2. Check if status is "success"
-      // 3. Return result to app
-
-      // Placeholder - assume success for now
-      return PaymentVerificationResult(
-        success: true,
-        reference: reference,
-        amount: 0, // Would come from verification response
-      );
-    } catch (e) {
-      return PaymentVerificationResult(
-        success: false,
-        reference: reference,
-        error: e.toString(),
-      );
+      return PaymentResult.failure(e.toString());
     }
   }
 
   // ============================================================
-  // BANK TRANSFER (Virtual Account)
+  // WITHDRAWAL OPERATIONS
   // ============================================================
 
-  /// Create dedicated virtual account for user
-  Future<VirtualAccountResult> createVirtualAccount({
-    required String email,
-    required String firstName,
-    required String lastName,
-    required String phoneNumber,
-  }) async {
+  /// Get list of banks from Cloud Function
+  Future<List<Bank>> getBanks({String country = 'nigeria'}) async {
     try {
-      // NOTE: This should be called from your backend
-      // Paystack creates a dedicated NUBAN for the user
-      // Any transfer to this account auto-credits their wallet
+      final callable = _functions.httpsCallable('getBanks');
+      final result = await callable.call({'country': country});
 
-      // API: POST https://api.paystack.co/dedicated_account
-      // Requires: customer code, preferred_bank
+      final data = result.data as Map<String, dynamic>;
 
-      return VirtualAccountResult(
-        success: true,
-        accountNumber: '0123456789', // Would come from API response
-        accountName: '$firstName $lastName',
-        bankName: 'Wema Bank',
-      );
+      if (data['success'] == true) {
+        final banks = (data['banks'] as List)
+            .map((b) => Bank(
+                  name: b['name'] as String,
+                  code: b['code'] as String,
+                  type: b['type'] as String? ?? 'nuban',
+                ))
+            .toList();
+        return banks;
+      }
+      return [];
     } catch (e) {
-      return VirtualAccountResult(
-        success: false,
-        error: e.toString(),
-      );
+      debugPrint('Error fetching banks: $e');
+      return [];
     }
   }
 
-  // ============================================================
-  // WITHDRAWAL (Transfer to Bank)
-  // ============================================================
-
-  /// Initiate transfer to user's bank account
-  Future<PaymentResult> initiateWithdrawal({
-    required double amount,
-    required String bankCode,
-    required String accountNumber,
-    required String accountName,
-    String? narration,
-  }) async {
-    try {
-      // NOTE: Withdrawals must be done server-side
-      // Your backend should:
-      // 1. Verify user has sufficient balance
-      // 2. Create transfer recipient if not exists
-      // 3. Initiate transfer via Paystack
-      // 4. Deduct from wallet on success
-
-      final reference = _generateReference();
-
-      // API flow:
-      // 1. POST /transferrecipient (create recipient)
-      // 2. POST /transfer (initiate transfer)
-
-      return PaymentResult.pending(reference);
-    } catch (e) {
-      return PaymentResult.failure('Withdrawal failed: $e');
-    }
-  }
-
-  /// Get list of Nigerian banks
-  Future<List<Bank>> getBankList() async {
-    // Paystack Bank List API
-    // GET https://api.paystack.co/bank
-
-    // Hardcoded common banks for now
-    return [
-      Bank(code: '044', name: 'Access Bank'),
-      Bank(code: '023', name: 'Citibank Nigeria'),
-      Bank(code: '050', name: 'Ecobank Nigeria'),
-      Bank(code: '070', name: 'Fidelity Bank'),
-      Bank(code: '011', name: 'First Bank of Nigeria'),
-      Bank(code: '214', name: 'First City Monument Bank'),
-      Bank(code: '058', name: 'Guaranty Trust Bank'),
-      Bank(code: '030', name: 'Heritage Bank'),
-      Bank(code: '301', name: 'Jaiz Bank'),
-      Bank(code: '082', name: 'Keystone Bank'),
-      Bank(code: '526', name: 'Parallex Bank'),
-      Bank(code: '076', name: 'Polaris Bank'),
-      Bank(code: '101', name: 'Providus Bank'),
-      Bank(code: '221', name: 'Stanbic IBTC Bank'),
-      Bank(code: '068', name: 'Standard Chartered Bank'),
-      Bank(code: '232', name: 'Sterling Bank'),
-      Bank(code: '100', name: 'Suntrust Bank'),
-      Bank(code: '032', name: 'Union Bank of Nigeria'),
-      Bank(code: '033', name: 'United Bank for Africa'),
-      Bank(code: '215', name: 'Unity Bank'),
-      Bank(code: '035', name: 'Wema Bank'),
-      Bank(code: '057', name: 'Zenith Bank'),
-    ];
-  }
-
-  /// Verify bank account
+  /// Verify bank account via Cloud Function
   Future<BankAccountVerification> verifyBankAccount({
     required String accountNumber,
     required String bankCode,
   }) async {
     try {
-      // API: GET https://api.paystack.co/bank/resolve
-      // ?account_number={account_number}&bank_code={bank_code}
+      final callable = _functions.httpsCallable('verifyBankAccount');
+      final result = await callable.call({
+        'accountNumber': accountNumber,
+        'bankCode': bankCode,
+      });
 
-      // Placeholder response
-      return BankAccountVerification(
-        success: true,
-        accountNumber: accountNumber,
-        accountName: 'John Doe', // Would come from API
-        bankCode: bankCode,
-      );
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return BankAccountVerification(
+          success: true,
+          accountName: data['accountName'] as String?,
+          accountNumber: data['accountNumber'] as String?,
+        );
+      } else {
+        return BankAccountVerification(
+          success: false,
+          error: data['error'] as String? ?? 'Verification failed',
+        );
+      }
     } catch (e) {
       return BankAccountVerification(
         success: false,
@@ -242,103 +170,197 @@ class PaymentService {
     }
   }
 
+  /// Initiate withdrawal to bank via Cloud Function
+  Future<WithdrawalResult> initiateWithdrawal({
+    required double amount,
+    required String bankCode,
+    required String accountNumber,
+    required String accountName,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('initiateWithdrawal');
+      final result = await callable.call({
+        'amount': amount,
+        'bankCode': bankCode,
+        'accountNumber': accountNumber,
+        'accountName': accountName,
+        'type': 'bank',
+      });
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return WithdrawalResult(
+          success: true,
+          reference: data['reference'] as String?,
+          message: data['message'] as String?,
+        );
+      } else {
+        return WithdrawalResult(
+          success: false,
+          error: data['error'] as String? ?? 'Withdrawal failed',
+        );
+      }
+    } catch (e) {
+      return WithdrawalResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Initiate withdrawal to mobile money via Cloud Function
+  Future<WithdrawalResult> initiateMobileMoneyWithdrawal({
+    required double amount,
+    required String provider,
+    required String phoneNumber,
+    required String accountName,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('initiateWithdrawal');
+      final result = await callable.call({
+        'amount': amount,
+        'mobileMoneyProvider': provider,
+        'phoneNumber': phoneNumber,
+        'accountName': accountName,
+        'type': 'mobile_money',
+      });
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return WithdrawalResult(
+          success: true,
+          reference: data['reference'] as String?,
+          message: data['message'] as String?,
+        );
+      } else {
+        return WithdrawalResult(
+          success: false,
+          error: data['error'] as String? ?? 'Withdrawal failed',
+        );
+      }
+    } catch (e) {
+      return WithdrawalResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
   // ============================================================
-  // HELPER METHODS
+  // HELPERS
   // ============================================================
 
-  /// Generate unique payment reference
   String _generateReference() {
-    final random = Random();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomPart = random.nextInt(999999).toString().padLeft(6, '0');
-    return 'QRW_$timestamp$randomPart';
+    final random = Random().nextInt(999999).toString().padLeft(6, '0');
+    return 'QRW_${timestamp}_$random';
   }
 }
 
 // ============================================================
-// DATA CLASSES
+// MODELS
 // ============================================================
 
-/// Payment result wrapper
 class PaymentResult {
   final bool success;
-  final bool pending;
   final String? reference;
   final String? error;
+  final bool pending;
 
   PaymentResult._({
-    this.success = false,
-    this.pending = false,
+    required this.success,
     this.reference,
     this.error,
+    this.pending = false,
   });
 
-  factory PaymentResult.success(String reference) {
-    return PaymentResult._(success: true, reference: reference);
-  }
+  factory PaymentResult.success(String reference) =>
+      PaymentResult._(success: true, reference: reference);
 
-  factory PaymentResult.pending(String reference) {
-    return PaymentResult._(pending: true, reference: reference);
-  }
+  factory PaymentResult.pending(String reference) =>
+      PaymentResult._(success: false, reference: reference, pending: true);
 
-  factory PaymentResult.failure(String error) {
-    return PaymentResult._(error: error);
-  }
+  factory PaymentResult.failure(String error) =>
+      PaymentResult._(success: false, error: error);
 }
 
-/// Payment verification result
 class PaymentVerificationResult {
   final bool success;
   final String reference;
-  final double? amount;
+  final double amount;
   final String? error;
 
   PaymentVerificationResult({
     required this.success,
     required this.reference,
-    this.amount,
+    this.amount = 0,
     this.error,
   });
 }
 
-/// Virtual account result
-class VirtualAccountResult {
-  final bool success;
-  final String? accountNumber;
-  final String? accountName;
-  final String? bankName;
-  final String? error;
-
-  VirtualAccountResult({
-    required this.success,
-    this.accountNumber,
-    this.accountName,
-    this.bankName,
-    this.error,
-  });
-}
-
-/// Bank model
 class Bank {
-  final String code;
   final String name;
+  final String code;
+  final String type;
 
-  Bank({required this.code, required this.name});
+  Bank({required this.name, required this.code, required this.type});
 }
 
-/// Bank account verification result
 class BankAccountVerification {
   final bool success;
-  final String? accountNumber;
   final String? accountName;
-  final String? bankCode;
+  final String? accountNumber;
   final String? error;
 
   BankAccountVerification({
     required this.success,
-    this.accountNumber,
     this.accountName,
-    this.bankCode,
+    this.accountNumber,
     this.error,
   });
+}
+
+class WithdrawalResult {
+  final bool success;
+  final String? reference;
+  final String? message;
+  final String? error;
+
+  WithdrawalResult({
+    required this.success,
+    this.reference,
+    this.message,
+    this.error,
+  });
+}
+
+class MobileMoneyProvider {
+  final String name;
+  final String code;
+
+  MobileMoneyProvider({required this.name, required this.code});
+
+  static List<MobileMoneyProvider> getProviders(String country) {
+    switch (country.toLowerCase()) {
+      case 'ghana':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+          MobileMoneyProvider(name: 'Vodafone Cash', code: 'VOD'),
+          MobileMoneyProvider(name: 'AirtelTigo Money', code: 'ATL'),
+        ];
+      case 'kenya':
+        return [
+          MobileMoneyProvider(name: 'M-Pesa', code: 'MPESA'),
+        ];
+      case 'uganda':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+          MobileMoneyProvider(name: 'Airtel Money', code: 'AIRTEL'),
+        ];
+      default:
+        return [];
+    }
+  }
 }
