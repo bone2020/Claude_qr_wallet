@@ -189,9 +189,7 @@ class HomeScreen extends ConsumerWidget {
               style: AppTextStyles.headlineSmall(),
             ),
             TextButton(
-              onPressed: () {
-                // Navigate to transactions tab
-              },
+                onPressed: () => context.push(AppRoutes.transactions),
               child: Text(
                 AppStrings.viewAll,
                 style: AppTextStyles.bodyMedium(color: AppColors.primary),
