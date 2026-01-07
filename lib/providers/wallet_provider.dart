@@ -121,6 +121,8 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
 /// Wallet provider
 final walletNotifierProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
+  // Watch auth state - recreates provider when user changes (logout/login)
+  ref.watch(currentUserProvider);
   final walletService = ref.watch(walletServiceProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   return WalletNotifier(walletService, localStorage);
@@ -128,6 +130,7 @@ final walletNotifierProvider = StateNotifierProvider<WalletNotifier, WalletState
 
 /// Wallet stream provider (real-time updates)
 final walletStreamProvider = StreamProvider<WalletModel?>((ref) {
+  ref.watch(currentUserProvider);
   final walletService = ref.watch(walletServiceProvider);
   return walletService.watchWallet();
 });
@@ -246,6 +249,7 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
 /// Transactions provider
 final transactionsNotifierProvider =
     StateNotifierProvider<TransactionsNotifier, TransactionsState>((ref) {
+  ref.watch(currentUserProvider);
   final walletService = ref.watch(walletServiceProvider);
   final localStorage = ref.watch(localStorageServiceProvider);
   return TransactionsNotifier(walletService, localStorage);
@@ -253,6 +257,7 @@ final transactionsNotifierProvider =
 
 /// Transactions stream provider (real-time updates)
 final transactionsStreamProvider = StreamProvider<List<TransactionModel>>((ref) {
+  ref.watch(currentUserProvider);
   final walletService = ref.watch(walletServiceProvider);
   return walletService.watchTransactions(limit: 50);
 });
