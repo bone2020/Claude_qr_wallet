@@ -42,6 +42,7 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
 class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   final _amountController = TextEditingController();
   bool _isLoading = false;
+  bool _hasConvertedMerchantAmount = false;
 
   // Mock fee calculation
   double get _fee => (_amount * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
@@ -74,14 +75,54 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     );
   }
 
+  // Merchant QR specific getters
+  bool get _isMerchantQR => widget.amountLocked && _needsConversion;
+
+  // Original amount seller requested in their currency
+  double get _sellerRequestedAmount => widget.amount;
+
+  // Reverse rate: from seller's currency to buyer's currency
+  double? get _reverseExchangeRate {
+    if (!_needsConversion || widget.recipientCurrency == null) return null;
+    return ExchangeRateService.getExchangeRate(
+      fromCurrency: widget.recipientCurrency!,
+      toCurrency: _currencyCode,
+    );
+  }
+
+  // Amount buyer needs to pay in their currency (for merchant QR)
+  double? get _buyerPaysAmount {
+    if (!_isMerchantQR || widget.recipientCurrency == null) return null;
+    return ExchangeRateService.convert(
+      amount: _sellerRequestedAmount,
+      fromCurrency: widget.recipientCurrency!,
+      toCurrency: _currencyCode,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
-    if (widget.amount > 0) {
-      // Use 2 decimal places for locked amounts (from merchant QR), otherwise whole numbers
-      _amountController.text = widget.amountLocked
-          ? widget.amount.toStringAsFixed(2)
-          : widget.amount.toStringAsFixed(0);
+    // For non-merchant QR or same currency, set amount directly
+    // Merchant QR with different currency needs conversion in didChangeDependencies
+    if (widget.amount > 0 && !widget.amountLocked) {
+      _amountController.text = widget.amount.toStringAsFixed(0);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Convert merchant QR amount from seller's currency to buyer's currency
+    if (!_hasConvertedMerchantAmount && widget.amountLocked && widget.amount > 0) {
+      _hasConvertedMerchantAmount = true;
+      if (_isMerchantQR && _buyerPaysAmount != null) {
+        // Seller requested amount in their currency, convert to buyer's currency
+        _amountController.text = _buyerPaysAmount!.toStringAsFixed(2);
+      } else {
+        // Same currency or no conversion needed
+        _amountController.text = widget.amount.toStringAsFixed(2);
+      }
     }
   }
 
@@ -456,7 +497,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             isTotal: true,
           ),
           // Show conversion info if currencies are different
-          if (_needsConversion && _convertedAmount != null) ...[
+          if (_needsConversion && (_isMerchantQR || _convertedAmount != null)) ...[
             const SizedBox(height: AppDimensions.spaceMD),
             _buildConversionInfo(),
           ],
@@ -467,8 +508,45 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
   Widget _buildConversionInfo() {
     final recipientSymbol = widget.recipientCurrencySymbol ?? widget.recipientCurrency ?? '';
-    final rate = _exchangeRate ?? 0;
 
+    // For merchant QR: show "Seller requested X" in seller's currency
+    // For regular send: show "Recipient receives X" in recipient's currency
+    if (_isMerchantQR) {
+      final reverseRate = _reverseExchangeRate ?? 0;
+      return Container(
+        padding: const EdgeInsets.all(AppDimensions.spaceMD),
+        decoration: BoxDecoration(
+          color: AppColors.info.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+          border: Border.all(color: AppColors.info.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Seller requested:',
+                  style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                ),
+                Text(
+                  '$recipientSymbol${_formatAmount(_sellerRequestedAmount)}',
+                  style: AppTextStyles.bodyLarge(color: AppColors.info),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.spaceXS),
+            Text(
+              '1 ${widget.recipientCurrency} = ${reverseRate.toStringAsFixed(2)} $_currencyCode',
+              style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Regular send: show what recipient receives
+    final rate = _exchangeRate ?? 0;
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
