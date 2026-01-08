@@ -21,6 +21,7 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
+import '../../features/wallet/screens/payment_result_screen.dart';
 import '../../features/settings/screens/currency_selector_screen.dart';
 
 /// Route names
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String requestPayment = '/request-payment';
   static const String addMoney = '/add-money';
   static const String withdraw = '/withdraw';
+  static const String paymentResult = '/payment-result';
   static const String currencySelector = '/currency-selector';
   static const String transactions = '/transactions';
   static const String transactionDetails = '/transaction-details';
@@ -168,6 +170,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.withdraw,
         name: 'withdraw',
         builder: (context, state) => const WithdrawScreen(),
+      ),
+
+      // Payment Result Screen (Deep Link Callback)
+      GoRoute(
+        path: AppRoutes.paymentResult,
+        name: 'paymentResult',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          return PaymentResultScreen(
+            reference: extra?['reference'] ?? '',
+            status: extra?['status'],
+          );
+        },
       ),
 
       // Currency Selector Screen

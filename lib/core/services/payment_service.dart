@@ -77,6 +77,7 @@ class PaymentService {
         amount: amountInSmallestUnit.toString(),
         reference: reference,
         currency: currencyCode,
+        callbackUrl: 'qrwallet://payment/success?reference=$reference',
         metadata: {
           'userId': userId,
           'custom_fields': [

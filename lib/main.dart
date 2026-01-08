@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/services.dart';
+import 'core/services/deep_link_service.dart';
 import 'providers/providers.dart';
 
 void main() async {
@@ -58,6 +59,46 @@ class QRWalletApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        return DeepLinkWrapper(child: child ?? const SizedBox.shrink());
+      },
     );
   }
+}
+
+/// Wrapper widget to initialize deep link handling
+class DeepLinkWrapper extends StatefulWidget {
+  final Widget child;
+  const DeepLinkWrapper({super.key, required this.child});
+
+  @override
+  State<DeepLinkWrapper> createState() => _DeepLinkWrapperState();
+}
+
+class _DeepLinkWrapperState extends State<DeepLinkWrapper> {
+  final _deepLinkService = DeepLinkService();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _deepLinkService.init(context);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update context reference when it changes
+    _deepLinkService.setContext(context);
+  }
+
+  @override
+  void dispose() {
+    _deepLinkService.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

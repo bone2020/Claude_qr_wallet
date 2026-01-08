@@ -73,6 +73,16 @@
 				<string>app-1-123632722078-ios-f0d3c4a5339da7cc7a5b8f</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Payment Callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>qrwallet</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>
