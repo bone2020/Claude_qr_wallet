@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecting to QR Wallet...</title>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const reference = params.get('reference') || params.get('trxref');
+        
+        let appUrl = 'qrwallet://payment/success';
+        if (reference) {
+            appUrl += '?reference=' + reference;
+        }
+        
+        window.location.href = appUrl;
+        
+        setTimeout(function() {
+            document.getElementById('message').innerHTML = 
+                '<h2>Payment Complete!</h2>' +
+                '<p>If the app didn\'t open automatically, please open QR Wallet app manually.</p>' +
+                '<p>Reference: ' + (reference || 'N/A') + '</p>';
+        }, 2000);
+    </script>
+</head>
+<body style="font-family: Arial; text-align: center; padding-top: 100px;">
+    <div id="message">
+        <h2>Redirecting to QR Wallet...</h2>
+        <p>Please wait...</p>
+    </div>
+</body>
+</html>

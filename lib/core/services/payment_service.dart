@@ -77,7 +77,6 @@ class PaymentService {
         amount: amountInSmallestUnit.toString(),
         reference: reference,
         currency: currencyCode,
-        callbackUrl: 'qrwallet://payment/success?reference=$reference',
         metadata: {
           'userId': userId,
           'custom_fields': [
@@ -96,7 +95,6 @@ class PaymentService {
           final verificationResult = await verifyPayment(reference);
           if (verificationResult.success) {
             // Refresh wallet to show new balance
-            await _walletService.refreshWallet();
           }
         },
         context: context,

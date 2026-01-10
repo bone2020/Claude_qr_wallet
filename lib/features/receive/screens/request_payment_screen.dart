@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../providers/auth_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -26,7 +27,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   final GlobalKey _qrKey = GlobalKey();
 
   String get _walletId => ref.watch(walletNotifierProvider).wallet?.walletId ?? '';
-  String get _userName => ref.watch(walletNotifierProvider).wallet?.ownerName ?? 'User';
+  String get _userName => ref.watch(currentUserProvider)?.fullName ?? 'User';
   String get _currencySymbol => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
 

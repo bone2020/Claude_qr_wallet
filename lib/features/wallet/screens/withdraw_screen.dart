@@ -73,7 +73,10 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       final banks = await _paymentService.getBanks(country: country);
       if (mounted) {
         setState(() {
-          _banks = banks;
+          _banks = [
+            Bank(name: 'Test Bank (Development)', code: '001', type: 'nuban'),
+            ...banks,
+          ];
           _isLoadingBanks = false;
         });
       }
@@ -118,8 +121,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     if (value == null || value.isEmpty) {
       return 'Please enter account number';
     }
-    if (value.length < 10) {
-      return 'Account number must be at least 10 digits';
+    if (value.length < 6) {
+      return 'Account number must be at least 6 digits';
     }
     return null;
   }
@@ -128,7 +131,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     if (value == null || value.isEmpty) {
       return 'Please enter phone number';
     }
-    if (value.length < 10) {
+    if (value.length < 6) {
       return 'Please enter a valid phone number';
     }
     return null;
@@ -141,7 +144,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     }
 
     final accountNumber = _accountNumberController.text.replaceAll(' ', '');
-    if (accountNumber.length < 10) {
+    if (accountNumber.length < 6) {
       return;
     }
 
@@ -229,7 +232,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
       if (!mounted) return;
 
-      if (result.success) {
+          if (result.success) {
         ref.read(walletNotifierProvider.notifier).refreshWallet();
         ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
         _showSuccessDialog(amount, result.reference ?? '');
@@ -710,6 +713,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   ),
                 )
               : DropdownButtonFormField<Bank>(
+                  isExpanded: true,
                   value: _selectedBank,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
@@ -725,6 +729,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                       value: bank,
                       child: Text(
                         bank.name,
+                        overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.bodyMedium(),
                       ),
                     );
@@ -734,7 +739,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                       _selectedBank = bank;
                       _verifiedAccountName = null;
                     });
-                    if (_accountNumberController.text.length >= 10) {
+                    if (_accountNumberController.text.length >= 6) {
                       _verifyBankAccount();
                     }
                   },
@@ -759,10 +764,10 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           style: AppTextStyles.bodyLarge(),
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(10),
+            LengthLimitingTextInputFormatter(20),
           ],
           decoration: InputDecoration(
-            hintText: 'Enter 10-digit account number',
+            hintText: 'Enter account number',
             hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
             filled: true,
             fillColor: AppColors.surfaceDark,
@@ -791,7 +796,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           ),
           validator: _validateAccountNumber,
           onChanged: (value) {
-            if (value.length >= 10 && _selectedBank != null) {
+            if (value.length >= 6 && _selectedBank != null) {
               _verifyBankAccount();
             }
           },

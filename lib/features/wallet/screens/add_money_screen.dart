@@ -75,6 +75,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
         context: context,
         email: user.email,
         amount: amount,
+        userId: user.id,
       );
 
       if (!mounted) return;

@@ -160,6 +160,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   try {
     // Verify with Paystack
+    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
     const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
 
     if (!response.status || response.data.status !== 'success') {
@@ -608,8 +609,11 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 exports.getBanks = functions.https.onCall(async (data, context) => {
   try {
     const country = data.country || 'nigeria';
+    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
     const response = await paystackRequest('GET', `/bank?country=${country}`);
 
+    console.log('Paystack response:', JSON.stringify(response));
+    console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
       throw new Error('Failed to fetch banks');
     }
@@ -641,8 +645,11 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   }
 
   try {
+    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
     const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
 
+    console.log('Paystack response:', JSON.stringify(response));
+    console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
       return { success: false, error: 'Could not verify account' };
     }
