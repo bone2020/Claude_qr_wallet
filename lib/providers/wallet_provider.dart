@@ -68,6 +68,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
   Future<void> _init() async {
     // Load cached wallet first
     final cachedWallet = await _localStorage.getWallet();
+    if (!mounted) return;
     if (cachedWallet != null) {
       state = state.copyWith(wallet: cachedWallet);
     }
@@ -77,20 +78,24 @@ class WalletNotifier extends StateNotifier<WalletState> {
       LocalStorageService.keyBalanceHidden,
       defaultValue: false,
     );
+    if (!mounted) return;
     state = state.copyWith(balanceHidden: balanceHidden ?? false);
 
     // Fetch fresh data
     await refreshWallet();
+    if (!mounted) return;
 
     // Subscribe to real-time wallet updates
     _walletSubscription = _walletService.watchWallet().listen(
       (wallet) {
+        if (!mounted) return;
         if (wallet != null) {
           state = state.copyWith(wallet: wallet, isLoading: false, error: null);
           _localStorage.saveWallet(wallet);
         }
       },
       onError: (error) {
+        if (!mounted) return;
         state = state.copyWith(error: error.toString());
       },
     );
@@ -104,10 +109,12 @@ class WalletNotifier extends StateNotifier<WalletState> {
 
   /// Refresh wallet data from server
   Future<void> refreshWallet() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final wallet = await _walletService.getWallet();
+      if (!mounted) return;
       if (wallet != null) {
         await _localStorage.saveWallet(wallet);
         state = state.copyWith(wallet: wallet, isLoading: false);
@@ -115,6 +122,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
         state = state.copyWith(isLoading: false, error: 'Wallet not found');
       }
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -235,20 +243,24 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
   Future<void> _init() async {
     // Load cached transactions first
     final cached = await _localStorage.getTransactions();
+    if (!mounted) return;
     if (cached.isNotEmpty) {
       state = state.copyWith(transactions: cached);
     }
 
     // Fetch fresh data
     await refreshTransactions();
+    if (!mounted) return;
 
     // Subscribe to real-time transaction updates
     _transactionsSubscription = _walletService.watchTransactions(limit: 50).listen(
       (transactions) {
+        if (!mounted) return;
         state = state.copyWith(transactions: transactions, isLoading: false, error: null);
         _localStorage.saveTransactions(transactions);
       },
       onError: (error) {
+        if (!mounted) return;
         state = state.copyWith(error: error.toString());
       },
     );
@@ -262,13 +274,16 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
 
   /// Refresh transactions from server
   Future<void> refreshTransactions() async {
+    if (!mounted) return;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final transactions = await _walletService.getTransactions(limit: 50);
+      if (!mounted) return;
       await _localStorage.saveTransactions(transactions);
       state = state.copyWith(transactions: transactions, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
