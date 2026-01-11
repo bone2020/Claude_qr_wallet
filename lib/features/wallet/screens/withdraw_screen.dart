@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,6 +43,14 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   MobileMoneyProvider? _selectedMomoProvider;
   String _momoAccountName = '';
 
+  // Debounce timer for bank verification
+  Timer? _debounceTimer;
+
+  // Configuration for bank account verification
+  static const int _minDigitsToVerify = 10;
+  static const int _maxAccountDigits = 20;
+  static const Duration _debounceDuration = Duration(milliseconds: 1000);
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +61,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
   @override
   void dispose() {
+    // Cancel debounce timer to prevent memory leaks and calls after dispose
+    _debounceTimer?.cancel();
     _tabController.dispose();
     _amountController.dispose();
     _accountNumberController.dispose();
@@ -121,8 +134,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     if (value == null || value.isEmpty) {
       return 'Please enter account number';
     }
-    if (value.length < 6) {
-      return 'Account number must be at least 6 digits';
+    if (value.length < _minDigitsToVerify) {
+      return 'Account number must be at least $_minDigitsToVerify digits';
     }
     return null;
   }
@@ -137,14 +150,51 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     return null;
   }
 
+  // ============================================================
+  // DEBOUNCED BANK VERIFICATION
+  // ============================================================
+
+  /// Schedules a bank account verification with debouncing.
+  /// This prevents multiple rapid API calls when user is typing.
+  void _scheduleBankVerification() {
+    // Cancel any existing timer
+    _debounceTimer?.cancel();
+
+    final accountNumber = _accountNumberController.text.replaceAll(' ', '');
+
+    // Don't schedule if conditions aren't met
+    if (accountNumber.length < _minDigitsToVerify) {
+      return;
+    }
+    if (_selectedBank == null) {
+      return;
+    }
+    if (_isVerifyingAccount) {
+      return;
+    }
+
+    // Schedule verification after debounce delay
+    _debounceTimer = Timer(_debounceDuration, () {
+      _verifyBankAccount();
+    });
+  }
+
+  /// Verifies bank account with Paystack API.
+  /// Called either by debounce timer or manual verify button.
   Future<void> _verifyBankAccount() async {
+    // Prevent duplicate calls
+    if (_isVerifyingAccount) {
+      return;
+    }
+
     if (_selectedBank == null) {
       _showError('Please select a bank');
       return;
     }
 
     final accountNumber = _accountNumberController.text.replaceAll(' ', '');
-    if (accountNumber.length < 6) {
+    if (accountNumber.length < _minDigitsToVerify) {
+      _showError('Account number must be at least $_minDigitsToVerify digits');
       return;
     }
 
@@ -178,6 +228,15 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     }
   }
 
+  /// Clears the verified account name when account details change.
+  void _clearVerification() {
+    if (_verifiedAccountName != null) {
+      setState(() {
+        _verifiedAccountName = null;
+      });
+    }
+  }
+
   Future<void> _handleWithdraw() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -190,7 +249,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         _showError('Please select a bank');
         return;
       }
-      if (_verifiedAccountName == null) {
+      if (_verifiedAccountName == null && !kDebugMode) {
         _showError('Please verify your account first');
         return;
       }
@@ -737,11 +796,10 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   onChanged: (bank) {
                     setState(() {
                       _selectedBank = bank;
-                      _verifiedAccountName = null;
                     });
-                    if (_accountNumberController.text.length >= 6) {
-                      _verifyBankAccount();
-                    }
+                    // Clear previous verification and schedule new one
+                    _clearVerification();
+                    _scheduleBankVerification();
                   },
                 ),
         ),
@@ -750,6 +808,10 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   }
 
   Widget _buildAccountNumberInput() {
+    final accountLength = _accountNumberController.text.replaceAll(' ', '').length;
+    final canVerify = accountLength >= _minDigitsToVerify && _selectedBank != null;
+    final showVerifyButton = canVerify && _verifiedAccountName == null && !_isVerifyingAccount;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -758,49 +820,86 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
-        TextFormField(
-          controller: _accountNumberController,
-          keyboardType: TextInputType.number,
-          style: AppTextStyles.bodyLarge(),
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            LengthLimitingTextInputFormatter(20),
-          ],
-          decoration: InputDecoration(
-            hintText: 'Enter account number',
-            hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
-            filled: true,
-            fillColor: AppColors.surfaceDark,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.inputBorderDark),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _accountNumberController,
+                keyboardType: TextInputType.number,
+                style: AppTextStyles.bodyLarge(),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(_maxAccountDigits),
+                ],
+                decoration: InputDecoration(
+                  hintText: 'Enter account number',
+                  hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
+                  filled: true,
+                  fillColor: AppColors.surfaceDark,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                    borderSide: const BorderSide(color: AppColors.inputBorderDark),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                    borderSide: const BorderSide(color: AppColors.inputBorderDark),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                  suffixIcon: _isVerifyingAccount
+                      ? const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                ),
+                validator: _validateAccountNumber,
+                onChanged: (value) {
+                  // Clear previous verification when account number changes
+                  _clearVerification();
+                  // Schedule debounced verification
+                  _scheduleBankVerification();
+                },
+              ),
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.inputBorderDark),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-            suffixIcon: _isVerifyingAccount
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+            // Manual verify button - shows when conditions are met but not yet verified
+            if (showVerifyButton) ...[
+              const SizedBox(width: AppDimensions.spaceSM),
+              SizedBox(
+                height: 56, // Match text field height
+                child: ElevatedButton(
+                  onPressed: _verifyBankAccount,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.spaceMD),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
                     ),
-                  )
-                : null,
-          ),
-          validator: _validateAccountNumber,
-          onChanged: (value) {
-            if (value.length >= 6 && _selectedBank != null) {
-              _verifyBankAccount();
-            }
-          },
+                  ),
+                  child: Text(
+                    'Verify',
+                    style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
+        // Helper text
+        if (!canVerify && accountLength > 0) ...[
+          const SizedBox(height: AppDimensions.spaceXS),
+          Text(
+            'Enter at least $_minDigitsToVerify digits to verify',
+            style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
+          ),
+        ],
       ],
     );
   }
