@@ -160,8 +160,6 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   try {
     // Verify with Paystack
-    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
-    const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
 
     if (!response.status || response.data.status !== 'success') {
       return { success: false, error: 'Payment verification failed' };
@@ -611,9 +609,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 exports.getBanks = functions.https.onCall(async (data, context) => {
   try {
     const country = data.country || 'nigeria';
-    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
     const response = await paystackRequest('GET', `/bank?country=${country}`);
-
     console.log('Paystack response:', JSON.stringify(response));
     console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
