@@ -473,6 +473,12 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       SnackBar(
         content: Text(message),
         backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          left: 16,
+          right: 16,
+        ),
       ),
     );
   }
