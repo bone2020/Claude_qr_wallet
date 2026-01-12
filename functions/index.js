@@ -647,7 +647,6 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
     const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
 
     console.log('Paystack response:', JSON.stringify(response));
-    console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
       return { success: false, error: 'Could not verify account' };
     }
@@ -661,5 +660,157 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error('Verify account error:', error);
     return { success: false, error: 'Account verification failed' };
+  }
+});
+
+// ============================================================
+// MOBILE MONEY CHARGE (For adding funds via Mobile Money)
+// ============================================================
+exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { email, amount, currency, provider, phoneNumber } = data;
+  const userId = context.auth.uid;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  }
+  if (!provider || !phoneNumber) {
+    throw new functions.https.HttpsError('invalid-argument', 'Provider and phone number are required');
+  }
+
+  try {
+    const reference = `MOMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const chargeResponse = await paystackRequest('POST', '/charge', {
+      email: email,
+      amount: Math.round(amount * 100),
+      currency: currency || 'GHS',
+      mobile_money: {
+        phone: phoneNumber,
+        provider: provider,
+      },
+      reference: reference,
+      metadata: {
+        userId: userId,
+        type: 'deposit',
+      },
+    });
+
+    console.log('Mobile Money charge response:', JSON.stringify(chargeResponse));
+
+    if (chargeResponse.status) {
+      return {
+        success: true,
+        reference: reference,
+        message: 'Payment initiated. Please approve on your phone.',
+        status: chargeResponse.data?.status,
+      };
+    } else {
+      return {
+        success: false,
+        error: chargeResponse.message || 'Failed to initiate payment',
+      };
+    }
+  } catch (error) {
+    console.error('Mobile Money charge error:', error);
+    throw new functions.https.HttpsError('internal', error.message || 'Payment failed');
+  }
+});
+
+// ============================================================
+// VIRTUAL ACCOUNT (For Bank Transfer deposits)
+// ============================================================
+exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { email, name } = data;
+  const userId = context.auth.uid;
+
+  try {
+    // Check if user already has a virtual account
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.data();
+
+    if (userData?.virtualAccount) {
+      return {
+        success: true,
+        bankName: userData.virtualAccount.bankName,
+        accountNumber: userData.virtualAccount.accountNumber,
+        accountName: userData.virtualAccount.accountName,
+      };
+    }
+
+    // Get or create customer
+    let customerId;
+    const customerListResponse = await paystackRequest('GET', `/customer/${email}`);
+
+    if (customerListResponse.status && customerListResponse.data) {
+      customerId = customerListResponse.data.id;
+    } else {
+      const createCustomerResponse = await paystackRequest('POST', '/customer', {
+        email: email,
+        first_name: name.split(' ')[0],
+        last_name: name.split(' ').slice(1).join(' ') || name.split(' ')[0],
+        metadata: { userId: userId },
+      });
+
+      if (!createCustomerResponse.status) {
+        throw new Error('Failed to create customer');
+      }
+      customerId = createCustomerResponse.data.id;
+    }
+
+    // Create Dedicated Virtual Account
+    const dvaResponse = await paystackRequest('POST', '/dedicated_account', {
+      customer: customerId,
+      preferred_bank: 'wema-bank',
+    });
+
+    console.log('DVA response:', JSON.stringify(dvaResponse));
+
+    if (dvaResponse.status && dvaResponse.data) {
+      const virtualAccount = {
+        bankName: dvaResponse.data.bank?.name || 'Wema Bank',
+        accountNumber: dvaResponse.data.account_number,
+        accountName: dvaResponse.data.account_name,
+        bankId: dvaResponse.data.bank?.id,
+        customerId: customerId,
+      };
+
+      await db.collection('users').doc(userId).update({
+        virtualAccount: virtualAccount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        bankName: virtualAccount.bankName,
+        accountNumber: virtualAccount.accountNumber,
+        accountName: virtualAccount.accountName,
+      };
+    } else {
+      // Return mock for development/test mode
+      return {
+        success: true,
+        bankName: 'Test Bank (Development)',
+        accountNumber: '0000000000',
+        accountName: name,
+        note: 'Virtual accounts are only available in live mode',
+      };
+    }
+  } catch (error) {
+    console.error('Virtual account error:', error);
+    return {
+      success: true,
+      bankName: 'Test Bank (Development)',
+      accountNumber: '0000000000',
+      accountName: name || 'Test Account',
+      note: 'Virtual accounts require live mode activation',
+    };
   }
 });

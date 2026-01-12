@@ -15,7 +15,7 @@ class PaymentService {
   // ============================================================
 
   /// Paystack public key - safe to include in client
-  static const String _publicKey = 'pk_test_your_public_key_here';
+  static const String _publicKey = 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b';
 
   // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 
@@ -103,6 +103,92 @@ class PaymentService {
       return PaymentResult.pending(reference);
     } catch (e) {
       return PaymentResult.failure(e.toString());
+    }
+  }
+
+  // ============================================================
+  // MOBILE MONEY PAYMENT (For adding funds via Mobile Money)
+  // ============================================================
+
+  /// Initialize mobile money payment via Cloud Function
+  Future<MobileMoneyPaymentResult> initializeMobileMoneyPayment({
+    required String email,
+    required double amount,
+    required String currency,
+    required String provider,
+    required String phoneNumber,
+    required String userId,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('chargeMobileMoney');
+      final result = await callable.call({
+        'email': email,
+        'amount': amount,
+        'currency': currency,
+        'provider': provider,
+        'phoneNumber': phoneNumber,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return MobileMoneyPaymentResult(
+          success: true,
+          reference: data['reference'] as String?,
+          message: data['message'] as String?,
+          status: data['status'] as String?,
+        );
+      } else {
+        return MobileMoneyPaymentResult(
+          success: false,
+          error: data['error'] as String? ?? 'Payment failed',
+        );
+      }
+    } catch (e) {
+      return MobileMoneyPaymentResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  // ============================================================
+  // VIRTUAL ACCOUNT (For Bank Transfer deposits)
+  // ============================================================
+
+  /// Get or create a virtual account for the user
+  Future<VirtualAccountResult> getOrCreateVirtualAccount({
+    required String email,
+    required String name,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('getOrCreateVirtualAccount');
+      final result = await callable.call({
+        'email': email,
+        'name': name,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return VirtualAccountResult(
+          success: true,
+          bankName: data['bankName'] as String?,
+          accountNumber: data['accountNumber'] as String?,
+          accountName: data['accountName'] as String?,
+          note: data['note'] as String?,
+        );
+      } else {
+        return VirtualAccountResult(
+          success: false,
+          error: data['error'] as String? ?? 'Failed to get virtual account',
+        );
+      }
+    } catch (e) {
+      return VirtualAccountResult(
+        success: false,
+        error: e.toString(),
+      );
     }
   }
 
@@ -362,4 +448,38 @@ class MobileMoneyProvider {
         return [];
     }
   }
+}
+
+class MobileMoneyPaymentResult {
+  final bool success;
+  final String? reference;
+  final String? message;
+  final String? status;
+  final String? error;
+
+  MobileMoneyPaymentResult({
+    required this.success,
+    this.reference,
+    this.message,
+    this.status,
+    this.error,
+  });
+}
+
+class VirtualAccountResult {
+  final bool success;
+  final String? bankName;
+  final String? accountNumber;
+  final String? accountName;
+  final String? note;
+  final String? error;
+
+  VirtualAccountResult({
+    required this.success,
+    this.bankName,
+    this.accountNumber,
+    this.accountName,
+    this.note,
+    this.error,
+  });
 }
