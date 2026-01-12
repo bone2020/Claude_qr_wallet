@@ -456,6 +456,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber } = data;
   const userId = context.auth.uid;
 
+  console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
   // Validate amount
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
@@ -510,6 +511,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
     // Create recipient
     const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData);
+    console.log("Paystack recipient response:", JSON.stringify(recipientResponse));
 
     if (!recipientResponse.status) {
       throw new functions.https.HttpsError('internal', 'Failed to create transfer recipient');
@@ -572,6 +574,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       reason: `Wallet withdrawal - ${reference}`,
     });
 
+    console.log("Paystack transfer response:", JSON.stringify(transferResponse));
     if (!transferResponse.status) {
       // Refund if transfer initiation fails
       await db.runTransaction(async (transaction) => {
