@@ -67,34 +67,48 @@ class QRWalletApp extends ConsumerWidget {
 }
 
 /// Wrapper widget to initialize deep link handling
-class DeepLinkWrapper extends StatefulWidget {
+class DeepLinkWrapper extends ConsumerStatefulWidget {
   final Widget child;
   const DeepLinkWrapper({super.key, required this.child});
 
   @override
-  State<DeepLinkWrapper> createState() => _DeepLinkWrapperState();
+  ConsumerState<DeepLinkWrapper> createState() => _DeepLinkWrapperState();
 }
 
-class _DeepLinkWrapperState extends State<DeepLinkWrapper> {
+class _DeepLinkWrapperState extends ConsumerState<DeepLinkWrapper>
+    with WidgetsBindingObserver {
   final _deepLinkService = DeepLinkService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _deepLinkService.init(context);
+      debugPrint('DeepLinkWrapper: Initializing deep link service');
+      _deepLinkService.init(ref.read(routerProvider));
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('App lifecycle state changed: $state');
+    // Re-sync router when app resumes from background
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('App resumed - syncing router with deep link service');
+      _deepLinkService.setRouter(ref.read(routerProvider));
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Update context reference when it changes
-    _deepLinkService.setContext(context);
+    // Update router reference when dependencies change
+    _deepLinkService.setRouter(ref.read(routerProvider));
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _deepLinkService.dispose();
     super.dispose();
   }

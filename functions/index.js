@@ -160,6 +160,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   try {
     // Verify with Paystack
+    const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
 
     if (!response.status || response.data.status !== 'success') {
       return { success: false, error: 'Payment verification failed' };
@@ -815,5 +816,114 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
       accountName: name || 'Test Account',
       note: 'Virtual accounts require live mode activation',
     };
+  }
+});
+
+// ============================================================
+// INITIALIZE TRANSACTION (For Card Payment via Browser)
+// ============================================================
+exports.initializeTransaction = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { email, amount, currency } = data;
+  const userId = context.auth.uid;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  }
+
+  if (!email) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+  }
+
+  try {
+    const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const response = await paystackRequest('POST', '/transaction/initialize', {
+      email: email,
+      amount: Math.round(amount * 100), // Convert to smallest unit
+      currency: currency || 'GHS',
+      reference: reference,
+      callback_url: 'https://qr-wallet-1993.web.app/payment-callback',
+      metadata: {
+        userId: userId,
+        type: 'deposit',
+      },
+    });
+
+    console.log('Initialize transaction response:', JSON.stringify(response));
+
+    if (response.status && response.data) {
+      return {
+        success: true,
+        authorizationUrl: response.data.authorization_url,
+        reference: response.data.reference,
+        accessCode: response.data.access_code,
+      };
+    } else {
+      return {
+        success: false,
+        error: response.message || 'Failed to initialize transaction',
+      };
+    }
+  } catch (error) {
+    console.error('Initialize transaction error:', error);
+    throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
+  }
+});
+
+// ============================================================
+// INITIALIZE TRANSACTION (For Card Payment via Browser)
+// ============================================================
+exports.initializeTransaction = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { email, amount, currency } = data;
+  const userId = context.auth.uid;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  }
+
+  if (!email) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+  }
+
+  try {
+    const reference = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const response = await paystackRequest('POST', '/transaction/initialize', {
+      email: email,
+      amount: Math.round(amount * 100),
+      currency: currency || 'GHS',
+      reference: reference,
+      metadata: {
+        userId: userId,
+        type: 'deposit',
+      },
+    });
+
+    console.log('Initialize transaction response:', JSON.stringify(response));
+
+    if (response.status && response.data) {
+      return {
+        success: true,
+        authorizationUrl: response.data.authorization_url,
+        reference: response.data.reference,
+        accessCode: response.data.access_code,
+      };
+    } else {
+      return {
+        success: false,
+        error: response.message || 'Failed to initialize transaction',
+      };
+    }
+  } catch (error) {
+    console.error('Initialize transaction error:', error);
+    throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
   }
 });

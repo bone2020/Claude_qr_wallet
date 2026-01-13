@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 
 part 'wallet_model.g.dart';
@@ -65,8 +66,8 @@ class WalletModel {
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
       currency: json['currency'] as String? ?? 'NGN',
       isActive: json['isActive'] as bool? ?? true,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: json['createdAt'] is Timestamp ? (json['createdAt'] as Timestamp).toDate() : DateTime.parse(json['createdAt'] as String),
+      updatedAt: json['updatedAt'] is Timestamp ? (json['updatedAt'] as Timestamp).toDate() : DateTime.parse(json['updatedAt'] as String),
       dailyLimit: (json['dailyLimit'] as num?)?.toDouble() ?? 500000.0,
       monthlyLimit: (json['monthlyLimit'] as num?)?.toDouble() ?? 5000000.0,
       dailySpent: (json['dailySpent'] as num?)?.toDouble() ?? 0.0,

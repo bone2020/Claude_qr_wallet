@@ -11,11 +11,22 @@ class DeepLinkService {
 
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _subscription;
-  BuildContext? _context;
+  GoRouter? _router;
+  
+  // Store pending deep link if router isn't ready
+  Uri? _pendingDeepLink;
 
-  /// Initialize deep link handling
-  void init(BuildContext context) {
-    _context = context;
+  /// Initialize deep link handling with router
+  void init(GoRouter router) {
+    _router = router;
+    
+    // Process any pending deep link
+    if (_pendingDeepLink != null) {
+      final pending = _pendingDeepLink;
+      _pendingDeepLink = null;
+      _processDeepLink(pending!);
+    }
+    
     _handleInitialLink();
     _handleIncomingLinks();
   }
@@ -39,6 +50,7 @@ class DeepLinkService {
 
   /// Handle incoming links while app is running
   void _handleIncomingLinks() {
+    _subscription?.cancel();
     _subscription = _appLinks.uriLinkStream.listen(
       (uri) => _processDeepLink(uri),
       onError: (err) => debugPrint('Deep link error: $err'),
@@ -47,34 +59,74 @@ class DeepLinkService {
 
   /// Process the deep link and navigate accordingly
   void _processDeepLink(Uri uri) {
-    debugPrint('Deep link received: $uri');
+    debugPrint('=== DEEP LINK RECEIVED ===');
+    debugPrint('URI: $uri');
+    debugPrint('Scheme: ${uri.scheme}, Host: ${uri.host}');
+    debugPrint('Path: ${uri.path}');
+    debugPrint('Query: ${uri.queryParameters}');
+    debugPrint('Router available: ${_router != null}');
+
+    if (_router == null) {
+      debugPrint('Router not ready, storing pending deep link');
+      _pendingDeepLink = uri;
+      return;
+    }
 
     // Handle payment callback: qrwallet://payment/success?reference=xxx
     if (uri.scheme == 'qrwallet' && uri.host == 'payment') {
-      final reference = uri.queryParameters['reference'];
-      final trxref = uri.queryParameters['trxref'];
-      final status = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
-
-      final paymentReference = reference ?? trxref;
-
-      if (paymentReference != null && _context != null) {
-        _context!.push('/payment-result', extra: {
-          'reference': paymentReference,
-          'status': status,
-        });
-      }
+      _handlePaymentCallback(uri);
     }
 
     // Handle pay QR: qrwallet://pay?id=xxx&name=xxx&amount=xxx
     if (uri.scheme == 'qrwallet' && uri.host == 'pay') {
-      final walletId = uri.queryParameters['id'];
-      final name = uri.queryParameters['name'];
-      final amount = uri.queryParameters['amount'];
-      final currency = uri.queryParameters['currency'];
-      final note = uri.queryParameters['note'];
+      _handlePayQRCallback(uri);
+    }
+  }
 
-      if (walletId != null && _context != null) {
-        _context!.push('/confirm-send', extra: {
+  void _handlePaymentCallback(Uri uri) {
+    final reference = uri.queryParameters['reference'];
+    final trxref = uri.queryParameters['trxref'];
+    final status = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : null;
+    final paymentReference = reference ?? trxref;
+
+    debugPrint('Payment callback - Reference: $paymentReference, Status: $status');
+
+    if (paymentReference == null) {
+      debugPrint('ERROR: No payment reference found');
+      return;
+    }
+
+    // Delay navigation slightly to ensure app is fully resumed
+    Future.delayed(const Duration(milliseconds: 300), () {
+      try {
+        debugPrint('Navigating to /payment-result...');
+        _router?.push('/payment-result', extra: {
+          'reference': paymentReference,
+          'status': status,
+        });
+        debugPrint('Navigation successful');
+      } catch (e, stack) {
+        debugPrint('Navigation ERROR: $e');
+        debugPrint('Stack: $stack');
+      }
+    });
+  }
+
+  void _handlePayQRCallback(Uri uri) {
+    final walletId = uri.queryParameters['id'];
+    final name = uri.queryParameters['name'];
+    final amount = uri.queryParameters['amount'];
+    final currency = uri.queryParameters['currency'];
+    final note = uri.queryParameters['note'];
+
+    if (walletId == null) {
+      debugPrint('ERROR: No wallet ID found in QR');
+      return;
+    }
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      try {
+        _router?.push('/confirm-send', extra: {
           'recipientWalletId': walletId,
           'recipientName': name ?? 'Unknown',
           'amount': double.tryParse(amount ?? '0') ?? 0.0,
@@ -83,12 +135,21 @@ class DeepLinkService {
           'amountLocked': amount != null && (double.tryParse(amount) ?? 0) > 0,
           'recipientCurrency': currency,
         });
+      } catch (e) {
+        debugPrint('Navigation ERROR: $e');
       }
-    }
+    });
   }
 
-  /// Update context reference (call from build methods)
-  void setContext(BuildContext context) {
-    _context = context;
+  /// Update router reference
+  void setRouter(GoRouter router) {
+    _router = router;
+    
+    // Process pending deep link if any
+    if (_pendingDeepLink != null) {
+      final pending = _pendingDeepLink;
+      _pendingDeepLink = null;
+      _processDeepLink(pending!);
+    }
   }
 }

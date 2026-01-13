@@ -143,9 +143,9 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
   Widget _buildResult(WalletState walletState) {
     final currencySymbol = walletState.currencySymbol;
 
-    return Column(
+    return SingleChildScrollView(child: Column(mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Spacer(),
+        const SizedBox(height: 40),
 
         // Status Icon
         Container(
@@ -261,7 +261,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
             .animate()
             .fadeIn(delay: 500.ms, duration: 400.ms),
 
-        const Spacer(),
+        const SizedBox(height: 40),
 
         // Done Button
         SizedBox(
@@ -301,6 +301,6 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
 
         const SizedBox(height: AppDimensions.spaceLG),
       ],
-    );
+    ));
   }
 }

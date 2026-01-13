@@ -54,6 +54,13 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
+    redirect: (context, state) {
+      // Intercept qrwallet:// deep links - let DeepLinkService handle them
+      if (state.uri.scheme == 'qrwallet') {
+        return '/main'; // Redirect to main, DeepLinkService handles actual navigation
+      }
+      return null;
+    },
     routes: [
       // Splash Screen
       GoRoute(

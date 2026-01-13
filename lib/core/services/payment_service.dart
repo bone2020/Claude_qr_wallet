@@ -1,6 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_paystack_plus/flutter_paystack_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 
 import 'wallet_service.dart';
@@ -57,7 +57,8 @@ class PaymentService {
   // ADD MONEY OPERATIONS
   // ============================================================
 
-  /// Initialize payment for adding money to wallet
+
+  /// Initialize payment for adding money to wallet via Browser Checkout
   Future<PaymentResult> initializePayment({
     required BuildContext context,
     required String email,
@@ -66,41 +67,27 @@ class PaymentService {
     String? currency,
   }) async {
     try {
-      final currencyCode = currency ?? 'NGN';
-      // Convert amount to smallest unit (kobo for NGN, pesewas for GHS, etc.)
-      final amountInSmallestUnit = (amount * 100).round();
-      final reference = _generateReference();
+      // Call Cloud Function to initialize transaction
+      final callable = _functions.httpsCallable('initializeTransaction');
+      final result = await callable.call({
+        'email': email,
+        'amount': amount,
+        'currency': currency ?? 'GHS',
+      });
 
-      await FlutterPaystackPlus.openPaystackPopup(
-        publicKey: _publicKey,
-        customerEmail: email,
-        amount: amountInSmallestUnit.toString(),
-        reference: reference,
-        currency: currencyCode,
-        metadata: {
-          'userId': userId,
-          'custom_fields': [
-            {
-              'display_name': 'User ID',
-              'variable_name': 'user_id',
-              'value': userId
-            },
-          ],
-        },
-        onClosed: () {
-          // User closed without completing
-        },
-        onSuccess: () async {
-          // Verify payment with server
-          final verificationResult = await verifyPayment(reference);
-          if (verificationResult.success) {
-            // Refresh wallet to show new balance
-          }
-        },
-        context: context,
-      );
+      final data = result.data as Map<String, dynamic>;
 
-      return PaymentResult.pending(reference);
+      if (data['success'] == true && data['authorizationUrl'] != null) {
+        final url = data['authorizationUrl'] as String;
+        final reference = data['reference'] as String;
+
+        // Open Paystack checkout in browser
+        final uri = Uri.parse(url);
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+        return PaymentResult.pending(reference);
+      } else {
+        return PaymentResult.failure(data['error'] ?? 'Failed to initialize payment');
+      }
     } catch (e) {
       return PaymentResult.failure(e.toString());
     }
