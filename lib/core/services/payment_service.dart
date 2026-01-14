@@ -344,11 +344,15 @@ class PaymentService {
           success: true,
           reference: data['reference'] as String?,
           message: data['message'] as String?,
+          requiresOtp: data['requiresOtp'] as bool? ?? false,
+          transferCode: data['transferCode'] as String?,
         );
       } else {
         return WithdrawalResult(
           success: false,
           error: data['error'] as String? ?? 'Withdrawal failed',
+          requiresOtp: data['requiresOtp'] as bool? ?? false,
+          transferCode: data['transferCode'] as String?,
         );
       }
     } catch (e) {
