@@ -266,11 +266,49 @@ class PaymentService {
           success: true,
           reference: data['reference'] as String?,
           message: data['message'] as String?,
+          requiresOtp: data['requiresOtp'] as bool? ?? false,
+          transferCode: data['transferCode'] as String?,
         );
       } else {
         return WithdrawalResult(
           success: false,
           error: data['error'] as String? ?? 'Withdrawal failed',
+          requiresOtp: data['requiresOtp'] as bool? ?? false,
+          transferCode: data['transferCode'] as String?,
+        );
+      }
+    } catch (e) {
+      return WithdrawalResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Finalize transfer with OTP via Cloud Function
+  Future<WithdrawalResult> finalizeTransfer({
+    required String transferCode,
+    required String otp,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('finalizeTransfer');
+      final result = await callable.call({
+        'transferCode': transferCode,
+        'otp': otp,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+
+      if (data['success'] == true) {
+        return WithdrawalResult(
+          success: true,
+          reference: data['reference'] as String?,
+          message: data['message'] as String?,
+        );
+      } else {
+        return WithdrawalResult(
+          success: false,
+          error: data['error'] as String? ?? 'OTP verification failed',
         );
       }
     } catch (e) {
@@ -399,12 +437,16 @@ class WithdrawalResult {
   final String? reference;
   final String? message;
   final String? error;
+  final bool requiresOtp;
+  final String? transferCode;
 
   WithdrawalResult({
     required this.success,
     this.reference,
     this.message,
     this.error,
+    this.requiresOtp = false,
+    this.transferCode,
   });
 }
 

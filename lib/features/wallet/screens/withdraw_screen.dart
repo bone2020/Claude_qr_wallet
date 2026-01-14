@@ -291,7 +291,15 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
       if (!mounted) return;
 
-          if (result.success) {
+      // Check if OTP is required
+      if (result.requiresOtp && result.transferCode != null) {
+        setState(() => _isLoading = false);
+        final otpResult = await _showOtpDialog(result.transferCode!, amount);
+        if (otpResult) {
+          ref.read(walletNotifierProvider.notifier).refreshWallet();
+          ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+        }
+      } else if (result.success) {
         ref.read(walletNotifierProvider.notifier).refreshWallet();
         ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
         _showSuccessDialog(amount, result.reference ?? '');
@@ -306,6 +314,129 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Shows OTP dialog for bank transfer verification
+  Future<bool> _showOtpDialog(String transferCode, double amount) async {
+    final otpController = TextEditingController();
+    bool isVerifying = false;
+
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              backgroundColor: AppColors.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+              ),
+              title: Text(
+                'Enter OTP',
+                style: AppTextStyles.headlineSmall(),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $_currencySymbol${_formatAmount(amount)}',
+                    style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                  ),
+                  const SizedBox(height: AppDimensions.spaceLG),
+                  TextFormField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.headlineSmall(),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: InputDecoration(
+                      hintText: '000000',
+                      hintStyle: AppTextStyles.headlineSmall(color: AppColors.textTertiaryDark),
+                      filled: true,
+                      fillColor: AppColors.backgroundDark,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: const BorderSide(color: AppColors.inputBorderDark),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: const BorderSide(color: AppColors.inputBorderDark),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
+                      counterText: '',
+                    ),
+                    autofocus: true,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isVerifying ? null : () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: AppTextStyles.labelMedium(
+                      color: isVerifying ? AppColors.textTertiaryDark : AppColors.textSecondaryDark,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isVerifying
+                      ? null
+                      : () async {
+                          final otp = otpController.text.trim();
+                          if (otp.length != 6) {
+                            _showError('Please enter a valid 6-digit OTP');
+                            return;
+                          }
+
+                          setDialogState(() => isVerifying = true);
+
+                          try {
+                            final result = await _paymentService.finalizeTransfer(
+                              transferCode: transferCode,
+                              otp: otp,
+                            );
+
+                            if (!mounted) return;
+
+                            if (result.success) {
+                              Navigator.of(context).pop(true);
+                              _showSuccessDialog(amount, result.reference ?? '');
+                            } else {
+                              setDialogState(() => isVerifying = false);
+                              _showError(result.error ?? 'OTP verification failed');
+                            }
+                          } catch (e) {
+                            setDialogState(() => isVerifying = false);
+                            _showError(e.toString());
+                          }
+                        },
+                  child: isVerifying
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.backgroundDark,
+                          ),
+                        )
+                      : Text(
+                          'Verify',
+                          style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        false;
   }
 
   Future<bool> _showConfirmationDialog(double amount, bool isBankWithdrawal) async {

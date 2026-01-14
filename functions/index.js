@@ -597,6 +597,24 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('internal', 'Failed to initiate transfer');
     }
 
+    // Check if OTP is required
+    const transferData = transferResponse.data;
+    if (transferData.status === 'otp') {
+      // Store transfer code for OTP verification
+      await db.collection('withdrawals').doc(reference).update({
+        status: 'pending_otp',
+        transferCode: transferData.transfer_code,
+      });
+
+      return {
+        success: false,
+        requiresOtp: true,
+        transferCode: transferData.transfer_code,
+        reference: reference,
+        message: 'OTP verification required',
+      };
+    }
+
     return {
       success: true,
       reference: reference,
@@ -605,6 +623,65 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('Withdrawal error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// Finalize transfer with OTP
+exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { transferCode, otp } = data;
+  const userId = context.auth.uid;
+
+  if (!transferCode || !otp) {
+    throw new functions.https.HttpsError('invalid-argument', 'Transfer code and OTP are required');
+  }
+
+  try {
+    // Find withdrawal by transfer code
+    const withdrawalQuery = await db.collection('withdrawals')
+      .where('transferCode', '==', transferCode)
+      .where('userId', '==', userId)
+      .limit(1)
+      .get();
+
+    if (withdrawalQuery.empty) {
+      throw new functions.https.HttpsError('not-found', 'Withdrawal not found');
+    }
+
+    const withdrawalDoc = withdrawalQuery.docs[0];
+
+    // Submit OTP to Paystack
+    const otpResponse = await paystackRequest('POST', '/transfer/finalize_transfer', {
+      transfer_code: transferCode,
+      otp: otp,
+    });
+
+    console.log('OTP finalize response:', JSON.stringify(otpResponse));
+
+    if (otpResponse.status) {
+      // Update withdrawal status
+      await withdrawalDoc.ref.update({
+        status: 'processing',
+        otpVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        reference: withdrawalDoc.data().reference,
+        message: 'Transfer finalized successfully',
+      };
+    } else {
+      return {
+        success: false,
+        error: otpResponse.message || 'OTP verification failed',
+      };
+    }
+  } catch (error) {
+    console.error('Finalize transfer error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
