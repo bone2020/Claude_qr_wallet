@@ -215,13 +215,22 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       if (!mounted) return;
 
       if (result.success) {
-        _showSuccess('Payment initiated! Please approve on your phone.');
-        // Refresh wallet after a delay to check for payment
-        Future.delayed(const Duration(seconds: 5), () {
-          if (mounted) {
-            ref.read(walletNotifierProvider.notifier).refreshWallet();
-          }
-        });
+        if (result.completed) {
+          // Payment was immediately successful (test mode)
+          ref.read(walletNotifierProvider.notifier).refreshWallet();
+          ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+          _showPaymentSuccessDialog(amount, result.reference ?? '');
+        } else {
+          // Payment pending - user needs to approve on phone
+          _showSuccess('Payment initiated! Please approve on your phone.');
+          // Refresh wallet after a delay to check for payment
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) {
+              ref.read(walletNotifierProvider.notifier).refreshWallet();
+              ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+            }
+          });
+        }
       } else {
         _showError(result.error ?? 'Payment failed');
       }
@@ -269,6 +278,53 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showPaymentSuccessDialog(double amount, String reference) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+        ),
+        title: Row(
+          children: [
+            const Icon(Iconsax.tick_circle5, color: AppColors.success, size: 28),
+            const SizedBox(width: AppDimensions.spaceSM),
+            Text('Payment Successful', style: AppTextStyles.headlineSmall()),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Amount: $_currencySymbol${amount.toStringAsFixed(2)}',
+              style: AppTextStyles.bodyLarge(),
+            ),
+            const SizedBox(height: AppDimensions.spaceSM),
+            Text(
+              'Reference: $reference',
+              style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              context.pop(); // Go back to wallet screen
+            },
+            child: Text(
+              'Done',
+              style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
+            ),
+          ),
+        ],
       ),
     );
   }

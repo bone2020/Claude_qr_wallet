@@ -124,6 +124,7 @@ class PaymentService {
           reference: data['reference'] as String?,
           message: data['message'] as String?,
           status: data['status'] as String?,
+          completed: data['completed'] as bool? ?? false,
         );
       } else {
         return MobileMoneyPaymentResult(
@@ -485,6 +486,7 @@ class MobileMoneyPaymentResult {
   final String? message;
   final String? status;
   final String? error;
+  final bool completed;
 
   MobileMoneyPaymentResult({
     required this.success,
@@ -492,6 +494,7 @@ class MobileMoneyPaymentResult {
     this.message,
     this.status,
     this.error,
+    this.completed = false,
   });
 }
 

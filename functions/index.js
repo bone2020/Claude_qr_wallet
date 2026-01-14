@@ -782,12 +782,54 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
 
     console.log('Mobile Money charge response:', JSON.stringify(chargeResponse));
 
-    if (chargeResponse.status) {
+    // Check if payment was immediately successful (common in test mode)
+    if (chargeResponse.status && chargeResponse.data?.status === 'success') {
+      // Update wallet balance immediately
+      const walletSnapshot = await db.collection('wallets')
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+
+      if (!walletSnapshot.empty) {
+        const walletDoc = walletSnapshot.docs[0];
+        const walletData = walletDoc.data();
+
+        await db.runTransaction(async (transaction) => {
+          transaction.update(walletDoc.ref, {
+            balance: (walletData.balance || 0) + amount,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Record transaction
+          const txRef = db.collection('users').doc(userId).collection('transactions').doc();
+          transaction.set(txRef, {
+            id: txRef.id,
+            type: 'deposit',
+            amount: amount,
+            currency: currency || 'GHS',
+            status: 'completed',
+            reference: reference,
+            description: 'Mobile Money deposit',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+      }
+
+      return {
+        success: true,
+        reference: reference,
+        message: 'Payment successful!',
+        status: 'success',
+        completed: true,
+      };
+    } else if (chargeResponse.status) {
+      // Payment pending - user needs to approve on phone
       return {
         success: true,
         reference: reference,
         message: 'Payment initiated. Please approve on your phone.',
         status: chargeResponse.data?.status,
+        completed: false,
       };
     } else {
       return {
