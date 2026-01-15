@@ -217,7 +217,7 @@ Or scan my QR code in the app.
             ),
             embeddedImage: const AssetImage('assets/images/app_logo.png'),
             embeddedImageStyle: const QrEmbeddedImageStyle(
-              size: Size(50, 50),
+              size: Size(60, 60),
             ),
           ),
 

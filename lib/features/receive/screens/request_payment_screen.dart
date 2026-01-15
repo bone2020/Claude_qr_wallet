@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:gal/gal.dart';
 import 'dart:io';
-import 'dart:ui' as ui;
+import 'dart:typed_data';
 
 import '../../../core/constants/constants.dart';
 import '../../../providers/wallet_provider.dart';
@@ -25,6 +27,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   bool _qrGenerated = false;
   String _qrData = '';
   final GlobalKey _qrKey = GlobalKey();
+  final ScreenshotController _screenshotController = ScreenshotController();
+  bool _isDownloading = false;
 
   String get _walletId => ref.watch(walletNotifierProvider).wallet?.walletId ?? '';
   String get _userName => ref.watch(currentUserProvider)?.fullName ?? 'User';
@@ -78,37 +82,21 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
     });
   }
 
-  Future<void> _saveQRImage() async {
+  Future<void> _shareQRCode() async {
     try {
-      // Create QR image with high error correction for embedded logo
-      final qrValidationResult = QrValidator.validate(
-        data: _qrData,
-        version: QrVersions.auto,
-        errorCorrectionLevel: QrErrorCorrectLevel.H,
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        pixelRatio: 3.0,
+        delay: const Duration(milliseconds: 10),
       );
 
-      if (qrValidationResult.status != QrValidationStatus.valid) {
-        throw Exception('Invalid QR data');
-      }
-
-      final qrCode = qrValidationResult.qrCode!;
-      final painter = QrPainter.withQr(
-        qr: qrCode,
-        color: const Color(0xFF000000),
-        emptyColor: const Color(0xFFFFFFFF),
-        gapless: true,
-      );
-
-      final picData = await painter.toImageData(300, format: ui.ImageByteFormat.png);
-      if (picData == null) throw Exception('Failed to generate image');
+      if (imageBytes == null) throw Exception('Failed to capture QR');
 
       final directory = await getTemporaryDirectory();
       final amount = _amountController.text;
       final fileName = 'payment_qr_${_currencyCode}_$amount.png';
       final file = File('${directory.path}/$fileName');
-      await file.writeAsBytes(picData.buffer.asUint8List());
+      await file.writeAsBytes(imageBytes);
 
-      // Share the file
       await Share.shareXFiles(
         [XFile(file.path)],
         text: 'Pay $_currencySymbol$amount to $_userName',
@@ -117,10 +105,72 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving QR: $e'),
+            content: Text('Error sharing QR: $e'),
             backgroundColor: AppColors.error,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _downloadQRCode() async {
+    if (_isDownloading) return;
+
+    setState(() => _isDownloading = true);
+
+    try {
+      final hasAccess = await Gal.hasAccess();
+      if (!hasAccess) {
+        final granted = await Gal.requestAccess();
+        if (!granted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Storage permission required to save QR code'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      final Uint8List? imageBytes = await _screenshotController.capture(
+        pixelRatio: 3.0,
+        delay: const Duration(milliseconds: 10),
+      );
+
+      if (imageBytes != null) {
+        final tempDir = await getTemporaryDirectory();
+        final amount = _amountController.text;
+        final fileName = 'payment_qr_${_currencyCode}_${amount}_${DateTime.now().millisecondsSinceEpoch}.png';
+        final tempFile = File('${tempDir.path}/$fileName');
+        await tempFile.writeAsBytes(imageBytes);
+
+        await Gal.putImage(tempFile.path);
+        await tempFile.delete();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('QR code saved to gallery!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving QR code: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
       }
     }
   }
@@ -311,33 +361,46 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         const SizedBox(height: AppDimensions.spaceXL),
 
         // QR Code Container
-        Container(
-          padding: const EdgeInsets.all(AppDimensions.spaceLG),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusXL),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: RepaintBoundary(
-            key: _qrKey,
-            child: QrImageView(
-              data: _qrData,
-              version: QrVersions.auto,
-              size: 250,
-              backgroundColor: Colors.white,
-              errorCorrectionLevel: QrErrorCorrectLevel.H,
-              embeddedImage: _businessLogoUrl != null && _businessLogoUrl!.isNotEmpty
-                  ? NetworkImage(_businessLogoUrl!) as ImageProvider
-                  : const AssetImage('assets/images/app_logo.png'),
-              embeddedImageStyle: const QrEmbeddedImageStyle(
-                size: Size(50, 50),
-              ),
+        Screenshot(
+          controller: _screenshotController,
+          child: Container(
+            padding: const EdgeInsets.all(AppDimensions.spaceLG),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXL),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                QrImageView(
+                  data: _qrData,
+                  version: QrVersions.auto,
+                  size: 250,
+                  backgroundColor: Colors.white,
+                  errorCorrectionLevel: QrErrorCorrectLevel.H,
+                  embeddedImage: _businessLogoUrl != null && _businessLogoUrl!.isNotEmpty
+                      ? NetworkImage(_businessLogoUrl!) as ImageProvider
+                      : const AssetImage('assets/images/app_logo.png'),
+                  embeddedImageStyle: const QrEmbeddedImageStyle(
+                    size: Size(60, 60),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _userName,
+                  style: AppTextStyles.bodyLarge(color: AppColors.backgroundDark),
+                ),
+                Text(
+                  '$_currencySymbol${_amountController.text}',
+                  style: AppTextStyles.headlineMedium(color: AppColors.primary),
+                ),
+              ],
             ),
           ),
         ),
@@ -351,20 +414,47 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         const SizedBox(height: AppDimensions.spaceXL),
 
         // Action Buttons
-        SizedBox(
-          width: double.infinity,
-          height: AppDimensions.buttonHeightMD,
-          child: OutlinedButton.icon(
-            onPressed: _saveQRImage,
-            icon: const Icon(Icons.share),
-            label: const Text('Save / Share QR'),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _shareQRCode,
+                icon: const Icon(Icons.share, size: 20),
+                label: const Text('Share'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimaryDark,
+                  side: const BorderSide(color: AppColors.inputBorderDark),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                  ),
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _isDownloading ? null : _downloadQRCode,
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.backgroundDark,
+                        ),
+                      )
+                    : const Icon(Icons.download, size: 20),
+                label: Text(_isDownloading ? 'Saving...' : 'Download'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppDimensions.spaceLG),
 
