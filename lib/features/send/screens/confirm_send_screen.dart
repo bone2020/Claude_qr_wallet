@@ -8,6 +8,8 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/exchange_rate_service.dart';
+import '../../../core/services/biometric_service.dart';
+import '../../../core/services/secure_storage_service.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
@@ -155,6 +157,34 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Check if biometric is enabled and require authentication
+      final secureStorage = SecureStorageService.instance;
+      final biometricEnabled = await secureStorage.isBiometricEnabled();
+
+      if (biometricEnabled) {
+        final biometricService = BiometricService();
+        final authResult = await biometricService.authenticateForTransaction(
+          amount: _total,
+          recipient: widget.recipientName,
+          currencySymbol: _currency,
+        );
+
+        if (!authResult.success) {
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+
+          if (!authResult.cancelled) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(authResult.error ?? 'Authentication failed'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       // Get wallet service and send money
       final walletService = ref.read(walletServiceProvider);
       final result = await walletService.sendMoney(

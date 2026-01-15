@@ -6,3 +6,5 @@ export 'payment_service.dart';
 export 'local_storage_service.dart';
 export 'biometric_service.dart';
 export 'currency_service.dart';
+export 'qr_signing_service.dart';
+export 'secure_storage_service.dart';

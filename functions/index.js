@@ -14,6 +14,10 @@ const db = admin.firestore();
 const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || 'sk_test_xxx';
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
+// QR Code Signing - set via: firebase functions:config:set qr.secret="your-secret-key"
+const QR_SECRET_KEY = functions.config().qr?.secret || 'qr-wallet-default-secret-key-change-me';
+const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
 // Helper function for Paystack API calls
 function paystackRequest(method, path, data = null) {
   return new Promise((resolve, reject) => {
@@ -1191,5 +1195,84 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     walletId: wallet.walletId,
     userName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
     profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null
+  };
+});
+
+// ============================================================
+// QR CODE SIGNING (P1 Security)
+// ============================================================
+
+// Sign QR payload for secure payment requests
+exports.signQrPayload = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { walletId, amount, note } = data;
+
+  if (!walletId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Wallet ID required');
+  }
+
+  // Verify wallet belongs to user
+  const walletDoc = await db.collection('wallets').doc(context.auth.uid).get();
+  if (!walletDoc.exists || walletDoc.data().walletId !== walletId) {
+    throw new functions.https.HttpsError('permission-denied', 'Invalid wallet');
+  }
+
+  const timestamp = Date.now();
+  const payload = JSON.stringify({
+    walletId,
+    amount: amount || null,
+    note: note || '',
+    timestamp,
+    userId: context.auth.uid
+  });
+
+  const signature = crypto
+    .createHmac('sha256', QR_SECRET_KEY)
+    .update(payload)
+    .digest('hex');
+
+  return {
+    payload,
+    signature,
+    expiresAt: timestamp + QR_EXPIRY_MS
+  };
+});
+
+// Verify QR signature before processing payment
+exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { payload, signature } = data;
+
+  if (!payload || !signature) {
+    throw new functions.https.HttpsError('invalid-argument', 'Payload and signature required');
+  }
+
+  // Verify signature
+  const expectedSig = crypto
+    .createHmac('sha256', QR_SECRET_KEY)
+    .update(payload)
+    .digest('hex');
+
+  if (signature !== expectedSig) {
+    return { valid: false, reason: 'Invalid signature' };
+  }
+
+  // Check expiry
+  const parsed = JSON.parse(payload);
+  if (Date.now() > parsed.timestamp + QR_EXPIRY_MS) {
+    return { valid: false, reason: 'QR code expired' };
+  }
+
+  return {
+    valid: true,
+    walletId: parsed.walletId,
+    amount: parsed.amount,
+    note: parsed.note
   };
 });
