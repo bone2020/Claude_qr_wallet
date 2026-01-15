@@ -173,7 +173,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleForgotPassword() {
-    // TODO: Navigate to forgot password screen
+    context.push(AppRoutes.forgotPassword);
   }
 
   @override

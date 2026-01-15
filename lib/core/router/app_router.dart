@@ -8,6 +8,7 @@ import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_verification_screen.dart';
 import '../../features/auth/screens/kyc_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
 import '../../features/send/screens/send_money_screen.dart';
@@ -30,6 +31,7 @@ class AppRoutes {
   static const String welcome = '/welcome';
   static const String signUp = '/sign-up';
   static const String login = '/login';
+  static const String forgotPassword = '/forgot-password';
   static const String otpVerification = '/otp-verification';
   static const String kyc = '/kyc';
   static const String main = '/main';
@@ -88,6 +90,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.login,
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+
+      // Forgot Password Screen
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        name: 'forgotPassword',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
       // OTP/Email Verification Screen
