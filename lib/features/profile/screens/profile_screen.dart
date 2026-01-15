@@ -159,9 +159,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Iconsax.notification,
                   title: AppStrings.notifications,
-                  onTap: () {
-                    // TODO: Navigate to notifications settings
-                  },
+                  onTap: () => context.push(AppRoutes.notificationSettings),
                 ),
               ],
             ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
