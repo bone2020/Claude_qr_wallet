@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/constants/african_countries.dart';
 import '../../../providers/auth_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
@@ -25,6 +26,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  AfricanCountry? _userCountry;
 
   final _imagePicker = ImagePicker();
   XFile? _newPhoto;
@@ -44,6 +46,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       _emailController.text = user.email;
       _phoneController.text = user.phoneNumber;
       _currentPhotoUrl = user.profilePhotoUrl;
+
+      // Load user's country
+      if (user.country != null) {
+        _userCountry = AfricanCountries.getByCode(user.country!);
+      }
     }
   }
 
@@ -262,6 +269,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                       PhoneTextField(
                         controller: _phoneController,
+                        initialCountry: _userCountry,
                       ),
                     ],
                   ),
