@@ -94,7 +94,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
         title: Text(AppStrings.transactions, style: AppTextStyles.headlineMedium()),
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: true,
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
