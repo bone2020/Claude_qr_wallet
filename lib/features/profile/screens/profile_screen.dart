@@ -175,16 +175,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Iconsax.message_question,
                   title: AppStrings.helpSupport,
-                  onTap: () {
-                    // TODO: Navigate to help & support
-                  },
+                  onTap: () => context.push(AppRoutes.helpSupport),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.info_circle,
                   title: AppStrings.about,
-                  onTap: () {
-                    // TODO: Navigate to about
-                  },
+                  onTap: () => context.push(AppRoutes.about),
                 ),
               ],
             ).animate().fadeIn(delay: 400.ms, duration: 400.ms),

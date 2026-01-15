@@ -22,6 +22,8 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/change_password_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
+import '../../features/profile/screens/help_support_screen.dart';
+import '../../features/profile/screens/about_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
@@ -54,6 +56,8 @@ class AppRoutes {
   static const String editProfile = '/edit-profile';
   static const String changePassword = '/change-password';
   static const String changePin = '/change-pin';
+  static const String helpSupport = '/help-support';
+  static const String about = '/about';
   static const String notifications = '/notifications';
 }
 
@@ -250,6 +254,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.changePin,
         name: 'changePin',
         builder: (context, state) => const ChangePinScreen(),
+      ),
+
+      // Help & Support Screen
+      GoRoute(
+        path: AppRoutes.helpSupport,
+        name: 'helpSupport',
+        builder: (context, state) => const HelpSupportScreen(),
+      ),
+
+      // About Screen
+      GoRoute(
+        path: AppRoutes.about,
+        name: 'about',
+        builder: (context, state) => const AboutScreen(),
       ),
 
       // Notifications Screen

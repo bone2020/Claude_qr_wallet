@@ -75,6 +75,7 @@ dependencies:
   # Cloud Functions
   cloud_functions: ^5.1.4
   url_launcher: ^6.3.2
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:
