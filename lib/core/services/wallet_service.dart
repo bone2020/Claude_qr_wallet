@@ -65,8 +65,8 @@ class WalletService {
         userId: '', // Not exposed for privacy
         fullName: data['userName'] as String? ?? 'Unknown',
         profilePhotoUrl: data['profilePhotoUrl'] as String?,
-        currency: data['currency'] as String? ?? 'NGN',
-        currencySymbol: _getCurrencySymbol(data['currency'] as String? ?? 'NGN'),
+        currency: data['currency'] as String? ?? 'GHS',
+        currencySymbol: _getCurrencySymbol(data['currency'] as String? ?? 'GHS'),
       );
     } on FirebaseFunctionsException catch (e) {
       if (e.code == 'not-found') {
@@ -121,8 +121,8 @@ class WalletService {
         // Get sender's wallet for currency info
         final walletDoc = await _firestore.collection('wallets').doc(_userId).get();
         final senderCurrency = walletDoc.exists
-            ? (walletDoc.data()?['currency'] as String? ?? 'NGN')
-            : 'NGN';
+            ? (walletDoc.data()?['currency'] as String? ?? 'GHS')
+            : 'GHS';
 
         // Create a local transaction model for the UI
         final transaction = TransactionModel(
@@ -214,7 +214,7 @@ class WalletService {
           receiverName: userName,
           amount: (data['amount'] as num?)?.toDouble() ?? amount,
           fee: 0,
-          currency: (data['currency'] as String?) ?? wallet?.currency ?? 'NGN',
+          currency: (data['currency'] as String?) ?? wallet?.currency ?? 'GHS',
           type: TransactionType.deposit,
           status: TransactionStatus.completed,
           note: 'Deposit via ${bankName ?? "Bank"}',
