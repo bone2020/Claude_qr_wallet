@@ -120,11 +120,11 @@ class HelpSupportScreen extends StatelessWidget {
 
             Row(
               children: [
-                _buildSocialButton(Iconsax.facebook, () => _launchUrl('https://facebook.com/qrwallet')),
+                _buildSocialButton(Icons.facebook, () => _launchUrl('https://facebook.com/qrwallet')),
                 const SizedBox(width: 16),
-                _buildSocialButton(Iconsax.instagram, () => _launchUrl('https://instagram.com/qrwallet')),
+                _buildSocialButton(Iconsax.camera, () => _launchUrl('https://instagram.com/qrwallet')),
                 const SizedBox(width: 16),
-                _buildSocialButton(Icons.close, () => _launchUrl('https://x.com/qrwallet')),
+                _buildSocialButton(Iconsax.message, () => _launchUrl('https://x.com/qrwallet')),
               ],
             ),
 
