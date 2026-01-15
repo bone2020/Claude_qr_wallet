@@ -199,6 +199,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CurrencySelectorScreen(),
       ),
 
+      // Transactions Screen (View All)
+      GoRoute(
+        path: AppRoutes.transactions,
+        name: 'transactions',
+        builder: (context, state) => const TransactionsScreen(),
+      ),
+
       // Transaction Details Screen
       GoRoute(
         path: AppRoutes.transactionDetails,
