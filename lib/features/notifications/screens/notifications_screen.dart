@@ -119,7 +119,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Iconsax.more, color: AppColors.textPrimaryDark),
-            color: AppColors.cardDark,
+            color: AppColors.surfaceDark,
             onSelected: (value) {
               if (value == 'mark_all_read') {
                 _markAllAsRead();
@@ -197,7 +197,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: AppColors.cardDark,
+              color: AppColors.surfaceDark,
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -247,7 +247,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 : AppColors.primary.withOpacity(0.05),
             border: Border(
               bottom: BorderSide(
-                color: AppColors.cardDark,
+                color: AppColors.surfaceDark,
                 width: 1,
               ),
             ),
