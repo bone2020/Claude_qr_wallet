@@ -126,14 +126,29 @@ class UserModel {
   }
 
   /// Get display name (first name)
-  String get firstName => fullName.split(' ').first;
+  String get firstName {
+    if (fullName.isEmpty) return '';
+    final parts = fullName.trim().split(' ');
+    return parts.isNotEmpty ? parts.first : '';
+  }
+
+  /// Get last name
+  String get lastName {
+    if (fullName.isEmpty) return '';
+    final parts = fullName.trim().split(' ');
+    return parts.length > 1 ? parts.skip(1).join(' ') : '';
+  }
 
   /// Get initials for avatar
   String get initials {
-    final parts = fullName.split(' ');
-    if (parts.length >= 2) {
+    if (fullName.isEmpty) return '??';
+    final parts = fullName.trim().split(' ');
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
-    return fullName.substring(0, 2).toUpperCase();
+    if (fullName.length >= 2) {
+      return fullName.substring(0, 2).toUpperCase();
+    }
+    return fullName.isNotEmpty ? fullName[0].toUpperCase() : '??';
   }
 }
