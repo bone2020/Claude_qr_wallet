@@ -135,9 +135,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Iconsax.key,
                   title: AppStrings.changePin,
-                  onTap: () {
-                    // TODO: Navigate to change PIN
-                  },
+                  onTap: () => context.push(AppRoutes.changePin),
                 ),
               ],
             ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
