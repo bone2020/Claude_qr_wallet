@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hive/hive.dart';
 
 part 'transaction_model.g.dart';
@@ -112,27 +113,35 @@ class TransactionModel {
 
   /// Create transaction from Firestore document
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
+    // Handle Firestore Timestamp or String for createdAt
+    DateTime parseDateTime(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is Timestamp) return value.toDate();
+      if (value is String) return DateTime.parse(value);
+      return DateTime.now();
+    }
+
     return TransactionModel(
-      id: json['id'] as String,
-      senderWalletId: json['senderWalletId'] as String,
-      receiverWalletId: json['receiverWalletId'] as String,
+      id: json['id'] as String? ?? '',
+      senderWalletId: json['senderWalletId'] as String? ?? '',
+      receiverWalletId: json['receiverWalletId'] as String? ?? '',
       senderName: json['senderName'] as String?,
       receiverName: json['receiverName'] as String?,
-      amount: (json['amount'] as num).toDouble(),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       fee: (json['fee'] as num?)?.toDouble() ?? 0.0,
-      currency: json['currency'] as String? ?? 'NGN',
+      currency: json['currency'] as String? ?? 'GHS',
       type: TransactionType.values.firstWhere(
         (e) => e.name == json['type'],
-        orElse: () => TransactionType.send,
+        orElse: () => TransactionType.deposit,
       ),
       status: TransactionStatus.values.firstWhere(
         (e) => e.name == json['status'],
         orElse: () => TransactionStatus.pending,
       ),
-      note: json['note'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      note: json['note'] as String? ?? json['description'] as String?,
+      createdAt: parseDateTime(json['createdAt']),
       completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'] as String)
+          ? parseDateTime(json['completedAt'])
           : null,
       reference: json['reference'] as String?,
       failureReason: json['failureReason'] as String?,
