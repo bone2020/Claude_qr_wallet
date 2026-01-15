@@ -1146,8 +1146,28 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================================
-// WALLET LOOKUP (with rate limiting)
+// WALLET LOOKUP (with user + IP rate limiting)
 // ============================================================
+
+// Helper: Check and update rate limit
+async function checkRateLimit(limitRef, maxRequests, windowMs) {
+  const now = Date.now();
+  const doc = await limitRef.get();
+
+  if (doc.exists) {
+    const { count, windowStart } = doc.data();
+    if (now - windowStart < windowMs && count >= maxRequests) {
+      return false; // Rate limited
+    }
+    await limitRef.update({
+      count: now - windowStart < windowMs ? count + 1 : 1,
+      windowStart: now - windowStart < windowMs ? windowStart : now
+    });
+  } else {
+    await limitRef.set({ count: 1, windowStart: now });
+  }
+  return true; // Allowed
+}
 
 exports.lookupWallet = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -1160,23 +1180,32 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
   }
 
-  // Rate limiting
-  const rateLimitRef = db.collection('rate_limits').doc(context.auth.uid);
-  const now = Date.now();
+  // Get client IP from request headers
+  const clientIp = context.rawRequest?.ip ||
+    context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
+    'unknown';
 
-  const rateDoc = await rateLimitRef.get();
-  if (rateDoc.exists) {
-    const { count, windowStart } = rateDoc.data();
-    if (now - windowStart < 60000 && count >= 30) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded');
-    }
-    await rateLimitRef.update({
-      count: now - windowStart < 60000 ? count + 1 : 1,
-      windowStart: now - windowStart < 60000 ? windowStart : now
-    });
-  } else {
-    await rateLimitRef.set({ count: 1, windowStart: now });
+  // Hash IP for privacy (don't store raw IPs)
+  const ipHash = crypto.createHash('sha256').update(clientIp).digest('hex').substring(0, 16);
+
+  // Rate limiting - User level: 30 requests per minute
+  const userLimitRef = db.collection('rate_limits').doc(`user_${context.auth.uid}`);
+  const userAllowed = await checkRateLimit(userLimitRef, 30, 60000);
+
+  if (!userAllowed) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded');
   }
+
+  // Rate limiting - IP level: 100 requests per minute (catches distributed attacks)
+  const ipLimitRef = db.collection('rate_limits').doc(`ip_${ipHash}`);
+  const ipAllowed = await checkRateLimit(ipLimitRef, 100, 60000);
+
+  if (!ipAllowed) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many requests from this network');
+  }
+
+  // Track failed lookups per user (anti-enumeration)
+  const failedLookupRef = db.collection('rate_limits').doc(`failed_${context.auth.uid}`);
 
   // Lookup
   const query = await db.collection('wallets')
@@ -1185,8 +1214,33 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     .get();
 
   if (query.empty) {
+    // Track failed lookup
+    const failedDoc = await failedLookupRef.get();
+    const now = Date.now();
+
+    if (failedDoc.exists) {
+      const { count, windowStart } = failedDoc.data();
+      const newCount = now - windowStart < 300000 ? count + 1 : 1; // 5 min window
+
+      // Block after 10 failed lookups in 5 minutes
+      if (newCount >= 10) {
+        await failedLookupRef.update({ count: newCount, windowStart: now - windowStart < 300000 ? windowStart : now });
+        throw new functions.https.HttpsError('resource-exhausted', 'Too many invalid lookups. Please try again later.');
+      }
+
+      await failedLookupRef.update({
+        count: newCount,
+        windowStart: now - windowStart < 300000 ? windowStart : now
+      });
+    } else {
+      await failedLookupRef.set({ count: 1, windowStart: now });
+    }
+
     throw new functions.https.HttpsError('not-found', 'Wallet not found');
   }
+
+  // Reset failed lookup counter on success
+  await failedLookupRef.delete().catch(() => {});
 
   const wallet = query.docs[0].data();
   const userDoc = await db.collection('users').doc(query.docs[0].id).get();

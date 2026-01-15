@@ -368,9 +368,12 @@ class PaymentService {
   // ============================================================
 
   String _generateReference() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random().nextInt(999999).toString().padLeft(6, '0');
-    return 'QRW_${timestamp}_$random';
+    final random = Random.secure();
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    // Generate 8 random bytes for better entropy
+    final randomBytes = List<int>.generate(8, (_) => random.nextInt(256));
+    final randomPart = randomBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return 'QRW_${timestamp}_$randomPart';
   }
 }
 
