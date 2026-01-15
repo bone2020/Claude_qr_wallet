@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/qr_signing_service.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// QR code scanner screen
@@ -54,33 +56,59 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
       double? amount;
       String? currency;
       String? note;
+      bool isVerifiedQr = false;
 
-      // Parse QR code
-      final uri = Uri.tryParse(code);
-      if (uri != null && uri.scheme == 'qrwallet' && uri.host == 'pay') {
-        // New format: qrwallet://pay?id=WALLET_ID&name=NAME&amount=50.00&currency=GHS&note=Description
-        walletId = uri.queryParameters['id'];
-        name = uri.queryParameters['name'];
+      // First, try to parse as signed QR (v2 format)
+      final qrSigningService = QrSigningService();
+      final parsed = qrSigningService.parseQrData(code);
 
-        // Parse amount if present
-        final amountStr = uri.queryParameters['amount'];
-        if (amountStr != null) {
-          amount = double.tryParse(amountStr);
+      if (parsed != null && parsed.isSigned) {
+        // This is a signed QR code - verify signature
+        final verification = await qrSigningService.verifySignature(
+          payload: parsed.payload,
+          signature: parsed.signature,
+        );
+
+        if (!verification.isValid) {
+          if (!mounted) return;
+          _showError(verification.reason ?? 'Invalid or expired QR code');
+          setState(() => _isProcessing = false);
+          return;
         }
 
-        currency = uri.queryParameters['currency'];
-        note = uri.queryParameters['note'];
-
-        // Decode URL-encoded values
-        if (name != null) {
-          name = Uri.decodeComponent(name);
-        }
-        if (note != null) {
-          note = Uri.decodeComponent(note);
-        }
+        // Extract data from verified payload
+        walletId = verification.walletId;
+        amount = verification.amount;
+        note = verification.note;
+        isVerifiedQr = true;
       } else {
-        // Fallback: treat the entire code as wallet ID
-        walletId = code;
+        // Try legacy format: qrwallet://pay?id=...
+        final uri = Uri.tryParse(code);
+        if (uri != null && uri.scheme == 'qrwallet' && uri.host == 'pay') {
+          walletId = uri.queryParameters['id'];
+          name = uri.queryParameters['name'];
+
+          final amountStr = uri.queryParameters['amount'];
+          if (amountStr != null) {
+            amount = double.tryParse(amountStr);
+          }
+
+          currency = uri.queryParameters['currency'];
+          note = uri.queryParameters['note'];
+
+          // Decode URL-encoded values
+          if (name != null) {
+            name = Uri.decodeComponent(name);
+          }
+          if (note != null) {
+            note = Uri.decodeComponent(note);
+          }
+        } else if (_isValidWalletIdFormat(code)) {
+          // Plain wallet ID format
+          walletId = code;
+        } else {
+          throw Exception('Unrecognized QR code format');
+        }
       }
 
       if (walletId == null || walletId.isEmpty) {
@@ -98,8 +126,13 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
           recipientCurrency = recipientCurrency ?? result.currency;
           recipientCurrencySymbol = result.currencySymbol;
         }
-      } catch (_) {
-        // Continue with navigation even if lookup fails
+      } catch (e) {
+        // For unverified QR codes, require successful lookup
+        if (!isVerifiedQr) {
+          _showError('Could not verify recipient wallet');
+          setState(() => _isProcessing = false);
+          return;
+        }
       }
 
       if (!mounted) return;
@@ -116,12 +149,22 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
           'amountLocked': amount != null && amount > 0,
           'recipientCurrency': recipientCurrency,
           'recipientCurrencySymbol': recipientCurrencySymbol,
+          'isVerifiedQr': isVerifiedQr,
         },
       );
     } catch (e) {
       _showError('Could not read QR code');
       setState(() => _isProcessing = false);
     }
+  }
+
+  /// Validate wallet ID format (QRW-XXXX-XXXX-XXXX or legacy QRW-XXXXX-XXXXX)
+  bool _isValidWalletIdFormat(String id) {
+    // New format: QRW-XXXX-XXXX-XXXX (alphanumeric)
+    final newFormat = RegExp(r'^QRW-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$');
+    // Legacy format: QRW-XXXXX-XXXXX (numeric)
+    final legacyFormat = RegExp(r'^QRW-\d{5}-\d{5}$');
+    return newFormat.hasMatch(id) || legacyFormat.hasMatch(id);
   }
 
   void _showError(String message) {

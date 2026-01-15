@@ -48,42 +48,33 @@ class WalletService {
   }
 
   /// Get wallet by wallet ID (for recipient lookup)
+  /// Uses Cloud Function with rate limiting to prevent enumeration attacks
   Future<WalletLookupResult> lookupWallet(String walletId) async {
     try {
-      final query = await _firestore
-          .collection('wallets')
-          .where('walletId', isEqualTo: walletId)
-          .limit(1)
-          .get();
+      // Use Cloud Function for rate-limited lookup
+      // This prevents wallet ID enumeration attacks
+      final callable = FirebaseFunctions.instance.httpsCallable('lookupWallet');
+      final result = await callable.call<Map<String, dynamic>>({
+        'walletId': walletId,
+      });
 
-      if (query.docs.isEmpty) {
-        return WalletLookupResult.notFound();
-      }
-
-      final walletDoc = query.docs.first;
-      final wallet = WalletModel.fromJson(walletDoc.data());
-
-      // Get user details
-      final userDoc = await _firestore
-          .collection('users')
-          .doc(wallet.userId)
-          .get();
-
-      if (!userDoc.exists) {
-        return WalletLookupResult.notFound();
-      }
-
-      final user = UserModel.fromJson(userDoc.data()!);
-      final currency = wallet.currency;
+      final data = result.data;
 
       return WalletLookupResult.found(
-        walletId: wallet.walletId,
-        userId: wallet.userId,
-        fullName: user.fullName,
-        profilePhotoUrl: user.profilePhotoUrl,
-        currency: currency,
-        currencySymbol: _getCurrencySymbol(currency),
+        walletId: data['walletId'] as String,
+        userId: '', // Not exposed for privacy
+        fullName: data['userName'] as String? ?? 'Unknown',
+        profilePhotoUrl: data['profilePhotoUrl'] as String?,
+        currency: data['currency'] as String? ?? 'NGN',
+        currencySymbol: _getCurrencySymbol(data['currency'] as String? ?? 'NGN'),
       );
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'not-found') {
+        return WalletLookupResult.notFound();
+      } else if (e.code == 'resource-exhausted') {
+        throw WalletException('Too many requests. Please try again later.');
+      }
+      throw WalletException('Failed to lookup wallet: ${e.message}');
     } catch (e) {
       throw WalletException('Failed to lookup wallet: $e');
     }
@@ -127,6 +118,12 @@ class WalletService {
       final data = result.data;
 
       if (data['success'] == true) {
+        // Get sender's wallet for currency info
+        final walletDoc = await _firestore.collection('wallets').doc(_userId).get();
+        final senderCurrency = walletDoc.exists
+            ? (walletDoc.data()?['currency'] as String? ?? 'NGN')
+            : 'NGN';
+
         // Create a local transaction model for the UI
         final transaction = TransactionModel(
           id: data['transactionId'] as String,
@@ -136,7 +133,7 @@ class WalletService {
           receiverName: data['recipientName'] as String? ?? 'Unknown',
           amount: amount,
           fee: (data['fee'] as num?)?.toDouble() ?? 0,
-          currency: 'GHS',
+          currency: senderCurrency, // Use sender's actual currency
           type: TransactionType.send,
           status: TransactionStatus.completed,
           note: note,
@@ -174,6 +171,7 @@ class WalletService {
   }
 
   /// Add money to wallet (from bank/card via Paystack)
+  /// Balance is credited server-side via verifyPayment Cloud Function
   Future<TransactionResult> addMoney({
     required double amount,
     required String paymentReference,
@@ -184,62 +182,55 @@ class WalletService {
     }
 
     try {
-      final walletDoc = await _firestore.collection('wallets').doc(_userId).get();
-      if (!walletDoc.exists) {
-        return TransactionResult.failure('Wallet not found');
+      // Verify payment and credit wallet via Cloud Function
+      // The Cloud Function handles:
+      // 1. Paystack verification
+      // 2. Idempotency check (prevents double-crediting)
+      // 3. Atomic balance update
+      // 4. Transaction record creation
+      final callable = FirebaseFunctions.instance.httpsCallable('verifyPayment');
+      final result = await callable.call<Map<String, dynamic>>({
+        'reference': paymentReference,
+      });
+
+      final data = result.data;
+
+      if (data['success'] == true) {
+        // Get wallet info for transaction model
+        final walletDoc = await _firestore.collection('wallets').doc(_userId).get();
+        final wallet = walletDoc.exists ? WalletModel.fromJson(walletDoc.data()!) : null;
+
+        final userDoc = await _firestore.collection('users').doc(_userId).get();
+        final userName = userDoc.exists
+            ? UserModel.fromJson(userDoc.data()!).fullName
+            : 'Unknown';
+
+        // Create local transaction model for UI
+        final transaction = TransactionModel(
+          id: paymentReference,
+          senderWalletId: bankName ?? 'Bank Account',
+          receiverWalletId: wallet?.walletId ?? '',
+          senderName: bankName ?? 'Bank Transfer',
+          receiverName: userName,
+          amount: (data['amount'] as num?)?.toDouble() ?? amount,
+          fee: 0,
+          currency: (data['currency'] as String?) ?? wallet?.currency ?? 'NGN',
+          type: TransactionType.deposit,
+          status: TransactionStatus.completed,
+          note: 'Deposit via ${bankName ?? "Bank"}',
+          createdAt: DateTime.now(),
+          completedAt: DateTime.now(),
+          reference: paymentReference,
+        );
+
+        return TransactionResult.success(transaction);
+      } else if (data['alreadyProcessed'] == true) {
+        return TransactionResult.failure('Payment already processed');
+      } else {
+        return TransactionResult.failure(data['error'] as String? ?? 'Payment verification failed');
       }
-
-      final wallet = WalletModel.fromJson(walletDoc.data()!);
-
-      final userDoc = await _firestore.collection('users').doc(_userId).get();
-      final userName = userDoc.exists
-          ? UserModel.fromJson(userDoc.data()!).fullName
-          : 'Unknown';
-
-      final transactionId = _generateTransactionId();
-      final now = DateTime.now();
-
-      final transaction = TransactionModel(
-        id: transactionId,
-        senderWalletId: bankName ?? 'Bank Account',
-        receiverWalletId: wallet.walletId,
-        senderName: bankName ?? 'Bank Transfer',
-        receiverName: userName,
-        amount: amount,
-        fee: 0,
-        currency: wallet.currency,
-        type: TransactionType.deposit,
-        status: TransactionStatus.completed,
-        note: 'Deposit via ${bankName ?? "Bank"}',
-        createdAt: now,
-        completedAt: now,
-        reference: paymentReference,
-      );
-
-      final batch = _firestore.batch();
-
-      // Add to wallet
-      batch.update(
-        _firestore.collection('wallets').doc(_userId),
-        {
-          'balance': FieldValue.increment(amount),
-          'updatedAt': now.toIso8601String(),
-        },
-      );
-
-      // Create transaction record
-      batch.set(
-        _firestore
-            .collection('users')
-            .doc(_userId)
-            .collection('transactions')
-            .doc(transactionId),
-        transaction.toJson(),
-      );
-
-      await batch.commit();
-
-      return TransactionResult.success(transaction);
+    } on FirebaseFunctionsException catch (e) {
+      return TransactionResult.failure(e.message ?? 'Payment verification failed');
     } catch (e) {
       return TransactionResult.failure('Deposit failed: $e');
     }

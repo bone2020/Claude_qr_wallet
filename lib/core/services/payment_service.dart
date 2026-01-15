@@ -1,4 +1,5 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
@@ -14,8 +15,26 @@ class PaymentService {
   // PAYSTACK CONFIGURATION
   // ============================================================
 
-  /// Paystack public key - safe to include in client
-  static const String _publicKey = 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b';
+  /// Paystack public key - configured via build-time environment variable
+  /// Build commands:
+  /// - Development: flutter run
+  /// - Production: flutter run --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_xxx
+  static const String _paystackPublicKeyEnv = String.fromEnvironment(
+    'PAYSTACK_PUBLIC_KEY',
+    defaultValue: 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b',
+  );
+
+  /// Get the Paystack public key with environment validation
+  static String get _publicKey {
+    // Warn in debug mode if using test key
+    if (kReleaseMode && _paystackPublicKeyEnv.startsWith('pk_test_')) {
+      debugPrint('WARNING: Using Paystack TEST key in RELEASE mode!');
+    }
+    return _paystackPublicKeyEnv;
+  }
+
+  /// Check if we're using live Paystack keys
+  static bool get isLiveMode => _paystackPublicKeyEnv.startsWith('pk_live_');
 
   // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 

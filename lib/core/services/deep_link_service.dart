@@ -119,26 +119,66 @@ class DeepLinkService {
     final currency = uri.queryParameters['currency'];
     final note = uri.queryParameters['note'];
 
-    if (walletId == null) {
-      debugPrint('ERROR: No wallet ID found in QR');
+    // SECURITY: Validate wallet ID format to prevent injection
+    if (walletId == null || !_isValidWalletIdFormat(walletId)) {
+      debugPrint('ERROR: Invalid or missing wallet ID in deep link');
       return;
+    }
+
+    // SECURITY: Validate amount is a reasonable positive number
+    double? parsedAmount;
+    if (amount != null) {
+      parsedAmount = double.tryParse(amount);
+      if (parsedAmount == null || parsedAmount < 0 || parsedAmount > 10000000) {
+        debugPrint('ERROR: Invalid amount in deep link: $amount');
+        parsedAmount = null; // Reset to null for safety
+      }
+    }
+
+    // SECURITY: Sanitize name to prevent XSS-like issues
+    final sanitizedName = _sanitizeString(name ?? 'Unknown');
+    final sanitizedNote = note != null ? _sanitizeString(note) : null;
+
+    // SECURITY: Validate currency code format (3 uppercase letters)
+    String? validatedCurrency;
+    if (currency != null && RegExp(r'^[A-Z]{3}$').hasMatch(currency)) {
+      validatedCurrency = currency;
     }
 
     Future.delayed(const Duration(milliseconds: 300), () {
       try {
         _router?.push('/confirm-send', extra: {
           'recipientWalletId': walletId,
-          'recipientName': name ?? 'Unknown',
-          'amount': double.tryParse(amount ?? '0') ?? 0.0,
-          'note': note,
+          'recipientName': sanitizedName,
+          'amount': parsedAmount ?? 0.0,
+          'note': sanitizedNote,
           'fromScan': true,
-          'amountLocked': amount != null && (double.tryParse(amount) ?? 0) > 0,
-          'recipientCurrency': currency,
+          'amountLocked': parsedAmount != null && parsedAmount > 0,
+          'recipientCurrency': validatedCurrency,
         });
       } catch (e) {
         debugPrint('Navigation ERROR: $e');
       }
     });
+  }
+
+  /// Validate wallet ID format (QRW-XXXX-XXXX-XXXX or legacy QRW-XXXXX-XXXXX)
+  bool _isValidWalletIdFormat(String id) {
+    // New format: QRW-XXXX-XXXX-XXXX (alphanumeric)
+    final newFormat = RegExp(r'^QRW-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$');
+    // Legacy format: QRW-XXXXX-XXXXX (numeric)
+    final legacyFormat = RegExp(r'^QRW-\d{5}-\d{5}$');
+    return newFormat.hasMatch(id) || legacyFormat.hasMatch(id);
+  }
+
+  /// Sanitize string to remove potentially dangerous characters
+  String _sanitizeString(String input) {
+    // Remove any HTML-like tags and limit length
+    return input
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll(RegExp(r'[<>"\']'), '')
+        .substring(0, input.length > 100 ? 100 : input.length)
+        .trim();
   }
 
   /// Update router reference

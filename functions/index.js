@@ -11,12 +11,24 @@ const db = admin.firestore();
 // ============================================================
 
 // Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || 'sk_test_xxx';
+// SECURITY: Paystack secret key must be configured in production
+const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key;
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // QR Code Signing - set via: firebase functions:config:set qr.secret="your-secret-key"
-const QR_SECRET_KEY = functions.config().qr?.secret || 'qr-wallet-default-secret-key-change-me';
+// SECURITY: QR secret must be configured - no default fallback for security
+const QR_SECRET_KEY = functions.config().qr?.secret;
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
+// Validate required secrets on cold start
+if (!PAYSTACK_SECRET_KEY) {
+  console.error('CRITICAL: Paystack secret key not configured!');
+  console.error('Run: firebase functions:config:set paystack.secret_key="sk_live_xxx"');
+}
+if (!QR_SECRET_KEY) {
+  console.error('CRITICAL: QR signing secret not configured!');
+  console.error('Run: firebase functions:config:set qr.secret="your-secure-secret-key"');
+}
 
 // Helper function for Paystack API calls
 function paystackRequest(method, path, data = null) {
@@ -150,6 +162,12 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
 
 // Verify Paystack payment and credit wallet
 exports.verifyPayment = functions.https.onCall(async (data, context) => {
+  // SECURITY: Ensure Paystack secret is configured
+  if (!PAYSTACK_SECRET_KEY) {
+    console.error('PAYSTACK_SECRET_KEY not configured - refusing to verify payment');
+    throw new functions.https.HttpsError('failed-precondition', 'Payment verification not configured');
+  }
+
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -1248,7 +1266,8 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   return {
     walletId: wallet.walletId,
     userName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
-    profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null
+    profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null,
+    currency: wallet.currency || 'NGN'
   };
 });
 
@@ -1258,6 +1277,12 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
 
 // Sign QR payload for secure payment requests
 exports.signQrPayload = functions.https.onCall(async (data, context) => {
+  // SECURITY: Ensure QR secret is configured
+  if (!QR_SECRET_KEY) {
+    console.error('QR_SECRET_KEY not configured - refusing to sign');
+    throw new functions.https.HttpsError('failed-precondition', 'QR signing not configured');
+  }
+
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
@@ -1297,6 +1322,12 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
 
 // Verify QR signature before processing payment
 exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
+  // SECURITY: Ensure QR secret is configured
+  if (!QR_SECRET_KEY) {
+    console.error('QR_SECRET_KEY not configured - refusing to verify');
+    throw new functions.https.HttpsError('failed-precondition', 'QR verification not configured');
+  }
+
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
