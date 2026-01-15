@@ -41,6 +41,9 @@ class UserModel {
   @HiveField(11)
   final String currency;
 
+  @HiveField(12)
+  final String? businessLogoUrl;
+
   UserModel({
     required this.id,
     required this.fullName,
@@ -54,6 +57,7 @@ class UserModel {
     this.dateOfBirth,
     this.country,
     this.currency = 'NGN',
+    this.businessLogoUrl,
   });
 
   /// Create user from Firestore document
@@ -73,6 +77,7 @@ class UserModel {
           : null,
       country: json['country'] as String?,
       currency: json['currency'] as String? ?? 'NGN',
+      businessLogoUrl: json['businessLogoUrl'] as String?,
     );
   }
 
@@ -91,6 +96,7 @@ class UserModel {
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'country': country,
       'currency': currency,
+      'businessLogoUrl': businessLogoUrl,
     };
   }
 
@@ -108,6 +114,7 @@ class UserModel {
     DateTime? dateOfBirth,
     String? country,
     String? currency,
+    String? businessLogoUrl,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -122,6 +129,7 @@ class UserModel {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       country: country ?? this.country,
       currency: currency ?? this.currency,
+      businessLogoUrl: businessLogoUrl ?? this.businessLogoUrl,
     );
   }
 

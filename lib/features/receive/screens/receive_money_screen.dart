@@ -200,12 +200,13 @@ Or scan my QR code in the app.
       ),
       child: Column(
         children: [
-          // QR Code
+          // QR Code with embedded app logo
           QrImageView(
             data: qrData,
             version: QrVersions.auto,
             size: AppDimensions.qrCodeSize,
             backgroundColor: Colors.white,
+            errorCorrectionLevel: QrErrorCorrectLevel.H,
             eyeStyle: const QrEyeStyle(
               eyeShape: QrEyeShape.square,
               color: AppColors.backgroundDark,
@@ -213,6 +214,10 @@ Or scan my QR code in the app.
             dataModuleStyle: const QrDataModuleStyle(
               dataModuleShape: QrDataModuleShape.square,
               color: AppColors.backgroundDark,
+            ),
+            embeddedImage: const AssetImage('assets/images/app_logo.png'),
+            embeddedImageStyle: const QrEmbeddedImageStyle(
+              size: Size(50, 50),
             ),
           ),
 

@@ -8,6 +8,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
+import '../widgets/business_logo_section.dart';
 
 /// User profile screen
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -112,6 +113,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             const SizedBox(height: AppDimensions.spaceLG),
 
+            // Business Logo Section
+            Padding(
+              padding: const EdgeInsets.only(
+                left: AppDimensions.spaceXS,
+                bottom: AppDimensions.spaceSM,
+              ),
+              child: Text(
+                'Business',
+                style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+              ),
+            ),
+            const BusinessLogoSection()
+                .animate()
+                .fadeIn(delay: 150.ms, duration: 400.ms),
+
+            const SizedBox(height: AppDimensions.spaceLG),
+
             // Security Section
             _buildSection(
               title: AppStrings.security,
@@ -135,7 +153,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push(AppRoutes.changePin),
                 ),
               ],
-            ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
+            ).animate().fadeIn(delay: 250.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
 
@@ -155,7 +173,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push(AppRoutes.notificationSettings),
                 ),
               ],
-            ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
+            ).animate().fadeIn(delay: 350.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
 
@@ -174,14 +192,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push(AppRoutes.about),
                 ),
               ],
-            ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
+            ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceXXL),
 
             // Logout Button
             _buildLogoutButton()
                 .animate()
-                .fadeIn(delay: 500.ms, duration: 400.ms),
+                .fadeIn(delay: 550.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
 

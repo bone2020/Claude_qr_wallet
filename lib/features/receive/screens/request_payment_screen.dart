@@ -28,6 +28,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
   String get _walletId => ref.watch(walletNotifierProvider).wallet?.walletId ?? '';
   String get _userName => ref.watch(currentUserProvider)?.fullName ?? 'User';
+  String? get _businessLogoUrl => ref.watch(currentUserProvider)?.businessLogoUrl;
   String get _currencySymbol => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
 
@@ -79,11 +80,11 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
   Future<void> _saveQRImage() async {
     try {
-      // Create QR image
+      // Create QR image with high error correction for embedded logo
       final qrValidationResult = QrValidator.validate(
         data: _qrData,
         version: QrVersions.auto,
-        errorCorrectionLevel: QrErrorCorrectLevel.M,
+        errorCorrectionLevel: QrErrorCorrectLevel.H,
       );
 
       if (qrValidationResult.status != QrValidationStatus.valid) {
@@ -330,7 +331,13 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               version: QrVersions.auto,
               size: 250,
               backgroundColor: Colors.white,
-              errorCorrectionLevel: QrErrorCorrectLevel.M,
+              errorCorrectionLevel: QrErrorCorrectLevel.H,
+              embeddedImage: _businessLogoUrl != null && _businessLogoUrl!.isNotEmpty
+                  ? NetworkImage(_businessLogoUrl!)
+                  : const AssetImage('assets/images/app_logo.png'),
+              embeddedImageStyle: const QrEmbeddedImageStyle(
+                size: Size(50, 50),
+              ),
             ),
           ),
         ),
