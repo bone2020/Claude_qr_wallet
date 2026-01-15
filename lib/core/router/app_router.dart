@@ -20,6 +20,7 @@ import '../../features/transactions/screens/transactions_screen.dart';
 import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
+import '../../features/profile/screens/change_password_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
@@ -50,6 +51,7 @@ class AppRoutes {
   static const String transactionDetails = '/transaction-details';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
+  static const String changePassword = '/change-password';
   static const String notifications = '/notifications';
 }
 
@@ -232,6 +234,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.editProfile,
         name: 'editProfile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // Change Password Screen
+      GoRoute(
+        path: AppRoutes.changePassword,
+        name: 'changePassword',
+        builder: (context, state) => const ChangePasswordScreen(),
       ),
 
       // Notifications Screen

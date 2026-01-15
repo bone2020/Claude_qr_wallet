@@ -130,9 +130,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Iconsax.lock,
                   title: AppStrings.changePassword,
-                  onTap: () {
-                    // TODO: Navigate to change password
-                  },
+                  onTap: () => context.push(AppRoutes.changePassword),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.key,
