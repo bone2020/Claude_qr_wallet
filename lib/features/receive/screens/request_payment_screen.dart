@@ -333,7 +333,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               backgroundColor: Colors.white,
               errorCorrectionLevel: QrErrorCorrectLevel.H,
               embeddedImage: _businessLogoUrl != null && _businessLogoUrl!.isNotEmpty
-                  ? NetworkImage(_businessLogoUrl!)
+                  ? NetworkImage(_businessLogoUrl!) as ImageProvider
                   : const AssetImage('assets/images/app_logo.png'),
               embeddedImageStyle: const QrEmbeddedImageStyle(
                 size: Size(50, 50),
