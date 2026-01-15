@@ -26,7 +26,6 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   final _noteController = TextEditingController();
   bool _qrGenerated = false;
   String _qrData = '';
-  final GlobalKey _qrKey = GlobalKey();
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isDownloading = false;
 

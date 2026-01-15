@@ -12,7 +12,6 @@ import '../../../core/services/biometric_service.dart';
 import '../../../core/services/secure_storage_service.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
-import '../../auth/widgets/custom_text_field.dart';
 
 /// Confirm send screen showing transaction summary
 class ConfirmSendScreen extends ConsumerStatefulWidget {

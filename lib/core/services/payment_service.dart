@@ -2,13 +2,9 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:math';
-
-import 'wallet_service.dart';
 
 /// Payment service handling Paystack integration via Cloud Functions
 class PaymentService {
-  final WalletService _walletService = WalletService();
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   // ============================================================
@@ -23,15 +19,6 @@ class PaymentService {
     'PAYSTACK_PUBLIC_KEY',
     defaultValue: 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b',
   );
-
-  /// Get the Paystack public key with environment validation
-  static String get _publicKey {
-    // Warn in debug mode if using test key
-    if (kReleaseMode && _paystackPublicKeyEnv.startsWith('pk_test_')) {
-      debugPrint('WARNING: Using Paystack TEST key in RELEASE mode!');
-    }
-    return _paystackPublicKeyEnv;
-  }
 
   /// Check if we're using live Paystack keys
   static bool get isLiveMode => _paystackPublicKeyEnv.startsWith('pk_live_');
@@ -380,19 +367,6 @@ class PaymentService {
         error: e.toString(),
       );
     }
-  }
-
-  // ============================================================
-  // HELPERS
-  // ============================================================
-
-  String _generateReference() {
-    final random = Random.secure();
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
-    // Generate 8 random bytes for better entropy
-    final randomBytes = List<int>.generate(8, (_) => random.nextInt(256));
-    final randomPart = randomBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return 'QRW_${timestamp}_$randomPart';
   }
 }
 

@@ -158,7 +158,6 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
         separatorBuilder: (_, __) => const SizedBox(height: AppDimensions.spaceSM),
         itemBuilder: (context, index) {
           final transaction = transactions[index];
-          final isCredit = transaction.isCredit(walletId);
           final counterpartyName = transaction.getCounterpartyName(walletId);
 
           return TransactionTile(

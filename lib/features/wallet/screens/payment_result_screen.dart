@@ -30,7 +30,6 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
   bool _isSuccess = false;
   String? _errorMessage;
   double _amount = 0;
-  String _currency = '';
 
   @override
   void initState() {
