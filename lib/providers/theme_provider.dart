@@ -68,8 +68,15 @@ final themeNotifierProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((r
 
 /// App theme mode provider (for UI to show current selection)
 final appThemeModeProvider = Provider<AppThemeMode>((ref) {
-  final notifier = ref.watch(themeNotifierProvider.notifier);
-  return notifier.appThemeMode;
+  final themeMode = ref.watch(themeNotifierProvider);
+  switch (themeMode) {
+    case ThemeMode.light:
+      return AppThemeMode.light;
+    case ThemeMode.dark:
+      return AppThemeMode.dark;
+    case ThemeMode.system:
+      return AppThemeMode.system;
+  }
 });
 
 /// Is dark mode provider

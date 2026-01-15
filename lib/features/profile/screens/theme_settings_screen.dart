@@ -12,7 +12,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentTheme = ref.watch(themeNotifierProvider.notifier).appThemeMode;
+    final currentTheme = ref.watch(appThemeModeProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
