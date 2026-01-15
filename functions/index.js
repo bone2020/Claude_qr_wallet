@@ -994,55 +994,202 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 });
 
 // ============================================================
-// INITIALIZE TRANSACTION (For Card Payment via Browser)
+// SECURE SEND MONEY (P2P TRANSFER) - Cloud Function
 // ============================================================
-exports.initializeTransaction = functions.https.onCall(async (data, context) => {
+
+// Helper: Generate secure transaction ID
+function generateSecureTransactionId() {
+  const timestamp = Date.now().toString(36);
+  const randomBytes = crypto.randomBytes(8).toString('hex');
+  return `TXN${timestamp}${randomBytes}`;
+}
+
+exports.sendMoney = functions.https.onCall(async (data, context) => {
+  // 1. Check authentication
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  const { email, amount, currency } = data;
-  const userId = context.auth.uid;
+  const senderUid = context.auth.uid;
+  const { recipientWalletId, amount, note } = data;
 
-  if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  // 2. Validate inputs
+  if (!recipientWalletId || typeof recipientWalletId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid recipient wallet ID');
   }
 
-  if (!email) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+  if (typeof amount !== 'number' || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Amount must be positive');
+  }
+
+  if (amount > 10000000) {
+    throw new functions.https.HttpsError('invalid-argument', 'Amount exceeds limit');
   }
 
   try {
-    const reference = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    
-    const response = await paystackRequest('POST', '/transaction/initialize', {
-      email: email,
-      amount: Math.round(amount * 100),
-      currency: currency || 'GHS',
-      reference: reference,
-      metadata: {
-        userId: userId,
-        type: 'deposit',
-      },
+    // 3. Run atomic transaction
+    const result = await db.runTransaction(async (transaction) => {
+      // Get sender wallet
+      const senderWalletRef = db.collection('wallets').doc(senderUid);
+      const senderWallet = await transaction.get(senderWalletRef);
+
+      if (!senderWallet.exists) {
+        throw new functions.https.HttpsError('not-found', 'Sender wallet not found');
+      }
+
+      const senderData = senderWallet.data();
+      const senderBalance = senderData.balance || 0;
+
+      // Calculate fee (1% with min 10, max 100)
+      const fee = Math.min(Math.max(amount * 0.01, 10), 100);
+      const totalDebit = amount + fee;
+
+      // Check balance
+      if (senderBalance < totalDebit) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+      }
+
+      // Prevent self-transfer
+      if (senderData.walletId === recipientWalletId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Cannot send to yourself');
+      }
+
+      // Find recipient
+      const recipientQuery = await db.collection('wallets')
+        .where('walletId', '==', recipientWalletId)
+        .limit(1)
+        .get();
+
+      if (recipientQuery.empty) {
+        throw new functions.https.HttpsError('not-found', 'Recipient not found');
+      }
+
+      const recipientDoc = recipientQuery.docs[0];
+      const recipientUid = recipientDoc.id;
+      const recipientRef = recipientDoc.ref;
+      const recipientData = recipientDoc.data();
+
+      // Get user names
+      const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
+      const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
+
+      const senderName = senderUserDoc.exists ? senderUserDoc.data().fullName : 'Unknown';
+      const recipientName = recipientUserDoc.exists ? recipientUserDoc.data().fullName : 'Unknown';
+
+      // Generate transaction ID
+      const txId = generateSecureTransactionId();
+      const now = new Date();
+
+      // Deduct from sender
+      transaction.update(senderWalletRef, {
+        balance: admin.firestore.FieldValue.increment(-totalDebit),
+        dailySpent: admin.firestore.FieldValue.increment(totalDebit),
+        monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
+        updatedAt: now.toISOString()
+      });
+
+      // Add to recipient
+      transaction.update(recipientRef, {
+        balance: admin.firestore.FieldValue.increment(amount),
+        updatedAt: now.toISOString()
+      });
+
+      // Transaction data
+      const baseTxData = {
+        id: txId,
+        senderWalletId: senderData.walletId,
+        receiverWalletId: recipientWalletId,
+        senderName: senderName,
+        receiverName: recipientName,
+        amount: amount,
+        fee: fee,
+        currency: senderData.currency || 'GHS',
+        note: note || '',
+        status: 'completed',
+        createdAt: now.toISOString(),
+        completedAt: now.toISOString(),
+        reference: `TXN-${now.getTime()}`
+      };
+
+      // Sender transaction record
+      transaction.set(
+        db.collection('users').doc(senderUid).collection('transactions').doc(txId),
+        { ...baseTxData, type: 'send' }
+      );
+
+      // Recipient transaction record
+      transaction.set(
+        db.collection('users').doc(recipientUid).collection('transactions').doc(txId),
+        { ...baseTxData, type: 'receive' }
+      );
+
+      return {
+        transactionId: txId,
+        amount: amount,
+        fee: fee,
+        recipientName: recipientName,
+        newBalance: senderBalance - totalDebit
+      };
     });
 
-    console.log('Initialize transaction response:', JSON.stringify(response));
+    return { success: true, ...result };
 
-    if (response.status && response.data) {
-      return {
-        success: true,
-        authorizationUrl: response.data.authorization_url,
-        reference: response.data.reference,
-        accessCode: response.data.access_code,
-      };
-    } else {
-      return {
-        success: false,
-        error: response.message || 'Failed to initialize transaction',
-      };
-    }
   } catch (error) {
-    console.error('Initialize transaction error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
+    console.error('sendMoney error:', error);
+    if (error.code) throw error;
+    throw new functions.https.HttpsError('internal', 'Transaction failed');
   }
+});
+
+// ============================================================
+// WALLET LOOKUP (with rate limiting)
+// ============================================================
+
+exports.lookupWallet = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { walletId } = data;
+
+  if (!walletId || typeof walletId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
+  }
+
+  // Rate limiting
+  const rateLimitRef = db.collection('rate_limits').doc(context.auth.uid);
+  const now = Date.now();
+
+  const rateDoc = await rateLimitRef.get();
+  if (rateDoc.exists) {
+    const { count, windowStart } = rateDoc.data();
+    if (now - windowStart < 60000 && count >= 30) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded');
+    }
+    await rateLimitRef.update({
+      count: now - windowStart < 60000 ? count + 1 : 1,
+      windowStart: now - windowStart < 60000 ? windowStart : now
+    });
+  } else {
+    await rateLimitRef.set({ count: 1, windowStart: now });
+  }
+
+  // Lookup
+  const query = await db.collection('wallets')
+    .where('walletId', '==', walletId)
+    .limit(1)
+    .get();
+
+  if (query.empty) {
+    throw new functions.https.HttpsError('not-found', 'Wallet not found');
+  }
+
+  const wallet = query.docs[0].data();
+  const userDoc = await db.collection('users').doc(query.docs[0].id).get();
+
+  return {
+    walletId: wallet.walletId,
+    userName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
+    profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null
+  };
 });

@@ -1,6 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 import 'dart:math';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/models.dart';
 import 'exchange_rate_service.dart';
@@ -103,7 +106,7 @@ class WalletService {
   // TRANSACTION OPERATIONS
   // ============================================================
 
-  /// Send money to another wallet
+  /// Send money to another wallet (via secure Cloud Function)
   Future<TransactionResult> sendMoney({
     required String recipientWalletId,
     required double amount,
@@ -114,164 +117,57 @@ class WalletService {
     }
 
     try {
-      // Get sender's wallet
-      final senderWalletDoc = await _firestore
-          .collection('wallets')
-          .doc(_userId)
-          .get();
+      final callable = FirebaseFunctions.instance.httpsCallable('sendMoney');
+      final result = await callable.call<Map<String, dynamic>>({
+        'recipientWalletId': recipientWalletId,
+        'amount': amount,
+        'note': note ?? '',
+      });
 
-      if (!senderWalletDoc.exists) {
-        return TransactionResult.failure('Sender wallet not found');
-      }
+      final data = result.data;
 
-      final senderWallet = WalletModel.fromJson(senderWalletDoc.data()!);
-
-      // Check balance
-      if (senderWallet.balance < amount) {
-        return TransactionResult.failure('Insufficient balance');
-      }
-
-      // Check daily limit
-      if (!senderWallet.canTransact(amount)) {
-        return TransactionResult.failure('Transaction limit exceeded');
-      }
-
-      // Get recipient's wallet
-      final recipientQuery = await _firestore
-          .collection('wallets')
-          .where('walletId', isEqualTo: recipientWalletId)
-          .limit(1)
-          .get();
-
-      if (recipientQuery.docs.isEmpty) {
-        return TransactionResult.failure('Recipient wallet not found');
-      }
-
-      final recipientWalletDoc = recipientQuery.docs.first;
-      final recipientWallet = WalletModel.fromJson(recipientWalletDoc.data());
-
-      // Prevent self-transfer
-      if (recipientWallet.userId == _userId) {
-        return TransactionResult.failure('Cannot send money to yourself');
-      }
-
-      // Get user names for transaction record
-      final senderUserDoc = await _firestore
-          .collection('users')
-          .doc(_userId)
-          .get();
-      final recipientUserDoc = await _firestore
-          .collection('users')
-          .doc(recipientWallet.userId)
-          .get();
-
-      final senderName = senderUserDoc.exists
-          ? UserModel.fromJson(senderUserDoc.data()!).fullName
-          : 'Unknown';
-      final recipientName = recipientUserDoc.exists
-          ? UserModel.fromJson(recipientUserDoc.data()!).fullName
-          : 'Unknown';
-
-      // Calculate fee (1% with min 10, max 100 in sender's currency)
-      final fee = (amount * 0.01).clamp(10.0, 100.0);
-
-      // Get currencies
-      final senderCurrency = senderWallet.currency;
-      final recipientCurrency = recipientWallet.currency;
-
-      // Calculate conversion if needed
-      double amountToCredit = amount;
-      double? exchangeRate;
-      double? convertedAmount;
-
-      if (ExchangeRateService.needsConversion(senderCurrency, recipientCurrency)) {
-        exchangeRate = ExchangeRateService.getExchangeRate(
-          fromCurrency: senderCurrency,
-          toCurrency: recipientCurrency,
-        );
-        convertedAmount = ExchangeRateService.convert(
+      if (data['success'] == true) {
+        // Create a local transaction model for the UI
+        final transaction = TransactionModel(
+          id: data['transactionId'] as String,
+          senderWalletId: '',
+          receiverWalletId: recipientWalletId,
+          senderName: '',
+          receiverName: data['recipientName'] as String? ?? 'Unknown',
           amount: amount,
-          fromCurrency: senderCurrency,
-          toCurrency: recipientCurrency,
+          fee: (data['fee'] as num?)?.toDouble() ?? 0,
+          currency: 'GHS',
+          type: TransactionType.send,
+          status: TransactionStatus.completed,
+          note: note,
+          createdAt: DateTime.now(),
+          completedAt: DateTime.now(),
+          reference: data['transactionId'] as String,
         );
-        amountToCredit = convertedAmount;
+
+        return TransactionResult.success(transaction);
+      } else {
+        return TransactionResult.failure(data['error'] as String? ?? 'Transaction failed');
       }
-
-      // Create transaction record
-      final transactionId = _generateTransactionId();
-      final now = DateTime.now();
-
-      final transaction = TransactionModel(
-        id: transactionId,
-        senderWalletId: senderWallet.walletId,
-        receiverWalletId: recipientWalletId,
-        senderName: senderName,
-        receiverName: recipientName,
-        amount: amount,
-        fee: fee,
-        currency: senderCurrency,
-        type: TransactionType.send,
-        status: TransactionStatus.completed,
-        note: note,
-        createdAt: now,
-        completedAt: now,
-        reference: 'TXN-${now.millisecondsSinceEpoch}',
-        senderCurrency: senderCurrency,
-        receiverCurrency: recipientCurrency,
-        convertedAmount: convertedAmount,
-        exchangeRate: exchangeRate,
-      );
-
-      // Execute transaction in a batch
-      final batch = _firestore.batch();
-
-      // Deduct from sender (amount + fee in sender's currency)
-      batch.update(
-        _firestore.collection('wallets').doc(_userId),
-        {
-          'balance': FieldValue.increment(-(amount + fee)),
-          'dailySpent': FieldValue.increment(amount + fee),
-          'monthlySpent': FieldValue.increment(amount + fee),
-          'updatedAt': now.toIso8601String(),
-        },
-      );
-
-      // Add to recipient (converted amount in recipient's currency)
-      batch.update(
-        recipientWalletDoc.reference,
-        {
-          'balance': FieldValue.increment(amountToCredit),
-          'updatedAt': now.toIso8601String(),
-        },
-      );
-
-      // Create transaction record for sender
-      batch.set(
-        _firestore
-            .collection('users')
-            .doc(_userId)
-            .collection('transactions')
-            .doc(transactionId),
-        transaction.toJson(),
-      );
-
-      // Create transaction record for recipient (as receive)
-      final recipientTransaction = transaction.copyWith(
-        type: TransactionType.receive,
-      );
-      batch.set(
-        _firestore
-            .collection('users')
-            .doc(recipientWallet.userId)
-            .collection('transactions')
-            .doc(transactionId),
-        recipientTransaction.toJson(),
-      );
-
-      // Commit transaction
-      await batch.commit();
-
-      return TransactionResult.success(transaction);
+    } on FirebaseFunctionsException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'unauthenticated':
+          errorMessage = 'Please log in to send money';
+          break;
+        case 'not-found':
+          errorMessage = 'Recipient wallet not found';
+          break;
+        case 'failed-precondition':
+          errorMessage = 'Insufficient balance';
+          break;
+        case 'invalid-argument':
+          errorMessage = e.message ?? 'Invalid request';
+          break;
+        default:
+          errorMessage = e.message ?? 'Transaction failed';
+      }
+      return TransactionResult.failure(errorMessage);
     } catch (e) {
       return TransactionResult.failure('Transaction failed: $e');
     }
@@ -427,12 +323,13 @@ class WalletService {
   // HELPER METHODS
   // ============================================================
 
-  /// Generate unique transaction ID
+  /// Generate unique transaction ID (cryptographically secure)
   String _generateTransactionId() {
-    final random = Random();
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomPart = random.nextInt(9999).toString().padLeft(4, '0');
-    return 'TXN$timestamp$randomPart';
+    final random = Random.secure();
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+    final randomBytes = List<int>.generate(8, (_) => random.nextInt(256));
+    final randomPart = base64Url.encode(randomBytes).replaceAll('=', '');
+    return 'TXN_${timestamp}_$randomPart';
   }
 }
 

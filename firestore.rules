@@ -1,19 +1,70 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 1, 27);
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if user owns the resource
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection - own data only
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Transactions - read only (writes via Cloud Functions)
+      match /transactions/{txId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
+      // Notifications
+      match /notifications/{notifId} {
+        allow read, update: if isOwner(userId);
+        allow create, delete: if false;
+      }
+
+      // Linked accounts
+      match /linkedAccounts/{accountId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Bank accounts
+      match /bankAccounts/{accountId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Cards
+      match /cards/{cardId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Wallets - read own only, writes via Cloud Functions
+    match /wallets/{walletId} {
+      allow read: if isAuthenticated() && request.auth.uid == walletId;
+      allow write: if false;
+    }
+
+    // Exchange rates - read only
+    match /exchange_rates/{rateId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // App config - read only
+    match /app_config/{doc} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Rate limits - Cloud Functions only
+    match /rate_limits/{userId} {
+      allow read, write: if false;
     }
   }
 }
