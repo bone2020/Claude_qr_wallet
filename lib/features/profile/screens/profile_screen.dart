@@ -18,7 +18,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _darkMode = true;
   bool _biometricEnabled = true;
 
   void _handleLogout() {
@@ -145,14 +144,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               title: 'Preferences',
               children: [
                 _buildCurrencyMenuItem(ref),
-                _buildSwitchItem(
+                _buildMenuItem(
                   icon: Iconsax.moon,
-                  title: AppStrings.darkMode,
-                  value: _darkMode,
-                  onChanged: (value) {
-                    setState(() => _darkMode = value);
-                    // TODO: Implement theme switching
-                  },
+                  title: 'Appearance',
+                  onTap: () => context.push(AppRoutes.themeSettings),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.notification,
