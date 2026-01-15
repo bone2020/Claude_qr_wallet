@@ -19,7 +19,7 @@ class HelpSupportScreen extends StatelessWidget {
   Future<void> _launchEmail() async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'support@qrwallet.com',
+      path: 'qrwallet.support@bongroups.co',
       query: 'subject=QR Wallet Support Request',
     );
     if (await canLaunchUrl(uri)) {
@@ -59,7 +59,7 @@ class HelpSupportScreen extends StatelessWidget {
               context: context,
               icon: Iconsax.sms,
               title: 'Email Support',
-              subtitle: 'support@qrwallet.com',
+              subtitle: 'qrwallet.support@bongroups.co',
               onTap: _launchEmail,
             ),
             _buildContactItem(
