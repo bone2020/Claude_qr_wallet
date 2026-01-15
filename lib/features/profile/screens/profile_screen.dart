@@ -106,9 +106,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildMenuItem(
                   icon: Iconsax.bank,
                   title: AppStrings.linkedAccounts,
-                  onTap: () {
-                    // TODO: Navigate to linked accounts
-                  },
+                  onTap: () => context.push(AppRoutes.linkedAccounts),
                 ),
               ],
             ).animate().fadeIn(delay: 100.ms, duration: 400.ms),

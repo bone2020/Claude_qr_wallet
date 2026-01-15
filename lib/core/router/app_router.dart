@@ -25,6 +25,7 @@ import '../../features/profile/screens/change_pin_screen.dart';
 import '../../features/profile/screens/help_support_screen.dart';
 import '../../features/profile/screens/about_screen.dart';
 import '../../features/profile/screens/notification_settings_screen.dart';
+import '../../features/profile/screens/linked_accounts_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
@@ -55,6 +56,7 @@ class AppRoutes {
   static const String transactionDetails = '/transaction-details';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
+  static const String linkedAccounts = '/linked-accounts';
   static const String changePassword = '/change-password';
   static const String changePin = '/change-pin';
   static const String helpSupport = '/help-support';
@@ -242,6 +244,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.editProfile,
         name: 'editProfile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // Linked Accounts Screen
+      GoRoute(
+        path: AppRoutes.linkedAccounts,
+        name: 'linkedAccounts',
+        builder: (context, state) => const LinkedAccountsScreen(),
       ),
 
       // Change Password Screen
