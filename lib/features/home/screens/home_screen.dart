@@ -129,7 +129,7 @@ class HomeScreen extends ConsumerWidget {
         ),
         GestureDetector(
           onTap: () {
-            // TODO: Navigate to notifications
+            context.push(AppRoutes.notifications);
           },
           child: Container(
             width: 44,

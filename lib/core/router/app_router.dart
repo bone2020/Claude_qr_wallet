@@ -24,6 +24,7 @@ import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
 import '../../features/settings/screens/currency_selector_screen.dart';
+import '../../features/notifications/screens/notifications_screen.dart';
 
 /// Route names
 class AppRoutes {
@@ -49,6 +50,7 @@ class AppRoutes {
   static const String transactionDetails = '/transaction-details';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
+  static const String notifications = '/notifications';
 }
 
 /// Router provider
@@ -230,6 +232,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.editProfile,
         name: 'editProfile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // Notifications Screen
+      GoRoute(
+        path: AppRoutes.notifications,
+        name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
     ],
 
