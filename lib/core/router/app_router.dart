@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../services/screenshot_prevention_service.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/auth/screens/welcome_screen.dart';
 import '../../features/auth/screens/sign_up_screen.dart';
@@ -136,11 +137,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const KycScreen(),
       ),
 
-      // Main Navigation (contains bottom nav)
+      // Main Navigation (contains bottom nav) - Protected: shows balance
       GoRoute(
         path: AppRoutes.main,
         name: 'main',
-        builder: (context, state) => const MainNavigationScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: MainNavigationScreen(),
+        ),
       ),
 
       // Send Money Screen
@@ -157,62 +160,74 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ScanQrScreen(),
       ),
 
-      // Confirm Send Screen
+      // Confirm Send Screen - Protected: shows transaction details
       GoRoute(
         path: AppRoutes.confirmSend,
         name: 'confirmSend',
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
-          return ConfirmSendScreen(
-            recipientWalletId: extras?['recipientWalletId'] ?? '',
-            recipientName: extras?['recipientName'] ?? '',
-            amount: extras?['amount'] ?? 0.0,
-            note: extras?['note'],
-            fromScan: extras?['fromScan'] ?? false,
-            amountLocked: extras?['amountLocked'] ?? false,
-            recipientCurrency: extras?['recipientCurrency'],
-            recipientCurrencySymbol: extras?['recipientCurrencySymbol'],
+          return ScreenshotProtectedScreen(
+            child: ConfirmSendScreen(
+              recipientWalletId: extras?['recipientWalletId'] ?? '',
+              recipientName: extras?['recipientName'] ?? '',
+              amount: extras?['amount'] ?? 0.0,
+              note: extras?['note'],
+              fromScan: extras?['fromScan'] ?? false,
+              amountLocked: extras?['amountLocked'] ?? false,
+              recipientCurrency: extras?['recipientCurrency'],
+              recipientCurrencySymbol: extras?['recipientCurrencySymbol'],
+            ),
           );
         },
       ),
 
-      // Receive Money Screen
+      // Receive Money Screen - Protected: shows QR with wallet ID
       GoRoute(
         path: AppRoutes.receiveMoney,
         name: 'receiveMoney',
-        builder: (context, state) => const ReceiveMoneyScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: ReceiveMoneyScreen(),
+        ),
       ),
 
-      // Request Payment Screen (Merchant QR)
+      // Request Payment Screen (Merchant QR) - Protected: shows payment QR
       GoRoute(
         path: AppRoutes.requestPayment,
         name: 'requestPayment',
-        builder: (context, state) => const RequestPaymentScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: RequestPaymentScreen(),
+        ),
       ),
 
-      // Add Money Screen
+      // Add Money Screen - Protected: shows payment details
       GoRoute(
         path: AppRoutes.addMoney,
         name: 'addMoney',
-        builder: (context, state) => const AddMoneyScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: AddMoneyScreen(),
+        ),
       ),
 
-      // Withdraw Screen
+      // Withdraw Screen - Protected: shows bank account details
       GoRoute(
         path: AppRoutes.withdraw,
         name: 'withdraw',
-        builder: (context, state) => const WithdrawScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: WithdrawScreen(),
+        ),
       ),
 
-      // Payment Result Screen (Deep Link Callback)
+      // Payment Result Screen (Deep Link Callback) - Protected: shows transaction result
       GoRoute(
         path: AppRoutes.paymentResult,
         name: 'paymentResult',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          return PaymentResultScreen(
-            reference: extra?['reference'] ?? '',
-            status: extra?['status'],
+          return ScreenshotProtectedScreen(
+            child: PaymentResultScreen(
+              reference: extra?['reference'] ?? '',
+              status: extra?['status'],
+            ),
           );
         },
       ),
@@ -224,20 +239,24 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CurrencySelectorScreen(),
       ),
 
-      // Transactions Screen (View All)
+      // Transactions Screen (View All) - Protected: shows transaction history
       GoRoute(
         path: AppRoutes.transactions,
         name: 'transactions',
-        builder: (context, state) => const TransactionsScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: TransactionsScreen(),
+        ),
       ),
 
-      // Transaction Details Screen
+      // Transaction Details Screen - Protected: shows transaction details
       GoRoute(
         path: AppRoutes.transactionDetails,
         name: 'transactionDetails',
         builder: (context, state) {
           final transactionId = state.extra as String?;
-          return TransactionDetailsScreen(transactionId: transactionId ?? '');
+          return ScreenshotProtectedScreen(
+            child: TransactionDetailsScreen(transactionId: transactionId ?? ''),
+          );
         },
       ),
 
@@ -248,11 +267,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const EditProfileScreen(),
       ),
 
-      // Linked Accounts Screen
+      // Linked Accounts Screen - Protected: shows bank account info
       GoRoute(
         path: AppRoutes.linkedAccounts,
         name: 'linkedAccounts',
-        builder: (context, state) => const LinkedAccountsScreen(),
+        builder: (context, state) => const ScreenshotProtectedScreen(
+          child: LinkedAccountsScreen(),
+        ),
       ),
 
       // Change Password Screen

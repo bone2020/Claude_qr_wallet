@@ -7,6 +7,73 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ============================================================
+// AUDIT LOGGING
+// ============================================================
+
+/**
+ * Log security-relevant events for monitoring and compliance
+ * Events are stored in Firestore for analysis and can be exported to BigQuery
+ */
+async function auditLog(eventType, data, context = null) {
+  try {
+    const logEntry = {
+      eventType,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      data: {
+        ...data,
+        // Sanitize sensitive fields
+        amount: data.amount,
+        walletId: data.walletId ? maskWalletId(data.walletId) : null,
+      },
+      metadata: {
+        userId: context?.auth?.uid || null,
+        ipHash: context?.rawRequest?.ip
+          ? crypto.createHash('sha256').update(context.rawRequest.ip).digest('hex').substring(0, 16)
+          : null,
+        userAgent: context?.rawRequest?.headers?.['user-agent']?.substring(0, 100) || null,
+        functionName: data.functionName || null,
+      }
+    };
+
+    await db.collection('audit_logs').add(logEntry);
+  } catch (error) {
+    // Don't let audit logging failures affect main operations
+    console.error('Audit log error:', error);
+  }
+}
+
+// Mask wallet ID for privacy in logs (show first and last 4 chars)
+function maskWalletId(walletId) {
+  if (!walletId || walletId.length < 10) return '***';
+  return `${walletId.substring(0, 4)}...${walletId.substring(walletId.length - 4)}`;
+}
+
+// Event types for audit logging
+const AuditEvents = {
+  // Transaction events
+  TRANSACTION_SUCCESS: 'transaction.success',
+  TRANSACTION_FAILED: 'transaction.failed',
+  DEPOSIT_SUCCESS: 'deposit.success',
+  DEPOSIT_FAILED: 'deposit.failed',
+  WITHDRAWAL_INITIATED: 'withdrawal.initiated',
+  WITHDRAWAL_COMPLETED: 'withdrawal.completed',
+
+  // Security events
+  RATE_LIMIT_EXCEEDED: 'security.rate_limit_exceeded',
+  INVALID_SIGNATURE: 'security.invalid_signature',
+  WALLET_LOOKUP_FAILED: 'security.wallet_lookup_failed',
+  ENUMERATION_BLOCKED: 'security.enumeration_blocked',
+
+  // Authentication events
+  QR_SIGNED: 'auth.qr_signed',
+  QR_VERIFIED: 'auth.qr_verified',
+  QR_EXPIRED: 'auth.qr_expired',
+
+  // Configuration events
+  SECRET_MISSING: 'config.secret_missing',
+};
+
+// ============================================================
 // PAYSTACK CONFIGURATION
 // ============================================================
 
@@ -1154,9 +1221,27 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       };
     });
 
+    // Audit log successful transaction
+    await auditLog(AuditEvents.TRANSACTION_SUCCESS, {
+      functionName: 'sendMoney',
+      transactionId: result.transactionId,
+      amount: amount,
+      fee: result.fee,
+      recipientWalletId: recipientWalletId,
+    }, context);
+
     return { success: true, ...result };
 
   } catch (error) {
+    // Audit log failed transaction
+    await auditLog(AuditEvents.TRANSACTION_FAILED, {
+      functionName: 'sendMoney',
+      amount: data.amount,
+      recipientWalletId: data.recipientWalletId,
+      errorCode: error.code || 'unknown',
+      errorMessage: error.message?.substring(0, 100),
+    }, context);
+
     console.error('sendMoney error:', error);
     if (error.code) throw error;
     throw new functions.https.HttpsError('internal', 'Transaction failed');
@@ -1211,6 +1296,12 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const userAllowed = await checkRateLimit(userLimitRef, 30, 60000);
 
   if (!userAllowed) {
+    // Audit log rate limit exceeded
+    await auditLog(AuditEvents.RATE_LIMIT_EXCEEDED, {
+      functionName: 'lookupWallet',
+      limitType: 'user',
+      walletId: walletId,
+    }, context);
     throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded');
   }
 
@@ -1219,6 +1310,12 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const ipAllowed = await checkRateLimit(ipLimitRef, 100, 60000);
 
   if (!ipAllowed) {
+    // Audit log IP rate limit exceeded
+    await auditLog(AuditEvents.RATE_LIMIT_EXCEEDED, {
+      functionName: 'lookupWallet',
+      limitType: 'ip',
+      walletId: walletId,
+    }, context);
     throw new functions.https.HttpsError('resource-exhausted', 'Too many requests from this network');
   }
 
@@ -1242,6 +1339,12 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
 
       // Block after 10 failed lookups in 5 minutes
       if (newCount >= 10) {
+        // Audit log enumeration attempt blocked
+        await auditLog(AuditEvents.ENUMERATION_BLOCKED, {
+          functionName: 'lookupWallet',
+          failedAttempts: newCount,
+          walletId: walletId,
+        }, context);
         await failedLookupRef.update({ count: newCount, windowStart: now - windowStart < 300000 ? windowStart : now });
         throw new functions.https.HttpsError('resource-exhausted', 'Too many invalid lookups. Please try again later.');
       }
@@ -1345,14 +1448,32 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
     .digest('hex');
 
   if (signature !== expectedSig) {
+    // Audit log invalid signature attempt
+    await auditLog(AuditEvents.INVALID_SIGNATURE, {
+      functionName: 'verifyQrSignature',
+      reason: 'signature_mismatch',
+    }, context);
     return { valid: false, reason: 'Invalid signature' };
   }
 
   // Check expiry
   const parsed = JSON.parse(payload);
   if (Date.now() > parsed.timestamp + QR_EXPIRY_MS) {
+    // Audit log expired QR code
+    await auditLog(AuditEvents.QR_EXPIRED, {
+      functionName: 'verifyQrSignature',
+      walletId: parsed.walletId,
+      expiredAt: new Date(parsed.timestamp + QR_EXPIRY_MS).toISOString(),
+    }, context);
     return { valid: false, reason: 'QR code expired' };
   }
+
+  // Audit log successful verification
+  await auditLog(AuditEvents.QR_VERIFIED, {
+    functionName: 'verifyQrSignature',
+    walletId: parsed.walletId,
+    amount: parsed.amount,
+  }, context);
 
   return {
     valid: true,

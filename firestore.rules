@@ -66,5 +66,15 @@ service cloud.firestore {
     match /rate_limits/{userId} {
       allow read, write: if false;
     }
+
+    // Audit logs - Cloud Functions only (no client access)
+    match /audit_logs/{logId} {
+      allow read, write: if false;
+    }
+
+    // Payments - Cloud Functions only (for idempotency tracking)
+    match /payments/{paymentId} {
+      allow read, write: if false;
+    }
   }
 }
