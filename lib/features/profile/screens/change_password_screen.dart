@@ -137,7 +137,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
         title: Text('Change Password', style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
           child: Form(
             key: _formKey,
@@ -232,7 +232,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                   ),
                 ),
 
-                const Spacer(),
+                const SizedBox(height: 32),
 
                 // Change Password Button
                 SizedBox(
