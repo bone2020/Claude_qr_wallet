@@ -74,31 +74,102 @@ const AuditEvents = {
 };
 
 // ============================================================
-// PAYSTACK CONFIGURATION
+// MULTI-COUNTRY PAYSTACK CONFIGURATION
 // ============================================================
 
-// Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
-// SECURITY: Paystack secret key must be configured in production
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key;
+// Paystack keys per country - set via:
+// firebase functions:config:set paystack.gh_key="sk_live_xxx" paystack.ng_key="sk_live_xxx"
+const PAYSTACK_KEYS = {
+  GH: functions.config().paystack?.gh_key || functions.config().paystack?.secret_key || null,
+  NG: functions.config().paystack?.ng_key || null,
+  KE: functions.config().paystack?.ke_key || null,
+  ZA: functions.config().paystack?.za_key || null,
+  CI: functions.config().paystack?.ci_key || null,
+  RW: functions.config().paystack?.rw_key || null,
+  TZ: functions.config().paystack?.tz_key || null,
+  EG: functions.config().paystack?.eg_key || null,
+};
+
+// Country phone prefixes
+const PHONE_PREFIX_TO_COUNTRY = {
+  '+233': 'GH',
+  '+234': 'NG',
+  '+254': 'KE',
+  '+27': 'ZA',
+  '+225': 'CI',
+  '+250': 'RW',
+  '+255': 'TZ',
+  '+20': 'EG',
+};
+
+// Country to currency mapping
+const COUNTRY_CURRENCY = {
+  GH: 'GHS',
+  NG: 'NGN',
+  KE: 'KES',
+  ZA: 'ZAR',
+  CI: 'XOF',
+  RW: 'RWF',
+  TZ: 'TZS',
+  EG: 'EGP',
+};
+
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
-// QR Code Signing - set via: firebase functions:config:set qr.secret="your-secret-key"
-// SECURITY: QR secret must be configured - no default fallback for security
-const QR_SECRET_KEY = functions.config().qr?.secret;
-const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+// Helper: Detect country from phone number
+function getCountryFromPhone(phoneNumber) {
+  if (!phoneNumber) return null;
 
-// Validate required secrets on cold start
-if (!PAYSTACK_SECRET_KEY) {
-  console.error('CRITICAL: Paystack secret key not configured!');
-  console.error('Run: firebase functions:config:set paystack.secret_key="sk_live_xxx"');
-}
-if (!QR_SECRET_KEY) {
-  console.error('CRITICAL: QR signing secret not configured!');
-  console.error('Run: firebase functions:config:set qr.secret="your-secure-secret-key"');
+  const sortedPrefixes = Object.keys(PHONE_PREFIX_TO_COUNTRY)
+    .sort((a, b) => b.length - a.length);
+
+  for (const prefix of sortedPrefixes) {
+    if (phoneNumber.startsWith(prefix)) {
+      return PHONE_PREFIX_TO_COUNTRY[prefix];
+    }
+  }
+  return null;
 }
 
-// Helper function for Paystack API calls
-function paystackRequest(method, path, data = null) {
+// Helper: Get Paystack key for country
+function getPaystackKey(countryCode) {
+  const key = PAYSTACK_KEYS[countryCode?.toUpperCase()];
+  if (!key) {
+    console.warn(`No Paystack key configured for country: ${countryCode}, using Ghana as fallback`);
+    return PAYSTACK_KEYS['GH'];
+  }
+  return key;
+}
+
+// Helper: Get currency for country
+function getCurrencyForCountry(countryCode) {
+  return COUNTRY_CURRENCY[countryCode?.toUpperCase()] || 'GHS';
+}
+
+// Helper: Get user's country from Firestore
+async function getUserCountry(userId) {
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      const phoneCountry = getCountryFromPhone(userData.phoneNumber);
+      return phoneCountry || userData.country || 'GH';
+    }
+    return 'GH';
+  } catch (e) {
+    console.error('Error getting user country:', e);
+    return 'GH';
+  }
+}
+
+// Helper function for Paystack API calls (country-aware)
+function paystackRequest(method, path, data = null, countryCode = 'GH') {
+  const secretKey = getPaystackKey(countryCode);
+
+  if (!secretKey) {
+    return Promise.reject(new Error(`Paystack not configured for country: ${countryCode}`));
+  }
+
   return new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
@@ -106,7 +177,7 @@ function paystackRequest(method, path, data = null) {
       path: path,
       method: method,
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
     };
@@ -131,6 +202,21 @@ function paystackRequest(method, path, data = null) {
     }
     req.end();
   });
+}
+
+// QR Code Signing - set via: firebase functions:config:set qr.secret="your-secret-key"
+// SECURITY: QR secret must be configured - no default fallback for security
+const QR_SECRET_KEY = functions.config().qr?.secret;
+const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
+// Validate required secrets on cold start
+if (!PAYSTACK_KEYS['GH']) {
+  console.error('CRITICAL: Paystack Ghana key not configured!');
+  console.error('Run: firebase functions:config:set paystack.gh_key="sk_live_xxx"');
+}
+if (!QR_SECRET_KEY) {
+  console.error('CRITICAL: QR signing secret not configured!');
+  console.error('Run: firebase functions:config:set qr.secret="your-secure-secret-key"');
 }
 
 // ============================================================
@@ -229,12 +315,6 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
 
 // Verify Paystack payment and credit wallet
 exports.verifyPayment = functions.https.onCall(async (data, context) => {
-  // SECURITY: Ensure Paystack secret is configured
-  if (!PAYSTACK_SECRET_KEY) {
-    console.error('PAYSTACK_SECRET_KEY not configured - refusing to verify payment');
-    throw new functions.https.HttpsError('failed-precondition', 'Payment verification not configured');
-  }
-
   // Check authentication
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
@@ -248,8 +328,17 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
 
   try {
+    // Get user's country for correct Paystack key
+    const userCountry = await getUserCountry(userId);
+
+    // SECURITY: Ensure Paystack secret is configured for this country
+    if (!getPaystackKey(userCountry)) {
+      console.error(`Paystack key not configured for country: ${userCountry}`);
+      throw new functions.https.HttpsError('failed-precondition', 'Payment verification not configured');
+    }
+
     // Verify with Paystack
-    const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
+    const response = await paystackRequest('GET', `/transaction/verify/${reference}`, null, userCountry);
 
     if (!response.status || response.data.status !== 'success') {
       return { success: false, error: 'Payment verification failed' };
@@ -546,7 +635,10 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber } = data;
   const userId = context.auth.uid;
 
-  console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
+
+  console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, userCountry }));
   // Validate amount
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
@@ -600,7 +692,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     }
 
     // Create recipient
-    const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData);
+    const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData, userCountry);
     console.log("Paystack recipient response:", JSON.stringify(recipientResponse));
 
     if (!recipientResponse.status) {
@@ -662,7 +754,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       recipient: recipientCode,
       reference: reference,
       reason: `Wallet withdrawal - ${reference}`,
-    });
+    }, userCountry);
 
     console.log("Paystack transfer response:", JSON.stringify(transferResponse));
     if (!transferResponse.status) {
@@ -725,6 +817,9 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   const { transferCode, otp } = data;
   const userId = context.auth.uid;
 
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
+
   if (!transferCode || !otp) {
     throw new functions.https.HttpsError('invalid-argument', 'Transfer code and OTP are required');
   }
@@ -747,7 +842,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     const otpResponse = await paystackRequest('POST', '/transfer/finalize_transfer', {
       transfer_code: transferCode,
       otp: otp,
-    });
+    }, userCountry);
 
     console.log('OTP finalize response:', JSON.stringify(otpResponse));
 
@@ -778,9 +873,16 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 // Get list of banks
 exports.getBanks = functions.https.onCall(async (data, context) => {
   try {
-    const country = data.country || 'nigeria';
-    const response = await paystackRequest('GET', `/bank?country=${country}`);
-    console.log('Paystack response:', JSON.stringify(response));
+    const userId = context.auth?.uid;
+    const { country } = data;
+
+    // Get user's country for correct Paystack key
+    const userCountry = country || (userId ? await getUserCountry(userId) : 'GH');
+
+    // Map country name to Paystack country parameter
+    const countryParam = country || 'ghana';
+
+    const response = await paystackRequest('GET', `/bank?country=${countryParam}`, null, userCountry);
     console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
       throw new Error('Failed to fetch banks');
@@ -807,14 +909,18 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   }
 
   const { accountNumber, bankCode } = data;
+  const userId = context.auth.uid;
+
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
 
   if (!accountNumber || !bankCode) {
     throw new functions.https.HttpsError('invalid-argument', 'Account number and bank code required');
   }
 
   try {
-    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
-    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
+    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode, 'country:', userCountry);
+    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`, null, userCountry);
 
     console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
@@ -844,6 +950,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   const { email, amount, currency, provider, phoneNumber } = data;
   const userId = context.auth.uid;
 
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
+
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
   }
@@ -857,7 +966,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     const chargeResponse = await paystackRequest('POST', '/charge', {
       email: email,
       amount: Math.round(amount * 100),
-      currency: currency || 'GHS',
+      currency: currency || getCurrencyForCountry(userCountry),
       mobile_money: {
         phone: phoneNumber,
         provider: provider,
@@ -866,8 +975,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       metadata: {
         userId: userId,
         type: 'deposit',
+        country: userCountry,
       },
-    });
+    }, userCountry);
 
     console.log('Mobile Money charge response:', JSON.stringify(chargeResponse));
 
@@ -943,6 +1053,9 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
   const { email, name } = data;
   const userId = context.auth.uid;
 
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
+
   try {
     // Check if user already has a virtual account
     const userDoc = await db.collection('users').doc(userId).get();
@@ -959,7 +1072,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
 
     // Get or create customer
     let customerId;
-    const customerListResponse = await paystackRequest('GET', `/customer/${email}`);
+    const customerListResponse = await paystackRequest('GET', `/customer/${email}`, null, userCountry);
 
     if (customerListResponse.status && customerListResponse.data) {
       customerId = customerListResponse.data.id;
@@ -968,8 +1081,8 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
         email: email,
         first_name: name.split(' ')[0],
         last_name: name.split(' ').slice(1).join(' ') || name.split(' ')[0],
-        metadata: { userId: userId },
-      });
+        metadata: { userId: userId, country: userCountry },
+      }, userCountry);
 
       if (!createCustomerResponse.status) {
         throw new Error('Failed to create customer');
@@ -981,7 +1094,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
     const dvaResponse = await paystackRequest('POST', '/dedicated_account', {
       customer: customerId,
       preferred_bank: 'wema-bank',
-    });
+    }, userCountry);
 
     console.log('DVA response:', JSON.stringify(dvaResponse));
 
@@ -1038,6 +1151,9 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   const { email, amount, currency } = data;
   const userId = context.auth.uid;
 
+  // Get user's country for correct Paystack key
+  const userCountry = await getUserCountry(userId);
+
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
   }
@@ -1048,18 +1164,19 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
   try {
     const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
       amount: Math.round(amount * 100), // Convert to smallest unit
-      currency: currency || 'GHS',
+      currency: currency || getCurrencyForCountry(userCountry),
       reference: reference,
       callback_url: 'https://qr-wallet-1993.web.app/payment-callback',
       metadata: {
         userId: userId,
         type: 'deposit',
+        country: userCountry,
       },
-    });
+    }, userCountry);
 
     console.log('Initialize transaction response:', JSON.stringify(response));
 
