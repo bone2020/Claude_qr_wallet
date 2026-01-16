@@ -369,7 +369,7 @@ class PaymentService {
 
   String _generateReference() {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random().nextInt(999999).toString().padLeft(6, '0');
+    final random = Random.secure().nextInt(999999).toString().padLeft(6, '0');
     return 'QRW_${timestamp}_$random';
   }
 }

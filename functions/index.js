@@ -1046,3 +1046,217 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
   }
 });
+
+// ============================================================
+// QR CODE SIGNING & VERIFICATION
+// ============================================================
+
+// Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
+const QR_SECRET_KEY = functions.config().qr?.secret || 'qr-wallet-default-secret-key-change-me';
+const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+
+// Helper: Generate HMAC signature
+function generateQrSignature(payload) {
+  return crypto.createHmac('sha256', QR_SECRET_KEY)
+    .update(payload)
+    .digest('hex');
+}
+
+// Rate limiting storage (in-memory, resets on cold start)
+const rateLimitStore = {};
+const failedLookupStore = {};
+
+// Helper: Check rate limit
+function checkRateLimit(key, maxRequests, windowMs) {
+  const now = Date.now();
+  if (!rateLimitStore[key]) {
+    rateLimitStore[key] = { count: 1, resetTime: now + windowMs };
+    return true;
+  }
+  
+  if (now > rateLimitStore[key].resetTime) {
+    rateLimitStore[key] = { count: 1, resetTime: now + windowMs };
+    return true;
+  }
+  
+  if (rateLimitStore[key].count >= maxRequests) {
+    return false;
+  }
+  
+  rateLimitStore[key].count++;
+  return true;
+}
+
+// Helper: Check failed lookup limit
+function checkFailedLookups(ip) {
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000; // 5 minutes
+  const maxFailures = 10;
+  
+  if (!failedLookupStore[ip]) {
+    failedLookupStore[ip] = { count: 0, resetTime: now + windowMs };
+  }
+  
+  if (now > failedLookupStore[ip].resetTime) {
+    failedLookupStore[ip] = { count: 0, resetTime: now + windowMs };
+  }
+  
+  return failedLookupStore[ip].count < maxFailures;
+}
+
+function recordFailedLookup(ip) {
+  if (!failedLookupStore[ip]) {
+    failedLookupStore[ip] = { count: 0, resetTime: Date.now() + 5 * 60 * 1000 };
+  }
+  failedLookupStore[ip].count++;
+}
+
+// Sign QR payload for payment requests
+exports.signQrPayload = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+  
+  const { walletId, amount, note } = data;
+  
+  if (!walletId || typeof walletId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
+  }
+  
+  // Verify the wallet belongs to the user
+  const walletDoc = await db.collection('wallets').doc(context.auth.uid).get();
+  if (!walletDoc.exists || walletDoc.data().walletId !== walletId) {
+    throw new functions.https.HttpsError('permission-denied', 'Wallet does not belong to user');
+  }
+  
+  const timestamp = Date.now();
+  const payload = {
+    walletId,
+    amount: amount || 0,
+    note: note || '',
+    timestamp,
+    userId: context.auth.uid
+  };
+  
+  const payloadString = JSON.stringify(payload);
+  const signature = generateQrSignature(payloadString);
+  
+  return {
+    payload: payloadString,
+    signature,
+    expiresAt: timestamp + QR_EXPIRY_MS
+  };
+});
+
+// Verify QR signature before processing payment
+exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+  
+  const { payload, signature } = data;
+  
+  if (!payload || !signature) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing payload or signature');
+  }
+  
+  // Verify signature
+  const expectedSignature = generateQrSignature(payload);
+  if (signature !== expectedSignature) {
+    return { valid: false, reason: 'Invalid signature' };
+  }
+  
+  // Parse and check expiry
+  let parsedPayload;
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch (e) {
+    return { valid: false, reason: 'Invalid payload format' };
+  }
+  
+  const now = Date.now();
+  if (parsedPayload.timestamp && (now - parsedPayload.timestamp) > QR_EXPIRY_MS) {
+    return { valid: false, reason: 'QR code expired' };
+  }
+  
+  // Verify wallet exists
+  const walletQuery = await db.collection('wallets')
+    .where('walletId', '==', parsedPayload.walletId)
+    .limit(1)
+    .get();
+  
+  if (walletQuery.empty) {
+    return { valid: false, reason: 'Wallet not found' };
+  }
+  
+  const walletData = walletQuery.docs[0].data();
+  const userDoc = await db.collection('users').doc(walletQuery.docs[0].id).get();
+  
+  return {
+    valid: true,
+    walletId: parsedPayload.walletId,
+    amount: parsedPayload.amount,
+    note: parsedPayload.note,
+    recipientName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
+    profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null
+  };
+});
+
+// Lookup wallet with rate limiting
+exports.lookupWallet = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+  
+  const { walletId } = data;
+  const userId = context.auth.uid;
+  
+  // Get IP for rate limiting (hashed for privacy)
+  const ip = context.rawRequest?.headers?.['x-forwarded-for'] || 'unknown';
+  const hashedIp = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+  
+  // Check user rate limit (30 requests per minute)
+  if (!checkRateLimit(`user:${userId}`, 30, 60000)) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Please wait.');
+  }
+  
+  // Check IP rate limit (100 requests per minute)
+  if (!checkRateLimit(`ip:${hashedIp}`, 100, 60000)) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many requests from this location.');
+  }
+  
+  // Check failed lookup limit
+  if (!checkFailedLookups(hashedIp)) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many failed attempts. Please wait 5 minutes.');
+  }
+  
+  if (!walletId || typeof walletId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
+  }
+  
+  // Find wallet
+  const walletQuery = await db.collection('wallets')
+    .where('walletId', '==', walletId)
+    .limit(1)
+    .get();
+  
+  if (walletQuery.empty) {
+    recordFailedLookup(hashedIp);
+    return { found: false };
+  }
+  
+  const walletDoc = walletQuery.docs[0];
+  const walletData = walletDoc.data();
+  
+  // Get user info
+  const userDoc = await db.collection('users').doc(walletDoc.id).get();
+  const userData = userDoc.exists ? userDoc.data() : {};
+  
+  return {
+    found: true,
+    walletId: walletData.walletId,
+    recipientName: userData.fullName || 'QR Wallet User',
+    profilePhotoUrl: userData.profilePhotoUrl || null
+  };
+});
+

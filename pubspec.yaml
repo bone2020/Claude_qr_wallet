@@ -18,10 +18,12 @@ dependencies:
   firebase_core: ^3.8.1
   firebase_auth: ^5.3.4
   cloud_firestore: ^5.6.0
+  firebase_app_check: ^0.3.1+4
   firebase_storage: ^12.4.0
   google_sign_in: ^6.2.2
   sign_in_with_apple: ^6.1.4
   crypto: ^3.0.6
+  flutter_secure_storage: ^9.2.2
 
   # Local Storage
   hive: ^2.2.3
