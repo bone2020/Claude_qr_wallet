@@ -146,6 +146,21 @@ function getCurrencyForCountry(countryCode) {
   return COUNTRY_CURRENCY[countryCode?.toUpperCase()] || 'GHS';
 }
 
+// Helper: Get country from currency (reverse lookup)
+function getCountryFromCurrency(currency) {
+  const currencyToCountry = {
+    'GHS': 'GH',
+    'NGN': 'NG',
+    'KES': 'KE',
+    'ZAR': 'ZA',
+    'XOF': 'CI',
+    'RWF': 'RW',
+    'TZS': 'TZ',
+    'EGP': 'EG',
+  };
+  return currencyToCountry[currency?.toUpperCase()] || 'GH';
+}
+
 // Helper: Get user's country from Firestore
 async function getUserCountry(userId) {
   try {
@@ -328,8 +343,20 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
 
   try {
-    // Get user's country for correct Paystack key
-    const userCountry = await getUserCountry(userId);
+    // Get user's wallet to determine country from currency
+    const walletSnapshot = await db.collection('wallets')
+      .where('userId', '==', userId)
+      .limit(1)
+      .get();
+
+    // Get user's country - prefer wallet currency, fallback to user profile
+    let userCountry;
+    if (!walletSnapshot.empty) {
+      const walletCurrency = walletSnapshot.docs[0].data().currency;
+      userCountry = walletCurrency ? getCountryFromCurrency(walletCurrency) : await getUserCountry(userId);
+    } else {
+      userCountry = await getUserCountry(userId);
+    }
 
     // SECURITY: Ensure Paystack secret is configured for this country
     if (!getPaystackKey(userCountry)) {
@@ -425,19 +452,30 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
 // Handle Paystack webhook events
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
-  // Verify webhook signature
+  const event = req.body;
+
+  // Detect country from currency in event data
+  const currency = event.data?.currency || 'GHS';
+  const country = getCountryFromCurrency(currency);
+  const secretKey = getPaystackKey(country);
+
+  if (!secretKey) {
+    console.error('No Paystack key configured for country:', country);
+    return res.status(500).send('Payment configuration error');
+  }
+
+  // Verify webhook signature with country-specific key
   const hash = crypto
-    .createHmac('sha512', PAYSTACK_SECRET_KEY)
+    .createHmac('sha512', secretKey)
     .update(JSON.stringify(req.body))
     .digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
-    console.error('Invalid webhook signature');
+    console.error('Invalid webhook signature for country:', country);
     return res.status(400).send('Invalid signature');
   }
 
-  const event = req.body;
-  console.log('Paystack webhook event:', event.event);
+  console.log('Paystack webhook event:', event.event, 'country:', country);
 
   try {
     switch (event.event) {
@@ -635,10 +673,6 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber } = data;
   const userId = context.auth.uid;
 
-  // Get user's country for correct Paystack key
-  const userCountry = await getUserCountry(userId);
-
-  console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, userCountry }));
   // Validate amount
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
@@ -662,6 +696,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
+
+    // Get user's country from wallet currency
+    const walletCurrency = walletData.currency;
+    const userCountry = walletCurrency ? getCountryFromCurrency(walletCurrency) : await getUserCountry(userId);
+
+    console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, userCountry }));
 
     // Check balance
     if (walletData.balance < amount) {
@@ -876,13 +916,57 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
     const userId = context.auth?.uid;
     const { country } = data;
 
-    // Get user's country for correct Paystack key
-    const userCountry = country || (userId ? await getUserCountry(userId) : 'GH');
+    // Map country names to country codes
+    const countryNameToCode = {
+      'ghana': 'GH',
+      'nigeria': 'NG',
+      'kenya': 'KE',
+      'south africa': 'ZA',
+      'ivory coast': 'CI',
+      'cote d\'ivoire': 'CI',
+      'rwanda': 'RW',
+      'tanzania': 'TZ',
+      'egypt': 'EG',
+    };
 
-    // Map country name to Paystack country parameter
-    const countryParam = country || 'ghana';
+    // Determine country code
+    let countryCode = 'GH';
+    if (country) {
+      // Check if it's already a code (2 chars) or a name
+      if (country.length === 2) {
+        countryCode = country.toUpperCase();
+      } else {
+        countryCode = countryNameToCode[country.toLowerCase()] || 'GH';
+      }
+    } else if (userId) {
+      // Get from user's wallet currency
+      const walletSnapshot = await db.collection('wallets')
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
 
-    const response = await paystackRequest('GET', `/bank?country=${countryParam}`, null, userCountry);
+      if (!walletSnapshot.empty) {
+        const walletCurrency = walletSnapshot.docs[0].data().currency;
+        countryCode = walletCurrency ? getCountryFromCurrency(walletCurrency) : await getUserCountry(userId);
+      } else {
+        countryCode = await getUserCountry(userId);
+      }
+    }
+
+    // Map country code back to Paystack country parameter (lowercase name)
+    const codeToCountryName = {
+      'GH': 'ghana',
+      'NG': 'nigeria',
+      'KE': 'kenya',
+      'ZA': 'south africa',
+      'CI': 'cote d\'ivoire',
+      'RW': 'rwanda',
+      'TZ': 'tanzania',
+      'EG': 'egypt',
+    };
+    const countryParam = codeToCountryName[countryCode] || 'ghana';
+
+    const response = await paystackRequest('GET', `/bank?country=${countryParam}`, null, countryCode);
     console.log('Paystack response:', JSON.stringify(response));
     if (!response.status) {
       throw new Error('Failed to fetch banks');
@@ -911,11 +995,22 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   const { accountNumber, bankCode } = data;
   const userId = context.auth.uid;
 
-  // Get user's country for correct Paystack key
-  const userCountry = await getUserCountry(userId);
-
   if (!accountNumber || !bankCode) {
     throw new functions.https.HttpsError('invalid-argument', 'Account number and bank code required');
+  }
+
+  // Get user's country from wallet currency
+  const walletSnapshot = await db.collection('wallets')
+    .where('userId', '==', userId)
+    .limit(1)
+    .get();
+
+  let userCountry;
+  if (!walletSnapshot.empty) {
+    const walletCurrency = walletSnapshot.docs[0].data().currency;
+    userCountry = walletCurrency ? getCountryFromCurrency(walletCurrency) : await getUserCountry(userId);
+  } else {
+    userCountry = await getUserCountry(userId);
   }
 
   try {
@@ -950,8 +1045,14 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   const { email, amount, currency, provider, phoneNumber } = data;
   const userId = context.auth.uid;
 
-  // Get user's country for correct Paystack key
-  const userCountry = await getUserCountry(userId);
+  // Get user's country - prefer currency-based detection, fallback to phone or user profile
+  let userCountry = currency ? getCountryFromCurrency(currency) : null;
+  if (!userCountry && phoneNumber) {
+    userCountry = getCountryFromPhone(phoneNumber);
+  }
+  if (!userCountry) {
+    userCountry = await getUserCountry(userId);
+  }
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
@@ -1053,13 +1154,24 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
   const { email, name } = data;
   const userId = context.auth.uid;
 
-  // Get user's country for correct Paystack key
-  const userCountry = await getUserCountry(userId);
-
   try {
     // Check if user already has a virtual account
     const userDoc = await db.collection('users').doc(userId).get();
     const userData = userDoc.data();
+
+    // Get user's country from wallet currency
+    const walletSnapshot = await db.collection('wallets')
+      .where('userId', '==', userId)
+      .limit(1)
+      .get();
+
+    let userCountry;
+    if (!walletSnapshot.empty) {
+      const walletCurrency = walletSnapshot.docs[0].data().currency;
+      userCountry = walletCurrency ? getCountryFromCurrency(walletCurrency) : await getUserCountry(userId);
+    } else {
+      userCountry = await getUserCountry(userId);
+    }
 
     if (userData?.virtualAccount) {
       return {
@@ -1151,8 +1263,8 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   const { email, amount, currency } = data;
   const userId = context.auth.uid;
 
-  // Get user's country for correct Paystack key
-  const userCountry = await getUserCountry(userId);
+  // Get user's country - prefer currency-based detection, fallback to user profile
+  const userCountry = currency ? getCountryFromCurrency(currency) : await getUserCountry(userId);
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
