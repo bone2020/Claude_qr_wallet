@@ -384,16 +384,6 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       return { success: true, message: 'Payment already processed', alreadyProcessed: true };
     }
 
-    // Get user's wallet
-    const walletSnapshot = await db.collection('wallets')
-      .where('userId', '==', userId)
-      .limit(1)
-      .get();
-
-    if (walletSnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Wallet not found');
-    }
-
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
 
