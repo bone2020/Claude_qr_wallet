@@ -157,8 +157,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
     try {
       // Check if biometric is enabled and require authentication
-      final secureStorage = SecureStorageService.instance;
-      final biometricEnabled = await secureStorage.isBiometricEnabled();
+      final biometricEnabled = await SecureStorageService.isBiometricEnabled();
 
       if (biometricEnabled) {
         final biometricService = BiometricService();

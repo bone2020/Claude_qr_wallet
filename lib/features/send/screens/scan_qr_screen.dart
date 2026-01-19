@@ -59,19 +59,18 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
       bool isVerifiedQr = false;
 
       // First, try to parse as signed QR (v2 format)
-      final qrSigningService = QrSigningService();
-      final parsed = qrSigningService.parseQrData(code);
+      final parsed = QrSigningService.parseQrData(code);
 
-      if (parsed != null && parsed.isSigned) {
+      if (parsed != null) {
         // This is a signed QR code - verify signature
-        final verification = await qrSigningService.verifySignature(
-          payload: parsed.payload,
-          signature: parsed.signature,
+        final verification = await QrSigningService.verifySignature(
+          payload: parsed['payload']!,
+          signature: parsed['signature']!,
         );
 
         if (!verification.isValid) {
           if (!mounted) return;
-          _showError(verification.reason ?? 'Invalid or expired QR code');
+          _showError(verification.errorReason ?? 'Invalid or expired QR code');
           setState(() => _isProcessing = false);
           return;
         }

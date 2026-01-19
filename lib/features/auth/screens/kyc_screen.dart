@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:smile_id/smile_id.dart';
+import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
+import 'package:smile_id/products/document/smile_id_document_verification.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -547,7 +549,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
               Expanded(
                 child: Text(
                   _smileIdVerified ? 'Verified with Smile ID' : 'Quick Verification',
-                  style: AppTextStyles.titleMedium(
+                  style: AppTextStyles.headlineSmall(
                     color: _smileIdVerified ? AppColors.success : null,
                   ),
                 ),
