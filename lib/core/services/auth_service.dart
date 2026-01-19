@@ -64,8 +64,8 @@ class AuthService {
         email: email,
         phoneNumber: phoneNumber,
         walletId: walletId,
-        country: countryCode ?? 'NG',
-        currency: currencyCode ?? 'NGN',
+        country: countryCode ?? 'GH',
+        currency: currencyCode ?? 'GHS',
         createdAt: DateTime.now(),
       );
 
@@ -76,7 +76,7 @@ class AuthService {
         id: user.uid,
         walletId: walletId,
         userId: user.uid,
-        currency: currencyCode ?? 'NGN',
+        currency: currencyCode ?? 'GHS',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );

@@ -61,8 +61,8 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       }
     }
     
-    // Default to Nigeria if no country detected
-    _userCountryCode ??= 'NG';
+    // Default to Ghana if no country detected
+    _userCountryCode ??= 'GH';
     
     // Load ID types for this country
     setState(() {
