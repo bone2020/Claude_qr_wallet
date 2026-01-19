@@ -226,6 +226,83 @@ class UserService {
     }
   }
 
+  /// Save Smile ID KYC verification data
+  Future<UserResult> saveSmileIdKycData({
+    required String idType,
+    String? idNumber,
+    required String countryCode,
+    required DateTime dateOfBirth,
+    String? smileIdJobId,
+    String? smileIdResultCode,
+    Map<String, dynamic>? userData,
+    File? selfie,
+  }) async {
+    if (_userId == null) {
+      return UserResult.failure('User not authenticated');
+    }
+
+    try {
+      final kycData = <String, dynamic>{
+        'idType': idType,
+        'idNumber': idNumber,
+        'countryCode': countryCode,
+        'dateOfBirth': dateOfBirth.toIso8601String(),
+        'submittedAt': DateTime.now().toIso8601String(),
+        'status': 'approved', // Smile ID verified
+        'verificationMethod': 'smile_id',
+        'smileIdJobId': smileIdJobId,
+        'smileIdResultCode': smileIdResultCode,
+      };
+
+      // Add extracted user data from Smile ID if available
+      if (userData != null) {
+        kycData['verifiedData'] = userData;
+      }
+
+      // Upload selfie if provided
+      if (selfie != null) {
+        final selfieRef = _storage
+            .ref()
+            .child('kyc_documents')
+            .child(_userId!)
+            .child('selfie.jpg');
+        final selfieUpload = await selfieRef.putFile(selfie);
+        kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
+      }
+
+      // Store KYC data in subcollection
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('kyc')
+          .doc('documents')
+          .set(kycData);
+
+      // Update user's KYC status and country
+      final userUpdates = <String, dynamic>{
+        'kycCompleted': true,
+        'kycVerified': true,
+        'dateOfBirth': dateOfBirth.toIso8601String(),
+        'country': countryCode,
+      };
+
+      // If Smile ID returned user data, update profile
+      if (userData != null) {
+        if (userData['fullName'] != null) {
+          userUpdates['fullName'] = userData['fullName'];
+          await _auth.currentUser?.updateDisplayName(userData['fullName']);
+        }
+      }
+
+      await _firestore.collection('users').doc(_userId).update(userUpdates);
+
+      final updatedUser = await getCurrentUser();
+      return UserResult.success(updatedUser!);
+    } catch (e) {
+      return UserResult.failure('Failed to save KYC data: $e');
+    }
+  }
+
   // ============================================================
   // USER LOOKUP
   // ============================================================
