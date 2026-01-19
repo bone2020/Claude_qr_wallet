@@ -132,15 +132,22 @@ class UserService {
 
   /// Upload KYC documents
   Future<UserResult> uploadKycDocuments({
-    required File idFront,
+    File? idFront,
     File? idBack,
     required String idType,
     required DateTime dateOfBirth,
     File? selfie,
     String? idNumber,
+    bool smileIdVerified = false,
+    String? smileIdResult,
   }) async {
     if (_userId == null) {
       return UserResult.failure('User not authenticated');
+    }
+
+    // Require ID front image unless verified via Smile ID
+    if (idFront == null && !smileIdVerified) {
+      return UserResult.failure('ID front image is required');
     }
 
     try {
@@ -148,18 +155,22 @@ class UserService {
         'idType': idType,
         'dateOfBirth': dateOfBirth.toIso8601String(),
         'submittedAt': DateTime.now().toIso8601String(),
-        'status': 'pending',
+        'status': smileIdVerified ? 'verified' : 'pending',
+        'smileIdVerified': smileIdVerified,
         if (idNumber != null) 'idNumber': idNumber,
+        if (smileIdResult != null) 'smileIdResult': smileIdResult,
       };
 
-      // Upload ID front
-      final frontRef = _storage
-          .ref()
-          .child('kyc_documents')
-          .child(_userId!)
-          .child('id_front.jpg');
-      final frontUpload = await frontRef.putFile(idFront);
-      kycData['idFrontUrl'] = await frontUpload.ref.getDownloadURL();
+      // Upload ID front (if provided)
+      if (idFront != null) {
+        final frontRef = _storage
+            .ref()
+            .child('kyc_documents')
+            .child(_userId!)
+            .child('id_front.jpg');
+        final frontUpload = await frontRef.putFile(idFront);
+        kycData['idFrontUrl'] = await frontUpload.ref.getDownloadURL();
+      }
 
       // Upload ID back (if provided)
       if (idBack != null) {
@@ -198,6 +209,7 @@ class UserService {
       await NetworkRetry.execute(
         () => _firestore.collection('users').doc(_userId).update({
           'kycCompleted': true,
+          'kycVerified': smileIdVerified,
           'dateOfBirth': dateOfBirth.toIso8601String(),
         }),
         config: RetryConfig.network,

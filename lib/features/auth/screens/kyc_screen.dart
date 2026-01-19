@@ -5,16 +5,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smile_id/smile_id.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/services/smile_id_service.dart';
-import '../../../core/utils/error_handler.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
 
-/// KYC screen for identity verification
+/// KYC screen for identity verification using Smile ID
 class KycScreen extends ConsumerStatefulWidget {
   const KycScreen({super.key});
 
@@ -33,13 +33,11 @@ class _KycScreenState extends ConsumerState<KycScreen> {
   DateTime? _dateOfBirth;
   XFile? _profilePhoto;
   String? _userCountryCode;
+  String? _userId;
 
   bool _isLoading = false;
-  bool _isVerifying = false;
-
-  // Smile ID verification state
-  SmileIDResult? _verificationResult;
-  bool get _isVerified => _verificationResult?.success == true;
+  bool _smileIdVerified = false;
+  String? _smileIdResult;
 
   List<Map<String, dynamic>> _idTypes = [];
 
@@ -47,6 +45,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
   void initState() {
     super.initState();
     _loadUserCountry();
+    _generateUserId();
   }
 
   @override
@@ -55,28 +54,28 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     super.dispose();
   }
 
+  void _generateUserId() {
+    final user = ref.read(currentUserProvider);
+    _userId = user?.id ?? _smileIdService.generateUserId();
+  }
+
   void _loadUserCountry() {
     final user = ref.read(currentUserProvider);
     if (user != null) {
-      // Try to get country from user model
       _userCountryCode = user.country;
-      
-      // If no country, try to extract from phone number
+
       if (_userCountryCode == null || _userCountryCode!.isEmpty) {
         _userCountryCode = _smileIdService.extractCountryCode(user.phoneNumber);
       }
     }
-    
-    // Default to Ghana if no country detected
+
     _userCountryCode ??= 'GH';
-    
-    // Load ID types for this country
+
     setState(() {
       _idTypes = _smileIdService.getIdTypesForCountry(_userCountryCode);
     });
   }
 
-  /// Check if the selected ID type requires a number input
   bool get _requiresIdNumber {
     if (_selectedIdType == null) return false;
     final idType = _idTypes.firstWhere(
@@ -86,10 +85,8 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     return idType['requiresNumber'] == true;
   }
 
-  /// Check if selected ID is a passport (only has front page)
   bool get _isPassport => _selectedIdType == 'PASSPORT';
 
-  /// Get the label for the selected ID type
   String get _selectedIdLabel {
     if (_selectedIdType == null) return '';
     final idType = _idTypes.firstWhere(
@@ -97,6 +94,48 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       orElse: () => {'label': ''},
     );
     return idType['label'] ?? '';
+  }
+
+  /// Navigate to Smile ID verification screen
+  Future<void> _startSmileIdVerification() async {
+    if (_selectedIdType == null) {
+      _showError('Please select an ID type first');
+      return;
+    }
+
+    if (_requiresIdNumber) {
+      final validation = _smileIdService.validateIdNumber(
+        _idNumberController.text.trim(),
+        _selectedIdType!,
+        _userCountryCode!,
+      );
+      if (!validation.isValid) {
+        _showError(validation.error ?? 'Invalid ID number');
+        return;
+      }
+    }
+
+    // Navigate to Smile ID verification screen
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _SmileIdVerificationScreen(
+          userId: _userId!,
+          countryCode: _userCountryCode!,
+          idType: _smileIdService.getSmileIdDocumentType(_selectedIdType!, _userCountryCode!),
+          idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
+          requiresIdNumber: _requiresIdNumber,
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _smileIdVerified = true;
+        _smileIdResult = result;
+      });
+      _showSuccess('Verification completed successfully!');
+    }
   }
 
   Future<void> _pickImage(ImageSource source, String type) async {
@@ -125,12 +164,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      _showError('Error picking image: $e');
     }
   }
 
@@ -207,135 +241,25 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     }
   }
 
-  /// Start Smile ID verification process
-  Future<void> _startSmileIdVerification() async {
-    if (_selectedIdType == null) {
-      _showError('Please select an ID type first');
-      return;
-    }
-
-    // Validate ID number if required
-    if (_requiresIdNumber) {
-      final idNumber = _idNumberController.text.trim();
-      if (idNumber.isEmpty) {
-        _showError('Please enter your ID number first');
-        return;
-      }
-
-      final validation = _smileIdService.validateIdNumber(
-        idNumber,
-        _selectedIdType!,
-        _userCountryCode ?? 'GH',
-      );
-
-      if (!validation.isValid) {
-        _showError(validation.error ?? 'Invalid ID number format');
-        return;
-      }
-    }
-
-    setState(() => _isVerifying = true);
-
-    try {
-      final user = ref.read(currentUserProvider);
-      final userId = user?.id ?? _smileIdService.generateUserId();
-      final smileIdType = _smileIdService.getSmileIdDocumentType(
-        _selectedIdType!,
-        _userCountryCode ?? 'GH',
-      );
-
-      SmileIDResult result;
-
-      if (_requiresIdNumber) {
-        // Use Biometric KYC for ID types that require a number (NIN, BVN, SSNIT)
-        // This verifies the ID number against government database AND captures selfie
-        result = await _smileIdService.doBiometricKyc(
-          userId: userId,
-          countryCode: _userCountryCode ?? 'GH',
-          idType: smileIdType,
-          idNumber: _idNumberController.text.trim(),
-          firstName: user?.fullName?.split(' ').first,
-          lastName: user?.fullName?.split(' ').skip(1).join(' '),
-        );
-      } else {
-        // Use Enhanced Document Verification for document-based verification
-        // This captures ID document AND selfie, then compares faces
-        result = await _smileIdService.doEnhancedDocumentVerification(
-          userId: userId,
-          countryCode: _userCountryCode ?? 'GH',
-          idType: smileIdType,
-        );
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _verificationResult = result;
-        _isVerifying = false;
-      });
-
-      if (result.success) {
-        _showSuccess('Identity verified successfully!');
-      } else {
-        _showError(result.error ?? 'Verification failed. Please try again.');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isVerifying = false);
-      _showError(ErrorHandler.getKycErrorMessage('biometric_kyc', e));
-    }
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-      ),
-    );
-  }
-
   Future<void> _handleContinue() async {
-    // Validate required fields
     if (_selectedIdType == null) {
       _showError('Please select an ID type');
       return;
     }
 
-    // Validate ID number if required
-    if (_requiresIdNumber) {
-      final idNumber = _idNumberController.text.trim();
-      if (idNumber.isEmpty) {
-        _showError('Please enter your $_selectedIdLabel number');
-        return;
-      }
-
-      // Validate ID number format
-      final validation = _smileIdService.validateIdNumber(
-        idNumber,
-        _selectedIdType!,
-        _userCountryCode ?? 'GH',
-      );
-
-      if (!validation.isValid) {
-        _showError(validation.error ?? 'Invalid ID number format');
-        return;
-      }
+    if (_requiresIdNumber && _idNumberController.text.trim().isEmpty) {
+      _showError('Please enter your $_selectedIdLabel number');
+      return;
     }
 
-    // Check for Smile ID verification OR manual document upload
-    if (!_isVerified) {
-      // If not verified via Smile ID, require manual document upload
+    // If Smile ID verified, we can skip manual document upload
+    if (!_smileIdVerified) {
       if (_idFrontImage == null) {
-        _showError('Please verify your identity or upload the front of your ID');
+        _showError('Please upload the front of your ID or verify with Smile ID');
         return;
       }
       if (!_isPassport && _idBackImage == null) {
         _showError('Please upload the back of your ID');
-        return;
-      }
-      if (_profilePhoto == null) {
-        _showError('Please upload a profile photo');
         return;
       }
     }
@@ -349,49 +273,32 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 
     try {
       final userService = UserService();
-      UserResult result;
 
-      if (_isVerified) {
-        // Use Smile ID verified data
-        result = await userService.saveSmileIdKycData(
-          idType: _selectedIdType!,
-          idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
-          countryCode: _userCountryCode ?? 'GH',
-          dateOfBirth: _dateOfBirth!,
-          smileIdJobId: _verificationResult?.jobId,
-          smileIdResultCode: _verificationResult?.resultCode,
-          userData: _verificationResult?.userData,
-          selfie: _profilePhoto != null ? File(_profilePhoto!.path) : null,
-        );
-      } else {
-        // Fallback to manual document upload
-        result = await userService.uploadKycDocuments(
-          idFront: File(_idFrontImage!.path),
-          idBack: _idBackImage != null ? File(_idBackImage!.path) : null,
-          idType: _selectedIdType!,
-          dateOfBirth: _dateOfBirth!,
-          selfie: _profilePhoto != null ? File(_profilePhoto!.path) : null,
-          idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
-        );
-      }
+      final result = await userService.uploadKycDocuments(
+        idFront: _idFrontImage != null ? File(_idFrontImage!.path) : null,
+        idBack: _idBackImage != null ? File(_idBackImage!.path) : null,
+        idType: _selectedIdType!,
+        dateOfBirth: _dateOfBirth!,
+        selfie: _profilePhoto != null ? File(_profilePhoto!.path) : null,
+        idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
+        smileIdVerified: _smileIdVerified,
+        smileIdResult: _smileIdResult,
+      );
 
       if (!mounted) return;
 
       if (result.success) {
-        // Update local user state if user data was returned
         if (result.user != null) {
           ref.read(authNotifierProvider.notifier).updateUser(result.user!);
         }
-        // Load user's currency before navigating
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
-        // Navigate to main screen
         context.go(AppRoutes.main);
       } else {
-        _showError(result.error ?? 'Failed to save KYC data');
+        _showError(result.error ?? 'Failed to upload KYC documents');
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(ErrorHandler.getKycErrorMessage('document_upload', e));
+      _showError(e.toString());
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -404,6 +311,15 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: AppColors.error,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.success,
       ),
     );
   }
@@ -423,7 +339,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                   children: [
                     const SizedBox(height: AppDimensions.spaceLG),
 
-                    // Header
                     _buildHeader()
                         .animate()
                         .fadeIn(duration: 400.ms)
@@ -431,14 +346,12 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 
                     const SizedBox(height: AppDimensions.spaceXXL),
 
-                    // ID Type Dropdown
                     _buildIdTypeDropdown()
                         .animate()
                         .fadeIn(delay: 100.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceLG),
 
-                    // ID Number Input (if required)
                     if (_selectedIdType != null && _requiresIdNumber) ...[
                       _buildIdNumberInput()
                           .animate()
@@ -448,31 +361,23 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 
                     // Smile ID Verification Button
                     if (_selectedIdType != null) ...[
-                      _buildVerificationSection()
-                          .animate()
-                          .fadeIn(delay: 175.ms, duration: 400.ms),
-                      const SizedBox(height: AppDimensions.spaceLG),
-                    ],
-
-                    // ID Upload (only if not verified via Smile ID)
-                    if (_selectedIdType != null && !_isVerified) ...[
-                      _buildIdUpload()
+                      _buildSmileIdVerificationCard()
                           .animate()
                           .fadeIn(delay: 200.ms, duration: 400.ms),
                       const SizedBox(height: AppDimensions.spaceLG),
                     ],
 
-                    // Date of Birth
+                    // Manual upload (optional if Smile ID verified)
+                    if (_selectedIdType != null && !_smileIdVerified) ...[
+                      _buildIdUpload()
+                          .animate()
+                          .fadeIn(delay: 250.ms, duration: 400.ms),
+                      const SizedBox(height: AppDimensions.spaceLG),
+                    ],
+
                     _buildDateOfBirth()
                         .animate()
                         .fadeIn(delay: 300.ms, duration: 400.ms),
-
-                    const SizedBox(height: AppDimensions.spaceLG),
-
-                    // Profile Photo
-                    _buildProfilePhoto()
-                        .animate()
-                        .fadeIn(delay: 400.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXXL),
                   ],
@@ -480,7 +385,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
               ),
             ),
 
-            // Bottom Buttons
             _buildBottomButtons(),
           ],
         ),
@@ -551,6 +455,8 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                   _idFrontImage = null;
                   _idBackImage = null;
                   _idNumberController.clear();
+                  _smileIdVerified = false;
+                  _smileIdResult = null;
                 });
               },
             ),
@@ -599,128 +505,81 @@ class _KycScreenState extends ConsumerState<KycScreen> {
   }
 
   String _getIdNumberHint() {
-    if (_selectedIdType == null) {
-      return 'Enter your ID number as shown on your document';
+    switch (_selectedIdType) {
+      case 'NIN':
+        return 'Your 11-digit National Identification Number';
+      case 'BVN':
+        return 'Your 11-digit Bank Verification Number';
+      case 'SSNIT':
+        return 'Your SSNIT number (1 letter + 12 digits)';
+      case 'NATIONAL_ID':
+        if (_userCountryCode == 'ZA') {
+          return 'Your 13-digit South African ID number';
+        }
+        return 'Your National ID number';
+      default:
+        return 'Enter your ID number as shown on your document';
     }
-    return _smileIdService.getIdFormatHint(_selectedIdType!, _userCountryCode ?? 'GH');
   }
 
-  Widget _buildVerificationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Identity Verification',
-          style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+  Widget _buildSmileIdVerificationCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.spaceLG),
+      decoration: BoxDecoration(
+        color: _smileIdVerified
+            ? AppColors.success.withOpacity(0.1)
+            : AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        border: Border.all(
+          color: _smileIdVerified ? AppColors.success : AppColors.inputBorderDark,
         ),
-        const SizedBox(height: AppDimensions.spaceXS),
-        Container(
-          padding: const EdgeInsets.all(AppDimensions.spaceMD),
-          decoration: BoxDecoration(
-            color: _isVerified
-                ? AppColors.success.withValues(alpha: 0.1)
-                : AppColors.inputBackgroundDark,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-            border: Border.all(
-              color: _isVerified ? AppColors.success : AppColors.inputBorderDark,
-            ),
-          ),
-          child: Column(
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              if (_isVerified) ...[
-                // Verified state
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check, color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: AppDimensions.spaceMD),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Verified Successfully',
-                            style: AppTextStyles.bodyLarge(color: AppColors.success),
-                          ),
-                          Text(
-                            'Your identity has been verified via Smile ID',
-                            style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                // Not verified state - show verify button
-                Row(
-                  children: [
-                    Icon(
-                      Icons.verified_user_outlined,
-                      color: AppColors.primary,
-                      size: 32,
-                    ),
-                    const SizedBox(width: AppDimensions.spaceMD),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quick Verification',
-                            style: AppTextStyles.bodyLarge(),
-                          ),
-                          Text(
-                            'Verify instantly with face recognition',
-                            style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppDimensions.spaceMD),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isVerifying ? null : _startSmileIdVerification,
-                    icon: _isVerifying
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.backgroundDark,
-                            ),
-                          )
-                        : const Icon(Icons.face_rounded),
-                    label: Text(
-                      _isVerifying ? 'Verifying...' : 'Verify with Smile ID',
-                      style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
-                    ),
+              Icon(
+                _smileIdVerified ? Icons.verified_rounded : Icons.fingerprint_rounded,
+                color: _smileIdVerified ? AppColors.success : AppColors.primary,
+              ),
+              const SizedBox(width: AppDimensions.spaceSM),
+              Expanded(
+                child: Text(
+                  _smileIdVerified ? 'Verified with Smile ID' : 'Quick Verification',
+                  style: AppTextStyles.titleMedium(
+                    color: _smileIdVerified ? AppColors.success : null,
                   ),
                 ),
-                const SizedBox(height: AppDimensions.spaceSM),
-                Center(
-                  child: Text(
-                    'Or upload documents manually below',
-                    style: AppTextStyles.bodySmall(color: AppColors.textTertiaryDark),
-                  ),
-                ),
-              ],
+              ),
+              if (_smileIdVerified)
+                const Icon(Icons.check_circle, color: AppColors.success),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: AppDimensions.spaceSM),
+          Text(
+            _smileIdVerified
+                ? 'Your identity has been verified successfully'
+                : 'Verify your identity instantly with face recognition',
+            style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+          ),
+          if (!_smileIdVerified) ...[
+            const SizedBox(height: AppDimensions.spaceMD),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _startSmileIdVerification,
+                icon: const Icon(Icons.camera_alt_rounded),
+                label: const Text('Verify with Smile ID'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.backgroundDark,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -728,14 +587,16 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Front / Main Page
+        Text(
+          'Or upload manually',
+          style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+        ),
+        const SizedBox(height: AppDimensions.spaceSM),
         _buildUploadCard(
           title: _isPassport ? AppStrings.uploadMainPage : AppStrings.uploadFront,
           image: _idFrontImage,
           onTap: () => _showImageSourceSheet('front'),
         ),
-
-        // Back (not for passport)
         if (!_isPassport) ...[
           const SizedBox(height: AppDimensions.spaceMD),
           _buildUploadCard(
@@ -762,7 +623,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
           borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
           border: Border.all(
             color: image != null ? AppColors.primary : AppColors.inputBorderDark,
-            style: image != null ? BorderStyle.solid : BorderStyle.none,
           ),
         ),
         child: image != null
@@ -775,7 +635,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildUploadPlaceholder(title),
                     ),
                   ),
                   Positioned(
@@ -787,43 +646,19 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                         color: AppColors.success,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.check,
-                        size: 16,
-                        color: Colors.white,
-                      ),
+                      child: const Icon(Icons.check, size: 16, color: Colors.white),
                     ),
                   ),
                 ],
               )
-            : _buildUploadPlaceholder(title),
-      ),
-    );
-  }
-
-  Widget _buildUploadPlaceholder(String title) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(
-          color: AppColors.inputBorderDark,
-          style: BorderStyle.solid,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.cloud_upload_outlined,
-            size: 32,
-            color: AppColors.textSecondaryDark,
-          ),
-          const SizedBox(height: AppDimensions.spaceXS),
-          Text(
-            title,
-            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-          ),
-        ],
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_upload_outlined, size: 32, color: AppColors.textSecondaryDark),
+                  const SizedBox(height: AppDimensions.spaceXS),
+                  Text(title, style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
+                ],
+              ),
       ),
     );
   }
@@ -859,70 +694,10 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                         : AppTextStyles.inputHint(),
                   ),
                 ),
-                const Icon(
-                  Icons.calendar_today_rounded,
-                  color: AppColors.textSecondaryDark,
-                  size: 20,
-                ),
+                const Icon(Icons.calendar_today_rounded, color: AppColors.textSecondaryDark, size: 20),
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfilePhoto() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          AppStrings.profilePhoto,
-          style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
-        ),
-        const SizedBox(height: AppDimensions.spaceXS),
-        GestureDetector(
-          onTap: () => _showImageSourceSheet('profile'),
-          child: Container(
-            height: 100,
-            decoration: BoxDecoration(
-              color: AppColors.inputBackgroundDark,
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              border: Border.all(
-                color: _profilePhoto != null ? AppColors.primary : AppColors.inputBorderDark,
-              ),
-            ),
-            child: _profilePhoto != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-                    child: Image.file(
-                      File(_profilePhoto!.path),
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildProfilePlaceholder(),
-                    ),
-                  )
-                : _buildProfilePlaceholder(),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildProfilePlaceholder() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.person_add_alt_1_rounded,
-          size: 28,
-          color: AppColors.textSecondaryDark,
-        ),
-        const SizedBox(width: AppDimensions.spaceSM),
-        Text(
-          AppStrings.uploadPhoto,
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
       ],
     );
@@ -933,37 +708,94 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
       decoration: const BoxDecoration(
         color: AppColors.backgroundDark,
-        border: Border(
-          top: BorderSide(color: AppColors.inputBorderDark, width: 0.5),
-        ),
+        border: Border(top: BorderSide(color: AppColors.inputBorderDark, width: 0.5)),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: double.infinity,
-              height: AppDimensions.buttonHeightLG,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _handleContinue,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.backgroundDark,
-                        ),
-                      )
-                    : Text(
-                        AppStrings.continueText,
-                        style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
-                      ),
-              ),
-            ),
-          ],
+        child: SizedBox(
+          width: double.infinity,
+          height: AppDimensions.buttonHeightLG,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _handleContinue,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark),
+                  )
+                : Text(
+                    AppStrings.continueText,
+                    style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
+                  ),
+          ),
         ),
       ),
     );
+  }
+}
+
+/// Smile ID Verification Screen - Shows the actual Smile ID widgets
+class _SmileIdVerificationScreen extends StatelessWidget {
+  final String userId;
+  final String countryCode;
+  final String idType;
+  final String? idNumber;
+  final bool requiresIdNumber;
+
+  const _SmileIdVerificationScreen({
+    required this.userId,
+    required this.countryCode,
+    required this.idType,
+    this.idNumber,
+    required this.requiresIdNumber,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Choose widget based on whether ID number is required
+    if (requiresIdNumber && idNumber != null) {
+      // Use Biometric KYC for ID number verification (NIN, BVN, etc.)
+      return Scaffold(
+        body: SmileIDBiometricKYC(
+          country: countryCode,
+          idType: idType,
+          idNumber: idNumber,
+          userId: userId,
+          allowAgentMode: false,
+          showAttribution: true,
+          showInstructions: true,
+          onSuccess: (result) {
+            Navigator.pop(context, result);
+          },
+          onError: (error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Verification failed: $error'), backgroundColor: Colors.red),
+            );
+            Navigator.pop(context);
+          },
+        ),
+      );
+    } else {
+      // Use Document Verification for passport, driver's license, etc.
+      return Scaffold(
+        body: SmileIDDocumentVerification(
+          countryCode: countryCode,
+          documentType: idType,
+          userId: userId,
+          captureBothSides: idType != 'PASSPORT',
+          allowAgentMode: false,
+          showAttribution: true,
+          showInstructions: true,
+          onSuccess: (result) {
+            Navigator.pop(context, result);
+          },
+          onError: (error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Verification failed: $error'), backgroundColor: Colors.red),
+            );
+            Navigator.pop(context);
+          },
+        ),
+      );
+    }
   }
 }

@@ -80,7 +80,7 @@ class QrSigningService {
     try {
       final uri = Uri.parse(qrData);
       final signedParam = uri.queryParameters['signed'];
-      
+
       if (signedParam != null) {
         final decoded = jsonDecode(Uri.decodeComponent(signedParam));
         return {
@@ -93,6 +93,19 @@ class QrSigningService {
       debugPrint('Error parsing signed QR data: $e');
       return null;
     }
+  }
+
+  /// Alias for parseSignedQrData - used by scan_qr_screen.dart
+  static Map<String, String>? parseQrData(String qrData) {
+    return parseSignedQrData(qrData);
+  }
+
+  /// Alias for verifyQrSignature - used by scan_qr_screen.dart
+  static Future<QrVerificationResult> verifySignature({
+    required String payload,
+    required String signature,
+  }) async {
+    return verifyQrSignature(payload: payload, signature: signature);
   }
 }
 
