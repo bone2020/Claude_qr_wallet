@@ -9,3 +9,4 @@ export 'currency_service.dart';
 export 'qr_signing_service.dart';
 export 'secure_storage_service.dart';
 export 'screenshot_prevention_service.dart';
+export 'smile_id_service.dart';

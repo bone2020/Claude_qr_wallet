@@ -176,7 +176,7 @@ class DeepLinkService {
     // Remove any HTML-like tags and limit length
     return input
         .replaceAll(RegExp(r'<[^>]*>'), '')
-        .replaceAll(RegExp(r'[<>"\']'), '')
+        .replaceAll(RegExp("[<>\"']"), '')
         .substring(0, input.length > 100 ? 100 : input.length)
         .trim();
   }

@@ -333,6 +333,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           _buildInstructionItem(2, 'Look for email from QR Wallet'),
           const SizedBox(height: AppDimensions.spaceSM),
           _buildInstructionItem(3, 'Click the verification link'),
+          const SizedBox(height: AppDimensions.spaceSM),
+          _buildInstructionItem(4, 'Check spam folder if not found'),
         ],
       ),
     );

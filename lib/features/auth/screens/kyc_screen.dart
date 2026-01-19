@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/user_service.dart';
+import '../../../core/services/smile_id_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
 
@@ -22,22 +23,75 @@ class KycScreen extends ConsumerStatefulWidget {
 
 class _KycScreenState extends ConsumerState<KycScreen> {
   final _imagePicker = ImagePicker();
+  final _idNumberController = TextEditingController();
+  final _smileIdService = SmileIDService.instance;
 
   String? _selectedIdType;
   XFile? _idFrontImage;
   XFile? _idBackImage;
   DateTime? _dateOfBirth;
   XFile? _profilePhoto;
+  String? _userCountryCode;
 
   bool _isLoading = false;
 
-  final List<Map<String, String>> _idTypes = [
-    {'value': 'national_id', 'label': AppStrings.nationalId},
-    {'value': 'drivers_license', 'label': AppStrings.driversLicense},
-    {'value': 'passport', 'label': AppStrings.passport},
-  ];
+  List<Map<String, dynamic>> _idTypes = [];
 
-  bool get _isPassport => _selectedIdType == 'passport';
+  @override
+  void initState() {
+    super.initState();
+    _loadUserCountry();
+  }
+
+  @override
+  void dispose() {
+    _idNumberController.dispose();
+    super.dispose();
+  }
+
+  void _loadUserCountry() {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      // Try to get country from user model
+      _userCountryCode = user.country;
+      
+      // If no country, try to extract from phone number
+      if (_userCountryCode == null || _userCountryCode!.isEmpty) {
+        _userCountryCode = _smileIdService.extractCountryCode(user.phoneNumber);
+      }
+    }
+    
+    // Default to Nigeria if no country detected
+    _userCountryCode ??= 'NG';
+    
+    // Load ID types for this country
+    setState(() {
+      _idTypes = _smileIdService.getIdTypesForCountry(_userCountryCode);
+    });
+  }
+
+  /// Check if the selected ID type requires a number input
+  bool get _requiresIdNumber {
+    if (_selectedIdType == null) return false;
+    final idType = _idTypes.firstWhere(
+      (type) => type['value'] == _selectedIdType,
+      orElse: () => {'requiresNumber': false},
+    );
+    return idType['requiresNumber'] == true;
+  }
+
+  /// Check if selected ID is a passport (only has front page)
+  bool get _isPassport => _selectedIdType == 'PASSPORT';
+
+  /// Get the label for the selected ID type
+  String get _selectedIdLabel {
+    if (_selectedIdType == null) return '';
+    final idType = _idTypes.firstWhere(
+      (type) => type['value'] == _selectedIdType,
+      orElse: () => {'label': ''},
+    );
+    return idType['label'] ?? '';
+  }
 
   Future<void> _pickImage(ImageSource source, String type) async {
     try {
@@ -153,12 +207,23 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       _showError('Please select an ID type');
       return;
     }
+    
+    // Validate ID number if required
+    if (_requiresIdNumber && _idNumberController.text.trim().isEmpty) {
+      _showError('Please enter your $_selectedIdLabel number');
+      return;
+    }
+    
     if (_idFrontImage == null) {
       _showError('Please upload the front of your ID');
       return;
     }
     if (!_isPassport && _idBackImage == null) {
       _showError('Please upload the back of your ID');
+      return;
+    }
+    if (_profilePhoto == null) {
+      _showError('Please upload a profile photo');
       return;
     }
     if (_dateOfBirth == null) {
@@ -177,6 +242,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         idType: _selectedIdType!,
         dateOfBirth: _dateOfBirth!,
         selfie: _profilePhoto != null ? File(_profilePhoto!.path) : null,
+        idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
       );
 
       if (!mounted) return;
@@ -212,13 +278,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     );
   }
 
-  Future<void> _handleSkip() async {
-    // Load user's currency before navigating
-    await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
-    // Navigate to main screen without KYC
-    context.go(AppRoutes.main);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -248,6 +307,14 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                         .fadeIn(delay: 100.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceLG),
+
+                    // ID Number Input (if required)
+                    if (_selectedIdType != null && _requiresIdNumber) ...[
+                      _buildIdNumberInput()
+                          .animate()
+                          .fadeIn(delay: 150.ms, duration: 400.ms),
+                      const SizedBox(height: AppDimensions.spaceLG),
+                    ],
 
                     // ID Upload
                     if (_selectedIdType != null) ...[
@@ -330,11 +397,11 @@ class _KycScreenState extends ConsumerState<KycScreen> {
               borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
               items: _idTypes.map((type) {
                 return DropdownMenuItem<String>(
-                  value: type['value'],
+                  value: type['value'] as String,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppDimensions.spaceMD),
                     child: Text(
-                      type['label']!,
+                      type['label'] as String,
                       style: AppTextStyles.inputText(),
                     ),
                   ),
@@ -345,6 +412,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                   _selectedIdType = value;
                   _idFrontImage = null;
                   _idBackImage = null;
+                  _idNumberController.clear();
                 });
               },
             ),
@@ -352,6 +420,62 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildIdNumberInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$_selectedIdLabel Number',
+          style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+        ),
+        const SizedBox(height: AppDimensions.spaceXS),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.inputBackgroundDark,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            border: Border.all(color: AppColors.inputBorderDark),
+          ),
+          child: TextField(
+            controller: _idNumberController,
+            style: AppTextStyles.inputText(),
+            decoration: InputDecoration(
+              hintText: 'Enter your $_selectedIdLabel number',
+              hintStyle: AppTextStyles.inputHint(),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.spaceMD,
+                vertical: AppDimensions.spaceMD,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spaceXS),
+        Text(
+          _getIdNumberHint(),
+          style: AppTextStyles.bodySmall(color: AppColors.textTertiaryDark),
+        ),
+      ],
+    );
+  }
+
+  String _getIdNumberHint() {
+    switch (_selectedIdType) {
+      case 'NIN':
+        return 'Your 11-digit National Identification Number';
+      case 'BVN':
+        return 'Your 11-digit Bank Verification Number';
+      case 'SSNIT':
+        return 'Your SSNIT number';
+      case 'NATIONAL_ID':
+        if (_userCountryCode == 'ZA') {
+          return 'Your 13-digit South African ID number';
+        }
+        return 'Your National ID number';
+      default:
+        return 'Enter your ID number as shown on your document';
+    }
   }
 
   Widget _buildIdUpload() {
@@ -507,7 +631,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '${AppStrings.profilePhoto} (${AppStrings.skip.toLowerCase()})',
+          AppStrings.profilePhoto,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
@@ -589,14 +713,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                         AppStrings.continueText,
                         style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                       ),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spaceSM),
-            TextButton(
-              onPressed: _handleSkip,
-              child: Text(
-                AppStrings.skip,
-                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               ),
             ),
           ],

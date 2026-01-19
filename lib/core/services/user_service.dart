@@ -129,6 +129,7 @@ class UserService {
     required String idType,
     required DateTime dateOfBirth,
     File? selfie,
+    String? idNumber,
   }) async {
     if (_userId == null) {
       return UserResult.failure('User not authenticated');
@@ -140,6 +141,7 @@ class UserService {
         'dateOfBirth': dateOfBirth.toIso8601String(),
         'submittedAt': DateTime.now().toIso8601String(),
         'status': 'pending',
+        if (idNumber != null) 'idNumber': idNumber,
       };
 
       // Upload ID front
