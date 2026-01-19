@@ -6,6 +6,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/models.dart';
+import '../utils/error_handler.dart';
+import '../utils/network_retry.dart';
 import 'exchange_rate_service.dart';
 
 /// Wallet service handling all wallet and transaction operations
@@ -20,16 +22,19 @@ class WalletService {
   // WALLET OPERATIONS
   // ============================================================
 
-  /// Get current user's wallet
+  /// Get current user's wallet with retry logic
   Future<WalletModel?> getWallet() async {
     if (_userId == null) return null;
 
     try {
-      final doc = await _firestore.collection('wallets').doc(_userId).get();
+      final doc = await NetworkRetry.execute(
+        () => _firestore.collection('wallets').doc(_userId).get(),
+        config: RetryConfig.quick,
+      );
       if (!doc.exists) return null;
       return WalletModel.fromJson(doc.data()!);
     } catch (e) {
-      throw WalletException('Failed to fetch wallet: $e');
+      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -265,13 +270,16 @@ class WalletService {
 
       query = query.limit(limit);
 
-      final snapshot = await query.get();
+      final snapshot = await NetworkRetry.execute(
+        () => query.get(),
+        config: RetryConfig.quick,
+      );
 
       return snapshot.docs
           .map((doc) => TransactionModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw WalletException('Failed to fetch transactions: $e');
+      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 

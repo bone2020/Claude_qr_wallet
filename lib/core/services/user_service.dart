@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../models/user_model.dart';
+import '../utils/error_handler.dart';
+import '../utils/network_retry.dart';
 
 /// User service handling profile and user data operations
 class UserService {
@@ -18,12 +20,15 @@ class UserService {
   // USER PROFILE
   // ============================================================
 
-  /// Get current user profile
+  /// Get current user profile with retry logic
   Future<UserModel?> getCurrentUser() async {
     if (_userId == null) return null;
 
     try {
-      final doc = await _firestore.collection('users').doc(_userId).get();
+      final doc = await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).get(),
+        config: RetryConfig.quick,
+      );
       if (!doc.exists) return null;
       return UserModel.fromJson(doc.data()!);
     } catch (e) {
@@ -68,7 +73,10 @@ class UserService {
         return UserResult.failure('No updates provided');
       }
 
-      await _firestore.collection('users').doc(_userId).update(updates);
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update(updates),
+        config: RetryConfig.network,
+      );
 
       // Update display name in Firebase Auth if fullName changed
       if (fullName != null) {
@@ -78,7 +86,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to update profile: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -114,7 +122,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to upload photo: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -175,38 +183,47 @@ class UserService {
         kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
       }
 
-      // Store KYC data in subcollection
-      await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents')
-          .set(kycData);
+      // Store KYC data in subcollection with retry
+      await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .set(kycData),
+        config: RetryConfig.network,
+      );
 
-      // Update user's KYC status
-      await _firestore.collection('users').doc(_userId).update({
-        'kycCompleted': true,
-        'dateOfBirth': dateOfBirth.toIso8601String(),
-      });
+      // Update user's KYC status with retry
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update({
+          'kycCompleted': true,
+          'dateOfBirth': dateOfBirth.toIso8601String(),
+        }),
+        config: RetryConfig.network,
+      );
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to upload KYC documents: $e');
+      return UserResult.failure(ErrorHandler.getKycErrorMessage('document_upload', e));
     }
   }
 
-  /// Get KYC status
+  /// Get KYC status with retry logic
   Future<KycStatus> getKycStatus() async {
     if (_userId == null) return KycStatus.notStarted;
 
     try {
-      final kycDoc = await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents')
-          .get();
+      final kycDoc = await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .get(),
+        config: RetryConfig.quick,
+      );
 
       if (!kycDoc.exists) return KycStatus.notStarted;
 
@@ -223,6 +240,89 @@ class UserService {
       }
     } catch (e) {
       return KycStatus.notStarted;
+    }
+  }
+
+  /// Save Smile ID KYC verification data
+  Future<UserResult> saveSmileIdKycData({
+    required String idType,
+    String? idNumber,
+    required String countryCode,
+    required DateTime dateOfBirth,
+    String? smileIdJobId,
+    String? smileIdResultCode,
+    Map<String, dynamic>? userData,
+    File? selfie,
+  }) async {
+    if (_userId == null) {
+      return UserResult.failure('User not authenticated');
+    }
+
+    try {
+      final kycData = <String, dynamic>{
+        'idType': idType,
+        'idNumber': idNumber,
+        'countryCode': countryCode,
+        'dateOfBirth': dateOfBirth.toIso8601String(),
+        'submittedAt': DateTime.now().toIso8601String(),
+        'status': 'approved', // Smile ID verified
+        'verificationMethod': 'smile_id',
+        'smileIdJobId': smileIdJobId,
+        'smileIdResultCode': smileIdResultCode,
+      };
+
+      // Add extracted user data from Smile ID if available
+      if (userData != null) {
+        kycData['verifiedData'] = userData;
+      }
+
+      // Upload selfie if provided
+      if (selfie != null) {
+        final selfieRef = _storage
+            .ref()
+            .child('kyc_documents')
+            .child(_userId!)
+            .child('selfie.jpg');
+        final selfieUpload = await selfieRef.putFile(selfie);
+        kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
+      }
+
+      // Store KYC data in subcollection with retry
+      await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .set(kycData),
+        config: RetryConfig.network,
+      );
+
+      // Update user's KYC status and country
+      final userUpdates = <String, dynamic>{
+        'kycCompleted': true,
+        'kycVerified': true,
+        'dateOfBirth': dateOfBirth.toIso8601String(),
+        'country': countryCode,
+      };
+
+      // If Smile ID returned user data, update profile
+      if (userData != null) {
+        if (userData['fullName'] != null) {
+          userUpdates['fullName'] = userData['fullName'];
+          await _auth.currentUser?.updateDisplayName(userData['fullName']);
+        }
+      }
+
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update(userUpdates),
+        config: RetryConfig.network,
+      );
+
+      final updatedUser = await getCurrentUser();
+      return UserResult.success(updatedUser!);
+    } catch (e) {
+      return UserResult.failure(ErrorHandler.getKycErrorMessage('biometric_kyc', e));
     }
   }
 
@@ -330,7 +430,7 @@ class UserService {
 
       return UserResult.success(null);
     } catch (e) {
-      return UserResult.failure('Failed to delete account: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 }
