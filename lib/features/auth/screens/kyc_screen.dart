@@ -207,13 +207,28 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       _showError('Please select an ID type');
       return;
     }
-    
+
     // Validate ID number if required
-    if (_requiresIdNumber && _idNumberController.text.trim().isEmpty) {
-      _showError('Please enter your $_selectedIdLabel number');
-      return;
+    if (_requiresIdNumber) {
+      final idNumber = _idNumberController.text.trim();
+      if (idNumber.isEmpty) {
+        _showError('Please enter your $_selectedIdLabel number');
+        return;
+      }
+
+      // Validate ID number format
+      final validation = _smileIdService.validateIdNumber(
+        idNumber,
+        _selectedIdType!,
+        _userCountryCode ?? 'GH',
+      );
+
+      if (!validation.isValid) {
+        _showError(validation.error ?? 'Invalid ID number format');
+        return;
+      }
     }
-    
+
     if (_idFrontImage == null) {
       _showError('Please upload the front of your ID');
       return;
@@ -461,21 +476,10 @@ class _KycScreenState extends ConsumerState<KycScreen> {
   }
 
   String _getIdNumberHint() {
-    switch (_selectedIdType) {
-      case 'NIN':
-        return 'Your 11-digit National Identification Number';
-      case 'BVN':
-        return 'Your 11-digit Bank Verification Number';
-      case 'SSNIT':
-        return 'Your SSNIT number';
-      case 'NATIONAL_ID':
-        if (_userCountryCode == 'ZA') {
-          return 'Your 13-digit South African ID number';
-        }
-        return 'Your National ID number';
-      default:
-        return 'Enter your ID number as shown on your document';
+    if (_selectedIdType == null) {
+      return 'Enter your ID number as shown on your document';
     }
+    return _smileIdService.getIdFormatHint(_selectedIdType!, _userCountryCode ?? 'GH');
   }
 
   Widget _buildIdUpload() {
