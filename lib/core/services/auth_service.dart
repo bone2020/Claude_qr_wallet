@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models/user_model.dart';
 import '../../models/wallet_model.dart';
+import '../utils/error_handler.dart';
 
 /// Authentication service handling all Firebase Auth operations
 class AuthService {
@@ -87,7 +88,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -119,7 +120,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -192,7 +193,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -291,7 +292,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -362,7 +363,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -387,7 +388,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -431,7 +432,7 @@ class AuthService {
 
       return AuthResult.success(null);
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -447,7 +448,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -475,7 +476,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
-      return AuthResult.failure(e.toString());
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 

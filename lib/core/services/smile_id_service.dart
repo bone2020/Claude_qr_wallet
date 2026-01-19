@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:smile_id/smile_id.dart';
 
+import '../utils/error_handler.dart';
+
 /// Service for handling Smile ID verification operations
 class SmileIDService {
   SmileIDService._();
@@ -250,7 +252,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Enrollment Error: $e');
-      return SmileIDResult.failure('Selfie enrollment failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 
@@ -279,7 +283,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Authentication Error: $e');
-      return SmileIDResult.failure('Selfie authentication failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 
@@ -314,7 +320,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Document Verification Error: $e');
-      return SmileIDResult.failure('Document verification failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 
@@ -350,7 +358,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Enhanced Document Verification Error: $e');
-      return SmileIDResult.failure('Enhanced document verification failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 
@@ -391,7 +401,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Biometric KYC Error: $e');
-      return SmileIDResult.failure('Biometric KYC failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 
@@ -425,7 +437,9 @@ class SmileIDService {
       );
     } catch (e) {
       debugPrint('SmileID Enhanced KYC Error: $e');
-      return SmileIDResult.failure('Enhanced KYC failed: $e');
+      return SmileIDResult.failure(
+        ErrorHandler.getSmileIdUserFriendlyMessage(null, e.toString()),
+      );
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../models/user_model.dart';
+import '../utils/error_handler.dart';
 
 /// User service handling profile and user data operations
 class UserService {
@@ -78,7 +79,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to update profile: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -114,7 +115,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to upload photo: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 
@@ -192,7 +193,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to upload KYC documents: $e');
+      return UserResult.failure(ErrorHandler.getKycErrorMessage('document_upload', e));
     }
   }
 
@@ -299,7 +300,7 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure('Failed to save KYC data: $e');
+      return UserResult.failure(ErrorHandler.getKycErrorMessage('biometric_kyc', e));
     }
   }
 
@@ -407,7 +408,7 @@ class UserService {
 
       return UserResult.success(null);
     } catch (e) {
-      return UserResult.failure('Failed to delete account: $e');
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
 }

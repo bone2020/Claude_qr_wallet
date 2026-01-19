@@ -10,6 +10,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/services/smile_id_service.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
 
@@ -126,7 +127,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error picking image: $e'),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
           backgroundColor: AppColors.error,
         ),
       );
@@ -281,7 +282,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isVerifying = false);
-      _showError('Verification error: ${e.toString()}');
+      _showError(ErrorHandler.getKycErrorMessage('biometric_kyc', e));
     }
   }
 
@@ -390,7 +391,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      _showError(ErrorHandler.getKycErrorMessage('document_upload', e));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
