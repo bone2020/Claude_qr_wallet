@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:smile_id/smile_id.dart';
 
 import '../utils/error_handler.dart';
+import '../utils/network_retry.dart';
 
 /// Service for handling Smile ID verification operations
 class SmileIDService {

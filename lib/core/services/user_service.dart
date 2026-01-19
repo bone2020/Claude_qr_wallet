@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../models/user_model.dart';
 import '../utils/error_handler.dart';
+import '../utils/network_retry.dart';
 
 /// User service handling profile and user data operations
 class UserService {
@@ -19,12 +20,15 @@ class UserService {
   // USER PROFILE
   // ============================================================
 
-  /// Get current user profile
+  /// Get current user profile with retry logic
   Future<UserModel?> getCurrentUser() async {
     if (_userId == null) return null;
 
     try {
-      final doc = await _firestore.collection('users').doc(_userId).get();
+      final doc = await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).get(),
+        config: RetryConfig.quick,
+      );
       if (!doc.exists) return null;
       return UserModel.fromJson(doc.data()!);
     } catch (e) {
@@ -69,7 +73,10 @@ class UserService {
         return UserResult.failure('No updates provided');
       }
 
-      await _firestore.collection('users').doc(_userId).update(updates);
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update(updates),
+        config: RetryConfig.network,
+      );
 
       // Update display name in Firebase Auth if fullName changed
       if (fullName != null) {
@@ -176,19 +183,25 @@ class UserService {
         kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
       }
 
-      // Store KYC data in subcollection
-      await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents')
-          .set(kycData);
+      // Store KYC data in subcollection with retry
+      await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .set(kycData),
+        config: RetryConfig.network,
+      );
 
-      // Update user's KYC status
-      await _firestore.collection('users').doc(_userId).update({
-        'kycCompleted': true,
-        'dateOfBirth': dateOfBirth.toIso8601String(),
-      });
+      // Update user's KYC status with retry
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update({
+          'kycCompleted': true,
+          'dateOfBirth': dateOfBirth.toIso8601String(),
+        }),
+        config: RetryConfig.network,
+      );
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
@@ -197,17 +210,20 @@ class UserService {
     }
   }
 
-  /// Get KYC status
+  /// Get KYC status with retry logic
   Future<KycStatus> getKycStatus() async {
     if (_userId == null) return KycStatus.notStarted;
 
     try {
-      final kycDoc = await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents')
-          .get();
+      final kycDoc = await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .get(),
+        config: RetryConfig.quick,
+      );
 
       if (!kycDoc.exists) return KycStatus.notStarted;
 
@@ -271,13 +287,16 @@ class UserService {
         kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
       }
 
-      // Store KYC data in subcollection
-      await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents')
-          .set(kycData);
+      // Store KYC data in subcollection with retry
+      await NetworkRetry.execute(
+        () => _firestore
+            .collection('users')
+            .doc(_userId)
+            .collection('kyc')
+            .doc('documents')
+            .set(kycData),
+        config: RetryConfig.network,
+      );
 
       // Update user's KYC status and country
       final userUpdates = <String, dynamic>{
@@ -295,7 +314,10 @@ class UserService {
         }
       }
 
-      await _firestore.collection('users').doc(_userId).update(userUpdates);
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update(userUpdates),
+        config: RetryConfig.network,
+      );
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
