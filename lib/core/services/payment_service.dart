@@ -1,27 +1,21 @@
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math';
+
+import 'wallet_service.dart';
 
 /// Payment service handling Paystack integration via Cloud Functions
 class PaymentService {
+  final WalletService _walletService = WalletService();
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   // ============================================================
   // PAYSTACK CONFIGURATION
   // ============================================================
 
-  /// Paystack public key - configured via build-time environment variable
-  /// Build commands:
-  /// - Development: flutter run
-  /// - Production: flutter run --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_xxx
-  static const String _paystackPublicKeyEnv = String.fromEnvironment(
-    'PAYSTACK_PUBLIC_KEY',
-    defaultValue: 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b',
-  );
-
-  /// Check if we're using live Paystack keys
-  static bool get isLiveMode => _paystackPublicKeyEnv.startsWith('pk_live_');
+  /// Paystack public key - safe to include in client
+  static const String _publicKey = 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b';
 
   // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 
@@ -367,6 +361,16 @@ class PaymentService {
         error: e.toString(),
       );
     }
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  String _generateReference() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = Random.secure().nextInt(999999).toString().padLeft(6, '0');
+    return 'QRW_${timestamp}_$random';
   }
 }
 

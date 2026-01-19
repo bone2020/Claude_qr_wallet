@@ -1,14 +1,11 @@
 import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 
-/// Service for signing and verifying QR code payloads
-/// Uses HMAC-SHA256 via Cloud Functions for security
 class QrSigningService {
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  static final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
-  /// Sign a QR payload for payment requests
-  /// Returns signed payload with expiration
-  Future<SignedQrPayload> signPayload({
+  static Future<SignedQrPayload?> signQrPayload({
     required String walletId,
     double? amount,
     String? note,
@@ -17,24 +14,24 @@ class QrSigningService {
       final callable = _functions.httpsCallable('signQrPayload');
       final result = await callable.call<Map<String, dynamic>>({
         'walletId': walletId,
-        'amount': amount,
+        'amount': amount ?? 0,
         'note': note ?? '',
       });
 
-      final data = result.data;
       return SignedQrPayload(
-        payload: data['payload'] as String,
-        signature: data['signature'] as String,
-        expiresAt: DateTime.fromMillisecondsSinceEpoch(data['expiresAt'] as int),
+        payload: result.data['payload'] as String,
+        signature: result.data['signature'] as String,
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(
+          result.data['expiresAt'] as int,
+        ),
       );
     } catch (e) {
-      throw QrSigningException('Failed to sign QR payload: $e');
+      debugPrint('Error signing QR payload: $e');
+      return null;
     }
   }
 
-  /// Verify a scanned QR signature
-  /// Returns verification result with parsed data
-  Future<QrVerificationResult> verifySignature({
+  static Future<QrVerificationResult> verifyQrSignature({
     required String payload,
     required String signature,
   }) async {
@@ -46,65 +43,59 @@ class QrSigningService {
       });
 
       final data = result.data;
+      
       if (data['valid'] == true) {
-        return QrVerificationResult.valid(
-          walletId: data['walletId'] as String,
+        return QrVerificationResult(
+          isValid: true,
+          walletId: data['walletId'] as String?,
           amount: (data['amount'] as num?)?.toDouble(),
           note: data['note'] as String?,
+          recipientName: data['recipientName'] as String?,
+          profilePhotoUrl: data['profilePhotoUrl'] as String?,
         );
       } else {
-        return QrVerificationResult.invalid(
-          reason: data['reason'] as String? ?? 'Verification failed',
+        return QrVerificationResult(
+          isValid: false,
+          errorReason: data['reason'] as String? ?? 'Verification failed',
         );
       }
     } catch (e) {
-      return QrVerificationResult.invalid(reason: 'Verification failed: $e');
+      debugPrint('Error verifying QR signature: $e');
+      return QrVerificationResult(
+        isValid: false,
+        errorReason: 'Verification error: $e',
+      );
     }
   }
 
-  /// Generate QR data string from signed payload
-  String generateQrData(SignedQrPayload signed) {
-    final qrData = {
-      'p': signed.payload,
-      's': signed.signature,
-      'v': 2, // Version 2 = signed QR
+  static String generateSignedQrData(SignedQrPayload signedPayload) {
+    final data = {
+      'p': signedPayload.payload,
+      's': signedPayload.signature,
     };
-    return jsonEncode(qrData);
+    return 'qrwallet://pay?signed=${Uri.encodeComponent(jsonEncode(data))}';
   }
 
-  /// Parse QR data string to extract payload and signature
-  /// Returns null if format is invalid or unsigned (v1)
-  ParsedQrData? parseQrData(String qrData) {
+  static Map<String, String>? parseSignedQrData(String qrData) {
     try {
-      final decoded = jsonDecode(qrData);
-
-      // Check if this is a signed QR (v2)
-      if (decoded is Map && decoded['v'] == 2) {
-        return ParsedQrData(
-          payload: decoded['p'] as String,
-          signature: decoded['s'] as String,
-          isSigned: true,
-        );
+      final uri = Uri.parse(qrData);
+      final signedParam = uri.queryParameters['signed'];
+      
+      if (signedParam != null) {
+        final decoded = jsonDecode(Uri.decodeComponent(signedParam));
+        return {
+          'payload': decoded['p'] as String,
+          'signature': decoded['s'] as String,
+        };
       }
-
-      // Legacy unsigned QR (v1 or no version)
-      return ParsedQrData(
-        payload: qrData,
-        signature: '',
-        isSigned: false,
-      );
+      return null;
     } catch (e) {
-      // Try parsing as legacy format (just wallet ID)
-      return ParsedQrData(
-        payload: qrData,
-        signature: '',
-        isSigned: false,
-      );
+      debugPrint('Error parsing signed QR data: $e');
+      return null;
     }
   }
 }
 
-/// Signed QR payload result
 class SignedQrPayload {
   final String payload;
   final String signature;
@@ -119,61 +110,22 @@ class SignedQrPayload {
   bool get isExpired => DateTime.now().isAfter(expiresAt);
 }
 
-/// QR verification result
 class QrVerificationResult {
   final bool isValid;
   final String? walletId;
   final double? amount;
   final String? note;
-  final String? reason;
+  final String? recipientName;
+  final String? profilePhotoUrl;
+  final String? errorReason;
 
-  QrVerificationResult._({
+  QrVerificationResult({
     required this.isValid,
     this.walletId,
     this.amount,
     this.note,
-    this.reason,
+    this.recipientName,
+    this.profilePhotoUrl,
+    this.errorReason,
   });
-
-  factory QrVerificationResult.valid({
-    required String walletId,
-    double? amount,
-    String? note,
-  }) {
-    return QrVerificationResult._(
-      isValid: true,
-      walletId: walletId,
-      amount: amount,
-      note: note,
-    );
-  }
-
-  factory QrVerificationResult.invalid({required String reason}) {
-    return QrVerificationResult._(
-      isValid: false,
-      reason: reason,
-    );
-  }
-}
-
-/// Parsed QR data
-class ParsedQrData {
-  final String payload;
-  final String signature;
-  final bool isSigned;
-
-  ParsedQrData({
-    required this.payload,
-    required this.signature,
-    required this.isSigned,
-  });
-}
-
-/// Custom exception for QR signing operations
-class QrSigningException implements Exception {
-  final String message;
-  QrSigningException(this.message);
-
-  @override
-  String toString() => message;
 }

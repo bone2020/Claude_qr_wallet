@@ -494,21 +494,20 @@ class AuthService {
   // ============================================================
 
   /// Generate unique wallet ID with Firestore uniqueness check
-  /// Uses alphanumeric format QRW-XXXX-XXXX-XXXX for ~62 bits entropy
-  /// Excludes confusing characters: 0/O, 1/I/L for readability
+  /// Generate unique wallet ID with Firestore uniqueness check
+  /// Uses alphanumeric format with ~60 bits entropy for security
   Future<String> _generateUniqueWalletId() async {
-    // Alphanumeric charset excluding confusing chars (32 chars = 5 bits each)
+    // Alphanumeric charset (excludes confusing chars: 0, 1, I, L, O)
     const charset = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-
+    final random = Random.secure();
+    
+    String generatePart(int length) {
+      return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+    }
+    
     while (true) {
-      final random = Random.secure();
-
-      // Generate 3 groups of 4 characters = 12 chars × 5 bits = 60 bits entropy
-      String generateGroup() {
-        return List.generate(4, (_) => charset[random.nextInt(charset.length)]).join();
-      }
-
-      final walletId = 'QRW-${generateGroup()}-${generateGroup()}-${generateGroup()}';
+      // Generate: QRW-XXXX-XXXX-XXXX (12 random chars = ~60 bits entropy)
+      final walletId = 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
 
       // Check if wallet ID already exists in Firestore
       final querySnapshot = await _firestore
