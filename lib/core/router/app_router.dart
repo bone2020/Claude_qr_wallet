@@ -10,6 +10,13 @@ import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_verification_screen.dart';
 import '../../features/auth/screens/kyc_screen.dart';
+import '../../features/auth/screens/kyc/passport_verification_screen.dart';
+import '../../features/auth/screens/kyc/nin_verification_screen.dart';
+import '../../features/auth/screens/kyc/bvn_verification_screen.dart';
+import '../../features/auth/screens/kyc/drivers_license_verification_screen.dart';
+import '../../features/auth/screens/kyc/voters_card_verification_screen.dart';
+import '../../features/auth/screens/kyc/national_id_verification_screen.dart';
+import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
 import '../../features/send/screens/send_money_screen.dart';
@@ -42,6 +49,13 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String otpVerification = '/otp-verification';
   static const String kyc = '/kyc';
+  static const String kycPassport = '/kyc-passport';
+  static const String kycNin = '/kyc-nin';
+  static const String kycBvn = '/kyc-bvn';
+  static const String kycDriversLicense = '/kyc-drivers-license';
+  static const String kycVotersCard = '/kyc-voters-card';
+  static const String kycNationalId = '/kyc-national-id';
+  static const String kycSsnit = '/kyc-ssnit';
   static const String main = '/main';
   static const String home = '/home';
   static const String sendMoney = '/send-money';
@@ -134,6 +148,90 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.kyc,
         name: 'kyc',
         builder: (context, state) => const KycScreen(),
+      ),
+
+      // KYC Passport Verification
+      GoRoute(
+        path: AppRoutes.kycPassport,
+        name: 'kycPassport',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return PassportVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
+      ),
+
+      // KYC NIN Verification
+      GoRoute(
+        path: AppRoutes.kycNin,
+        name: 'kycNin',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return NinVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'NG',
+          );
+        },
+      ),
+
+      // KYC BVN Verification
+      GoRoute(
+        path: AppRoutes.kycBvn,
+        name: 'kycBvn',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return BvnVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'NG',
+          );
+        },
+      ),
+
+      // KYC Driver's License Verification
+      GoRoute(
+        path: AppRoutes.kycDriversLicense,
+        name: 'kycDriversLicense',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return DriversLicenseVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
+      ),
+
+      // KYC Voter's Card Verification
+      GoRoute(
+        path: AppRoutes.kycVotersCard,
+        name: 'kycVotersCard',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return VotersCardVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'NG',
+          );
+        },
+      ),
+
+      // KYC National ID Verification
+      GoRoute(
+        path: AppRoutes.kycNationalId,
+        name: 'kycNationalId',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return NationalIdVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
+      ),
+
+      // KYC SSNIT Verification
+      GoRoute(
+        path: AppRoutes.kycSsnit,
+        name: 'kycSsnit',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return SsnitVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
       ),
 
       // Main Navigation (contains bottom nav) - Protected: shows balance

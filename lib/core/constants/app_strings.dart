@@ -185,4 +185,30 @@ class AppStrings {
   static const String back = 'Back';
   static const String retry = 'Retry';
   static const String close = 'Close';
+
+  // ============ KYC VERIFICATION SCREENS ============
+  static const String selectVerificationMethod = 'Select Verification Method';
+  static const String selectVerificationMethodSubtitle = 'Choose your preferred ID type to verify your identity';
+  static const String verifyPassport = 'Verify Passport';
+  static const String verifyNin = 'Verify NIN';
+  static const String verifyBvn = 'Verify BVN';
+  static const String verifyDriversLicense = "Verify Driver's License";
+  static const String verifyVotersCard = "Verify Voter's Card";
+  static const String verifyNationalId = 'Verify National ID';
+  static const String verifySsnit = 'Verify SSNIT';
+
+  static const String passportDescription = 'International passport verification';
+  static const String ninDescription = 'National Identification Number (11 digits)';
+  static const String bvnDescription = 'Bank Verification Number (11 digits)';
+  static const String driversLicenseDescription = "Driver's license verification";
+  static const String votersCardDescription = "Voter's card verification";
+  static const String nationalIdDescription = 'National ID card verification';
+  static const String ssnitDescription = 'SSNIT number (1 letter + 12 digits)';
+
+  static const String startVerification = 'Start Verification';
+  static const String verificationDescription = 'We will capture your document and take a selfie to verify your identity';
+  static const String enterIdNumber = 'Enter ID Number';
+  static const String idNumberRequired = 'ID number is required for verification';
+  static const String verificationSuccessful = 'Verification completed successfully!';
+  static const String verificationFailed = 'Verification failed. Please try again.';
 }
