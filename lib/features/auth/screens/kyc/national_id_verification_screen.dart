@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
+import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
+import 'package:smile_id/products/document/smile_id_document_verification.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -55,13 +57,13 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   String get _countryName {
     switch (widget.countryCode) {
       case 'GH':
-        return 'Ghana Card';
+        return 'National ID';
       case 'KE':
-        return 'Kenya National ID';
+        return 'National ID';
       case 'ZA':
-        return 'South African ID';
+        return 'National ID';
       case 'CI':
-        return 'Ivory Coast National ID';
+        return 'National ID';
       default:
         return 'National ID';
     }

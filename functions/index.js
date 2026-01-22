@@ -1260,3 +1260,360 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   };
 });
 
+
+// ============================================================
+// SMILE ID PHONE VERIFICATION
+// ============================================================
+
+const SMILE_ID_API_KEY = functions.config().smileid?.api_key || '';
+const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
+const SMILE_ID_BASE_URL = 'testapi.smileidentity.com'; // Change to 'api.smileidentity.com' for production
+
+// Helper: Generate Smile ID signature
+function generateSmileIdSignature(timestamp) {
+  const message = timestamp + SMILE_ID_PARTNER_ID + 'sid_request';
+  return crypto.createHmac('sha256', SMILE_ID_API_KEY)
+    .update(message)
+    .digest('base64');
+}
+
+// Helper: Make Smile ID API request
+function smileIdRequest(method, path, data = null) {
+  return new Promise((resolve, reject) => {
+    const timestamp = new Date().toISOString();
+    const signature = generateSmileIdSignature(timestamp);
+
+    const options = {
+      hostname: SMILE_ID_BASE_URL,
+      port: 443,
+      path: path,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'smileid-partner-id': SMILE_ID_PARTNER_ID,
+        'smileid-request-signature': signature,
+        'smileid-timestamp': timestamp,
+        'smileid-source-sdk': 'cloud_functions',
+        'smileid-source-sdk-version': '1.0.0',
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => responseData += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(responseData);
+          resolve(json);
+        } catch (e) {
+          reject(new Error('Failed to parse Smile ID response: ' + responseData));
+        }
+      });
+    });
+
+    req.on('error', reject);
+
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    req.end();
+  });
+}
+
+// Verify phone number belongs to ID holder
+exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { phoneNumber, country, firstName, lastName, idNumber } = data;
+
+  // Validate required fields
+  if (!phoneNumber || !country) {
+    throw new functions.https.HttpsError('invalid-argument', 'Phone number and country are required');
+  }
+
+  // Check if country supports phone verification
+  const supportedCountries = ['NG', 'GH', 'KE', 'ZA', 'TZ', 'UG'];
+  if (!supportedCountries.includes(country.toUpperCase())) {
+    return {
+      success: false,
+      supported: false,
+      error: 'Phone verification not available for this country',
+    };
+  }
+
+  try {
+    console.log('Verifying phone:', phoneNumber, 'Country:', country);
+
+    // Format phone number (remove country code prefix if present)
+    let formattedPhone = phoneNumber.replace(/\s+/g, '');
+    
+    // Build match fields (optional - for matching against ID)
+    const matchFields = {};
+    if (firstName) matchFields.first_name = firstName;
+    if (lastName) matchFields.last_name = lastName;
+    if (idNumber) matchFields.id_number = idNumber;
+
+    const requestBody = {
+      country: country.toUpperCase(),
+      phone_number: formattedPhone,
+      partner_params: {
+        user_id: context.auth.uid,
+        job_id: `phone_${Date.now()}`,
+        job_type: 7, // Phone verification job type
+      },
+    };
+
+    // Add match fields if provided
+    if (Object.keys(matchFields).length > 0) {
+      requestBody.match_fields = matchFields;
+    }
+
+    console.log('Smile ID request:', JSON.stringify(requestBody));
+
+    const response = await smileIdRequest('POST', '/v2/verify-phone-number', requestBody);
+
+    console.log('Smile ID response:', JSON.stringify(response));
+
+    if (response.error) {
+      return {
+        success: false,
+        error: response.error,
+      };
+    }
+
+    // Parse result
+    const result = {
+      success: true,
+      verified: false,
+      resultText: response.ResultText || response.result_text || 'Unknown',
+      resultCode: response.ResultCode || response.result_code,
+      phoneInfo: {},
+    };
+
+    // Check verification result
+    if (response.ResultCode === '1020' || response.result_code === '1020') {
+      result.verified = true;
+      result.match = 'Exact Match';
+    } else if (response.ResultCode === '1021' || response.result_code === '1021') {
+      result.verified = true;
+      result.match = 'Partial Match';
+    } else if (response.ResultCode === '1022' || response.result_code === '1022') {
+      result.verified = false;
+      result.match = 'No Match';
+    }
+
+    // Extract phone info if available
+    if (response.PhoneInfo || response.phone_info) {
+      const phoneInfo = response.PhoneInfo || response.phone_info;
+      result.phoneInfo = {
+        carrier: phoneInfo.carrier || phoneInfo.Carrier,
+        phoneType: phoneInfo.phone_type || phoneInfo.PhoneType,
+        countryCode: phoneInfo.country_code || phoneInfo.CountryCode,
+      };
+    }
+
+    // Store verification result
+    await db.collection('users').doc(context.auth.uid).collection('verifications').add({
+      type: 'phone',
+      phoneNumber: formattedPhone,
+      country: country.toUpperCase(),
+      verified: result.verified,
+      resultCode: result.resultCode,
+      resultText: result.resultText,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('Phone verification error:', error);
+    throw new functions.https.HttpsError('internal', error.message || 'Verification failed');
+  }
+});
+
+// Check if phone verification is supported for a country
+exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, context) => {
+  const { country } = data;
+  
+  const supportedCountries = {
+    'NG': { supported: true, operators: ['MTN', 'GLO', 'AIRTEL', '9MOBILE'] },
+    'GH': { supported: true, operators: ['MTN', 'VODAFONE', 'AIRTELTIGO'] },
+    'KE': { supported: true, operators: ['SAFARICOM', 'AIRTEL', 'TELKOM'] },
+    'ZA': { supported: true, operators: ['VODACOM', 'MTN', 'CELL C', 'TELKOM'] },
+    'TZ': { supported: true, operators: ['VODACOM', 'AIRTEL', 'TIGO', 'HALOTEL'] },
+    'UG': { supported: true, operators: ['MTN', 'AIRTEL', 'AFRICELL'] },
+  };
+
+  const countryUpper = (country || '').toUpperCase();
+  
+  if (supportedCountries[countryUpper]) {
+    return {
+      supported: true,
+      country: countryUpper,
+      operators: supportedCountries[countryUpper].operators,
+    };
+  }
+
+  return {
+    supported: false,
+    country: countryUpper,
+    message: 'Phone verification not available for this country',
+  };
+});
+
+// ============================================================
+// SEND MONEY (Wallet to Wallet Transfer)
+// ============================================================
+
+// Helper: Generate secure transaction ID
+function generateSecureTransactionId() {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000000);
+  return `TXN${timestamp}${random}`;
+}
+
+exports.sendMoney = functions.https.onCall(async (data, context) => {
+  // 1. Check authentication
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const senderUid = context.auth.uid;
+  const { recipientWalletId, amount, note } = data;
+
+  // 2. Validate inputs
+  if (!recipientWalletId || typeof recipientWalletId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid recipient wallet ID');
+  }
+
+  if (typeof amount !== 'number' || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Amount must be positive');
+  }
+
+  if (amount > 10000000) {
+    throw new functions.https.HttpsError('invalid-argument', 'Amount exceeds limit');
+  }
+
+  try {
+    // 3. Run atomic transaction
+    const result = await db.runTransaction(async (transaction) => {
+      // Get sender wallet
+      const senderWalletRef = db.collection('wallets').doc(senderUid);
+      const senderWallet = await transaction.get(senderWalletRef);
+
+      if (!senderWallet.exists) {
+        throw new functions.https.HttpsError('not-found', 'Sender wallet not found');
+      }
+
+      const senderData = senderWallet.data();
+      const senderBalance = senderData.balance || 0;
+
+      // Calculate fee (1% with min 10, max 100)
+      const fee = Math.min(Math.max(amount * 0.01, 10), 100);
+      const totalDebit = amount + fee;
+
+      // Check balance
+      if (senderBalance < totalDebit) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+      }
+
+      // Prevent self-transfer
+      if (senderData.walletId === recipientWalletId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Cannot send to yourself');
+      }
+
+      // Find recipient
+      const recipientQuery = await db.collection('wallets')
+        .where('walletId', '==', recipientWalletId)
+        .limit(1)
+        .get();
+
+      if (recipientQuery.empty) {
+        throw new functions.https.HttpsError('not-found', 'Recipient not found');
+      }
+
+      const recipientDoc = recipientQuery.docs[0];
+      const recipientUid = recipientDoc.id;
+      const recipientRef = recipientDoc.ref;
+      const recipientData = recipientDoc.data();
+
+      // Get user names
+      const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
+      const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
+
+      const senderName = senderUserDoc.exists ? senderUserDoc.data().fullName : 'Unknown';
+      const recipientName = recipientUserDoc.exists ? recipientUserDoc.data().fullName : 'Unknown';
+
+      // Generate transaction ID
+      const txId = generateSecureTransactionId();
+      const now = new Date();
+
+      // Deduct from sender
+      transaction.update(senderWalletRef, {
+        balance: admin.firestore.FieldValue.increment(-totalDebit),
+        dailySpent: admin.firestore.FieldValue.increment(totalDebit),
+        monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
+        updatedAt: now.toISOString()
+      });
+
+      // Add to recipient
+      transaction.update(recipientRef, {
+        balance: admin.firestore.FieldValue.increment(amount),
+        updatedAt: now.toISOString()
+      });
+
+      // Transaction data
+      const baseTxData = {
+        id: txId,
+        senderWalletId: senderData.walletId,
+        receiverWalletId: recipientWalletId,
+        senderName: senderName,
+        receiverName: recipientName,
+        amount: amount,
+        fee: fee,
+        currency: senderData.currency || 'GHS',
+        senderCurrency: senderData.currency || 'GHS',
+        receiverCurrency: recipientData.currency || 'GHS',
+        note: note || '',
+        status: 'completed',
+        createdAt: now.toISOString(),
+        completedAt: now.toISOString(),
+        reference: `TXN-${now.getTime()}`,
+        exchangeRate: null,
+        convertedAmount: null,
+        failureReason: null,
+      };
+
+      // Sender transaction record
+      transaction.set(
+        db.collection('users').doc(senderUid).collection('transactions').doc(txId),
+        { ...baseTxData, type: 'send' }
+      );
+
+      // Recipient transaction record
+      transaction.set(
+        db.collection('users').doc(recipientUid).collection('transactions').doc(txId),
+        { ...baseTxData, type: 'receive', fee: 0 }
+      );
+
+      return {
+        transactionId: txId,
+        amount: amount,
+        fee: fee,
+        recipientName: recipientName,
+        newBalance: senderBalance - totalDebit
+      };
+    });
+
+    console.log('sendMoney success:', result.transactionId);
+
+    return { success: true, ...result };
+
+  } catch (error) {
+    console.error('sendMoney error:', error);
+    if (error.code) throw error;
+    throw new functions.https.HttpsError('internal', 'Transaction failed');
+  }
+});
