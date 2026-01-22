@@ -1564,6 +1564,51 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         updatedAt: now.toISOString()
       });
 
+      // ============================================
+      // COLLECT FEE TO PLATFORM WALLET
+      // ============================================
+      const senderCurrency = senderData.currency || 'GHS';
+      
+      // Get exchange rates for USD conversion
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+      const exchangeRate = rates[senderCurrency] || 1;
+      const feeInUSD = fee / exchangeRate;
+      
+      // Update platform wallet USD balance
+      const platformWalletRef = db.collection('wallets').doc('platform');
+      transaction.update(platformWalletRef, {
+        totalBalanceUSD: admin.firestore.FieldValue.increment(feeInUSD),
+        totalTransactions: admin.firestore.FieldValue.increment(1),
+        totalFeesCollected: admin.firestore.FieldValue.increment(1),
+        updatedAt: now.toISOString()
+      });
+      
+      // Update currency-specific balance
+      const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
+      transaction.set(currencyBalanceRef, {
+        currency: senderCurrency,
+        amount: admin.firestore.FieldValue.increment(fee),
+        usdEquivalent: admin.firestore.FieldValue.increment(feeInUSD),
+        txCount: admin.firestore.FieldValue.increment(1),
+        lastTransactionAt: now.toISOString(),
+        updatedAt: now.toISOString()
+      }, { merge: true });
+      
+      // Record fee in history
+      const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
+      transaction.set(feeRecordRef, {
+        transactionId: txId,
+        originalAmount: fee,
+        currency: senderCurrency,
+        usdAmount: feeInUSD,
+        exchangeRate: exchangeRate,
+        senderUid: senderUid,
+        senderName: senderName,
+        transferAmount: amount,
+        createdAt: now.toISOString()
+      });
+
       // Transaction data
       const baseTxData = {
         id: txId,
