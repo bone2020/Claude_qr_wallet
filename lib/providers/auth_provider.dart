@@ -217,6 +217,52 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     }
     return result;
   }
+
+  // ============================================================
+  // PHONE OTP VERIFICATION
+  // ============================================================
+
+  String? _verificationId;
+
+  /// Send OTP to phone number
+  Future<bool> sendPhoneOtp({
+    required String phoneNumber,
+    required Function(String error) onError,
+  }) async {
+    try {
+      await _authService.sendOtp(
+        phoneNumber: phoneNumber,
+        onCodeSent: (verificationId) {
+          _verificationId = verificationId;
+        },
+        onError: onError,
+        onAutoVerify: (credential) async {
+          // Auto-verification on Android
+        },
+      );
+      return true;
+    } catch (e) {
+      onError(e.toString());
+      return false;
+    }
+  }
+
+  /// Verify OTP code
+  Future<AuthResult> verifyPhoneOtp(String otp) async {
+    if (_verificationId == null) {
+      return AuthResult.failure('No verification ID. Please request OTP again.');
+    }
+    final result = await _authService.verifyOtp(
+      verificationId: _verificationId!,
+      otp: otp,
+    );
+    if (result.success && result.user != null) {
+      state = state.copyWith(user: result.user);
+      await _localStorage.saveUser(result.user!);
+    }
+    return result;
+  }
+
 }
 
 /// Auth state data

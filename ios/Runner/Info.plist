@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -9,7 +13,7 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-    <string>com.qrwallet1993</string>
+	<string>com.qrwallet1993</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -45,16 +49,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	
-	<!-- QR Wallet Required Permissions -->
 	<key>NSCameraUsageDescription</key>
 	<string>QR Wallet needs camera access to scan QR codes for payments</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>QR Wallet uses Face ID for secure authentication</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>QR Wallet needs photo access for profile pictures</string>
-	
-	<!-- Google Sign-In URL Scheme -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -106,7 +106,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           ),
         );
 
-        context.go(AppRoutes.kyc);
+        context.go(AppRoutes.phoneOtp, extra: {'phoneNumber': widget.phoneNumber});
       } else if (showError) {
         setState(() {
           _errorMessage = 'Email not verified yet. Please check your inbox and click the verification link.';

@@ -179,6 +179,19 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
     setState(() => _isLoading = true);
 
     try {
+      // Phone verification step
+      final phoneVerified = await context.push<bool>(
+        AppRoutes.kycPhoneVerification,
+        extra: {
+          'countryCode': widget.countryCode,
+          'firstName': null,
+          'lastName': null,
+          'idNumber': _requiresIdNumber ? _idNumberController.text.trim() : null,
+        },
+      );
+
+      if (!mounted) return;
+
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: 'NATIONAL_ID',

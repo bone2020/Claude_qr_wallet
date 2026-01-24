@@ -10,6 +10,7 @@ import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_verification_screen.dart';
 import '../../features/auth/screens/kyc_screen.dart';
+import '../../features/auth/screens/phone_otp_screen.dart';
 import '../../features/auth/screens/kyc/passport_verification_screen.dart';
 import '../../features/auth/screens/kyc/nin_verification_screen.dart';
 import '../../features/auth/screens/kyc/bvn_verification_screen.dart';
@@ -17,6 +18,7 @@ import '../../features/auth/screens/kyc/drivers_license_verification_screen.dart
 import '../../features/auth/screens/kyc/voters_card_verification_screen.dart';
 import '../../features/auth/screens/kyc/national_id_verification_screen.dart';
 import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
+import '../../features/auth/screens/kyc/phone_verification_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
 import '../../features/send/screens/send_money_screen.dart';
@@ -48,6 +50,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String forgotPassword = '/forgot-password';
   static const String otpVerification = '/otp-verification';
+  static const String phoneOtp = '/phone-otp';
   static const String kyc = '/kyc';
   static const String kycPassport = '/kyc-passport';
   static const String kycNin = '/kyc-nin';
@@ -56,6 +59,7 @@ class AppRoutes {
   static const String kycVotersCard = '/kyc-voters-card';
   static const String kycNationalId = '/kyc-national-id';
   static const String kycSsnit = '/kyc-ssnit';
+  static const String kycPhoneVerification = '/kyc-phone-verification';
   static const String main = '/main';
   static const String home = '/home';
   static const String sendMoney = '/send-money';
@@ -143,6 +147,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
+
+      // Phone OTP Verification
+      GoRoute(
+        path: AppRoutes.phoneOtp,
+        name: 'phoneOtp',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return PhoneOtpScreen(
+            phoneNumber: extras?['phoneNumber'] ?? '',
+          );
+        },
+      ),
       // KYC Screen
       GoRoute(
         path: AppRoutes.kyc,
@@ -230,6 +246,21 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extras = state.extra as Map<String, dynamic>?;
           return SsnitVerificationScreen(
             countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
+      ),
+
+      // KYC Phone Verification
+      GoRoute(
+        path: AppRoutes.kycPhoneVerification,
+        name: 'kycPhoneVerification',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return PhoneVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
+            firstName: extras?['firstName'],
+            lastName: extras?['lastName'],
+            idNumber: extras?['idNumber'],
           );
         },
       ),

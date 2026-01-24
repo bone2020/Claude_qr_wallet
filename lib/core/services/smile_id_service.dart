@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 /// Service for handling Smile ID verification operations
@@ -144,6 +145,76 @@ class SmileIDService {
 
     return IdValidationResult(isValid: true);
   }
+
+  // ============================================
+  // PHONE VERIFICATION METHODS
+  // ============================================
+
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+
+  /// Verify phone number belongs to ID holder via Cloud Function
+  Future<PhoneVerificationResult> verifyPhoneNumber({
+    required String phoneNumber,
+    required String country,
+    String? firstName,
+    String? lastName,
+    String? idNumber,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('verifyPhoneNumber');
+      final result = await callable.call<Map<String, dynamic>>({
+        'phoneNumber': phoneNumber,
+        'country': country,
+        'firstName': firstName,
+        'lastName': lastName,
+        'idNumber': idNumber,
+      });
+
+      final data = result.data;
+
+      return PhoneVerificationResult(
+        success: data['success'] == true,
+        verified: data['verified'] == true,
+        resultText: data['resultText'] as String?,
+        resultCode: data['resultCode'] as String?,
+        match: data['match'] as String?,
+        phoneInfo: data['phoneInfo'] as Map<String, dynamic>?,
+        error: data['error'] as String?,
+      );
+    } catch (e) {
+      debugPrint('Phone verification error: $e');
+      return PhoneVerificationResult(
+        success: false,
+        verified: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Check if phone verification is supported for a country
+  Future<PhoneVerificationSupport> checkPhoneVerificationSupport(String country) async {
+    try {
+      final callable = _functions.httpsCallable('checkPhoneVerificationSupport');
+      final result = await callable.call<Map<String, dynamic>>({
+        'country': country,
+      });
+
+      final data = result.data;
+
+      return PhoneVerificationSupport(
+        supported: data['supported'] == true,
+        country: data['country'] as String?,
+        operators: (data['operators'] as List<dynamic>?)?.cast<String>(),
+        message: data['message'] as String?,
+      );
+    } catch (e) {
+      debugPrint('Check phone support error: $e');
+      return PhoneVerificationSupport(
+        supported: false,
+        message: e.toString(),
+      );
+    }
+  }
 }
 
 /// Result of ID number validation
@@ -226,4 +297,43 @@ class SmileIDResult {
       error: error,
     );
   }
+}
+
+/// Result class for phone verification
+class PhoneVerificationResult {
+  final bool success;
+  final bool verified;
+  final String? resultText;
+  final String? resultCode;
+  final String? match;
+  final Map<String, dynamic>? phoneInfo;
+  final String? error;
+
+  PhoneVerificationResult({
+    required this.success,
+    required this.verified,
+    this.resultText,
+    this.resultCode,
+    this.match,
+    this.phoneInfo,
+    this.error,
+  });
+
+  /// Check if phone is verified and matches ID holder
+  bool get isVerifiedMatch => verified && (match == 'Exact Match' || match == 'Partial Match');
+}
+
+/// Result class for phone verification support check
+class PhoneVerificationSupport {
+  final bool supported;
+  final String? country;
+  final List<String>? operators;
+  final String? message;
+
+  PhoneVerificationSupport({
+    required this.supported,
+    this.country,
+    this.operators,
+    this.message,
+  });
 }
