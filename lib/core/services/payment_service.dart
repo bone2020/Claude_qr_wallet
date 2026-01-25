@@ -4,11 +4,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 
 import 'wallet_service.dart';
+import 'momo_service.dart';
 
 /// Payment service handling Paystack integration via Cloud Functions
 class PaymentService {
   final WalletService _walletService = WalletService();
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final MomoService _momoService = MomoService();
 
   // ============================================================
   // PAYSTACK CONFIGURATION
@@ -371,6 +373,104 @@ class PaymentService {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random.secure().nextInt(999999).toString().padLeft(6, '0');
     return 'QRW_${timestamp}_$random';
+  }
+
+  // ============================================================
+  // MTN MOMO DIRECT API (For MTN users)
+  // ============================================================
+
+  /// Initialize MTN MoMo payment via direct API
+  /// Use this for MTN users instead of Paystack
+  Future<MobileMoneyPaymentResult> initializeMtnMomoPayment({
+    required double amount,
+    required String phoneNumber,
+    required String userId,
+    String? currency,
+  }) async {
+    try {
+      final result = await _momoService.requestToPay(
+        amount: amount,
+        phoneNumber: phoneNumber,
+        currency: currency,
+      );
+
+      if (result.success) {
+        return MobileMoneyPaymentResult(
+          success: true,
+          reference: result.referenceId,
+          status: result.status,
+          message: result.message,
+          completed: false, // Needs user approval
+        );
+      } else {
+        return MobileMoneyPaymentResult(
+          success: false,
+          error: result.error ?? 'MTN MoMo payment failed',
+        );
+      }
+    } catch (e) {
+      return MobileMoneyPaymentResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Check MTN MoMo transaction status
+  Future<MobileMoneyPaymentResult> checkMtnMomoStatus(String referenceId, {String type = 'collection'}) async {
+    try {
+      final result = await _momoService.checkStatus(
+        referenceId: referenceId,
+        type: type,
+      );
+
+      return MobileMoneyPaymentResult(
+        success: result.success,
+        reference: referenceId,
+        status: result.status,
+        completed: result.isSuccessful,
+        error: result.error,
+      );
+    } catch (e) {
+      return MobileMoneyPaymentResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Initiate MTN MoMo withdrawal via direct API
+  Future<WithdrawalResult> initiateMtnMomoWithdrawal({
+    required double amount,
+    required String phoneNumber,
+    required String accountName,
+    String? currency,
+  }) async {
+    try {
+      final result = await _momoService.transfer(
+        amount: amount,
+        phoneNumber: phoneNumber,
+        currency: currency,
+      );
+
+      if (result.success) {
+        return WithdrawalResult(
+          success: true,
+          reference: result.referenceId,
+          message: result.message,
+        );
+      } else {
+        return WithdrawalResult(
+          success: false,
+          error: result.error ?? 'MTN MoMo withdrawal failed',
+        );
+      }
+    } catch (e) {
+      return WithdrawalResult(
+        success: false,
+        error: e.toString(),
+      );
+    }
   }
 }
 

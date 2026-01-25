@@ -1662,3 +1662,538 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'Transaction failed');
   }
 });
+
+// ============================================================
+// MTN MOMO API CONFIGURATION
+// ============================================================
+
+// MTN MoMo configuration - set via: firebase functions:config:set momo.collections_subscription_key="xxx" etc.
+const MOMO_CONFIG = {
+  collections: {
+    subscriptionKey: functions.config().momo?.collections_subscription_key || '02e123077f6d495986e243a28aa5b357',
+    apiUser: functions.config().momo?.collections_api_user || 'fbc05238-f396-4901-9d91-0885597feed7',
+    apiKey: functions.config().momo?.collections_api_key || '44fd8ff16d2a4bceb10972a11b363fbb',
+  },
+  disbursements: {
+    subscriptionKey: functions.config().momo?.disbursements_subscription_key || 'c3d6c20d5d164c238c7e5dc9da68d200',
+    apiUser: functions.config().momo?.disbursements_api_user || '090f74d7-4295-4f07-8fa7-a1e8f7ef6813',
+    apiKey: functions.config().momo?.disbursements_api_key || 'd9f3ba42f70d4cada7a8741e215f4500',
+  },
+  baseUrl: functions.config().momo?.environment === 'production'
+    ? 'proxy.momoapi.mtn.com'
+    : 'sandbox.momodeveloper.mtn.com',
+  environment: functions.config().momo?.environment || 'sandbox',
+  callbackUrl: 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
+};
+
+// Helper function to get MTN MoMo access token
+async function getMomoAccessToken(product) {
+  const config = product === 'collections' ? MOMO_CONFIG.collections : MOMO_CONFIG.disbursements;
+  const credentials = Buffer.from(`${config.apiUser}:${config.apiKey}`).toString('base64');
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: MOMO_CONFIG.baseUrl,
+      port: 443,
+      path: `/${product}/token/`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.access_token) {
+            resolve(json.access_token);
+          } else {
+            reject(new Error('Failed to get access token: ' + data));
+          }
+        } catch (e) {
+          reject(new Error('Failed to parse token response: ' + data));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// Helper function for MTN MoMo API requests
+async function momoRequest(product, method, path, data, referenceId) {
+  const config = product === 'collections' ? MOMO_CONFIG.collections : MOMO_CONFIG.disbursements;
+  const accessToken = await getMomoAccessToken(product);
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: MOMO_CONFIG.baseUrl,
+      port: 443,
+      path: `/${product}${path}`,
+      method: method,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-Reference-Id': referenceId,
+        'X-Target-Environment': MOMO_CONFIG.environment,
+        'Ocp-Apim-Subscription-Key': config.subscriptionKey,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (MOMO_CONFIG.environment !== 'sandbox') {
+      options.headers['X-Callback-Url'] = MOMO_CONFIG.callbackUrl;
+    }
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => responseData += chunk);
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          data: responseData ? JSON.parse(responseData) : null,
+        });
+      });
+    });
+
+    req.on('error', reject);
+
+    if (data) {
+      req.write(JSON.stringify(data));
+    }
+    req.end();
+  });
+}
+
+// ============================================================
+// MTN MOMO COLLECTIONS - REQUEST TO PAY (Add Money)
+// ============================================================
+
+exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { amount, currency, phoneNumber, payerMessage, payeeNote } = data;
+  const userId = context.auth.uid;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  }
+  if (!phoneNumber) {
+    throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
+  }
+
+  try {
+    // Generate unique reference ID
+    const referenceId = crypto.randomUUID();
+
+    // Create request to pay
+    const response = await momoRequest('collection', 'POST', '/v1_0/requesttopay', {
+      amount: amount.toString(),
+      currency: currency || 'EUR', // Sandbox only supports EUR
+      externalId: referenceId,
+      payer: {
+        partyIdType: 'MSISDN',
+        partyId: phoneNumber.replace('+', ''),
+      },
+      payerMessage: payerMessage || 'Add money to QR Wallet',
+      payeeNote: payeeNote || 'Wallet deposit',
+    }, referenceId);
+
+    console.log('MoMo RequestToPay response:', response);
+
+    if (response.statusCode === 202) {
+      // Request accepted - store pending transaction
+      await db.collection('momo_transactions').doc(referenceId).set({
+        type: 'collection',
+        userId: userId,
+        amount: amount,
+        currency: currency || 'EUR',
+        phoneNumber: phoneNumber,
+        status: 'PENDING',
+        referenceId: referenceId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        referenceId: referenceId,
+        status: 'PENDING',
+        message: 'Please approve the payment on your phone',
+      };
+    } else {
+      throw new functions.https.HttpsError('internal', 'Failed to initiate payment: ' + JSON.stringify(response.data));
+    }
+  } catch (error) {
+    console.error('MoMo RequestToPay error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================
+// MTN MOMO - CHECK TRANSACTION STATUS
+// ============================================================
+
+exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { referenceId, type } = data;
+
+  if (!referenceId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Reference ID is required');
+  }
+
+  try {
+    const product = type === 'disbursement' ? 'disbursement' : 'collection';
+    const path = type === 'disbursement' ? `/v1_0/transfer/${referenceId}` : `/v1_0/requesttopay/${referenceId}`;
+
+    const response = await momoRequest(product, 'GET', path, null, referenceId);
+
+    console.log('MoMo status check response:', response);
+
+    if (response.statusCode === 200 && response.data) {
+      const status = response.data.status;
+
+      // Update transaction in Firestore
+      const txRef = db.collection('momo_transactions').doc(referenceId);
+      const txDoc = await txRef.get();
+
+      if (txDoc.exists) {
+        const txData = txDoc.data();
+
+        // If status changed to SUCCESSFUL, credit/debit wallet
+        if (status === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
+          await db.runTransaction(async (transaction) => {
+            // Get user's wallet
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
+
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
+              const walletData = walletDoc.data();
+
+              if (txData.type === 'collection') {
+                // Add money - credit wallet
+                transaction.update(walletDoc.ref, {
+                  balance: (walletData.balance || 0) + txData.amount,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+
+                // Record transaction
+                transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId), {
+                  id: referenceId,
+                  type: 'deposit',
+                  amount: txData.amount,
+                  currency: txData.currency,
+                  method: 'MTN MoMo',
+                  phoneNumber: txData.phoneNumber,
+                  status: 'completed',
+                  createdAt: txData.createdAt,
+                  completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              } else {
+                // Disbursement already debited wallet, just record completion
+                transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId), {
+                  id: referenceId,
+                  type: 'withdrawal',
+                  amount: txData.amount,
+                  currency: txData.currency,
+                  method: 'MTN MoMo',
+                  phoneNumber: txData.phoneNumber,
+                  status: 'completed',
+                  createdAt: txData.createdAt,
+                  completedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            }
+
+            // Update momo transaction status
+            transaction.update(txRef, {
+              status: status,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+        } else {
+          // Just update status
+          await txRef.update({
+            status: status,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      return {
+        success: true,
+        status: status,
+        data: response.data,
+      };
+    } else {
+      return {
+        success: false,
+        status: 'UNKNOWN',
+        error: 'Failed to get status',
+      };
+    }
+  } catch (error) {
+    console.error('MoMo status check error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================
+// MTN MOMO DISBURSEMENTS - TRANSFER (Withdraw)
+// ============================================================
+
+exports.momoTransfer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { amount, currency, phoneNumber, payerMessage, payeeNote } = data;
+  const userId = context.auth.uid;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+  }
+  if (!phoneNumber) {
+    throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
+  }
+
+  try {
+    // Check wallet balance
+    const walletSnapshot = await db.collection('wallets')
+      .where('userId', '==', userId)
+      .limit(1)
+      .get();
+
+    if (walletSnapshot.empty) {
+      throw new functions.https.HttpsError('not-found', 'Wallet not found');
+    }
+
+    const walletDoc = walletSnapshot.docs[0];
+    const walletData = walletDoc.data();
+
+    if ((walletData.balance || 0) < amount) {
+      throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+    }
+
+    // Generate unique reference ID
+    const referenceId = crypto.randomUUID();
+
+    // Debit wallet first
+    await db.runTransaction(async (transaction) => {
+      const freshWallet = await transaction.get(walletDoc.ref);
+      const currentBalance = freshWallet.data().balance || 0;
+
+      if (currentBalance < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+      }
+
+      transaction.update(walletDoc.ref, {
+        balance: currentBalance - amount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Store pending withdrawal
+      transaction.set(db.collection('momo_transactions').doc(referenceId), {
+        type: 'disbursement',
+        userId: userId,
+        amount: amount,
+        currency: currency || 'EUR',
+        phoneNumber: phoneNumber,
+        status: 'PENDING',
+        referenceId: referenceId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Create transfer request
+    const response = await momoRequest('disbursement', 'POST', '/v1_0/transfer', {
+      amount: amount.toString(),
+      currency: currency || 'EUR', // Sandbox only supports EUR
+      externalId: referenceId,
+      payee: {
+        partyIdType: 'MSISDN',
+        partyId: phoneNumber.replace('+', ''),
+      },
+      payerMessage: payerMessage || 'Withdrawal from QR Wallet',
+      payeeNote: payeeNote || 'Wallet withdrawal',
+    }, referenceId);
+
+    console.log('MoMo Transfer response:', response);
+
+    if (response.statusCode === 202) {
+      return {
+        success: true,
+        referenceId: referenceId,
+        status: 'PENDING',
+        message: 'Withdrawal is being processed',
+      };
+    } else {
+      // Refund wallet if transfer failed
+      await db.runTransaction(async (transaction) => {
+        const freshWallet = await transaction.get(walletDoc.ref);
+        const currentBalance = freshWallet.data().balance || 0;
+
+        transaction.update(walletDoc.ref, {
+          balance: currentBalance + amount,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(db.collection('momo_transactions').doc(referenceId), {
+          status: 'FAILED',
+          failureReason: JSON.stringify(response.data),
+          refunded: true,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      throw new functions.https.HttpsError('internal', 'Failed to initiate transfer: ' + JSON.stringify(response.data));
+    }
+  } catch (error) {
+    console.error('MoMo Transfer error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================
+// MTN MOMO - GET BALANCE
+// ============================================================
+
+exports.momoGetBalance = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const { product } = data; // 'collection' or 'disbursement'
+
+  try {
+    const response = await momoRequest(
+      product || 'collection',
+      'GET',
+      '/v1_0/account/balance',
+      null,
+      crypto.randomUUID()
+    );
+
+    if (response.statusCode === 200) {
+      return {
+        success: true,
+        balance: response.data,
+      };
+    } else {
+      throw new functions.https.HttpsError('internal', 'Failed to get balance');
+    }
+  } catch (error) {
+    console.error('MoMo balance error:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================================
+// MTN MOMO - WEBHOOK (Callback for async notifications)
+// ============================================================
+
+exports.momoWebhook = functions.https.onRequest(async (req, res) => {
+  console.log('MoMo webhook received:', req.body);
+
+  try {
+    const { externalId, status, financialTransactionId } = req.body;
+
+    if (externalId) {
+      const txRef = db.collection('momo_transactions').doc(externalId);
+      const txDoc = await txRef.get();
+
+      if (txDoc.exists) {
+        const txData = txDoc.data();
+
+        // Update status and process if successful
+        if (status === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
+          await db.runTransaction(async (transaction) => {
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
+
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
+              const walletData = walletDoc.data();
+
+              if (txData.type === 'collection') {
+                transaction.update(walletDoc.ref, {
+                  balance: (walletData.balance || 0) + txData.amount,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+
+              transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(externalId), {
+                id: externalId,
+                type: txData.type === 'collection' ? 'deposit' : 'withdrawal',
+                amount: txData.amount,
+                currency: txData.currency,
+                method: 'MTN MoMo',
+                phoneNumber: txData.phoneNumber,
+                status: 'completed',
+                financialTransactionId: financialTransactionId,
+                createdAt: txData.createdAt,
+                completedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+
+            transaction.update(txRef, {
+              status: status,
+              financialTransactionId: financialTransactionId,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          });
+        } else if (status === 'FAILED') {
+          // Refund if disbursement failed
+          if (txData.type === 'disbursement') {
+            await db.runTransaction(async (transaction) => {
+              const walletSnapshot = await db.collection('wallets')
+                .where('userId', '==', txData.userId)
+                .limit(1)
+                .get();
+
+              if (!walletSnapshot.empty) {
+                const walletDoc = walletSnapshot.docs[0];
+                const walletData = walletDoc.data();
+
+                transaction.update(walletDoc.ref, {
+                  balance: (walletData.balance || 0) + txData.amount,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+
+              transaction.update(txRef, {
+                status: status,
+                refunded: true,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            });
+          } else {
+            await txRef.update({
+              status: status,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('MoMo webhook error:', error);
+    res.status(500).send('Error');
+  }
+});
