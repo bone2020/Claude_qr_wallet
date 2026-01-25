@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/services/payment_service.dart';
+import '../../../core/services/momo_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
@@ -203,44 +204,145 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     setState(() => _isLoading = true);
 
     try {
-      final result = await _paymentService.initializeMobileMoneyPayment(
-        email: user.email,
-        amount: amount,
-        currency: _currency,
-        provider: _selectedMomoProvider!.code,
-        phoneNumber: _phoneController.text.replaceAll(' ', ''),
-        userId: user.id,
-      );
-
-      if (!mounted) return;
-
-      if (result.success) {
-        if (result.completed) {
-          // Payment was immediately successful (test mode)
-          ref.read(walletNotifierProvider.notifier).refreshWallet();
-          ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
-          _showPaymentSuccessDialog(amount, result.reference ?? '');
-        } else {
-          // Payment pending - user needs to approve on phone
-          _showSuccess('Payment initiated! Please approve on your phone.');
-          // Refresh wallet after a delay to check for payment
-          Future.delayed(const Duration(seconds: 5), () {
-            if (mounted) {
-              ref.read(walletNotifierProvider.notifier).refreshWallet();
-              ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
-            }
-          });
-        }
+      // Check if MTN provider - use direct MTN API
+      if (MomoService.isMtnProvider(_selectedMomoProvider!.code)) {
+        await _handleMtnMomoPayment(amount, user);
       } else {
-        _showError(result.error ?? 'Payment failed');
+        // Use Paystack for non-MTN providers
+        await _handlePaystackMomoPayment(amount, user);
       }
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // MTN MoMo Direct API Payment
+  Future<void> _handleMtnMomoPayment(double amount, dynamic user) async {
+    final result = await _paymentService.initializeMtnMomoPayment(
+      amount: amount,
+      phoneNumber: _phoneController.text.replaceAll(' ', ''),
+      userId: user.id,
+      currency: _currency,
+    );
+
+    if (!mounted) return;
+
+    if (result.success) {
+      // Payment initiated - user needs to approve on phone
+      _showMtnApprovalDialog(amount, result.reference ?? '');
+    } else {
+      _showError(result.error ?? 'MTN MoMo payment failed');
+    }
+  }
+
+  // Show MTN approval dialog with status polling
+  void _showMtnApprovalDialog(double amount, String referenceId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.phone_android, color: Colors.amber),
+            SizedBox(width: 12),
+            Text('Approve Payment'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Please approve the payment of $_currencySymbol${amount.toStringAsFixed(2)} on your MTN MoMo phone.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Check your phone for the approval prompt.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _checkMtnPaymentStatus(referenceId, amount);
+            },
+            child: const Text('I\'ve Approved'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Check MTN payment status
+  Future<void> _checkMtnPaymentStatus(String referenceId, double amount) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await _paymentService.checkMtnMomoStatus(referenceId);
+
+      if (!mounted) return;
+
+      if (result.completed) {
+        ref.read(walletNotifierProvider.notifier).refreshWallet();
+        ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+        _showPaymentSuccessDialog(amount, referenceId);
+      } else if (result.status == 'PENDING') {
+        _showError('Payment still pending. Please check your phone and try again.');
+      } else {
+        _showError(result.error ?? 'Payment failed or was rejected');
       }
+    } catch (e) {
+      if (!mounted) return;
+      _showError(e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // Paystack MoMo Payment (for non-MTN providers)
+  Future<void> _handlePaystackMomoPayment(double amount, dynamic user) async {
+    final result = await _paymentService.initializeMobileMoneyPayment(
+      email: user.email,
+      amount: amount,
+      currency: _currency,
+      provider: _selectedMomoProvider!.code,
+      phoneNumber: _phoneController.text.replaceAll(' ', ''),
+      userId: user.id,
+    );
+
+    if (!mounted) return;
+
+    if (result.success) {
+      if (result.completed) {
+        // Payment was immediately successful (test mode)
+        ref.read(walletNotifierProvider.notifier).refreshWallet();
+        ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+        _showPaymentSuccessDialog(amount, result.reference ?? '');
+      } else {
+        // Payment pending - user needs to approve on phone
+        _showSuccess('Payment initiated! Please approve on your phone.');
+        // Refresh wallet after a delay to check for payment
+        Future.delayed(const Duration(seconds: 5), () {
+          if (mounted) {
+            ref.read(walletNotifierProvider.notifier).refreshWallet();
+            ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+          }
+        });
+      }
+    } else {
+      _showError(result.error ?? 'Payment failed');
     }
   }
 

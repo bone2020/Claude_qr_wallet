@@ -10,6 +10,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/services/payment_service.dart';
+import '../../../core/services/momo_service.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// Screen for withdrawing money from wallet to bank or mobile money
@@ -281,12 +282,23 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           accountName: _verifiedAccountName!,
         );
       } else {
-        result = await _paymentService.initiateMobileMoneyWithdrawal(
-          amount: amount,
-          provider: _selectedMomoProvider!.code,
-          phoneNumber: _phoneController.text.replaceAll(' ', ''),
-          accountName: _momoAccountName,
-        );
+        // Check if MTN provider - use direct MTN API
+        if (MomoService.isMtnProvider(_selectedMomoProvider!.code)) {
+          result = await _paymentService.initiateMtnMomoWithdrawal(
+            amount: amount,
+            phoneNumber: _phoneController.text.replaceAll(' ', ''),
+            accountName: _momoAccountName,
+            currency: ref.read(walletNotifierProvider).currency,
+          );
+        } else {
+          // Use Paystack for non-MTN providers
+          result = await _paymentService.initiateMobileMoneyWithdrawal(
+            amount: amount,
+            provider: _selectedMomoProvider!.code,
+            phoneNumber: _phoneController.text.replaceAll(' ', ''),
+            accountName: _momoAccountName,
+          );
+        }
       }
 
       if (!mounted) return;
