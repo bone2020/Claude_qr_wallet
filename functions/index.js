@@ -507,6 +507,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Enforce persistent rate limiting (5 withdrawals per hour)
+  await enforceRateLimit(userId, 'initiateWithdrawal');
+
   console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
   // Validate amount
   if (!amount || amount <= 0) {
@@ -1187,6 +1190,101 @@ function recordFailedLookup(ip) {
 }
 
 // ============================================================
+// PERSISTENT RATE LIMITING (Firestore-backed)
+// ============================================================
+
+/**
+ * Rate limit configuration per operation.
+ * windowMs: sliding window duration in milliseconds
+ * maxRequests: maximum requests allowed in the window
+ * message: user-facing error message when rate limited
+ */
+const RATE_LIMITS = {
+  sendMoney:          { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many transfers. Please wait before sending again.' },
+  initiateWithdrawal: { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many withdrawal attempts. Please try again later.' },
+  momoRequestToPay:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many MoMo payment requests. Please try again later.' },
+  momoTransfer:       { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many MoMo transfers. Please try again later.' },
+  lookupWallet:       { windowMs: 5 * 60 * 1000,  maxRequests: 30, message: 'Too many wallet lookups. Please wait a few minutes.' },
+};
+
+/**
+ * Persistent rate limit check using Firestore.
+ * Uses a sliding window counter stored in the rate_limits collection.
+ * Survives cold starts (unlike the in-memory rateLimitStore).
+ *
+ * @param {string} userId - The user ID to rate limit
+ * @param {string} operation - The operation name (must exist in RATE_LIMITS)
+ * @returns {Promise<boolean>} true if within limit, false if rate limited
+ */
+async function checkRateLimitPersistent(userId, operation) {
+  const config = RATE_LIMITS[operation];
+  if (!config) {
+    console.warn(`No rate limit config for operation: ${operation}`);
+    return true;
+  }
+
+  const docId = `${userId}_${operation}`;
+  const rateLimitRef = db.collection('rate_limits').doc(docId);
+  const now = Date.now();
+  const windowStart = now - config.windowMs;
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(rateLimitRef);
+
+      if (!doc.exists) {
+        transaction.set(rateLimitRef, {
+          userId,
+          operation,
+          requests: [now],
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return true;
+      }
+
+      const data = doc.data();
+      const recentRequests = (data.requests || []).filter(ts => ts > windowStart);
+
+      if (recentRequests.length >= config.maxRequests) {
+        return false;
+      }
+
+      recentRequests.push(now);
+      transaction.update(rateLimitRef, {
+        requests: recentRequests,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+
+    return result;
+  } catch (error) {
+    console.error(`Rate limit check failed for ${userId}/${operation}:`, error);
+    return true; // Fail open to avoid blocking legitimate users
+  }
+}
+
+/**
+ * Enforces rate limiting for a financial operation.
+ * Throws resource-exhausted HttpsError if the user has exceeded the limit.
+ *
+ * @param {string} userId - The user ID to rate limit
+ * @param {string} operation - The operation name (must exist in RATE_LIMITS)
+ * @throws {HttpsError} resource-exhausted if rate limited
+ */
+async function enforceRateLimit(userId, operation) {
+  const allowed = await checkRateLimitPersistent(userId, operation);
+  if (!allowed) {
+    const config = RATE_LIMITS[operation];
+    console.warn(`Rate limit exceeded: user=${userId}, operation=${operation}`);
+    throw new functions.https.HttpsError(
+      'resource-exhausted',
+      config?.message || 'Too many requests. Please try again later.'
+    );
+  }
+}
+
+// ============================================================
 // KYC ENFORCEMENT (Server-Side)
 // ============================================================
 
@@ -1669,20 +1767,18 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const ip = context.rawRequest?.headers?.['x-forwarded-for'] || 'unknown';
   const hashedIp = crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
   
-  // Check user rate limit (30 requests per minute)
-  if (!checkRateLimit(`user:${userId}`, 30, 60000)) {
-    throw new functions.https.HttpsError('resource-exhausted', 'Too many requests. Please wait.');
-  }
-  
-  // Check IP rate limit (100 requests per minute)
+  // Fast in-memory IP rate limit (burst protection within single instance)
   if (!checkRateLimit(`ip:${hashedIp}`, 100, 60000)) {
     throw new functions.https.HttpsError('resource-exhausted', 'Too many requests from this location.');
   }
-  
-  // Check failed lookup limit
+
+  // Check failed lookup limit (in-memory, per IP)
   if (!checkFailedLookups(hashedIp)) {
     throw new functions.https.HttpsError('resource-exhausted', 'Too many failed attempts. Please wait 5 minutes.');
   }
+
+  // Persistent rate limit (30 lookups per 5 minutes, survives cold starts)
+  await enforceRateLimit(userId, 'lookupWallet');
   
   if (!walletId || typeof walletId !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
@@ -1938,6 +2034,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
   // Enforce KYC verification before financial operation
   await enforceKyc(senderUid);
+
+  // Enforce persistent rate limiting (20 sends per hour)
+  await enforceRateLimit(senderUid, 'sendMoney');
 
   const { recipientWalletId, amount, note, idempotencyKey } = data;
 
@@ -2260,6 +2359,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Enforce persistent rate limiting (10 MoMo payments per hour)
+  await enforceRateLimit(userId, 'momoRequestToPay');
+
   return withIdempotency(idempotencyKey, 'momoRequestToPay', userId, async () => {
   try {
     // Generate unique reference ID
@@ -2447,6 +2549,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
+
+  // Enforce persistent rate limiting (5 MoMo transfers per hour)
+  await enforceRateLimit(userId, 'momoTransfer');
 
   return withIdempotency(idempotencyKey, 'momoTransfer', userId, async () => {
   try {
