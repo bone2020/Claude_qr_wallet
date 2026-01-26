@@ -274,6 +274,13 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       });
     });
 
+    await auditLog({
+      userId, operation: 'verifyPayment', result: 'success',
+      amount, currency,
+      metadata: { reference },
+      ipHash: hashIp(context),
+    });
+
     return {
       success: true,
       amount: amount,
@@ -283,6 +290,12 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('Payment verification error:', error);
+    await auditLog({
+      userId, operation: 'verifyPayment', result: 'failure',
+      metadata: { reference },
+      error: error.message,
+      ipHash: hashIp(context),
+    });
     throw new functions.https.HttpsError('internal', error.message);
   }
 });
@@ -670,6 +683,13 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       };
     }
 
+    await auditLog({
+      userId, operation: 'initiateWithdrawal', result: 'success',
+      amount, currency: walletData.currency || 'NGN',
+      metadata: { reference, type: type || 'bank' },
+      ipHash: hashIp(context),
+    });
+
     return {
       success: true,
       reference: reference,
@@ -678,6 +698,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('Withdrawal error:', error);
+    await auditLog({
+      userId, operation: 'initiateWithdrawal', result: 'failure',
+      amount,
+      error: error.message,
+      ipHash: hashIp(context),
+    });
     throw new functions.https.HttpsError('internal', error.message);
   }
   });
@@ -1281,6 +1307,50 @@ async function enforceRateLimit(userId, operation) {
       'resource-exhausted',
       config?.message || 'Too many requests. Please try again later.'
     );
+  }
+}
+
+// ============================================================
+// FINANCIAL AUDIT LOGGING
+// ============================================================
+
+/**
+ * Hash the client IP from the request context for privacy-safe forensics.
+ * @param {Object} context - Cloud Function onCall context
+ * @returns {string} First 16 hex chars of SHA-256 hash
+ */
+function hashIp(context) {
+  const ip = context.rawRequest?.headers?.['x-forwarded-for'] || 'unknown';
+  return crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
+}
+
+/**
+ * Writes an immutable audit log entry to the audit_logs collection.
+ * Creates a tamper-resistant record of all financial operations.
+ * The audit_logs collection is Cloud Functions-only (client access blocked by Firestore rules).
+ *
+ * Never throws — audit logging must not block or fail the main operation.
+ *
+ * @param {Object} entry - Audit log entry
+ * @param {string} entry.userId - The user who performed the operation
+ * @param {string} entry.operation - Operation name (e.g., 'sendMoney', 'withdrawal')
+ * @param {string} entry.result - 'success' or 'failure'
+ * @param {number} [entry.amount] - Amount involved
+ * @param {string} [entry.currency] - Currency code
+ * @param {string} [entry.error] - Error message (for failures)
+ * @param {Object} [entry.metadata] - Additional context (transactionId, reference, etc.)
+ * @param {string} [entry.ipHash] - Hashed IP for forensics
+ */
+async function auditLog(entry) {
+  try {
+    await db.collection('audit_logs').add({
+      ...entry,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      loggedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    // Audit logging must never block the main operation
+    console.error('AUDIT LOG WRITE FAILED:', error, 'Entry:', JSON.stringify(entry));
   }
 }
 
@@ -2212,10 +2282,24 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
     console.log('sendMoney success:', result.transactionId);
 
+    await auditLog({
+      userId: senderUid, operation: 'sendMoney', result: 'success',
+      amount, currency: result.currency || 'GHS',
+      metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee },
+      ipHash: hashIp(context),
+    });
+
     return { success: true, ...result };
 
   } catch (error) {
     console.error('sendMoney error:', error);
+    await auditLog({
+      userId: senderUid, operation: 'sendMoney', result: 'failure',
+      amount,
+      metadata: { recipientWalletId },
+      error: error.message,
+      ipHash: hashIp(context),
+    });
     if (error.code) throw error;
     throw new functions.https.HttpsError('internal', 'Transaction failed');
   }
@@ -2396,6 +2480,13 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: new Date().toISOString() }],
       });
 
+      await auditLog({
+        userId, operation: 'momoRequestToPay', result: 'success',
+        amount, currency: currency || 'EUR',
+        metadata: { referenceId, phoneNumber },
+        ipHash: hashIp(context),
+      });
+
       return {
         success: true,
         referenceId: referenceId,
@@ -2407,6 +2498,12 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     }
   } catch (error) {
     console.error('MoMo RequestToPay error:', error);
+    await auditLog({
+      userId, operation: 'momoRequestToPay', result: 'failure',
+      amount, currency: currency || 'EUR',
+      error: error.message,
+      ipHash: hashIp(context),
+    });
     throw new functions.https.HttpsError('internal', error.message);
   }
   });
@@ -2619,6 +2716,13 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     console.log('MoMo Transfer response:', response);
 
     if (response.statusCode === 202) {
+      await auditLog({
+        userId, operation: 'momoTransfer', result: 'success',
+        amount, currency: currency || 'EUR',
+        metadata: { referenceId, phoneNumber },
+        ipHash: hashIp(context),
+      });
+
       return {
         success: true,
         referenceId: referenceId,
@@ -2649,6 +2753,12 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     }
   } catch (error) {
     console.error('MoMo Transfer error:', error);
+    await auditLog({
+      userId, operation: 'momoTransfer', result: 'failure',
+      amount, currency: currency || 'EUR',
+      error: error.message,
+      ipHash: hashIp(context),
+    });
     throw new functions.https.HttpsError('internal', error.message);
   }
   });
