@@ -145,14 +145,14 @@ function throwAppError(code, customMessage = null, details = {}) {
     errorCode: code,
     message,
     details,
-    timestamp: new Date().toISOString(),
+    timestamp: timestamps.isoNow(),
   }));
 
   throw new functions.https.HttpsError(httpCode, message, {
     code,
     message,
     ...details,
-    timestamp: new Date().toISOString(),
+    timestamp: timestamps.isoNow(),
   });
 }
 
@@ -175,7 +175,7 @@ function throwServiceError(serviceName, originalError, context = {}) {
     service: serviceName,
     originalError: originalError.message || String(originalError),
     context,
-    timestamp: new Date().toISOString(),
+    timestamp: timestamps.isoNow(),
   }));
 
   throw new functions.https.HttpsError('unavailable',
@@ -187,6 +187,38 @@ function throwServiceError(serviceName, originalError, context = {}) {
     }
   );
 }
+
+// ============================================================
+// TIMESTAMP STANDARDIZATION
+// ============================================================
+
+/**
+ * TIMESTAMP RULES:
+ *
+ * 1. FIRESTORE DOCUMENTS: Use serverTimestamp() for all time fields.
+ * 2. ARRAY ENTRIES (e.g. statusHistory): Use timestamps.firestoreNow()
+ *    since FieldValue.serverTimestamp() is not supported inside arrays.
+ * 3. LOGS: Use timestamps.isoNow() for ISO 8601 UTC strings.
+ * 4. CALCULATIONS: Use Date.now() for millisecond arithmetic.
+ * 5. TTL FIELDS: Use timestamps.expiresIn(ms) for Firestore Timestamps.
+ * 6. NEVER: Trust client-provided timestamps for financial records.
+ */
+const timestamps = {
+  /** Firestore server-managed timestamp for document fields */
+  serverTimestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+
+  /** Firestore Timestamp from Cloud Function clock (for array entries) */
+  firestoreNow: () => admin.firestore.Timestamp.now(),
+
+  /** ISO 8601 UTC string for logs and non-persisted data */
+  isoNow: () => new Date().toISOString(),
+
+  /** Milliseconds since epoch for arithmetic */
+  nowMs: () => Date.now(),
+
+  /** Firestore Timestamp for TTL/expiry fields */
+  expiresIn: (ms) => admin.firestore.Timestamp.fromDate(new Date(Date.now() + ms)),
+};
 
 // ============================================================
 // REQUEST CORRELATION FRAMEWORK
@@ -1669,8 +1701,8 @@ async function auditLog(entry) {
   try {
     await db.collection('audit_logs').add({
       ...entry,
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      loggedAt: new Date().toISOString(),
+      timestamp: timestamps.serverTimestamp(),
+      loggedAt: timestamps.serverTimestamp(),
     });
   } catch (error) {
     // Audit logging must never block the main operation
@@ -1827,8 +1859,8 @@ async function withIdempotency(key, operation, userId, executeOperation) {
       operation,
       userId,
       status: 'pending',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+      createdAt: timestamps.serverTimestamp(),
+      expiresAt: timestamps.expiresIn(24 * 60 * 60 * 1000), // 24h TTL
     });
 
     return { alreadyCompleted: false };
@@ -1982,7 +2014,7 @@ function buildStateTransitionFields(currentStatus, newStatus, docId) {
     statusHistory: admin.firestore.FieldValue.arrayUnion({
       from: from,
       to: to,
-      timestamp: new Date().toISOString(),
+      timestamp: timestamps.firestoreNow(),
     }),
   };
 }
@@ -2016,7 +2048,7 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
       statusHistory: admin.firestore.FieldValue.arrayUnion({
         from: from,
         to: to,
-        timestamp: new Date().toISOString(),
+        timestamp: timestamps.firestoreNow(),
       }),
       ...additionalData,
     });
@@ -2483,13 +2515,13 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         balance: admin.firestore.FieldValue.increment(-totalDebit),
         dailySpent: admin.firestore.FieldValue.increment(totalDebit),
         monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
-        updatedAt: now.toISOString()
+        updatedAt: timestamps.serverTimestamp()
       });
 
       // Add to recipient
       transaction.update(recipientRef, {
         balance: admin.firestore.FieldValue.increment(amount),
-        updatedAt: now.toISOString()
+        updatedAt: timestamps.serverTimestamp()
       });
 
       // ============================================
@@ -2509,7 +2541,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         totalBalanceUSD: admin.firestore.FieldValue.increment(feeInUSD),
         totalTransactions: admin.firestore.FieldValue.increment(1),
         totalFeesCollected: admin.firestore.FieldValue.increment(1),
-        updatedAt: now.toISOString()
+        updatedAt: timestamps.serverTimestamp()
       });
       
       // Update currency-specific balance
@@ -2519,8 +2551,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         amount: admin.firestore.FieldValue.increment(fee),
         usdEquivalent: admin.firestore.FieldValue.increment(feeInUSD),
         txCount: admin.firestore.FieldValue.increment(1),
-        lastTransactionAt: now.toISOString(),
-        updatedAt: now.toISOString()
+        lastTransactionAt: timestamps.serverTimestamp(),
+        updatedAt: timestamps.serverTimestamp()
       }, { merge: true });
       
       // Record fee in history
@@ -2534,7 +2566,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         senderUid: senderUid,
         senderName: senderName,
         transferAmount: amount,
-        createdAt: now.toISOString()
+        createdAt: timestamps.serverTimestamp()
       });
 
       // Transaction data
@@ -2551,8 +2583,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         receiverCurrency: recipientData.currency || 'GHS',
         note: note || '',
         status: 'completed',
-        createdAt: now.toISOString(),
-        completedAt: now.toISOString(),
+        createdAt: timestamps.serverTimestamp(),
+        completedAt: timestamps.serverTimestamp(),
         reference: `TXN-${now.getTime()}`,
         exchangeRate: null,
         convertedAmount: null,
@@ -2781,7 +2813,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: new Date().toISOString() }],
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
 
       await auditLog({
@@ -3006,7 +3038,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: new Date().toISOString() }],
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
     });
 
