@@ -7,15 +7,54 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ============================================================
+// CONFIGURATION VALIDATION
+// ============================================================
+
+/**
+ * Validates that a required config value is present.
+ * Throws a clear HttpsError if missing, so callers get an actionable message
+ * instead of cryptic auth/network failures.
+ */
+function requireConfig(value, name) {
+  if (!value) {
+    console.error(`CONFIGURATION ERROR: ${name} is not set. Set it via: firebase functions:config:set ${name.toLowerCase().replace(/ /g, '_')}="value"`);
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Server configuration error: ${name} is not set. Contact support.`
+    );
+  }
+  return value;
+}
+
+// Log missing config at cold-start (non-blocking warnings)
+(function validateConfig() {
+  const missing = [];
+  if (!functions.config().paystack?.secret_key) missing.push('paystack.secret_key');
+  if (!functions.config().qr?.secret) missing.push('qr.secret');
+  if (!functions.config().momo?.collections_subscription_key) missing.push('momo.collections_subscription_key');
+  if (!functions.config().momo?.collections_api_user) missing.push('momo.collections_api_user');
+  if (!functions.config().momo?.collections_api_key) missing.push('momo.collections_api_key');
+  if (!functions.config().momo?.disbursements_subscription_key) missing.push('momo.disbursements_subscription_key');
+  if (!functions.config().momo?.disbursements_api_user) missing.push('momo.disbursements_api_user');
+  if (!functions.config().momo?.disbursements_api_key) missing.push('momo.disbursements_api_key');
+  if (!functions.config().momo?.webhook_secret) missing.push('momo.webhook_secret');
+  if (missing.length > 0) {
+    console.warn(`⚠ MISSING CONFIG (${missing.length}): ${missing.join(', ')}. Set via: firebase functions:config:set KEY="value"`);
+  }
+})();
+
+// ============================================================
 // PAYSTACK CONFIGURATION
 // ============================================================
 
 // Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || 'sk_test_xxx';
+// REQUIRED: Must be configured. Functions will fail with clear errors if missing.
+const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // Helper function for Paystack API calls
 function paystackRequest(method, path, data = null) {
+  requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
   return new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
@@ -1073,11 +1112,13 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 // ============================================================
 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
-const QR_SECRET_KEY = functions.config().qr?.secret || 'qr-wallet-default-secret-key-change-me';
+// REQUIRED: Must be configured. QR signing will fail if missing.
+const QR_SECRET_KEY = functions.config().qr?.secret || '';
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // Helper: Generate HMAC signature
 function generateQrSignature(payload) {
+  requireConfig(QR_SECRET_KEY, 'qr.secret');
   return crypto.createHmac('sha256', QR_SECRET_KEY)
     .update(payload)
     .digest('hex');
@@ -1797,14 +1838,14 @@ const MOMO_WEBHOOK_SECRET = functions.config().momo?.webhook_secret || '';
 
 const MOMO_CONFIG = {
   collections: {
-    subscriptionKey: functions.config().momo?.collections_subscription_key || '02e123077f6d495986e243a28aa5b357',
-    apiUser: functions.config().momo?.collections_api_user || 'fbc05238-f396-4901-9d91-0885597feed7',
-    apiKey: functions.config().momo?.collections_api_key || '44fd8ff16d2a4bceb10972a11b363fbb',
+    subscriptionKey: functions.config().momo?.collections_subscription_key || '',
+    apiUser: functions.config().momo?.collections_api_user || '',
+    apiKey: functions.config().momo?.collections_api_key || '',
   },
   disbursements: {
-    subscriptionKey: functions.config().momo?.disbursements_subscription_key || 'c3d6c20d5d164c238c7e5dc9da68d200',
-    apiUser: functions.config().momo?.disbursements_api_user || '090f74d7-4295-4f07-8fa7-a1e8f7ef6813',
-    apiKey: functions.config().momo?.disbursements_api_key || 'd9f3ba42f70d4cada7a8741e215f4500',
+    subscriptionKey: functions.config().momo?.disbursements_subscription_key || '',
+    apiUser: functions.config().momo?.disbursements_api_user || '',
+    apiKey: functions.config().momo?.disbursements_api_key || '',
   },
   baseUrl: functions.config().momo?.environment === 'production'
     ? 'proxy.momoapi.mtn.com'
@@ -1818,6 +1859,9 @@ const MOMO_CONFIG = {
 // Helper function to get MTN MoMo access token
 async function getMomoAccessToken(product) {
   const config = product === 'collections' ? MOMO_CONFIG.collections : MOMO_CONFIG.disbursements;
+  requireConfig(config.subscriptionKey, `momo.${product}_subscription_key`);
+  requireConfig(config.apiUser, `momo.${product}_api_user`);
+  requireConfig(config.apiKey, `momo.${product}_api_key`);
   const credentials = Buffer.from(`${config.apiUser}:${config.apiKey}`).toString('base64');
 
   return new Promise((resolve, reject) => {
