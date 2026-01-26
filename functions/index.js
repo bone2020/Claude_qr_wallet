@@ -140,13 +140,7 @@ function throwAppError(code, customMessage = null, details = {}) {
   const httpCode = ERROR_CODE_TO_HTTP[code] || 'failed-precondition';
   const message = customMessage || ERROR_MESSAGES[code] || 'An error occurred.';
 
-  console.error(JSON.stringify({
-    level: 'ERROR',
-    errorCode: code,
-    message,
-    details,
-    timestamp: timestamps.isoNow(),
-  }));
+  logError(`throwAppError: ${code}`, { errorCode: code, userMessage: message, details });
 
   throw new functions.https.HttpsError(httpCode, message, {
     code,
@@ -169,14 +163,7 @@ function throwServiceError(serviceName, originalError, context = {}) {
   const codeKey = `SERVICE_${serviceName.toUpperCase()}_ERROR`;
   const code = ERROR_CODES[codeKey] || ERROR_CODES.SERVICE_UNAVAILABLE;
 
-  console.error(JSON.stringify({
-    level: 'ERROR',
-    errorCode: code,
-    service: serviceName,
-    originalError: originalError.message || String(originalError),
-    context,
-    timestamp: timestamps.isoNow(),
-  }));
+  logError(`throwServiceError: ${serviceName}`, { errorCode: code, service: serviceName, originalError: originalError.message || String(originalError), context });
 
   throw new functions.https.HttpsError('unavailable',
     `${serviceName} service error. Please try again.`, {
@@ -186,6 +173,65 @@ function throwServiceError(serviceName, originalError, context = {}) {
       ...context,
     }
   );
+}
+
+// ============================================================
+// STRUCTURED LOGGING FRAMEWORK
+// ============================================================
+
+/**
+ * Log severity levels aligned with Google Cloud Logging.
+ * JSON output is automatically parsed by Cloud Logging.
+ */
+const LOG_LEVELS = {
+  DEBUG: 'DEBUG', INFO: 'INFO', NOTICE: 'NOTICE',
+  WARNING: 'WARNING', ERROR: 'ERROR', CRITICAL: 'CRITICAL',
+};
+
+/**
+ * Core structured logging function.
+ * Outputs JSON that Google Cloud Logging parses automatically.
+ */
+function logStructured(level, message, data = {}) {
+  const entry = {
+    severity: level,
+    message,
+    timestamp: new Date().toISOString(),
+    ...data,
+  };
+  const output = JSON.stringify(entry);
+  switch (level) {
+    case LOG_LEVELS.ERROR:
+    case LOG_LEVELS.CRITICAL:
+      console.error(output);
+      break;
+    case LOG_LEVELS.WARNING:
+      console.warn(output);
+      break;
+    default:
+      console.log(output);
+  }
+}
+
+function logInfo(message, data = {}) { logStructured(LOG_LEVELS.INFO, message, data); }
+function logWarning(message, data = {}) { logStructured(LOG_LEVELS.WARNING, message, data); }
+function logError(message, data = {}) { logStructured(LOG_LEVELS.ERROR, message, data); }
+
+/**
+ * Log a financial operation with required context.
+ * Flagged for Cloud Logging filters: jsonPayload.financial=true
+ */
+function logFinancialOperation(operation, status, data = {}) {
+  logInfo(`Financial: ${operation} ${status}`, { operation, status, financial: true, ...data });
+}
+
+/**
+ * Log a security-relevant event.
+ * Flagged for Cloud Logging alerts: jsonPayload.security=true
+ */
+function logSecurityEvent(event, severity, data = {}) {
+  const level = severity === 'high' ? LOG_LEVELS.WARNING : LOG_LEVELS.NOTICE;
+  logStructured(level, `Security: ${event}`, { event, security: true, severity, ...data });
 }
 
 // ============================================================
@@ -354,13 +400,9 @@ const MISSING_CRITICAL_CONFIGS = new Set();
   }
 
   if (missingCritical.length > 0) {
-    console.error(
-      `CRITICAL CONFIG MISSING (${missingCritical.length}): ${missingCritical.join(', ')}. ` +
-      `Set via: firebase functions:config:set KEY="value". ` +
-      `Functions depending on these keys will fail at call time.`
-    );
+    logError('CRITICAL CONFIG MISSING', { count: missingCritical.length, keys: missingCritical.join(', '), action: 'Set via: firebase functions:config:set KEY="value". Functions depending on these keys will fail at call time.' });
   } else {
-    console.log('All critical environment configs present.');
+    logInfo('All critical environment configs present');
   }
 })();
 
@@ -468,7 +510,7 @@ exports.updateExchangeRatesDaily = functions.pubsub
   .timeZone('UTC')
   .onRun(async (context) => {
     try {
-      console.log('Fetching exchange rates...');
+      logInfo('Fetching exchange rates');
       const allRates = await fetchRates();
 
       const rates = { 'USD': 1.0 };
@@ -485,10 +527,10 @@ exports.updateExchangeRatesDaily = functions.pubsub
         source: 'exchangerate.host'
       });
 
-      console.log(`Updated ${Object.keys(rates).length} exchange rates`);
+      logInfo('Updated exchange rates', { count: Object.keys(rates).length });
       return null;
     } catch (error) {
-      console.error('Error updating rates:', error);
+      logError('Error updating rates', { error: error.message });
       throw error;
     }
   });
@@ -633,7 +675,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     };
 
   } catch (error) {
-    console.error('Payment verification error:', error);
+    logError('Payment verification error', { error: error.message });
     await auditLog({
       userId, operation: 'verifyPayment', result: 'failure',
       metadata: { reference, ...correlation.toAuditContext() },
@@ -648,11 +690,11 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
     `webhook_paystack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  console.log(JSON.stringify({ severity: 'INFO', message: 'Paystack webhook received', correlationId: webhookCorrelationId, event: req.body?.event }));
+  logSecurityEvent('paystack_webhook_received', 'low', { correlationId: webhookCorrelationId, event: req.body?.event });
 
   // Fail fast if Paystack secret key is not configured
   if (MISSING_CRITICAL_CONFIGS.has('paystack.secret_key')) {
-    console.error('paystackWebhook: PAYSTACK_SECRET_KEY not configured, rejecting webhook');
+    logSecurityEvent('paystack_webhook_not_configured', 'high', { correlationId: webhookCorrelationId });
     return res.status(503).send('Service not configured');
   }
 
@@ -663,12 +705,12 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
     .digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
-    console.error('Invalid webhook signature');
+    logSecurityEvent('paystack_webhook_invalid_signature', 'high', { correlationId: webhookCorrelationId });
     return res.status(400).send('Invalid signature');
   }
 
   const event = req.body;
-  console.log('Paystack webhook event:', event.event);
+  logInfo('Paystack webhook event', { event: event.event, correlationId: webhookCorrelationId });
 
   try {
     switch (event.event) {
@@ -685,12 +727,12 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
         break;
 
       default:
-        console.log('Unhandled event type:', event.event);
+        logInfo('Unhandled webhook event type', { event: event.event, correlationId: webhookCorrelationId });
     }
 
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    logError('Webhook processing error', { error: error.message, correlationId: webhookCorrelationId });
     res.status(500).send('Error processing webhook');
   }
 });
@@ -701,7 +743,7 @@ async function handleSuccessfulCharge(data) {
   const userId = metadata.userId;
 
   if (!userId) {
-    console.error('No userId in metadata for charge:', reference);
+    logError('No userId in metadata for charge', { reference });
     return;
   }
 
@@ -710,7 +752,7 @@ async function handleSuccessfulCharge(data) {
   const paymentDoc = await paymentRef.get();
 
   if (paymentDoc.exists && paymentDoc.data().processed) {
-    console.log('Payment already processed:', reference);
+    logInfo('Payment already processed', { reference });
     return;
   }
 
@@ -724,7 +766,7 @@ async function handleSuccessfulCharge(data) {
     .get();
 
   if (walletSnapshot.empty) {
-    console.error('Wallet not found for user:', userId);
+    logError('Wallet not found for user', { userId });
     return;
   }
 
@@ -767,7 +809,7 @@ async function handleSuccessfulCharge(data) {
     });
   });
 
-  console.log('Successfully credited wallet for:', reference);
+  logFinancialOperation('creditWallet', 'success', { reference });
 }
 
 async function handleSuccessfulTransfer(data) {
@@ -801,7 +843,7 @@ async function handleSuccessfulTransfer(data) {
     }
   }
 
-  console.log('Withdrawal completed:', reference);
+  logFinancialOperation('withdrawal', 'completed', { reference });
 }
 
 async function handleFailedTransfer(data) {
@@ -810,7 +852,7 @@ async function handleFailedTransfer(data) {
   // Get withdrawal details
   const withdrawalDoc = await db.collection('withdrawals').doc(reference).get();
   if (!withdrawalDoc.exists) {
-    console.error('Withdrawal not found:', reference);
+    logError('Withdrawal not found', { reference });
     return;
   }
 
@@ -859,7 +901,7 @@ async function handleFailedTransfer(data) {
     });
   }
 
-  console.log('Withdrawal failed and refunded:', reference);
+  logFinancialOperation('withdrawal', 'failed_refunded', { reference });
 }
 
 // Initiate withdrawal to bank or mobile money
@@ -881,7 +923,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   // Enforce persistent rate limiting (5 withdrawals per hour)
   await enforceRateLimit(userId, 'initiateWithdrawal');
 
-  console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
+  logFinancialOperation('initiateWithdrawal', 'initiated', { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber });
   // Validate amount
   if (!amount || amount <= 0) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
@@ -937,7 +979,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
     // Create recipient
     const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData);
-    console.log("Paystack recipient response:", JSON.stringify(recipientResponse));
+    logInfo('Paystack recipient response', { response: recipientResponse });
 
     if (!recipientResponse.status) {
       throwServiceError('paystack', new Error('Failed to create transfer recipient'));
@@ -1000,7 +1042,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       reason: `Wallet withdrawal - ${reference}`,
     });
 
-    console.log("Paystack transfer response:", JSON.stringify(transferResponse));
+    logInfo('Paystack transfer response', { response: transferResponse });
     if (!transferResponse.status) {
       // Refund if transfer initiation fails
       await db.runTransaction(async (transaction) => {
@@ -1056,7 +1098,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     };
 
   } catch (error) {
-    console.error('Withdrawal error:', error);
+    logError('Withdrawal error', { error: error.message });
     await auditLog({
       userId, operation: 'initiateWithdrawal', result: 'failure',
       amount,
@@ -1106,7 +1148,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
       otp: otp,
     });
 
-    console.log('OTP finalize response:', JSON.stringify(otpResponse));
+    logInfo('OTP finalize response', { response: otpResponse });
 
     if (otpResponse.status) {
       // Update withdrawal status
@@ -1128,7 +1170,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
-    console.error('Finalize transfer error:', error);
+    logError('Finalize transfer error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
   });
@@ -1139,8 +1181,7 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
   try {
     const country = data.country || 'nigeria';
     const response = await paystackRequest('GET', `/bank?country=${country}`);
-    console.log('Paystack response:', JSON.stringify(response));
-    console.log('Paystack response:', JSON.stringify(response));
+    logInfo('Paystack getBanks response', { status: response.status });
     if (!response.status) {
       throw new Error('Failed to fetch banks');
     }
@@ -1154,7 +1195,7 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
       })),
     };
   } catch (error) {
-    console.error('Get banks error:', error);
+    logError('Get banks error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
@@ -1172,10 +1213,10 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    console.log('Calling Paystack with account:', accountNumber, 'bank:', bankCode);
+    logInfo('Calling Paystack to verify account', { accountNumber, bankCode });
     const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
 
-    console.log('Paystack response:', JSON.stringify(response));
+    logInfo('Paystack verifyAccount response', { status: response.status });
     if (!response.status) {
       return { success: false, error: 'Could not verify account' };
     }
@@ -1187,7 +1228,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
       bankId: response.data.bank_id,
     };
   } catch (error) {
-    console.error('Verify account error:', error);
+    logError('Verify account error', { error: error.message });
     return { success: false, error: 'Account verification failed' };
   }
 });
@@ -1232,7 +1273,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       },
     });
 
-    console.log('Mobile Money charge response:', JSON.stringify(chargeResponse));
+    logFinancialOperation('chargeMobileMoney', 'response_received', { status: chargeResponse.status, dataStatus: chargeResponse.data?.status });
 
     // Check if payment was immediately successful (common in test mode)
     if (chargeResponse.status && chargeResponse.data?.status === 'success') {
@@ -1290,7 +1331,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
-    console.error('Mobile Money charge error:', error);
+    logError('Mobile Money charge error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Payment failed.');
   }
   });
@@ -1350,7 +1391,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
       preferred_bank: 'wema-bank',
     });
 
-    console.log('DVA response:', JSON.stringify(dvaResponse));
+    logInfo('DVA response', { status: dvaResponse.status });
 
     if (dvaResponse.status && dvaResponse.data) {
       const virtualAccount = {
@@ -1383,7 +1424,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
       };
     }
   } catch (error) {
-    console.error('Virtual account error:', error);
+    logError('Virtual account error', { error: error.message });
     return {
       success: true,
       bankName: 'Test Bank (Development)',
@@ -1431,7 +1472,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
       },
     });
 
-    console.log('Initialize transaction response:', JSON.stringify(response));
+    logInfo('Initialize transaction response', { status: response.status });
 
     if (response.status && response.data) {
       return {
@@ -1447,7 +1488,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
       };
     }
   } catch (error) {
-    console.error('Initialize transaction error:', error);
+    logError('Initialize transaction error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
   }
 });
@@ -1488,7 +1529,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
       },
     });
 
-    console.log('Initialize transaction response:', JSON.stringify(response));
+    logInfo('Initialize transaction response', { status: response.status });
 
     if (response.status && response.data) {
       return {
@@ -1504,7 +1545,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
       };
     }
   } catch (error) {
-    console.error('Initialize transaction error:', error);
+    logError('Initialize transaction error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
   }
 });
@@ -1605,7 +1646,7 @@ const RATE_LIMITS = {
 async function checkRateLimitPersistent(userId, operation) {
   const config = RATE_LIMITS[operation];
   if (!config) {
-    console.warn(`No rate limit config for operation: ${operation}`);
+    logWarning('No rate limit config for operation', { operation });
     return true;
   }
 
@@ -1645,7 +1686,7 @@ async function checkRateLimitPersistent(userId, operation) {
 
     return result;
   } catch (error) {
-    console.error(`Rate limit check failed for ${userId}/${operation}:`, error);
+    logError('Rate limit check failed', { userId, operation, error: error.message });
     return true; // Fail open to avoid blocking legitimate users
   }
 }
@@ -1706,7 +1747,7 @@ async function auditLog(entry) {
     });
   } catch (error) {
     // Audit logging must never block the main operation
-    console.error('AUDIT LOG WRITE FAILED:', error, 'Entry:', JSON.stringify(entry));
+    logError('AUDIT LOG WRITE FAILED', { error: error.message, entry: JSON.stringify(entry) });
   }
 }
 
@@ -1744,7 +1785,7 @@ async function enforceKyc(userId) {
   if (!userData.kycStatus && userData.kycCompleted === true && userData.kycVerified === true) {
     // Auto-migrate: set canonical kycStatus for this user
     await db.collection('users').doc(userId).update({ kycStatus: 'verified' });
-    console.log(`Auto-migrated kycStatus to 'verified' for user: ${userId}`);
+    logInfo('Auto-migrated kycStatus to verified', { userId });
     return;
   }
 
@@ -1788,7 +1829,7 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
     ...(status === 'verified' ? { kycCompleted: true, kycVerified: true } : {}),
   });
 
-  console.log(`KYC status updated to '${status}' for user: ${userId}`);
+  logInfo('KYC status updated', { status, userId });
 
   return {
     success: true,
@@ -1868,7 +1909,7 @@ async function withIdempotency(key, operation, userId, executeOperation) {
 
   // Return cached result for idempotent replays
   if (reservation.alreadyCompleted) {
-    console.log(`Idempotent replay: ${key} (operation: ${operation})`);
+    logInfo('Idempotent replay', { key, operation });
     return { ...reservation.result, _idempotent: true };
   }
 
@@ -1891,7 +1932,7 @@ async function withIdempotency(key, operation, userId, executeOperation) {
       error: error.message || 'Unknown error',
       failedAt: admin.firestore.FieldValue.serverTimestamp(),
     }).catch(updateErr => {
-      console.error('Failed to update idempotency key status:', updateErr);
+      logError('Failed to update idempotency key status', { error: updateErr.message });
     });
 
     throw error;
@@ -1909,7 +1950,7 @@ exports.cleanupIdempotencyKeys = functions.pubsub
       .get();
 
     if (expired.empty) {
-      console.log('No expired idempotency keys to clean up');
+      logInfo('No expired idempotency keys to clean up');
       return null;
     }
 
@@ -1917,7 +1958,7 @@ exports.cleanupIdempotencyKeys = functions.pubsub
     expired.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
 
-    console.log(`Cleaned ${expired.size} expired idempotency keys`);
+    logInfo('Cleaned expired idempotency keys', { count: expired.size });
     return null;
   });
 
@@ -1989,7 +2030,7 @@ function validateStateTransition(currentState, newState, transactionId) {
     throwAppError(ERROR_CODES.TXN_INVALID_STATE, `Invalid state transition: ${from} → ${to}.`, { transactionId, from, to });
   }
 
-  console.log(`State transition: ${from} → ${to} for ${transactionId}`);
+  logInfo('State transition', { from, to, transactionId });
   return true;
 }
 
@@ -2295,7 +2336,7 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    console.log('Verifying phone:', phoneNumber, 'Country:', country);
+    logInfo('Verifying phone', { phoneNumber, country });
 
     // Format phone number (remove country code prefix if present)
     let formattedPhone = phoneNumber.replace(/\s+/g, '');
@@ -2321,11 +2362,11 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
       requestBody.match_fields = matchFields;
     }
 
-    console.log('Smile ID request:', JSON.stringify(requestBody));
+    logInfo('Smile ID request', { requestBody });
 
     const response = await smileIdRequest('POST', '/v2/verify-phone-number', requestBody);
 
-    console.log('Smile ID response:', JSON.stringify(response));
+    logInfo('Smile ID response', { resultCode: response.ResultCode || response.result_code });
 
     if (response.error) {
       return {
@@ -2379,7 +2420,7 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
     return result;
 
   } catch (error) {
-    console.error('Phone verification error:', error);
+    logError('Phone verification error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Verification failed.');
   }
 });
@@ -2612,7 +2653,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       };
     });
 
-    console.log('sendMoney success:', result.transactionId);
+    logFinancialOperation('sendMoney', 'success', { transactionId: result.transactionId });
 
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'success',
@@ -2624,7 +2665,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     return { success: true, ...result, _correlationId: correlation.correlationId };
 
   } catch (error) {
-    console.error('sendMoney error:', error);
+    logError('sendMoney error', { error: error.message });
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'failure',
       amount,
@@ -2800,7 +2841,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       payeeNote: payeeNote || 'Wallet deposit',
     }, referenceId);
 
-    console.log('MoMo RequestToPay response:', response);
+    logFinancialOperation('momoRequestToPay', 'response_received', { statusCode: response.statusCode });
 
     if (response.statusCode === 202) {
       // Request accepted - store pending transaction
@@ -2834,7 +2875,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to initiate payment'), { responseData: response.data });
     }
   } catch (error) {
-    console.error('MoMo RequestToPay error:', error);
+    logError('MoMo RequestToPay error', { error: error.message });
     await auditLog({
       userId, operation: 'momoRequestToPay', result: 'failure',
       amount, currency: currency || 'EUR',
@@ -2868,7 +2909,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
 
     const response = await momoRequest(product, 'GET', path, null, referenceId);
 
-    console.log('MoMo status check response:', response);
+    logInfo('MoMo status check response', { statusCode: response.statusCode, status: response.data?.status });
 
     if (response.statusCode === 200 && response.data) {
       const status = response.data.status;
@@ -2958,7 +2999,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
-    console.error('MoMo status check error:', error);
+    logError('MoMo status check error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
@@ -3055,7 +3096,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       payeeNote: payeeNote || 'Wallet withdrawal',
     }, referenceId);
 
-    console.log('MoMo Transfer response:', response);
+    logFinancialOperation('momoTransfer', 'response_received', { statusCode: response.statusCode });
 
     if (response.statusCode === 202) {
       await auditLog({
@@ -3095,7 +3136,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to initiate transfer'), { responseData: response.data });
     }
   } catch (error) {
-    console.error('MoMo Transfer error:', error);
+    logError('MoMo Transfer error', { error: error.message });
     await auditLog({
       userId, operation: 'momoTransfer', result: 'failure',
       amount, currency: currency || 'EUR',
@@ -3137,7 +3178,7 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to get balance'));
     }
   } catch (error) {
-    console.error('MoMo balance error:', error);
+    logError('MoMo balance error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
@@ -3149,11 +3190,11 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 exports.momoWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
     `webhook_momo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  console.log(JSON.stringify({ severity: 'INFO', message: 'MoMo webhook received', correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status }));
+  logSecurityEvent('momo_webhook_received', 'low', { correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status });
 
   // ── LAYER 1: HTTP Method Restriction ──
   if (req.method !== 'POST') {
-    console.warn('MoMo webhook: rejected non-POST request:', req.method);
+    logSecurityEvent('momo_webhook_method_rejected', 'medium', { method: req.method, correlationId: webhookCorrelationId });
     return res.status(405).send('Method Not Allowed');
   }
 
@@ -3163,23 +3204,23 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
   if (MOMO_WEBHOOK_SECRET) {
     const token = req.query.token;
     if (!token || token !== MOMO_WEBHOOK_SECRET) {
-      console.error('MoMo webhook: invalid or missing webhook token');
+      logSecurityEvent('momo_webhook_invalid_token', 'high', { correlationId: webhookCorrelationId });
       return res.status(403).send('Forbidden');
     }
   } else if (MOMO_CONFIG.environment === 'production') {
     // In production, a webhook secret MUST be configured
-    console.error('MoMo webhook: CRITICAL - no webhook_secret configured in production');
+    logSecurityEvent('momo_webhook_no_secret_production', 'high', { correlationId: webhookCorrelationId });
     return res.status(503).send('Service misconfigured');
   }
 
-  console.log('MoMo webhook received (authenticated):', JSON.stringify(req.body));
+  logInfo('MoMo webhook received (authenticated)', { externalId: req.body?.externalId, status: req.body?.status, correlationId: webhookCorrelationId });
 
   try {
     const { externalId, status, financialTransactionId } = req.body;
 
     // ── LAYER 3: Request Body Validation ──
     if (!externalId || typeof externalId !== 'string' || !status) {
-      console.error('MoMo webhook: missing or invalid required fields');
+      logSecurityEvent('momo_webhook_invalid_fields', 'medium', { correlationId: webhookCorrelationId });
       return res.status(400).send('Bad Request');
     }
 
@@ -3189,7 +3230,7 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     const txDoc = await txRef.get();
 
     if (!txDoc.exists) {
-      console.error('MoMo webhook: unknown externalId (not initiated by us):', externalId);
+      logSecurityEvent('momo_webhook_unknown_transaction', 'high', { externalId, correlationId: webhookCorrelationId });
       return res.status(404).send('Transaction not found');
     }
 
@@ -3209,22 +3250,22 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
 
       if (apiResponse.statusCode === 200 && apiResponse.data && apiResponse.data.status) {
         verifiedStatus = apiResponse.data.status;
-        console.log(`MoMo webhook cross-verified: callback=${status}, api=${verifiedStatus}, ref=${externalId}`);
+        logInfo('MoMo webhook cross-verified', { callbackStatus: status, apiStatus: verifiedStatus, ref: externalId, correlationId: webhookCorrelationId });
 
         if (verifiedStatus !== status) {
-          console.warn(`MoMo webhook STATUS MISMATCH: callback=${status}, api=${verifiedStatus} for ref=${externalId}`);
+          logSecurityEvent('momo_webhook_status_mismatch', 'high', { callbackStatus: status, apiStatus: verifiedStatus, ref: externalId, correlationId: webhookCorrelationId });
           // Trust the API response, not the callback
         }
       } else {
-        console.warn('MoMo webhook: cross-verification returned unexpected response:', apiResponse.statusCode);
+        logWarning('MoMo webhook: cross-verification returned unexpected response', { statusCode: apiResponse.statusCode, correlationId: webhookCorrelationId });
       }
     } catch (verifyError) {
-      console.error('MoMo webhook: cross-verification error:', verifyError.message);
+      logError('MoMo webhook: cross-verification error', { error: verifyError.message, correlationId: webhookCorrelationId });
     }
 
     // In production, reject if cross-verification failed
     if (!verifiedStatus && MOMO_CONFIG.environment === 'production') {
-      console.error('MoMo webhook: rejecting callback — unable to cross-verify in production');
+      logSecurityEvent('momo_webhook_verification_failure', 'high', { correlationId: webhookCorrelationId });
       return res.status(502).send('Unable to verify transaction status');
     }
 
@@ -3312,12 +3353,12 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
       }
     } else {
       // Status is PENDING or already processed — just log and acknowledge
-      console.log(`MoMo webhook: no action needed for status=${effectiveStatus}, current=${txData.status}`);
+      logInfo('MoMo webhook: no action needed', { effectiveStatus, currentStatus: txData.status, correlationId: webhookCorrelationId });
     }
 
     res.status(200).send('OK');
   } catch (error) {
-    console.error('MoMo webhook error:', error);
+    logError('MoMo webhook error', { error: error.message, correlationId: webhookCorrelationId });
     res.status(500).send('Error');
   }
 });
