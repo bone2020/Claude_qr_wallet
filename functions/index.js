@@ -26,22 +26,85 @@ function requireConfig(value, name) {
   return value;
 }
 
-// Log missing config at cold-start (non-blocking warnings)
-(function validateConfig() {
-  const missing = [];
-  if (!functions.config().paystack?.secret_key) missing.push('paystack.secret_key');
-  if (!functions.config().qr?.secret) missing.push('qr.secret');
-  if (!functions.config().momo?.collections_subscription_key) missing.push('momo.collections_subscription_key');
-  if (!functions.config().momo?.collections_api_user) missing.push('momo.collections_api_user');
-  if (!functions.config().momo?.collections_api_key) missing.push('momo.collections_api_key');
-  if (!functions.config().momo?.disbursements_subscription_key) missing.push('momo.disbursements_subscription_key');
-  if (!functions.config().momo?.disbursements_api_user) missing.push('momo.disbursements_api_user');
-  if (!functions.config().momo?.disbursements_api_key) missing.push('momo.disbursements_api_key');
-  if (!functions.config().momo?.webhook_secret) missing.push('momo.webhook_secret');
-  if (missing.length > 0) {
-    console.warn(`⚠ MISSING CONFIG (${missing.length}): ${missing.join(', ')}. Set via: firebase functions:config:set KEY="value"`);
+// ============================================================
+// ENVIRONMENT CONFIGURATION ENFORCEMENT
+// ============================================================
+
+/**
+ * Critical configs: Financial and security keys that MUST be set in production.
+ * Functions depending on these will fail loudly at call time via requireConfig().
+ * Missing critical configs are tracked at cold-start for fast runtime checks.
+ */
+const CRITICAL_CONFIGS = {
+  'paystack.secret_key': functions.config().paystack?.secret_key,
+  'qr.secret': functions.config().qr?.secret,
+  'momo.collections_subscription_key': functions.config().momo?.collections_subscription_key,
+  'momo.collections_api_user': functions.config().momo?.collections_api_user,
+  'momo.collections_api_key': functions.config().momo?.collections_api_key,
+  'momo.disbursements_subscription_key': functions.config().momo?.disbursements_subscription_key,
+  'momo.disbursements_api_user': functions.config().momo?.disbursements_api_user,
+  'momo.disbursements_api_key': functions.config().momo?.disbursements_api_key,
+  'momo.webhook_secret': functions.config().momo?.webhook_secret,
+};
+
+/**
+ * Service-to-config mapping: which configs each service needs.
+ * Used by requireServiceReady() to validate all configs for a service at once.
+ */
+const SERVICE_CONFIGS = {
+  paystack: ['paystack.secret_key'],
+  qr: ['qr.secret'],
+  momo_collections: ['momo.collections_subscription_key', 'momo.collections_api_user', 'momo.collections_api_key'],
+  momo_disbursements: ['momo.disbursements_subscription_key', 'momo.disbursements_api_user', 'momo.disbursements_api_key'],
+  momo_webhook: ['momo.webhook_secret'],
+};
+
+/** Set of config keys known to be missing at cold-start */
+const MISSING_CRITICAL_CONFIGS = new Set();
+
+// Validate all configs at cold-start and log appropriately
+(function enforceEnvironmentConfig() {
+  const missingCritical = [];
+
+  for (const [key, value] of Object.entries(CRITICAL_CONFIGS)) {
+    if (!value) {
+      missingCritical.push(key);
+      MISSING_CRITICAL_CONFIGS.add(key);
+    }
+  }
+
+  if (missingCritical.length > 0) {
+    console.error(
+      `CRITICAL CONFIG MISSING (${missingCritical.length}): ${missingCritical.join(', ')}. ` +
+      `Set via: firebase functions:config:set KEY="value". ` +
+      `Functions depending on these keys will fail at call time.`
+    );
+  } else {
+    console.log('All critical environment configs present.');
   }
 })();
+
+/**
+ * Validates that all required configs for a service are present.
+ * Uses the cold-start MISSING_CRITICAL_CONFIGS set for O(1) lookup.
+ * Throws a clear HttpsError listing exactly which keys are missing.
+ *
+ * @param {string} serviceName - Service name from SERVICE_CONFIGS (e.g., 'paystack', 'momo_collections')
+ * @throws {HttpsError} failed-precondition if any required config is missing
+ */
+function requireServiceReady(serviceName) {
+  const requiredKeys = SERVICE_CONFIGS[serviceName];
+  if (!requiredKeys) return; // Unknown service, skip check
+
+  const missing = requiredKeys.filter(key => MISSING_CRITICAL_CONFIGS.has(key));
+  if (missing.length > 0) {
+    console.error(`Service ${serviceName} not ready: missing ${missing.join(', ')}`);
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Service unavailable: ${serviceName} is not configured. Contact support.`
+    );
+  }
+}
 
 // ============================================================
 // PAYSTACK CONFIGURATION
@@ -197,6 +260,9 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   const userId = context.auth.uid;
 
+  // Fail fast if Paystack is not configured
+  requireServiceReady('paystack');
+
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
@@ -302,6 +368,12 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
 // Handle Paystack webhook events
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
+  // Fail fast if Paystack secret key is not configured
+  if (MISSING_CRITICAL_CONFIGS.has('paystack.secret_key')) {
+    console.error('paystackWebhook: PAYSTACK_SECRET_KEY not configured, rejecting webhook');
+    return res.status(503).send('Service not configured');
+  }
+
   // Verify webhook signature
   const hash = crypto
     .createHmac('sha512', PAYSTACK_SECRET_KEY)
@@ -516,6 +588,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey } = data;
   const userId = context.auth.uid;
+
+  // Fail fast if Paystack is not configured
+  requireServiceReady('paystack');
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
@@ -2433,6 +2508,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
 
+  // Fail fast if MoMo collections API is not configured
+  requireServiceReady('momo_collections');
+
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
   }
@@ -2636,6 +2714,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
+
+  // Fail fast if MoMo disbursements API is not configured
+  requireServiceReady('momo_disbursements');
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
