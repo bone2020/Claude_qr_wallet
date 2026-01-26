@@ -7,6 +7,188 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ============================================================
+// STANDARDIZED ERROR CODE FRAMEWORK
+// ============================================================
+
+/**
+ * Application-level error codes for consistent client handling.
+ * Returned in error details for machine-readable parsing.
+ *
+ * Naming Convention: CATEGORY_SPECIFIC_CONDITION
+ * Categories: AUTH, KYC, WALLET, TXN, RATE, SERVICE, CONFIG, SYSTEM
+ */
+const ERROR_CODES = Object.freeze({
+  // Authentication & Authorization
+  AUTH_UNAUTHENTICATED: 'AUTH_UNAUTHENTICATED',
+  AUTH_PERMISSION_DENIED: 'AUTH_PERMISSION_DENIED',
+  AUTH_SESSION_EXPIRED: 'AUTH_SESSION_EXPIRED',
+
+  // KYC & Verification
+  KYC_REQUIRED: 'KYC_REQUIRED',
+  KYC_INCOMPLETE: 'KYC_INCOMPLETE',
+  KYC_VERIFICATION_FAILED: 'KYC_VERIFICATION_FAILED',
+
+  // Wallet Operations
+  WALLET_NOT_FOUND: 'WALLET_NOT_FOUND',
+  WALLET_INSUFFICIENT_FUNDS: 'WALLET_INSUFFICIENT_FUNDS',
+  WALLET_LIMIT_EXCEEDED: 'WALLET_LIMIT_EXCEEDED',
+  WALLET_SUSPENDED: 'WALLET_SUSPENDED',
+
+  // Transaction Errors
+  TXN_INVALID_STATE: 'TXN_INVALID_STATE',
+  TXN_DUPLICATE_REQUEST: 'TXN_DUPLICATE_REQUEST',
+  TXN_SELF_TRANSFER: 'TXN_SELF_TRANSFER',
+  TXN_RECIPIENT_NOT_FOUND: 'TXN_RECIPIENT_NOT_FOUND',
+  TXN_NOT_FOUND: 'TXN_NOT_FOUND',
+  TXN_AMOUNT_INVALID: 'TXN_AMOUNT_INVALID',
+  TXN_AMOUNT_TOO_SMALL: 'TXN_AMOUNT_TOO_SMALL',
+  TXN_AMOUNT_TOO_LARGE: 'TXN_AMOUNT_TOO_LARGE',
+
+  // Rate Limiting
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  RATE_COOLDOWN_ACTIVE: 'RATE_COOLDOWN_ACTIVE',
+
+  // External Services
+  SERVICE_PAYSTACK_ERROR: 'SERVICE_PAYSTACK_ERROR',
+  SERVICE_MOMO_ERROR: 'SERVICE_MOMO_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+
+  // Configuration
+  CONFIG_MISSING: 'CONFIG_MISSING',
+  CONFIG_INVALID: 'CONFIG_INVALID',
+
+  // System Errors
+  SYSTEM_INTERNAL_ERROR: 'SYSTEM_INTERNAL_ERROR',
+  SYSTEM_VALIDATION_FAILED: 'SYSTEM_VALIDATION_FAILED',
+});
+
+/**
+ * Maps application error codes to gRPC-style Cloud Function status codes.
+ */
+const ERROR_CODE_TO_HTTP = {
+  AUTH_UNAUTHENTICATED: 'unauthenticated',
+  AUTH_PERMISSION_DENIED: 'permission-denied',
+  AUTH_SESSION_EXPIRED: 'unauthenticated',
+  KYC_REQUIRED: 'failed-precondition',
+  KYC_INCOMPLETE: 'failed-precondition',
+  KYC_VERIFICATION_FAILED: 'failed-precondition',
+  WALLET_NOT_FOUND: 'not-found',
+  WALLET_INSUFFICIENT_FUNDS: 'failed-precondition',
+  WALLET_LIMIT_EXCEEDED: 'failed-precondition',
+  WALLET_SUSPENDED: 'failed-precondition',
+  TXN_INVALID_STATE: 'failed-precondition',
+  TXN_DUPLICATE_REQUEST: 'already-exists',
+  TXN_SELF_TRANSFER: 'invalid-argument',
+  TXN_RECIPIENT_NOT_FOUND: 'not-found',
+  TXN_NOT_FOUND: 'not-found',
+  TXN_AMOUNT_INVALID: 'invalid-argument',
+  TXN_AMOUNT_TOO_SMALL: 'invalid-argument',
+  TXN_AMOUNT_TOO_LARGE: 'invalid-argument',
+  RATE_LIMIT_EXCEEDED: 'resource-exhausted',
+  RATE_COOLDOWN_ACTIVE: 'resource-exhausted',
+  SERVICE_PAYSTACK_ERROR: 'unavailable',
+  SERVICE_MOMO_ERROR: 'unavailable',
+  SERVICE_UNAVAILABLE: 'unavailable',
+  CONFIG_MISSING: 'failed-precondition',
+  CONFIG_INVALID: 'failed-precondition',
+  SYSTEM_INTERNAL_ERROR: 'internal',
+  SYSTEM_VALIDATION_FAILED: 'invalid-argument',
+};
+
+/**
+ * User-friendly messages safe for direct UI display.
+ */
+const ERROR_MESSAGES = {
+  AUTH_UNAUTHENTICATED: 'Please sign in to continue.',
+  AUTH_PERMISSION_DENIED: 'You do not have permission to perform this action.',
+  AUTH_SESSION_EXPIRED: 'Your session has expired. Please sign in again.',
+  KYC_REQUIRED: 'Please complete identity verification to continue.',
+  KYC_INCOMPLETE: 'Your verification is incomplete. Please finish all steps.',
+  KYC_VERIFICATION_FAILED: 'Identity verification failed. Please try again.',
+  WALLET_NOT_FOUND: 'Wallet not found. Please contact support.',
+  WALLET_INSUFFICIENT_FUNDS: 'Insufficient balance for this transaction.',
+  WALLET_LIMIT_EXCEEDED: 'Transaction exceeds your daily limit.',
+  WALLET_SUSPENDED: 'This wallet is suspended. Please contact support.',
+  TXN_INVALID_STATE: 'This transaction cannot be modified.',
+  TXN_DUPLICATE_REQUEST: 'This request has already been processed.',
+  TXN_SELF_TRANSFER: 'You cannot transfer to your own wallet.',
+  TXN_RECIPIENT_NOT_FOUND: 'Recipient wallet not found. Please check the ID.',
+  TXN_NOT_FOUND: 'Transaction not found.',
+  TXN_AMOUNT_INVALID: 'Please enter a valid amount.',
+  TXN_AMOUNT_TOO_SMALL: 'Amount is below the minimum allowed.',
+  TXN_AMOUNT_TOO_LARGE: 'Amount exceeds the maximum allowed.',
+  RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait before trying again.',
+  RATE_COOLDOWN_ACTIVE: 'Please wait before retrying this action.',
+  SERVICE_PAYSTACK_ERROR: 'Payment service error. Please try again.',
+  SERVICE_MOMO_ERROR: 'MoMo service error. Please try again.',
+  SERVICE_UNAVAILABLE: 'Service temporarily unavailable. Please try again.',
+  CONFIG_MISSING: 'Service is not configured. Contact support.',
+  CONFIG_INVALID: 'Service configuration error. Contact support.',
+  SYSTEM_INTERNAL_ERROR: 'Something went wrong. Please try again later.',
+  SYSTEM_VALIDATION_FAILED: 'Invalid data provided.',
+};
+
+/**
+ * Throws a standardized application error with consistent structure.
+ *
+ * @param {string} code - Error code from ERROR_CODES
+ * @param {string} [customMessage] - Override default message (optional)
+ * @param {Object} [details] - Additional context for debugging
+ * @throws {functions.https.HttpsError}
+ */
+function throwAppError(code, customMessage = null, details = {}) {
+  const httpCode = ERROR_CODE_TO_HTTP[code] || 'failed-precondition';
+  const message = customMessage || ERROR_MESSAGES[code] || 'An error occurred.';
+
+  console.error(JSON.stringify({
+    level: 'ERROR',
+    errorCode: code,
+    message,
+    details,
+    timestamp: new Date().toISOString(),
+  }));
+
+  throw new functions.https.HttpsError(httpCode, message, {
+    code,
+    message,
+    ...details,
+    timestamp: new Date().toISOString(),
+  });
+}
+
+/**
+ * Wraps external service errors with consistent formatting.
+ * Use when catching errors from Paystack, MoMo, etc.
+ *
+ * @param {string} serviceName - 'paystack' or 'momo'
+ * @param {Error} originalError - The caught error
+ * @param {Object} [context] - Additional context
+ * @throws {functions.https.HttpsError}
+ */
+function throwServiceError(serviceName, originalError, context = {}) {
+  const codeKey = `SERVICE_${serviceName.toUpperCase()}_ERROR`;
+  const code = ERROR_CODES[codeKey] || ERROR_CODES.SERVICE_UNAVAILABLE;
+
+  console.error(JSON.stringify({
+    level: 'ERROR',
+    errorCode: code,
+    service: serviceName,
+    originalError: originalError.message || String(originalError),
+    context,
+    timestamp: new Date().toISOString(),
+  }));
+
+  throw new functions.https.HttpsError('unavailable',
+    `${serviceName} service error. Please try again.`, {
+      code,
+      service: serviceName,
+      retryable: true,
+      ...context,
+    }
+  );
+}
+
+// ============================================================
 // CONFIGURATION VALIDATION
 // ============================================================
 
@@ -17,11 +199,7 @@ const db = admin.firestore();
  */
 function requireConfig(value, name) {
   if (!value) {
-    console.error(`CONFIGURATION ERROR: ${name} is not set. Set it via: firebase functions:config:set ${name.toLowerCase().replace(/ /g, '_')}="value"`);
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Server configuration error: ${name} is not set. Contact support.`
-    );
+    throwAppError(ERROR_CODES.CONFIG_MISSING, `Server configuration error: ${name} is not set. Contact support.`);
   }
   return value;
 }
@@ -98,11 +276,7 @@ function requireServiceReady(serviceName) {
 
   const missing = requiredKeys.filter(key => MISSING_CRITICAL_CONFIGS.has(key));
   if (missing.length > 0) {
-    console.error(`Service ${serviceName} not ready: missing ${missing.join(', ')}`);
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Service unavailable: ${serviceName} is not configured. Contact support.`
-    );
+    throwAppError(ERROR_CODES.CONFIG_MISSING, `Service unavailable: ${serviceName} is not configured. Contact support.`);
   }
 }
 
@@ -250,12 +424,12 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
 exports.verifyPayment = functions.https.onCall(async (data, context) => {
   // Check authentication
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { reference } = data;
   if (!reference) {
-    throw new functions.https.HttpsError('invalid-argument', 'Payment reference is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Payment reference is required.');
   }
 
   const userId = context.auth.uid;
@@ -294,7 +468,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       .get();
 
     if (walletSnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Wallet not found');
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND);
     }
 
     const walletDoc = walletSnapshot.docs[0];
@@ -362,7 +536,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
 
@@ -583,7 +757,7 @@ async function handleFailedTransfer(data) {
 // Initiate withdrawal to bank or mobile money
 exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey } = data;
@@ -601,12 +775,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
   // Validate amount
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
 
   // Minimum withdrawal amount (e.g., 100)
   if (amount < 100) {
-    throw new functions.https.HttpsError('invalid-argument', 'Minimum withdrawal is 100');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_SMALL, 'Minimum withdrawal is 100.');
   }
 
   return withIdempotency(idempotencyKey, 'initiateWithdrawal', userId, async () => {
@@ -618,7 +792,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       .get();
 
     if (walletSnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Wallet not found');
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND);
     }
 
     const walletDoc = walletSnapshot.docs[0];
@@ -626,7 +800,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
     // Check balance
     if (walletData.balance < amount) {
-      throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+      throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
     // Generate reference
@@ -657,7 +831,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     console.log("Paystack recipient response:", JSON.stringify(recipientResponse));
 
     if (!recipientResponse.status) {
-      throw new functions.https.HttpsError('internal', 'Failed to create transfer recipient');
+      throwServiceError('paystack', new Error('Failed to create transfer recipient'));
     }
 
     const recipientCode = recipientResponse.data.recipient_code;
@@ -736,7 +910,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         });
       });
 
-      throw new functions.https.HttpsError('internal', 'Failed to initiate transfer');
+      throwServiceError('paystack', new Error('Failed to initiate transfer'));
     }
 
     // Check if OTP is required
@@ -779,7 +953,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
   });
 });
@@ -787,7 +961,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 // Finalize transfer with OTP
 exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { transferCode, otp, idempotencyKey } = data;
@@ -797,7 +971,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   await enforceKyc(userId);
 
   if (!transferCode || !otp) {
-    throw new functions.https.HttpsError('invalid-argument', 'Transfer code and OTP are required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Transfer code and OTP are required.');
   }
 
   return withIdempotency(idempotencyKey, 'finalizeTransfer', userId, async () => {
@@ -810,7 +984,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
       .get();
 
     if (withdrawalQuery.empty) {
-      throw new functions.https.HttpsError('not-found', 'Withdrawal not found');
+      throwAppError(ERROR_CODES.TXN_NOT_FOUND, 'Withdrawal not found.');
     }
 
     const withdrawalDoc = withdrawalQuery.docs[0];
@@ -844,7 +1018,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     }
   } catch (error) {
     console.error('Finalize transfer error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
   });
 });
@@ -870,20 +1044,20 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     console.error('Get banks error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
 
 // Verify bank account
 exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { accountNumber, bankCode } = data;
 
   if (!accountNumber || !bankCode) {
-    throw new functions.https.HttpsError('invalid-argument', 'Account number and bank code required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Account number and bank code required.');
   }
 
   try {
@@ -912,7 +1086,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
 // ============================================================
 exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { email, amount, currency, provider, phoneNumber, idempotencyKey } = data;
@@ -922,10 +1096,10 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   await enforceKyc(userId);
 
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
   if (!provider || !phoneNumber) {
-    throw new functions.https.HttpsError('invalid-argument', 'Provider and phone number are required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Provider and phone number are required.');
   }
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
@@ -1006,7 +1180,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     }
   } catch (error) {
     console.error('Mobile Money charge error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Payment failed');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Payment failed.');
   }
   });
 });
@@ -1016,7 +1190,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
 // ============================================================
 exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { email, name } = data;
@@ -1114,18 +1288,18 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
 // ============================================================
 exports.initializeTransaction = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { email, amount, currency } = data;
   const userId = context.auth.uid;
 
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
 
   if (!email) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Email is required.');
   }
 
   // Enforce KYC verification before financial operation
@@ -1163,7 +1337,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     }
   } catch (error) {
     console.error('Initialize transaction error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
   }
 });
 
@@ -1172,18 +1346,18 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 // ============================================================
 exports.initializeTransaction = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { email, amount, currency } = data;
   const userId = context.auth.uid;
 
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
 
   if (!email) {
-    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Email is required.');
   }
 
   // Enforce KYC verification before financial operation
@@ -1220,7 +1394,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     }
   } catch (error) {
     console.error('Initialize transaction error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Transaction initialization failed');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
   }
 });
 
@@ -1377,11 +1551,7 @@ async function enforceRateLimit(userId, operation) {
   const allowed = await checkRateLimitPersistent(userId, operation);
   if (!allowed) {
     const config = RATE_LIMITS[operation];
-    console.warn(`Rate limit exceeded: user=${userId}, operation=${operation}`);
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      config?.message || 'Too many requests. Please try again later.'
-    );
+    throwAppError(ERROR_CODES.RATE_LIMIT_EXCEEDED, config?.message, { operation, userId });
   }
 }
 
@@ -1448,7 +1618,7 @@ async function enforceKyc(userId) {
   const userDoc = await db.collection('users').doc(userId).get();
 
   if (!userDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'User account not found');
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'User account not found.');
   }
 
   const userData = userDoc.data();
@@ -1468,16 +1638,13 @@ async function enforceKyc(userId) {
   }
 
   // KYC not verified — block the operation
-  throw new functions.https.HttpsError(
-    'permission-denied',
-    'KYC_REQUIRED: Identity verification is required to perform financial operations'
-  );
+  throwAppError(ERROR_CODES.KYC_REQUIRED);
 }
 
 // Set KYC status (called after successful Smile ID verification)
 exports.updateKycStatus = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const userId = context.auth.uid;
@@ -1486,7 +1653,7 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
   // Only allow setting to specific valid statuses
   const validStatuses = ['pending', 'verified', 'rejected'];
   if (!validStatuses.includes(status)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid KYC status');
+    throwAppError(ERROR_CODES.KYC_VERIFICATION_FAILED, 'Invalid KYC status.');
   }
 
   // For 'verified', require that KYC documents have been approved in the subcollection
@@ -1495,15 +1662,12 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
       .collection('kyc').doc('documents').get();
 
     if (!kycDoc.exists) {
-      throw new functions.https.HttpsError('failed-precondition', 'No KYC documents found');
+      throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'No KYC documents found.');
     }
 
     const kycData = kycDoc.data();
     if (kycData.status !== 'approved' && kycData.status !== 'verified') {
-      throw new functions.https.HttpsError(
-        'failed-precondition',
-        'KYC documents have not been approved'
-      );
+      throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'KYC documents have not been approved.');
     }
   }
 
@@ -1543,10 +1707,7 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
  */
 async function withIdempotency(key, operation, userId, executeOperation) {
   if (!key || typeof key !== 'string' || key.length < 16) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Idempotency key required (min 16 characters)'
-    );
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Idempotency key required (min 16 characters).');
   }
 
   const idempotencyRef = db.collection('idempotency_keys').doc(key);
@@ -1560,10 +1721,7 @@ async function withIdempotency(key, operation, userId, executeOperation) {
 
       // Validate ownership — different user cannot reuse a key
       if (data.userId !== userId) {
-        throw new functions.https.HttpsError(
-          'permission-denied',
-          'Idempotency key belongs to another user'
-        );
+        throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Idempotency key belongs to another user.');
       }
 
       // Already completed — return cached result
@@ -1581,10 +1739,7 @@ async function withIdempotency(key, operation, userId, executeOperation) {
       }
 
       // Still pending from another request — reject to prevent races
-      throw new functions.https.HttpsError(
-        'already-exists',
-        'Operation already in progress with this idempotency key'
-      );
+      throwAppError(ERROR_CODES.TXN_DUPLICATE_REQUEST, 'Operation already in progress with this idempotency key.');
     }
 
     // Key does not exist — reserve it
@@ -1711,26 +1866,16 @@ function validateStateTransition(currentState, newState, transactionId) {
   const to = normalizeStatus(newState);
 
   if (TERMINAL_STATES.includes(from)) {
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Transaction ${transactionId} is in terminal state: ${from}`
-    );
+    throwAppError(ERROR_CODES.TXN_INVALID_STATE, `Transaction ${transactionId} is in terminal state: ${from}.`, { transactionId, from });
   }
 
   if (from === 'completed' && to !== 'refunded') {
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Completed transaction ${transactionId} can only be refunded`
-    );
+    throwAppError(ERROR_CODES.TXN_INVALID_STATE, `Completed transaction ${transactionId} can only be refunded.`, { transactionId, from, to });
   }
 
   const allowed = VALID_TRANSITIONS[from] || [];
   if (!allowed.includes(to)) {
-    console.error(`Invalid state transition: ${from} → ${to} for ${transactionId}`);
-    throw new functions.https.HttpsError(
-      'failed-precondition',
-      `Invalid state transition: ${from} → ${to}`
-    );
+    throwAppError(ERROR_CODES.TXN_INVALID_STATE, `Invalid state transition: ${from} → ${to}.`, { transactionId, from, to });
   }
 
   console.log(`State transition: ${from} → ${to} for ${transactionId}`);
@@ -1779,7 +1924,7 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
     const doc = await transaction.get(docRef);
 
     if (!doc.exists) {
-      throw new functions.https.HttpsError('not-found', 'Transaction document not found');
+      throwAppError(ERROR_CODES.TXN_NOT_FOUND, 'Transaction document not found.');
     }
 
     const from = normalizeStatus(doc.data().status);
@@ -1808,7 +1953,7 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
 // Sign QR payload for payment requests
 exports.signQrPayload = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   // Enforce KYC verification before financial operation
@@ -1817,13 +1962,13 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
   const { walletId, amount, note } = data;
 
   if (!walletId || typeof walletId !== 'string') {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid wallet ID.');
   }
   
   // Verify the wallet belongs to the user
   const walletDoc = await db.collection('wallets').doc(context.auth.uid).get();
   if (!walletDoc.exists || walletDoc.data().walletId !== walletId) {
-    throw new functions.https.HttpsError('permission-denied', 'Wallet does not belong to user');
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Wallet does not belong to user.');
   }
   
   const timestamp = Date.now();
@@ -1848,13 +1993,13 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
 // Verify QR signature before processing payment
 exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
   
   const { payload, signature } = data;
   
   if (!payload || !signature) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing payload or signature');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Missing payload or signature.');
   }
   
   // Verify signature
@@ -1902,7 +2047,7 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
 // Lookup wallet with rate limiting
 exports.lookupWallet = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
   
   const { walletId } = data;
@@ -1914,19 +2059,19 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   
   // Fast in-memory IP rate limit (burst protection within single instance)
   if (!checkRateLimit(`ip:${hashedIp}`, 100, 60000)) {
-    throw new functions.https.HttpsError('resource-exhausted', 'Too many requests from this location.');
+    throwAppError(ERROR_CODES.RATE_LIMIT_EXCEEDED, 'Too many requests from this location.');
   }
 
   // Check failed lookup limit (in-memory, per IP)
   if (!checkFailedLookups(hashedIp)) {
-    throw new functions.https.HttpsError('resource-exhausted', 'Too many failed attempts. Please wait 5 minutes.');
+    throwAppError(ERROR_CODES.RATE_COOLDOWN_ACTIVE, 'Too many failed attempts. Please wait 5 minutes.');
   }
 
   // Persistent rate limit (30 lookups per 5 minutes, survives cold starts)
   await enforceRateLimit(userId, 'lookupWallet');
   
   if (!walletId || typeof walletId !== 'string') {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid wallet ID.');
   }
   
   // Find wallet
@@ -2018,14 +2163,14 @@ function smileIdRequest(method, path, data = null) {
 // Verify phone number belongs to ID holder
 exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { phoneNumber, country, firstName, lastName, idNumber } = data;
 
   // Validate required fields
   if (!phoneNumber || !country) {
-    throw new functions.https.HttpsError('invalid-argument', 'Phone number and country are required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number and country are required.');
   }
 
   // Check if country supports phone verification
@@ -2124,7 +2269,7 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
 
   } catch (error) {
     console.error('Phone verification error:', error);
-    throw new functions.https.HttpsError('internal', error.message || 'Verification failed');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Verification failed.');
   }
 });
 
@@ -2172,7 +2317,7 @@ function generateSecureTransactionId() {
 exports.sendMoney = functions.https.onCall(async (data, context) => {
   // 1. Check authentication
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const senderUid = context.auth.uid;
@@ -2187,15 +2332,15 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
   // 2. Validate inputs
   if (!recipientWalletId || typeof recipientWalletId !== 'string') {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid recipient wallet ID');
+    throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND, 'Invalid recipient wallet ID.');
   }
 
   if (typeof amount !== 'number' || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Amount must be positive');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'Amount must be positive.');
   }
 
   if (amount > 10000000) {
-    throw new functions.https.HttpsError('invalid-argument', 'Amount exceeds limit');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE);
   }
 
   return withIdempotency(idempotencyKey, 'sendMoney', senderUid, async () => {
@@ -2207,7 +2352,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const senderWallet = await transaction.get(senderWalletRef);
 
       if (!senderWallet.exists) {
-        throw new functions.https.HttpsError('not-found', 'Sender wallet not found');
+        throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
       }
 
       const senderData = senderWallet.data();
@@ -2219,12 +2364,12 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
       // Check balance
       if (senderBalance < totalDebit) {
-        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
       }
 
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Cannot send to yourself');
+        throwAppError(ERROR_CODES.TXN_SELF_TRANSFER);
       }
 
       // Find recipient
@@ -2234,7 +2379,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         .get();
 
       if (recipientQuery.empty) {
-        throw new functions.https.HttpsError('not-found', 'Recipient not found');
+        throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND);
       }
 
       const recipientDoc = recipientQuery.docs[0];
@@ -2376,7 +2521,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       ipHash: hashIp(context),
     });
     if (error.code) throw error;
-    throw new functions.https.HttpsError('internal', 'Transaction failed');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Transaction failed.');
   }
   });
 });
@@ -2502,7 +2647,7 @@ async function momoRequest(product, method, path, data, referenceId) {
 
 exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
@@ -2512,10 +2657,10 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   requireServiceReady('momo_collections');
 
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
   if (!phoneNumber) {
-    throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
   // Enforce KYC verification before financial operation
@@ -2572,7 +2717,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         message: 'Please approve the payment on your phone',
       };
     } else {
-      throw new functions.https.HttpsError('internal', 'Failed to initiate payment: ' + JSON.stringify(response.data));
+      throwServiceError('momo', new Error('Failed to initiate payment'), { responseData: response.data });
     }
   } catch (error) {
     console.error('MoMo RequestToPay error:', error);
@@ -2582,7 +2727,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
   });
 });
@@ -2593,13 +2738,13 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
 exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { referenceId, type } = data;
 
   if (!referenceId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Reference ID is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Reference ID is required.');
   }
 
   try {
@@ -2699,7 +2844,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
     }
   } catch (error) {
     console.error('MoMo status check error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
 
@@ -2709,7 +2854,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
 
 exports.momoTransfer = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
@@ -2719,10 +2864,10 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
   requireServiceReady('momo_disbursements');
 
   if (!amount || amount <= 0) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
   if (!phoneNumber) {
-    throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
   // Enforce KYC verification before financial operation
@@ -2740,14 +2885,14 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       .get();
 
     if (walletSnapshot.empty) {
-      throw new functions.https.HttpsError('not-found', 'Wallet not found');
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND);
     }
 
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
 
     if ((walletData.balance || 0) < amount) {
-      throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+      throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
     // Generate unique reference ID
@@ -2759,7 +2904,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       const currentBalance = freshWallet.data().balance || 0;
 
       if (currentBalance < amount) {
-        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance');
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
       }
 
       transaction.update(walletDoc.ref, {
@@ -2830,7 +2975,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         });
       });
 
-      throw new functions.https.HttpsError('internal', 'Failed to initiate transfer: ' + JSON.stringify(response.data));
+      throwServiceError('momo', new Error('Failed to initiate transfer'), { responseData: response.data });
     }
   } catch (error) {
     console.error('MoMo Transfer error:', error);
@@ -2840,7 +2985,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
   });
 });
@@ -2851,7 +2996,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
 exports.momoGetBalance = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const { product } = data; // 'collection' or 'disbursement'
@@ -2871,11 +3016,11 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
         balance: response.data,
       };
     } else {
-      throw new functions.https.HttpsError('internal', 'Failed to get balance');
+      throwServiceError('momo', new Error('Failed to get balance'));
     }
   } catch (error) {
     console.error('MoMo balance error:', error);
-    throw new functions.https.HttpsError('internal', error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
 });
 
