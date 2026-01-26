@@ -113,11 +113,13 @@ class WalletService {
     }
 
     try {
+      final idempotencyKey = _generateIdempotencyKey('sendMoney');
       final callable = FirebaseFunctions.instance.httpsCallable('sendMoney');
       final result = await callable.call<Map<String, dynamic>>({
         'recipientWalletId': recipientWalletId,
         'amount': amount,
         'note': note ?? '',
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data;
@@ -321,6 +323,14 @@ class WalletService {
   // ============================================================
   // HELPER METHODS
   // ============================================================
+
+  /// Generate a unique idempotency key for financial operations
+  String _generateIdempotencyKey(String operation) {
+    final random = Random.secure();
+    final bytes = List<int>.generate(12, (_) => random.nextInt(256));
+    final randomPart = base64Url.encode(bytes).replaceAll('=', '');
+    return 'idem_${operation}_${DateTime.now().millisecondsSinceEpoch}_$randomPart';
+  }
 
   /// Generate unique transaction ID (cryptographically secure)
   String _generateTransactionId() {

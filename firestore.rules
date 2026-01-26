@@ -89,5 +89,20 @@ service cloud.firestore {
     match /payments/{paymentId} {
       allow read, write: if false;
     }
+
+    // Idempotency keys - Cloud Functions only (prevents duplicate financial operations)
+    match /idempotency_keys/{keyId} {
+      allow read, write: if false;
+    }
+
+    // MoMo transactions - Cloud Functions only
+    match /momo_transactions/{txId} {
+      allow read, write: if false;
+    }
+
+    // Withdrawals - Cloud Functions only
+    match /withdrawals/{withdrawalId} {
+      allow read, write: if false;
+    }
   }
 }

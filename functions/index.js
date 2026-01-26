@@ -496,7 +496,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber } = data;
+  const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   // Enforce KYC verification before financial operation
@@ -513,6 +513,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Minimum withdrawal is 100');
   }
 
+  return withIdempotency(idempotencyKey, 'initiateWithdrawal', userId, async () => {
   try {
     // Get user's wallet
     const walletSnapshot = await db.collection('wallets')
@@ -670,6 +671,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     console.error('Withdrawal error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+  });
 });
 
 // Finalize transfer with OTP
@@ -678,7 +680,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { transferCode, otp } = data;
+  const { transferCode, otp, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   // Enforce KYC verification before financial operation
@@ -688,6 +690,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Transfer code and OTP are required');
   }
 
+  return withIdempotency(idempotencyKey, 'finalizeTransfer', userId, async () => {
   try {
     // Find withdrawal by transfer code
     const withdrawalQuery = await db.collection('withdrawals')
@@ -732,6 +735,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     console.error('Finalize transfer error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+  });
 });
 
 // Get list of banks
@@ -800,7 +804,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { email, amount, currency, provider, phoneNumber } = data;
+  const { email, amount, currency, provider, phoneNumber, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   // Enforce KYC verification before financial operation
@@ -813,6 +817,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Provider and phone number are required');
   }
 
+  return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
   try {
     const reference = `MOMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -892,6 +897,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     console.error('Mobile Money charge error:', error);
     throw new functions.https.HttpsError('internal', error.message || 'Payment failed');
   }
+  });
 });
 
 // ============================================================
@@ -1264,6 +1270,140 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
     kycStatus: status,
   };
 });
+
+// ============================================================
+// IDEMPOTENCY PROTECTION FOR FINANCIAL OPERATIONS
+// ============================================================
+
+/**
+ * Idempotency guard for financial operations.
+ * Prevents duplicate execution on client retries, webhook replays,
+ * and network timeout re-sends.
+ *
+ * Uses a two-phase approach to avoid nested Firestore transactions:
+ *   Phase 1: Atomically check/reserve the idempotency key (transaction)
+ *   Phase 2: Execute the operation (may use its own transactions)
+ *   Phase 3: Mark key as completed or failed
+ *
+ * @param {string} key - Client-provided idempotency key (min 16 chars)
+ * @param {string} operation - Function name (for logging/grouping)
+ * @param {string} userId - Authenticated user ID (ownership check)
+ * @param {Function} executeOperation - Async function containing the business logic
+ * @returns {Promise<any>} - Cached result (if replay) or fresh result
+ */
+async function withIdempotency(key, operation, userId, executeOperation) {
+  if (!key || typeof key !== 'string' || key.length < 16) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Idempotency key required (min 16 characters)'
+    );
+  }
+
+  const idempotencyRef = db.collection('idempotency_keys').doc(key);
+
+  // Phase 1: Atomically check and reserve the key
+  const reservation = await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(idempotencyRef);
+
+    if (existing.exists) {
+      const data = existing.data();
+
+      // Validate ownership — different user cannot reuse a key
+      if (data.userId !== userId) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Idempotency key belongs to another user'
+        );
+      }
+
+      // Already completed — return cached result
+      if (data.status === 'completed') {
+        return { alreadyCompleted: true, result: data.result };
+      }
+
+      // Previous attempt failed — allow retry
+      if (data.status === 'failed') {
+        transaction.update(idempotencyRef, {
+          status: 'pending',
+          retryAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return { alreadyCompleted: false };
+      }
+
+      // Still pending from another request — reject to prevent races
+      throw new functions.https.HttpsError(
+        'already-exists',
+        'Operation already in progress with this idempotency key'
+      );
+    }
+
+    // Key does not exist — reserve it
+    transaction.set(idempotencyRef, {
+      key,
+      operation,
+      userId,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+    });
+
+    return { alreadyCompleted: false };
+  });
+
+  // Return cached result for idempotent replays
+  if (reservation.alreadyCompleted) {
+    console.log(`Idempotent replay: ${key} (operation: ${operation})`);
+    return { ...reservation.result, _idempotent: true };
+  }
+
+  // Phase 2: Execute the actual operation
+  try {
+    const result = await executeOperation();
+
+    // Phase 3a: Mark as completed with cached result
+    await idempotencyRef.update({
+      status: 'completed',
+      result: result,
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return result;
+  } catch (error) {
+    // Phase 3b: Mark as failed (allows retry with same key)
+    await idempotencyRef.update({
+      status: 'failed',
+      error: error.message || 'Unknown error',
+      failedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }).catch(updateErr => {
+      console.error('Failed to update idempotency key status:', updateErr);
+    });
+
+    throw error;
+  }
+}
+
+// Scheduled cleanup: remove expired idempotency keys every 6 hours
+exports.cleanupIdempotencyKeys = functions.pubsub
+  .schedule('every 6 hours')
+  .onRun(async () => {
+    const now = new Date();
+    const expired = await db.collection('idempotency_keys')
+      .where('expiresAt', '<', now)
+      .limit(500)
+      .get();
+
+    if (expired.empty) {
+      console.log('No expired idempotency keys to clean up');
+      return null;
+    }
+
+    const batch = db.batch();
+    expired.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+
+    console.log(`Cleaned ${expired.size} expired idempotency keys`);
+    return null;
+  });
 
 // ============================================================
 // QR CODE SIGNING & VERIFICATION
@@ -1646,7 +1786,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(senderUid);
 
-  const { recipientWalletId, amount, note } = data;
+  const { recipientWalletId, amount, note, idempotencyKey } = data;
 
   // 2. Validate inputs
   if (!recipientWalletId || typeof recipientWalletId !== 'string') {
@@ -1661,6 +1801,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Amount exceeds limit');
   }
 
+  return withIdempotency(idempotencyKey, 'sendMoney', senderUid, async () => {
   try {
     // 3. Run atomic transaction
     const result = await db.runTransaction(async (transaction) => {
@@ -1826,6 +1967,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     if (error.code) throw error;
     throw new functions.https.HttpsError('internal', 'Transaction failed');
   }
+  });
 });
 
 // ============================================================
@@ -1952,7 +2094,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { amount, currency, phoneNumber, payerMessage, payeeNote } = data;
+  const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   if (!amount || amount <= 0) {
@@ -1965,6 +2107,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  return withIdempotency(idempotencyKey, 'momoRequestToPay', userId, async () => {
   try {
     // Generate unique reference ID
     const referenceId = crypto.randomUUID();
@@ -2010,6 +2153,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     console.error('MoMo RequestToPay error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+  });
 });
 
 // ============================================================
@@ -2135,7 +2279,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
   }
 
-  const { amount, currency, phoneNumber, payerMessage, payeeNote } = data;
+  const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   if (!amount || amount <= 0) {
@@ -2148,6 +2292,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  return withIdempotency(idempotencyKey, 'momoTransfer', userId, async () => {
   try {
     // Check wallet balance
     const walletSnapshot = await db.collection('wallets')
@@ -2243,6 +2388,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     console.error('MoMo Transfer error:', error);
     throw new functions.https.HttpsError('internal', error.message);
   }
+  });
 });
 
 // ============================================================

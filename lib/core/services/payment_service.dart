@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 import 'dart:math';
 
 import 'wallet_service.dart';
@@ -109,6 +110,7 @@ class PaymentService {
     required String userId,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('chargeMobileMoney');
       final callable = _functions.httpsCallable('chargeMobileMoney');
       final result = await callable.call({
         'email': email,
@@ -116,6 +118,7 @@ class PaymentService {
         'currency': currency,
         'provider': provider,
         'phoneNumber': phoneNumber,
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -253,6 +256,7 @@ class PaymentService {
     required String accountName,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('initiateWithdrawal');
       final callable = _functions.httpsCallable('initiateWithdrawal');
       final result = await callable.call({
         'amount': amount,
@@ -260,6 +264,7 @@ class PaymentService {
         'accountNumber': accountNumber,
         'accountName': accountName,
         'type': 'bank',
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -294,10 +299,12 @@ class PaymentService {
     required String otp,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('finalizeTransfer');
       final callable = _functions.httpsCallable('finalizeTransfer');
       final result = await callable.call({
         'transferCode': transferCode,
         'otp': otp,
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -330,6 +337,7 @@ class PaymentService {
     required String accountName,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('initiateWithdrawal');
       final callable = _functions.httpsCallable('initiateWithdrawal');
       final result = await callable.call({
         'amount': amount,
@@ -337,6 +345,7 @@ class PaymentService {
         'phoneNumber': phoneNumber,
         'accountName': accountName,
         'type': 'mobile_money',
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -373,6 +382,14 @@ class PaymentService {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final random = Random.secure().nextInt(999999).toString().padLeft(6, '0');
     return 'QRW_${timestamp}_$random';
+  }
+
+  /// Generate a unique idempotency key for financial operations
+  String _generateIdempotencyKey(String operation) {
+    final random = Random.secure();
+    final bytes = List<int>.generate(12, (_) => random.nextInt(256));
+    final randomPart = base64Url.encode(bytes).replaceAll('=', '');
+    return 'idem_${operation}_${DateTime.now().millisecondsSinceEpoch}_$randomPart';
   }
 
   // ============================================================

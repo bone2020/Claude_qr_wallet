@@ -1,9 +1,20 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 /// MTN MoMo API Service for direct mobile money integration
 class MomoService {
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
+
+  /// Generate a unique idempotency key for financial operations
+  String _generateIdempotencyKey(String operation) {
+    final random = Random.secure();
+    final bytes = List<int>.generate(12, (_) => random.nextInt(256));
+    final randomPart = base64Url.encode(bytes).replaceAll('=', '');
+    return 'idem_${operation}_${DateTime.now().millisecondsSinceEpoch}_$randomPart';
+  }
 
   // ============================================================
   // COLLECTIONS - REQUEST TO PAY (Add Money)
@@ -18,12 +29,14 @@ class MomoService {
     String? payerMessage,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('momoRequestToPay');
       final callable = _functions.httpsCallable('momoRequestToPay');
       final result = await callable.call({
         'amount': amount,
         'currency': currency ?? 'EUR', // Sandbox uses EUR
         'phoneNumber': phoneNumber,
         'payerMessage': payerMessage ?? 'Add money to QR Wallet',
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -62,12 +75,14 @@ class MomoService {
     String? payeeNote,
   }) async {
     try {
+      final idempotencyKey = _generateIdempotencyKey('momoTransfer');
       final callable = _functions.httpsCallable('momoTransfer');
       final result = await callable.call({
         'amount': amount,
         'currency': currency ?? 'EUR', // Sandbox uses EUR
         'phoneNumber': phoneNumber,
         'payeeNote': payeeNote ?? 'Withdrawal from QR Wallet',
+        'idempotencyKey': idempotencyKey,
       });
 
       final data = result.data as Map<String, dynamic>;
