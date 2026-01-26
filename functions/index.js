@@ -267,6 +267,134 @@ const timestamps = {
 };
 
 // ============================================================
+// DEFENSIVE SCHEMA VALIDATION GUARDS
+// ============================================================
+
+/**
+ * VALIDATION RULES:
+ * 1. requireString() — assert a value is a non-empty string.
+ * 2. requireNumber() — assert a value is a finite, non-NaN number.
+ * 3. requirePositiveNumber() — assert a value is a positive finite number.
+ * 4. validateWalletDocument() — verify a wallet document has the expected shape
+ *    before performing any balance arithmetic. Fails loudly if corrupted.
+ * 5. safeAdd() / safeSubtract() — defensive balance arithmetic with overflow
+ *    checks and NaN guards. Returns a plain number, never NaN/Infinity.
+ */
+
+/**
+ * Assert value is a non-empty string.
+ * @param {*} value
+ * @param {string} fieldName - Name for error messages
+ * @returns {string} The validated string
+ */
+function requireString(value, fieldName) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, `${fieldName} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+/**
+ * Assert value is a finite number (not NaN, not Infinity).
+ * @param {*} value
+ * @param {string} fieldName
+ * @returns {number} The validated number
+ */
+function requireNumber(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, `${fieldName} must be a valid number.`);
+  }
+  return num;
+}
+
+/**
+ * Assert value is a positive finite number (> 0).
+ * @param {*} value
+ * @param {string} fieldName
+ * @returns {number}
+ */
+function requirePositiveNumber(value, fieldName) {
+  const num = requireNumber(value, fieldName);
+  if (num <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, `${fieldName} must be greater than zero.`);
+  }
+  return num;
+}
+
+/**
+ * Validate a wallet Firestore document has the required shape.
+ * Call this after reading a wallet document and before any balance arithmetic.
+ *
+ * @param {Object} walletData - The wallet document data
+ * @param {string} context - Description for error messages (e.g. 'sender wallet')
+ * @returns {{ balance: number, currency: string }} Validated wallet fields
+ */
+function validateWalletDocument(walletData, context = 'wallet') {
+  if (!walletData || typeof walletData !== 'object') {
+    logError('Wallet document validation failed: missing data', { context });
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, `${context} data is missing or corrupt.`);
+  }
+
+  const balance = Number(walletData.balance);
+  if (!Number.isFinite(balance) || balance < 0) {
+    logError('Wallet document validation failed: invalid balance', {
+      context,
+      rawBalance: walletData.balance,
+      parsedBalance: balance,
+    });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid balance. Contact support.`);
+  }
+
+  const currency = walletData.currency || 'GHS';
+  if (typeof currency !== 'string') {
+    logError('Wallet document validation failed: invalid currency', { context, currency });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid currency. Contact support.`);
+  }
+
+  return { balance, currency };
+}
+
+/**
+ * Safely add two numbers, guarding against NaN / Infinity / negative results.
+ * Intended for balance credits.
+ *
+ * @param {number} base - Current balance
+ * @param {number} addend - Amount to add
+ * @param {string} context - Description for error messages
+ * @returns {number} The result
+ */
+function safeAdd(base, addend, context = 'balance credit') {
+  const result = Number(base) + Number(addend);
+  if (!Number.isFinite(result) || result < 0) {
+    logError('safeAdd produced invalid result', { base, addend, result, context });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
+  }
+  return result;
+}
+
+/**
+ * Safely subtract, guarding against NaN / Infinity / negative results.
+ * Intended for balance debits. Returns an error if result would be negative.
+ *
+ * @param {number} base - Current balance
+ * @param {number} subtrahend - Amount to subtract
+ * @param {string} context - Description for error messages
+ * @returns {number} The result
+ */
+function safeSubtract(base, subtrahend, context = 'balance debit') {
+  const result = Number(base) - Number(subtrahend);
+  if (!Number.isFinite(result)) {
+    logError('safeSubtract produced non-finite result', { base, subtrahend, result, context });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
+  }
+  if (result < 0) {
+    throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Insufficient funds for ${context}.`);
+  }
+  return result;
+}
+
+// ============================================================
 // REQUEST CORRELATION FRAMEWORK
 // ============================================================
 
@@ -618,12 +746,15 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
+    validateWalletDocument(walletData, 'verifyPayment wallet');
 
     // Credit wallet using transaction
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
-      const currentBalance = freshWallet.data().balance || 0;
-      const newBalance = currentBalance + amount;
+      const freshData = freshWallet.data();
+      validateWalletDocument(freshData, 'verifyPayment fresh wallet');
+      const currentBalance = freshData.balance;
+      const newBalance = safeAdd(currentBalance, amount, 'verifyPayment credit');
 
       // Update wallet balance
       transaction.update(walletDoc.ref, {
@@ -670,7 +801,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       success: true,
       amount: amount,
       currency: currency,
-      newBalance: walletData.balance + amount,
+      newBalance: safeAdd(walletData.balance, amount, 'verifyPayment response balance'),
       _correlationId: correlation.correlationId,
     };
 
@@ -775,8 +906,10 @@ async function handleSuccessfulCharge(data) {
   // Credit wallet
   await db.runTransaction(async (transaction) => {
     const freshWallet = await transaction.get(walletDoc.ref);
-    const currentBalance = freshWallet.data().balance || 0;
-    const newBalance = currentBalance + amount;
+    const freshData = freshWallet.data();
+    validateWalletDocument(freshData, 'handleSuccessfulCharge wallet');
+    const currentBalance = freshData.balance;
+    const newBalance = safeAdd(currentBalance, amount, 'handleSuccessfulCharge credit');
 
     transaction.update(walletDoc.ref, {
       balance: newBalance,
@@ -871,10 +1004,13 @@ async function handleFailedTransfer(data) {
 
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
-      const currentBalance = freshWallet.data().balance || 0;
+      const freshData = freshWallet.data();
+      validateWalletDocument(freshData, 'handleFailedTransfer refund wallet');
+      const currentBalance = freshData.balance;
+      const newBalance = safeAdd(currentBalance, amount, 'handleFailedTransfer refund');
 
       transaction.update(walletDoc.ref, {
-        balance: currentBalance + amount,
+        balance: newBalance,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -948,9 +1084,10 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
+    const validated = validateWalletDocument(walletData, 'initiateWithdrawal wallet');
 
     // Check balance
-    if (walletData.balance < amount) {
+    if (validated.balance < amount) {
       throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
@@ -965,7 +1102,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         name: accountName,
         account_number: phoneNumber,
         bank_code: mobileMoneyProvider,
-        currency: walletData.currency || 'NGN',
+        currency: validated.currency || 'NGN',
       };
     } else {
       recipientData = {
@@ -973,7 +1110,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         name: accountName,
         account_number: accountNumber,
         bank_code: bankCode,
-        currency: walletData.currency || 'NGN',
+        currency: validated.currency || 'NGN',
       };
     }
 
@@ -990,14 +1127,13 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     // Debit wallet first
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
-      const currentBalance = freshWallet.data().balance || 0;
-
-      if (currentBalance < amount) {
-        throw new Error('Insufficient balance');
-      }
+      const freshData = freshWallet.data();
+      validateWalletDocument(freshData, 'initiateWithdrawal fresh wallet');
+      const currentBalance = freshData.balance;
+      const newBalance = safeSubtract(currentBalance, amount, 'initiateWithdrawal debit');
 
       transaction.update(walletDoc.ref, {
-        balance: currentBalance - amount,
+        balance: newBalance,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1007,7 +1143,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         walletId: walletDoc.id,
         reference: reference,
         amount: amount,
-        currency: walletData.currency || 'NGN',
+        currency: validated.currency || 'NGN',
         type: type || 'bank',
         bankCode: bankCode || null,
         mobileMoneyProvider: mobileMoneyProvider || null,
@@ -1047,10 +1183,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       // Refund if transfer initiation fails
       await db.runTransaction(async (transaction) => {
         const freshWallet = await transaction.get(walletDoc.ref);
-        const currentBalance = freshWallet.data().balance || 0;
+        const freshRefundData = freshWallet.data();
+        validateWalletDocument(freshRefundData, 'initiateWithdrawal refund wallet');
+        const newBalance = safeAdd(freshRefundData.balance, amount, 'initiateWithdrawal refund');
 
         transaction.update(walletDoc.ref, {
-          balance: currentBalance + amount,
+          balance: newBalance,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
@@ -1286,10 +1424,12 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       if (!walletSnapshot.empty) {
         const walletDoc = walletSnapshot.docs[0];
         const walletData = walletDoc.data();
+        validateWalletDocument(walletData, 'chargeMobileMoney wallet');
 
         await db.runTransaction(async (transaction) => {
+          const creditBalance = safeAdd(walletData.balance, amount, 'chargeMobileMoney credit');
           transaction.update(walletDoc.ref, {
-            balance: (walletData.balance || 0) + amount,
+            balance: creditBalance,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
@@ -2509,16 +2649,15 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       }
 
       const senderData = senderWallet.data();
-      const senderBalance = senderData.balance || 0;
+      const validatedSender = validateWalletDocument(senderData, 'sendMoney sender wallet');
+      const senderBalance = validatedSender.balance;
 
       // Calculate fee (1% with min 10, max 100)
       const fee = Math.min(Math.max(amount * 0.01, 10), 100);
       const totalDebit = amount + fee;
 
-      // Check balance
-      if (senderBalance < totalDebit) {
-        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
-      }
+      // Check balance (safeSubtract validates the arithmetic)
+      safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
 
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
@@ -2539,6 +2678,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const recipientUid = recipientDoc.id;
       const recipientRef = recipientDoc.ref;
       const recipientData = recipientDoc.data();
+      validateWalletDocument(recipientData, 'sendMoney recipient wallet');
 
       // Get user names
       const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
@@ -2934,11 +3074,13 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
             if (!walletSnapshot.empty) {
               const walletDoc = walletSnapshot.docs[0];
               const walletData = walletDoc.data();
+              validateWalletDocument(walletData, 'momoCheckStatus wallet');
 
               if (txData.type === 'collection') {
                 // Add money - credit wallet
+                const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus credit');
                 transaction.update(walletDoc.ref, {
-                  balance: (walletData.balance || 0) + txData.amount,
+                  balance: creditBalance,
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
 
@@ -3047,8 +3189,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
     const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
+    const validated = validateWalletDocument(walletData, 'momoTransfer wallet');
 
-    if ((walletData.balance || 0) < amount) {
+    if (validated.balance < amount) {
       throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
@@ -3058,14 +3201,12 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     // Debit wallet first
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
-      const currentBalance = freshWallet.data().balance || 0;
-
-      if (currentBalance < amount) {
-        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
-      }
+      const freshData = freshWallet.data();
+      validateWalletDocument(freshData, 'momoTransfer fresh wallet');
+      const newBalance = safeSubtract(freshData.balance, amount, 'momoTransfer debit');
 
       transaction.update(walletDoc.ref, {
-        balance: currentBalance - amount,
+        balance: newBalance,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -3117,10 +3258,12 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       // Refund wallet if transfer failed
       await db.runTransaction(async (transaction) => {
         const freshWallet = await transaction.get(walletDoc.ref);
-        const currentBalance = freshWallet.data().balance || 0;
+        const freshRefundData = freshWallet.data();
+        validateWalletDocument(freshRefundData, 'momoTransfer refund wallet');
+        const refundBalance = safeAdd(freshRefundData.balance, amount, 'momoTransfer refund');
 
         transaction.update(walletDoc.ref, {
-          balance: currentBalance + amount,
+          balance: refundBalance,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
@@ -3284,10 +3427,12 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
         if (!walletSnapshot.empty) {
           const walletDoc = walletSnapshot.docs[0];
           const walletData = walletDoc.data();
+          validateWalletDocument(walletData, 'momoWebhook SUCCESSFUL wallet');
 
           if (txData.type === 'collection') {
+            const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook collection credit');
             transaction.update(walletDoc.ref, {
-              balance: (walletData.balance || 0) + txData.amount,
+              balance: creditBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
@@ -3327,9 +3472,11 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           if (!walletSnapshot.empty) {
             const walletDoc = walletSnapshot.docs[0];
             const walletData = walletDoc.data();
+            validateWalletDocument(walletData, 'momoWebhook FAILED refund wallet');
+            const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook disbursement refund');
 
             transaction.update(walletDoc.ref, {
-              balance: (walletData.balance || 0) + txData.amount,
+              balance: refundBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
