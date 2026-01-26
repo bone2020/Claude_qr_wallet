@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,11 +92,116 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
-    redirect: (context, state) {
-      // Intercept qrwallet:// deep links - let DeepLinkService handle them
-      if (state.uri.scheme == 'qrwallet') {
-        return '/main'; // Redirect to main, DeepLinkService handles actual navigation
+    redirect: (context, state) async {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final location = state.matchedLocation;
+
+      // Routes accessible without authentication
+      const publicRoutes = {
+        AppRoutes.splash,
+        AppRoutes.welcome,
+        AppRoutes.signUp,
+        AppRoutes.login,
+        AppRoutes.forgotPassword,
+      };
+
+      // Routes that require auth but NOT KYC completion
+      // (user is completing verification/KYC flow)
+      const verificationRoutes = {
+        AppRoutes.otpVerification,
+        AppRoutes.phoneOtp,
+        AppRoutes.kyc,
+        AppRoutes.kycPassport,
+        AppRoutes.kycNin,
+        AppRoutes.kycBvn,
+        AppRoutes.kycDriversLicense,
+        AppRoutes.kycVotersCard,
+        AppRoutes.kycNationalId,
+        AppRoutes.kycSsnit,
+        AppRoutes.kycPhoneVerification,
+      };
+
+      // Helper: determine correct destination for an authenticated user
+      Future<String> resolveAuthenticatedDestination() async {
+        if (!currentUser!.emailVerified) {
+          return AppRoutes.otpVerification;
+        }
+        try {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .get();
+          if (userDoc.exists) {
+            final data = userDoc.data()!;
+            final kycVerified = data['kycStatus'] == 'verified' ||
+                data['kycCompleted'] == true;
+            if (!kycVerified) return AppRoutes.kyc;
+          }
+        } catch (e) {
+          debugPrint('Route guard: KYC check failed: $e');
+        }
+        return AppRoutes.main;
       }
+
+      // --- DEEP LINK GUARD ---
+      // Intercept qrwallet:// deep links — require auth before allowing
+      if (state.uri.scheme == 'qrwallet') {
+        if (currentUser == null) return AppRoutes.welcome;
+        return resolveAuthenticatedDestination();
+      }
+
+      // Splash screen manages its own routing logic
+      if (location == AppRoutes.splash) return null;
+
+      // --- UNAUTHENTICATED USER ---
+      if (currentUser == null) {
+        if (publicRoutes.contains(location)) return null;
+        // Block access to all protected routes
+        return AppRoutes.welcome;
+      }
+
+      // --- AUTHENTICATED USER ---
+
+      // Redirect away from public auth screens (already logged in)
+      if (publicRoutes.contains(location)) {
+        return resolveAuthenticatedDestination();
+      }
+
+      // Email not verified: only allow OTP verification screen
+      if (!currentUser.emailVerified) {
+        if (location == AppRoutes.otpVerification) return null;
+        return AppRoutes.otpVerification;
+      }
+
+      // Verification/KYC flow routes: allow without KYC check
+      if (verificationRoutes.contains(location)) return null;
+
+      // --- ALL REMAINING ROUTES REQUIRE KYC ---
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          // User exists in Auth but not Firestore (incomplete signup)
+          await FirebaseAuth.instance.signOut();
+          return AppRoutes.welcome;
+        }
+
+        final data = userDoc.data()!;
+        final kycVerified = data['kycStatus'] == 'verified' ||
+            data['kycCompleted'] == true;
+
+        if (!kycVerified) {
+          return AppRoutes.kyc;
+        }
+      } catch (e) {
+        // On error, allow navigation — server-side enforcement (Issue 1)
+        // is the primary guard for financial operations
+        debugPrint('Route guard: KYC check failed: $e');
+      }
+
       return null;
     },
     routes: [
