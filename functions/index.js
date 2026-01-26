@@ -1792,6 +1792,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 // ============================================================
 
 // MTN MoMo configuration - set via: firebase functions:config:set momo.collections_subscription_key="xxx" etc.
+// IMPORTANT: webhook_secret MUST be configured for production to verify callback authenticity
+const MOMO_WEBHOOK_SECRET = functions.config().momo?.webhook_secret || '';
+
 const MOMO_CONFIG = {
   collections: {
     subscriptionKey: functions.config().momo?.collections_subscription_key || '02e123077f6d495986e243a28aa5b357',
@@ -1807,7 +1810,9 @@ const MOMO_CONFIG = {
     ? 'proxy.momoapi.mtn.com'
     : 'sandbox.momodeveloper.mtn.com',
   environment: functions.config().momo?.environment || 'sandbox',
-  callbackUrl: 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
+  callbackUrl: MOMO_WEBHOOK_SECRET
+    ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}`
+    : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
 };
 
 // Helper function to get MTN MoMo access token
@@ -2235,90 +2240,165 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 // ============================================================
 
 exports.momoWebhook = functions.https.onRequest(async (req, res) => {
-  console.log('MoMo webhook received:', req.body);
+  // ── LAYER 1: HTTP Method Restriction ──
+  if (req.method !== 'POST') {
+    console.warn('MoMo webhook: rejected non-POST request:', req.method);
+    return res.status(405).send('Method Not Allowed');
+  }
+
+  // ── LAYER 2: Webhook Secret Token Verification ──
+  // The token is appended to the callback URL registered with MoMo.
+  // Only MoMo (which received the URL) should know the token.
+  if (MOMO_WEBHOOK_SECRET) {
+    const token = req.query.token;
+    if (!token || token !== MOMO_WEBHOOK_SECRET) {
+      console.error('MoMo webhook: invalid or missing webhook token');
+      return res.status(403).send('Forbidden');
+    }
+  } else if (MOMO_CONFIG.environment === 'production') {
+    // In production, a webhook secret MUST be configured
+    console.error('MoMo webhook: CRITICAL - no webhook_secret configured in production');
+    return res.status(503).send('Service misconfigured');
+  }
+
+  console.log('MoMo webhook received (authenticated):', JSON.stringify(req.body));
 
   try {
     const { externalId, status, financialTransactionId } = req.body;
 
-    if (externalId) {
-      const txRef = db.collection('momo_transactions').doc(externalId);
-      const txDoc = await txRef.get();
+    // ── LAYER 3: Request Body Validation ──
+    if (!externalId || typeof externalId !== 'string' || !status) {
+      console.error('MoMo webhook: missing or invalid required fields');
+      return res.status(400).send('Bad Request');
+    }
 
-      if (txDoc.exists) {
-        const txData = txDoc.data();
+    // ── LAYER 4: Transaction Existence Verification ──
+    // Only process callbacks for transactions WE initiated
+    const txRef = db.collection('momo_transactions').doc(externalId);
+    const txDoc = await txRef.get();
 
-        // Update status and process if successful
-        if (status === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
-          await db.runTransaction(async (transaction) => {
-            const walletSnapshot = await db.collection('wallets')
-              .where('userId', '==', txData.userId)
-              .limit(1)
-              .get();
+    if (!txDoc.exists) {
+      console.error('MoMo webhook: unknown externalId (not initiated by us):', externalId);
+      return res.status(404).send('Transaction not found');
+    }
 
-            if (!walletSnapshot.empty) {
-              const walletDoc = walletSnapshot.docs[0];
-              const walletData = walletDoc.data();
+    const txData = txDoc.data();
 
-              if (txData.type === 'collection') {
-                transaction.update(walletDoc.ref, {
-                  balance: (walletData.balance || 0) + txData.amount,
-                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-              }
+    // ── LAYER 5: Cross-Verify Status via MoMo API ──
+    // Never trust the callback body alone. Independently confirm the
+    // transaction status by calling MoMo's GET status endpoint.
+    let verifiedStatus = null;
+    try {
+      const product = txData.type === 'disbursement' ? 'disbursement' : 'collection';
+      const statusPath = txData.type === 'disbursement'
+        ? `/v1_0/transfer/${externalId}`
+        : `/v1_0/requesttopay/${externalId}`;
 
-              transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(externalId), {
-                id: externalId,
-                type: txData.type === 'collection' ? 'deposit' : 'withdrawal',
-                amount: txData.amount,
-                currency: txData.currency,
-                method: 'MTN MoMo',
-                phoneNumber: txData.phoneNumber,
-                status: 'completed',
-                financialTransactionId: financialTransactionId,
-                createdAt: txData.createdAt,
-                completedAt: admin.firestore.FieldValue.serverTimestamp(),
-              });
-            }
+      const apiResponse = await momoRequest(product, 'GET', statusPath, null, externalId);
 
-            transaction.update(txRef, {
-              status: status,
-              financialTransactionId: financialTransactionId,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-          });
-        } else if (status === 'FAILED') {
-          // Refund if disbursement failed
-          if (txData.type === 'disbursement') {
-            await db.runTransaction(async (transaction) => {
-              const walletSnapshot = await db.collection('wallets')
-                .where('userId', '==', txData.userId)
-                .limit(1)
-                .get();
+      if (apiResponse.statusCode === 200 && apiResponse.data && apiResponse.data.status) {
+        verifiedStatus = apiResponse.data.status;
+        console.log(`MoMo webhook cross-verified: callback=${status}, api=${verifiedStatus}, ref=${externalId}`);
 
-              if (!walletSnapshot.empty) {
-                const walletDoc = walletSnapshot.docs[0];
-                const walletData = walletDoc.data();
+        if (verifiedStatus !== status) {
+          console.warn(`MoMo webhook STATUS MISMATCH: callback=${status}, api=${verifiedStatus} for ref=${externalId}`);
+          // Trust the API response, not the callback
+        }
+      } else {
+        console.warn('MoMo webhook: cross-verification returned unexpected response:', apiResponse.statusCode);
+      }
+    } catch (verifyError) {
+      console.error('MoMo webhook: cross-verification error:', verifyError.message);
+    }
 
-                transaction.update(walletDoc.ref, {
-                  balance: (walletData.balance || 0) + txData.amount,
-                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-              }
+    // In production, reject if cross-verification failed
+    if (!verifiedStatus && MOMO_CONFIG.environment === 'production') {
+      console.error('MoMo webhook: rejecting callback — unable to cross-verify in production');
+      return res.status(502).send('Unable to verify transaction status');
+    }
 
-              transaction.update(txRef, {
-                status: status,
-                refunded: true,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              });
-            });
-          } else {
-            await txRef.update({
-              status: status,
+    // Use verified status (from API) or fall back to callback status in sandbox
+    const effectiveStatus = verifiedStatus || status;
+
+    // ── Process the verified transaction status ──
+    if (effectiveStatus === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
+      await db.runTransaction(async (transaction) => {
+        const walletSnapshot = await db.collection('wallets')
+          .where('userId', '==', txData.userId)
+          .limit(1)
+          .get();
+
+        if (!walletSnapshot.empty) {
+          const walletDoc = walletSnapshot.docs[0];
+          const walletData = walletDoc.data();
+
+          if (txData.type === 'collection') {
+            transaction.update(walletDoc.ref, {
+              balance: (walletData.balance || 0) + txData.amount,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
+
+          transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(externalId), {
+            id: externalId,
+            type: txData.type === 'collection' ? 'deposit' : 'withdrawal',
+            amount: txData.amount,
+            currency: txData.currency,
+            method: 'MTN MoMo',
+            phoneNumber: txData.phoneNumber,
+            status: 'completed',
+            financialTransactionId: financialTransactionId,
+            createdAt: txData.createdAt,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
         }
+
+        transaction.update(txRef, {
+          status: effectiveStatus,
+          financialTransactionId: financialTransactionId,
+          callbackStatus: status,
+          verifiedStatus: verifiedStatus,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    } else if (effectiveStatus === 'FAILED') {
+      // Refund if disbursement failed
+      if (txData.type === 'disbursement') {
+        await db.runTransaction(async (transaction) => {
+          const walletSnapshot = await db.collection('wallets')
+            .where('userId', '==', txData.userId)
+            .limit(1)
+            .get();
+
+          if (!walletSnapshot.empty) {
+            const walletDoc = walletSnapshot.docs[0];
+            const walletData = walletDoc.data();
+
+            transaction.update(walletDoc.ref, {
+              balance: (walletData.balance || 0) + txData.amount,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          transaction.update(txRef, {
+            status: effectiveStatus,
+            refunded: true,
+            callbackStatus: status,
+            verifiedStatus: verifiedStatus,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        });
+      } else {
+        await txRef.update({
+          status: effectiveStatus,
+          callbackStatus: status,
+          verifiedStatus: verifiedStatus,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
       }
+    } else {
+      // Status is PENDING or already processed — just log and acknowledge
+      console.log(`MoMo webhook: no action needed for status=${effectiveStatus}, current=${txData.status}`);
     }
 
     res.status(200).send('OK');
