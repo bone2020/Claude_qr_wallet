@@ -189,6 +189,76 @@ function throwServiceError(serviceName, originalError, context = {}) {
 }
 
 // ============================================================
+// REQUEST CORRELATION FRAMEWORK
+// ============================================================
+
+/**
+ * Extracts or generates a correlation ID for request tracing.
+ *
+ * Priority:
+ * 1. X-Request-ID header (from API gateway/load balancer)
+ * 2. X-Correlation-ID header (from upstream service)
+ * 3. Generate new ID if none provided
+ *
+ * @param {Object} context - Cloud Function context
+ * @returns {string} Correlation ID
+ */
+function getCorrelationId(context) {
+  const headers = context?.rawRequest?.headers || {};
+
+  const existingId =
+    headers['x-request-id'] ||
+    headers['x-correlation-id'] ||
+    headers['X-Request-ID'] ||
+    headers['X-Correlation-ID'];
+
+  if (existingId && typeof existingId === 'string') {
+    return existingId;
+  }
+
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 10);
+  return `corr_${timestamp}_${random}`;
+}
+
+/**
+ * Creates a correlation context for logging and audit throughout a function call.
+ *
+ * @param {Object} context - Cloud Function context
+ * @param {string} functionName - Name of the Cloud Function
+ * @returns {Object} Correlation context with helper methods
+ */
+function createCorrelationContext(context, functionName) {
+  const correlationId = getCorrelationId(context);
+  const userId = context?.auth?.uid || 'anonymous';
+
+  return {
+    correlationId,
+    functionName,
+    userId,
+    startTime: Date.now(),
+
+    /** Fields for structured log entries */
+    toLogContext() {
+      return {
+        correlationId: this.correlationId,
+        functionName: this.functionName,
+        userId: this.userId,
+      };
+    },
+
+    /** Fields for audit log entries (includes duration) */
+    toAuditContext() {
+      return {
+        correlationId: this.correlationId,
+        functionName: this.functionName,
+        durationMs: Date.now() - this.startTime,
+      };
+    },
+  };
+}
+
+// ============================================================
 // CONFIGURATION VALIDATION
 // ============================================================
 
@@ -433,6 +503,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   }
 
   const userId = context.auth.uid;
+  const correlation = createCorrelationContext(context, 'verifyPayment');
 
   // Fail fast if Paystack is not configured
   requireServiceReady('paystack');
@@ -517,7 +588,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId, operation: 'verifyPayment', result: 'success',
       amount, currency,
-      metadata: { reference },
+      metadata: { reference, ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
 
@@ -526,13 +597,14 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       amount: amount,
       currency: currency,
       newBalance: walletData.balance + amount,
+      _correlationId: correlation.correlationId,
     };
 
   } catch (error) {
     console.error('Payment verification error:', error);
     await auditLog({
       userId, operation: 'verifyPayment', result: 'failure',
-      metadata: { reference },
+      metadata: { reference, ...correlation.toAuditContext() },
       error: error.message,
       ipHash: hashIp(context),
     });
@@ -542,6 +614,10 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
 // Handle Paystack webhook events
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
+  const webhookCorrelationId = req.headers['x-correlation-id'] ||
+    `webhook_paystack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  console.log(JSON.stringify({ severity: 'INFO', message: 'Paystack webhook received', correlationId: webhookCorrelationId, event: req.body?.event }));
+
   // Fail fast if Paystack secret key is not configured
   if (MISSING_CRITICAL_CONFIGS.has('paystack.secret_key')) {
     console.error('paystackWebhook: PAYSTACK_SECRET_KEY not configured, rejecting webhook');
@@ -762,6 +838,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey } = data;
   const userId = context.auth.uid;
+  const correlation = createCorrelationContext(context, 'initiateWithdrawal');
 
   // Fail fast if Paystack is not configured
   requireServiceReady('paystack');
@@ -935,7 +1012,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId, operation: 'initiateWithdrawal', result: 'success',
       amount, currency: walletData.currency || 'NGN',
-      metadata: { reference, type: type || 'bank' },
+      metadata: { reference, type: type || 'bank', ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
 
@@ -943,6 +1020,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       success: true,
       reference: reference,
       message: 'Withdrawal initiated successfully',
+      _correlationId: correlation.correlationId,
     };
 
   } catch (error) {
@@ -950,6 +1028,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId, operation: 'initiateWithdrawal', result: 'failure',
       amount,
+      metadata: { ...correlation.toAuditContext() },
       error: error.message,
       ipHash: hashIp(context),
     });
@@ -2321,6 +2400,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
   }
 
   const senderUid = context.auth.uid;
+  const correlation = createCorrelationContext(context, 'sendMoney');
 
   // Enforce KYC verification before financial operation
   await enforceKyc(senderUid);
@@ -2505,18 +2585,18 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'success',
       amount, currency: result.currency || 'GHS',
-      metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee },
+      metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee, ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
 
-    return { success: true, ...result };
+    return { success: true, ...result, _correlationId: correlation.correlationId };
 
   } catch (error) {
     console.error('sendMoney error:', error);
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'failure',
       amount,
-      metadata: { recipientWalletId },
+      metadata: { recipientWalletId, ...correlation.toAuditContext() },
       error: error.message,
       ipHash: hashIp(context),
     });
@@ -2652,6 +2732,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
+  const correlation = createCorrelationContext(context, 'momoRequestToPay');
 
   // Fail fast if MoMo collections API is not configured
   requireServiceReady('momo_collections');
@@ -2706,7 +2787,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       await auditLog({
         userId, operation: 'momoRequestToPay', result: 'success',
         amount, currency: currency || 'EUR',
-        metadata: { referenceId, phoneNumber },
+        metadata: { referenceId, phoneNumber, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
 
@@ -2715,6 +2796,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         referenceId: referenceId,
         status: TRANSACTION_STATES.PENDING,
         message: 'Please approve the payment on your phone',
+        _correlationId: correlation.correlationId,
       };
     } else {
       throwServiceError('momo', new Error('Failed to initiate payment'), { responseData: response.data });
@@ -2724,6 +2806,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId, operation: 'momoRequestToPay', result: 'failure',
       amount, currency: currency || 'EUR',
+      metadata: { ...correlation.toAuditContext() },
       error: error.message,
       ipHash: hashIp(context),
     });
@@ -2859,6 +2942,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
   const { amount, currency, phoneNumber, payerMessage, payeeNote, idempotencyKey } = data;
   const userId = context.auth.uid;
+  const correlation = createCorrelationContext(context, 'momoTransfer');
 
   // Fail fast if MoMo disbursements API is not configured
   requireServiceReady('momo_disbursements');
@@ -2945,7 +3029,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       await auditLog({
         userId, operation: 'momoTransfer', result: 'success',
         amount, currency: currency || 'EUR',
-        metadata: { referenceId, phoneNumber },
+        metadata: { referenceId, phoneNumber, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
 
@@ -2954,6 +3038,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         referenceId: referenceId,
         status: 'PENDING',
         message: 'Withdrawal is being processed',
+        _correlationId: correlation.correlationId,
       };
     } else {
       // Refund wallet if transfer failed
@@ -2982,6 +3067,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     await auditLog({
       userId, operation: 'momoTransfer', result: 'failure',
       amount, currency: currency || 'EUR',
+      metadata: { ...correlation.toAuditContext() },
       error: error.message,
       ipHash: hashIp(context),
     });
@@ -3029,6 +3115,10 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 // ============================================================
 
 exports.momoWebhook = functions.https.onRequest(async (req, res) => {
+  const webhookCorrelationId = req.headers['x-correlation-id'] ||
+    `webhook_momo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  console.log(JSON.stringify({ severity: 'INFO', message: 'MoMo webhook received', correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status }));
+
   // ── LAYER 1: HTTP Method Restriction ──
   if (req.method !== 'POST') {
     console.warn('MoMo webhook: rejected non-POST request:', req.method);
