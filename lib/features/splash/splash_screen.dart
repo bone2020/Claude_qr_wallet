@@ -76,8 +76,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // Parse user data
         final userData = UserModel.fromJson(userDoc.data()!);
 
-        // Check if KYC is completed
-        if (!userData.kycCompleted) {
+        // Check if KYC is completed (defense in depth - server also enforces)
+        // Accept both canonical kycStatus and legacy kycCompleted
+        final kycVerified = userData.kycStatus == 'verified' || userData.kycCompleted;
+        if (!kycVerified) {
           // User hasn't completed KYC
           context.go(AppRoutes.kyc);
           return;

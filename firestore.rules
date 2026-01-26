@@ -12,9 +12,22 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Helper: Ensure kycStatus field is not modified by client
+    // kycStatus is authoritative and can only be set by Cloud Functions (Admin SDK)
+    function kycStatusUnchanged() {
+      return !('kycStatus' in resource.data)
+        ? !request.resource.data.keys().hasAny(['kycStatus'])
+        : request.resource.data.kycStatus == resource.data.kycStatus;
+    }
+
     // Users collection - own data only
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      // Allow create without kycStatus (new user signup)
+      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus']);
+      // Allow update but kycStatus must not be modified (server-only field)
+      allow update: if isOwner(userId) && kycStatusUnchanged();
+      allow delete: if isOwner(userId);
 
       // Transactions - read only (writes via Cloud Functions)
       match /transactions/{txId} {

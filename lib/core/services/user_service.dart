@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -130,6 +131,20 @@ class UserService {
   // KYC OPERATIONS
   // ============================================================
 
+  /// Set KYC status on the server via Cloud Function.
+  /// This sets the canonical kycStatus field that Cloud Functions enforce.
+  Future<void> _setKycStatusOnServer(String status) async {
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('updateKycStatus');
+      await callable.call({'status': status});
+    } catch (e) {
+      // Log but don't fail the entire KYC flow — the legacy kycCompleted
+      // field still provides backward-compatible enforcement
+      // ignore: avoid_print
+      print('Warning: Failed to set kycStatus via Cloud Function: $e');
+    }
+  }
+
   /// Upload KYC documents
   Future<UserResult> uploadKycDocuments({
     File? idFront,
@@ -205,7 +220,7 @@ class UserService {
         config: RetryConfig.network,
       );
 
-      // Update user's KYC status with retry
+      // Update user's KYC status with retry (legacy fields for backward compat)
       await NetworkRetry.execute(
         () => _firestore.collection('users').doc(_userId).update({
           'kycCompleted': true,
@@ -214,6 +229,13 @@ class UserService {
         }),
         config: RetryConfig.network,
       );
+
+      // Set canonical kycStatus via Cloud Function (server-authoritative)
+      if (smileIdVerified) {
+        await _setKycStatusOnServer('verified');
+      } else {
+        await _setKycStatusOnServer('pending');
+      }
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
@@ -330,6 +352,9 @@ class UserService {
         () => _firestore.collection('users').doc(_userId).update(userUpdates),
         config: RetryConfig.network,
       );
+
+      // Set canonical kycStatus via Cloud Function (server-authoritative)
+      await _setKycStatusOnServer('verified');
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);

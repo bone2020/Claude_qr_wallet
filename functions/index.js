@@ -158,6 +158,9 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   const userId = context.auth.uid;
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   try {
     // Verify with Paystack
     const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
@@ -457,6 +460,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber } = data;
   const userId = context.auth.uid;
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   console.log("initiateWithdrawal called with:", JSON.stringify({ amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber }));
   // Validate amount
   if (!amount || amount <= 0) {
@@ -636,6 +642,9 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   const { transferCode, otp } = data;
   const userId = context.auth.uid;
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   if (!transferCode || !otp) {
     throw new functions.https.HttpsError('invalid-argument', 'Transfer code and OTP are required');
   }
@@ -755,6 +764,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   const { email, amount, currency, provider, phoneNumber } = data;
   const userId = context.auth.uid;
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid amount');
   }
@@ -853,6 +865,9 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
 
   const { email, name } = data;
   const userId = context.auth.uid;
+
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
 
   try {
     // Check if user already has a virtual account
@@ -957,6 +972,9 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Email is required');
   }
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   try {
     const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -1011,6 +1029,9 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   if (!email) {
     throw new functions.https.HttpsError('invalid-argument', 'Email is required');
   }
+
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
 
   try {
     const reference = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -1111,14 +1132,113 @@ function recordFailedLookup(ip) {
   failedLookupStore[ip].count++;
 }
 
+// ============================================================
+// KYC ENFORCEMENT (Server-Side)
+// ============================================================
+
+/**
+ * Enforces that a user has completed KYC verification.
+ * Must be called in ALL Cloud Functions that handle financial operations.
+ *
+ * Checks the canonical 'kycStatus' field on the user document.
+ * Falls back to legacy 'kycCompleted' + 'kycVerified' for existing users,
+ * and auto-migrates them to the new kycStatus field.
+ *
+ * @param {string} userId - The Firebase Auth UID
+ * @throws {HttpsError} permission-denied with code KYC_REQUIRED if not verified
+ */
+async function enforceKyc(userId) {
+  const userDoc = await db.collection('users').doc(userId).get();
+
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User account not found');
+  }
+
+  const userData = userDoc.data();
+
+  // Check canonical kycStatus field (authoritative, set by Cloud Functions only)
+  if (userData.kycStatus === 'verified') {
+    return;
+  }
+
+  // Backward compatibility: trust legacy fields if kycStatus not yet set
+  // This covers existing users who completed KYC before this enforcement was added
+  if (!userData.kycStatus && userData.kycCompleted === true && userData.kycVerified === true) {
+    // Auto-migrate: set canonical kycStatus for this user
+    await db.collection('users').doc(userId).update({ kycStatus: 'verified' });
+    console.log(`Auto-migrated kycStatus to 'verified' for user: ${userId}`);
+    return;
+  }
+
+  // KYC not verified — block the operation
+  throw new functions.https.HttpsError(
+    'permission-denied',
+    'KYC_REQUIRED: Identity verification is required to perform financial operations'
+  );
+}
+
+// Set KYC status (called after successful Smile ID verification)
+exports.updateKycStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be logged in');
+  }
+
+  const userId = context.auth.uid;
+  const { status } = data;
+
+  // Only allow setting to specific valid statuses
+  const validStatuses = ['pending', 'verified', 'rejected'];
+  if (!validStatuses.includes(status)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid KYC status');
+  }
+
+  // For 'verified', require that KYC documents have been approved in the subcollection
+  if (status === 'verified') {
+    const kycDoc = await db.collection('users').doc(userId)
+      .collection('kyc').doc('documents').get();
+
+    if (!kycDoc.exists) {
+      throw new functions.https.HttpsError('failed-precondition', 'No KYC documents found');
+    }
+
+    const kycData = kycDoc.data();
+    if (kycData.status !== 'approved' && kycData.status !== 'verified') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'KYC documents have not been approved'
+      );
+    }
+  }
+
+  await db.collection('users').doc(userId).update({
+    kycStatus: status,
+    kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    ...(status === 'verified' ? { kycCompleted: true, kycVerified: true } : {}),
+  });
+
+  console.log(`KYC status updated to '${status}' for user: ${userId}`);
+
+  return {
+    success: true,
+    kycStatus: status,
+  };
+});
+
+// ============================================================
+// QR CODE SIGNING & VERIFICATION
+// ============================================================
+
 // Sign QR payload for payment requests
 exports.signQrPayload = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
-  
+
+  // Enforce KYC verification before financial operation
+  await enforceKyc(context.auth.uid);
+
   const { walletId, amount, note } = data;
-  
+
   if (!walletId || typeof walletId !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid wallet ID');
   }
@@ -1481,6 +1601,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
   }
 
   const senderUid = context.auth.uid;
+
+  // Enforce KYC verification before financial operation
+  await enforceKyc(senderUid);
+
   const { recipientWalletId, amount, note } = data;
 
   // 2. Validate inputs
@@ -1789,6 +1913,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
   }
 
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
+
   try {
     // Generate unique reference ID
     const referenceId = crypto.randomUUID();
@@ -1968,6 +2095,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
   if (!phoneNumber) {
     throw new functions.https.HttpsError('invalid-argument', 'Phone number is required');
   }
+
+  // Enforce KYC verification before financial operation
+  await enforceKyc(userId);
 
   try {
     // Check wallet balance
