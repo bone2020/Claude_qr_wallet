@@ -406,11 +406,14 @@ async function handleSuccessfulCharge(data) {
 async function handleSuccessfulTransfer(data) {
   const reference = data.reference;
 
-  await db.collection('withdrawals').doc(reference).update({
-    status: 'success',
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    paystackTransferCode: data.transfer_code,
-  });
+  await updateTransactionState(
+    db.collection('withdrawals').doc(reference),
+    TRANSACTION_STATES.COMPLETED,
+    {
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      paystackTransferCode: data.transfer_code,
+    }
+  );
 
   // Update user's transaction
   const withdrawalDoc = await db.collection('withdrawals').doc(reference).get();
@@ -423,10 +426,11 @@ async function handleSuccessfulTransfer(data) {
       .get();
 
     if (!txQuery.empty) {
-      await txQuery.docs[0].ref.update({
-        status: 'completed',
-        completedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await updateTransactionState(
+        txQuery.docs[0].ref,
+        TRANSACTION_STATES.COMPLETED,
+        { completedAt: admin.firestore.FieldValue.serverTimestamp() }
+      );
     }
   }
 
@@ -466,7 +470,7 @@ async function handleFailedTransfer(data) {
       });
 
       transaction.update(db.collection('withdrawals').doc(reference), {
-        status: 'failed',
+        ...buildStateTransitionFields(withdrawalData.status, TRANSACTION_STATES.FAILED, reference),
         failedAt: admin.firestore.FieldValue.serverTimestamp(),
         failureReason: data.reason || 'Transfer failed',
         refunded: true,
@@ -479,8 +483,9 @@ async function handleFailedTransfer(data) {
         .get();
 
       if (!txQuery.empty) {
+        const txCurrentStatus = txQuery.docs[0].data().status || 'pending';
         transaction.update(txQuery.docs[0].ref, {
-          status: 'failed',
+          ...buildStateTransitionFields(txCurrentStatus, TRANSACTION_STATES.FAILED, txQuery.docs[0].id),
           failedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
@@ -634,7 +639,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         });
 
         transaction.update(db.collection('withdrawals').doc(reference), {
-          status: 'failed',
+          ...buildStateTransitionFields(TRANSACTION_STATES.PENDING, TRANSACTION_STATES.FAILED, reference),
           failureReason: 'Transfer initiation failed',
           refunded: true,
         });
@@ -647,10 +652,11 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     const transferData = transferResponse.data;
     if (transferData.status === 'otp') {
       // Store transfer code for OTP verification
-      await db.collection('withdrawals').doc(reference).update({
-        status: 'pending_otp',
-        transferCode: transferData.transfer_code,
-      });
+      await updateTransactionState(
+        db.collection('withdrawals').doc(reference),
+        TRANSACTION_STATES.PENDING_OTP,
+        { transferCode: transferData.transfer_code }
+      );
 
       return {
         success: false,
@@ -715,10 +721,11 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 
     if (otpResponse.status) {
       // Update withdrawal status
-      await withdrawalDoc.ref.update({
-        status: 'processing',
-        otpVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await updateTransactionState(
+        withdrawalDoc.ref,
+        TRANSACTION_STATES.PROCESSING,
+        { otpVerifiedAt: admin.firestore.FieldValue.serverTimestamp() }
+      );
 
       return {
         success: true,
@@ -1404,6 +1411,152 @@ exports.cleanupIdempotencyKeys = functions.pubsub
     console.log(`Cleaned ${expired.size} expired idempotency keys`);
     return null;
   });
+
+// ============================================================
+// TRANSACTION STATE MACHINE
+// ============================================================
+
+const TRANSACTION_STATES = {
+  CREATED: 'created',
+  PENDING: 'pending',
+  PENDING_OTP: 'pending_otp',
+  PROCESSING: 'processing',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  REFUNDED: 'refunded',
+  CANCELLED: 'cancelled',
+};
+
+const VALID_TRANSITIONS = {
+  'created': ['pending', 'completed', 'cancelled'],
+  'pending': ['processing', 'pending_otp', 'completed', 'failed', 'cancelled'],
+  'pending_otp': ['processing', 'failed', 'cancelled'],
+  'processing': ['completed', 'failed'],
+  'completed': ['refunded'],
+  'failed': ['refunded', 'pending'],
+  'refunded': [],
+  'cancelled': [],
+};
+
+const TERMINAL_STATES = ['refunded', 'cancelled'];
+
+/**
+ * Normalize external status values to internal state machine states.
+ * MoMo API uses UPPERCASE, Paystack uses 'success', etc.
+ */
+function normalizeStatus(status) {
+  if (!status) return 'created';
+  const map = {
+    'SUCCESSFUL': 'completed',
+    'SUCCESS': 'completed',
+    'success': 'completed',
+    'PENDING': 'pending',
+    'FAILED': 'failed',
+  };
+  return map[status] || status.toLowerCase();
+}
+
+/**
+ * Validate a state transition is allowed.
+ * @param {string} currentState - Current (possibly unnormalized) state
+ * @param {string} newState - Desired (possibly unnormalized) state
+ * @param {string} transactionId - Document ID for logging
+ * @throws {HttpsError} if the transition is invalid
+ */
+function validateStateTransition(currentState, newState, transactionId) {
+  const from = normalizeStatus(currentState);
+  const to = normalizeStatus(newState);
+
+  if (TERMINAL_STATES.includes(from)) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Transaction ${transactionId} is in terminal state: ${from}`
+    );
+  }
+
+  if (from === 'completed' && to !== 'refunded') {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Completed transaction ${transactionId} can only be refunded`
+    );
+  }
+
+  const allowed = VALID_TRANSITIONS[from] || [];
+  if (!allowed.includes(to)) {
+    console.error(`Invalid state transition: ${from} → ${to} for ${transactionId}`);
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Invalid state transition: ${from} → ${to}`
+    );
+  }
+
+  console.log(`State transition: ${from} → ${to} for ${transactionId}`);
+  return true;
+}
+
+/**
+ * Build Firestore update fields for a validated state transition.
+ * Use inside existing Firestore transactions (spreads into update object).
+ *
+ * @param {string} currentStatus - Current document status
+ * @param {string} newStatus - Desired new status
+ * @param {string} docId - Document ID for logging/validation
+ * @returns {Object} Fields to spread into transaction.update()
+ */
+function buildStateTransitionFields(currentStatus, newStatus, docId) {
+  const from = normalizeStatus(currentStatus);
+  const to = normalizeStatus(newStatus);
+  validateStateTransition(from, to, docId);
+
+  return {
+    status: to,
+    previousStatus: from,
+    statusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    statusHistory: admin.firestore.FieldValue.arrayUnion({
+      from: from,
+      to: to,
+      timestamp: new Date().toISOString(),
+    }),
+  };
+}
+
+/**
+ * Atomically validate and update a document's transaction state.
+ * Runs its own Firestore transaction — do NOT call from inside another transaction.
+ * For in-transaction use, call buildStateTransitionFields() instead.
+ *
+ * @param {DocumentReference} docRef - Firestore document reference
+ * @param {string} newState - Desired new state
+ * @param {Object} additionalData - Extra fields to set alongside the state change
+ */
+async function updateTransactionState(docRef, newState, additionalData = {}) {
+  const to = normalizeStatus(newState);
+
+  return db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+
+    if (!doc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction document not found');
+    }
+
+    const from = normalizeStatus(doc.data().status);
+    validateStateTransition(from, to, doc.id);
+
+    transaction.update(docRef, {
+      status: to,
+      previousStatus: from,
+      statusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      statusHistory: admin.firestore.FieldValue.arrayUnion({
+        from: from,
+        to: to,
+        timestamp: new Date().toISOString(),
+      }),
+      ...additionalData,
+    });
+
+    return { previousState: from, newState: to };
+  });
+}
 
 // ============================================================
 // QR CODE SIGNING & VERIFICATION
@@ -2135,15 +2288,16 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         amount: amount,
         currency: currency || 'EUR',
         phoneNumber: phoneNumber,
-        status: 'PENDING',
+        status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: new Date().toISOString() }],
       });
 
       return {
         success: true,
         referenceId: referenceId,
-        status: 'PENDING',
+        status: TRANSACTION_STATES.PENDING,
         message: 'Please approve the payment on your phone',
       };
     } else {
@@ -2190,7 +2344,8 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
         const txData = txDoc.data();
 
         // If status changed to SUCCESSFUL, credit/debit wallet
-        if (status === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
+        // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
+        if (status === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
           await db.runTransaction(async (transaction) => {
             // Get user's wallet
             const walletSnapshot = await db.collection('wallets')
@@ -2237,16 +2392,17 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
               }
             }
 
-            // Update momo transaction status
+            // Update momo transaction status with state machine validation
             transaction.update(txRef, {
-              status: status,
+              ...buildStateTransitionFields(txData.status, status, referenceId),
+              providerStatus: status,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           });
         } else {
-          // Just update status
-          await txRef.update({
-            status: status,
+          // Just update status with state machine validation
+          await updateTransactionState(txRef, status, {
+            providerStatus: status,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
         }
@@ -2335,9 +2491,10 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         amount: amount,
         currency: currency || 'EUR',
         phoneNumber: phoneNumber,
-        status: 'PENDING',
+        status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: new Date().toISOString() }],
       });
     });
 
@@ -2375,7 +2532,8 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         });
 
         transaction.update(db.collection('momo_transactions').doc(referenceId), {
-          status: 'FAILED',
+          ...buildStateTransitionFields(TRANSACTION_STATES.PENDING, TRANSACTION_STATES.FAILED, referenceId),
+          providerStatus: 'FAILED',
           failureReason: JSON.stringify(response.data),
           refunded: true,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2511,7 +2669,8 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     const effectiveStatus = verifiedStatus || status;
 
     // ── Process the verified transaction status ──
-    if (effectiveStatus === 'SUCCESSFUL' && txData.status !== 'SUCCESSFUL') {
+    // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
+    if (effectiveStatus === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
       await db.runTransaction(async (transaction) => {
         const walletSnapshot = await db.collection('wallets')
           .where('userId', '==', txData.userId)
@@ -2544,7 +2703,8 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
         }
 
         transaction.update(txRef, {
-          status: effectiveStatus,
+          ...buildStateTransitionFields(txData.status, effectiveStatus, externalId),
+          providerStatus: effectiveStatus,
           financialTransactionId: financialTransactionId,
           callbackStatus: status,
           verifiedStatus: verifiedStatus,
@@ -2571,7 +2731,8 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           }
 
           transaction.update(txRef, {
-            status: effectiveStatus,
+            ...buildStateTransitionFields(txData.status, effectiveStatus, externalId),
+            providerStatus: effectiveStatus,
             refunded: true,
             callbackStatus: status,
             verifiedStatus: verifiedStatus,
@@ -2579,8 +2740,8 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           });
         });
       } else {
-        await txRef.update({
-          status: effectiveStatus,
+        await updateTransactionState(txRef, effectiveStatus, {
+          providerStatus: effectiveStatus,
           callbackStatus: status,
           verifiedStatus: verifiedStatus,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
