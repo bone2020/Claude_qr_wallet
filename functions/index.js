@@ -521,6 +521,46 @@ function safeSubtract(base, subtrahend, context = 'balance debit') {
   return result;
 }
 
+/**
+ * Validate and normalize a phone number to E.164 format.
+ *
+ * @param {string} phone - Phone number to validate
+ * @param {string} defaultCountryCode - Default country code (e.g., '233' for Ghana)
+ * @returns {string} Normalized E.164 phone number
+ * @throws {HttpsError} If phone number is invalid
+ */
+function validatePhoneNumber(phone, defaultCountryCode = '233') {
+  if (!phone || typeof phone !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required');
+  }
+
+  // Remove whitespace and common separators
+  let cleaned = phone.replace(/[\s\-\(\)\.]/g, '');
+
+  // Normalize to international format
+  if (cleaned.startsWith('+')) {
+    // Already has country code
+  } else if (cleaned.startsWith('00')) {
+    cleaned = '+' + cleaned.slice(2);
+  } else if (cleaned.startsWith('0')) {
+    cleaned = '+' + defaultCountryCode + cleaned.slice(1);
+  } else if (!cleaned.startsWith('+')) {
+    cleaned = '+' + defaultCountryCode + cleaned;
+  }
+
+  // Validate E.164: + followed by 7-15 digits
+  const e164Regex = /^\+[1-9]\d{6,14}$/;
+
+  if (!e164Regex.test(cleaned)) {
+    throwAppError(
+      ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      'Invalid phone number format. Use international format (e.g., +233501234567)'
+    );
+  }
+
+  return cleaned;
+}
+
 // ============================================================
 // REQUEST CORRELATION FRAMEWORK
 // ============================================================
@@ -1293,7 +1333,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   // Enforce persistent rate limiting (5 withdrawals per hour)
   await enforceRateLimit(userId, 'initiateWithdrawal');
 
-  logFinancialOperation('initiateWithdrawal', 'initiated', { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber });
+  // Validate phone number if mobile money withdrawal
+  const validatedPhone = (type === 'mobile_money' && phoneNumber)
+    ? validatePhoneNumber(phoneNumber)
+    : phoneNumber;
+
+  logFinancialOperation('initiateWithdrawal', 'initiated', { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber: validatedPhone });
   // Validate amount
   if (!amount || amount <= 0) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
@@ -1626,6 +1671,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Provider and phone number are required.');
   }
 
+  // Validate phone number format
+  const validatedPhone = validatePhoneNumber(phoneNumber);
+
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
   try {
     const reference = `MOMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1635,7 +1683,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       amount: Math.round(amount * 100),
       currency: currency || 'GHS',
       mobile_money: {
-        phone: phoneNumber,
+        phone: validatedPhone,
         provider: provider,
       },
       reference: reference,
@@ -2796,6 +2844,12 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number and country are required.');
   }
 
+  // Validate phone number format (E.164)
+  // Country code mapping for validation context
+  const countryDialCodes = { NG: '234', GH: '233', KE: '254', ZA: '27', TZ: '255', UG: '256' };
+  const dialCode = countryDialCodes[country.toUpperCase()] || '233';
+  validatePhoneNumber(phoneNumber, dialCode);
+
   // Validate Smile ID is properly configured
   if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
     logError('Smile ID configuration missing', {
@@ -3336,6 +3390,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
+  // Validate phone number format
+  const validatedPhone = validatePhoneNumber(phoneNumber);
+
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
@@ -3354,7 +3411,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       externalId: referenceId,
       payer: {
         partyIdType: 'MSISDN',
-        partyId: phoneNumber.replace('+', ''),
+        partyId: validatedPhone.replace('+', ''),
       },
       payerMessage: payerMessage || 'Add money to QR Wallet',
       payeeNote: payeeNote || 'Wallet deposit',
@@ -3369,7 +3426,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         userId: userId,
         amount: amount,
         currency: currency || 'EUR',
-        phoneNumber: phoneNumber,
+        phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -3379,7 +3436,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       await auditLog({
         userId, operation: 'momoRequestToPay', result: 'success',
         amount, currency: currency || 'EUR',
-        metadata: { referenceId, phoneNumber, ...correlation.toAuditContext() },
+        metadata: { referenceId, phoneNumber: validatedPhone, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
 
@@ -3553,6 +3610,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
+  // Validate phone number format
+  const validatedPhone = validatePhoneNumber(phoneNumber);
+
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
@@ -3600,7 +3660,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         userId: userId,
         amount: amount,
         currency: currency || 'EUR',
-        phoneNumber: phoneNumber,
+        phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -3615,7 +3675,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       externalId: referenceId,
       payee: {
         partyIdType: 'MSISDN',
-        partyId: phoneNumber.replace('+', ''),
+        partyId: validatedPhone.replace('+', ''),
       },
       payerMessage: payerMessage || 'Withdrawal from QR Wallet',
       payeeNote: payeeNote || 'Wallet withdrawal',
@@ -3627,7 +3687,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       await auditLog({
         userId, operation: 'momoTransfer', result: 'success',
         amount, currency: currency || 'EUR',
-        metadata: { referenceId, phoneNumber, ...correlation.toAuditContext() },
+        metadata: { referenceId, phoneNumber: validatedPhone, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
 
