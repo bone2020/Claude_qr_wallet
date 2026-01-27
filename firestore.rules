@@ -120,5 +120,10 @@ service cloud.firestore {
     match /flagged_transactions/{txId} {
       allow read, write: if false;
     }
+
+    // Pending transactions - Cloud Functions only (amount cross-validation)
+    match /pending_transactions/{txId} {
+      allow read, write: if false;
+    }
   }
 }

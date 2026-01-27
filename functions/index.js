@@ -1161,8 +1161,39 @@ async function handleSuccessfulCharge(data) {
     return;
   }
 
-  const amount = data.amount / 100;
+  const receivedAmountKobo = data.amount;
   const currency = data.currency;
+
+  // Cross-validate amount against stored expected amount
+  const pendingTx = await db.collection('pending_transactions').doc(reference).get();
+  if (pendingTx.exists) {
+    const expectedAmountKobo = pendingTx.data().expectedAmountKobo;
+    if (expectedAmountKobo && Math.abs(expectedAmountKobo - receivedAmountKobo) > 1) {
+      logSecurityEvent('paystack_amount_mismatch', 'critical', {
+        reference,
+        expected: expectedAmountKobo,
+        received: receivedAmountKobo,
+        difference: receivedAmountKobo - expectedAmountKobo,
+        userId,
+      });
+
+      // Flag for manual review — do NOT credit wallet
+      await db.collection('flagged_transactions').doc(reference).set({
+        reason: 'Amount mismatch between initialized and webhook amounts',
+        expectedAmountKobo,
+        receivedAmountKobo,
+        userId,
+        reference,
+        webhookData: { amount: data.amount, currency: data.currency, status: data.status },
+        flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      logError('Payment amount mismatch — flagged, not credited', { reference, userId });
+      return;
+    }
+  }
+
+  const amount = receivedAmountKobo / 100;
 
   // Get user's wallet
   const walletSnapshot = await db.collection('wallets')
@@ -1898,6 +1929,19 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     logInfo('Initialize transaction response', { status: response.status });
 
     if (response.status && response.data) {
+      // Store pending transaction with expected amount for webhook cross-validation
+      await db.collection('pending_transactions').doc(reference).set({
+        userId,
+        email,
+        expectedAmount: amount,
+        expectedAmountKobo: Math.round(amount * 100),
+        currency: currency || 'GHS',
+        reference,
+        paystackReference: response.data.reference,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
       return {
         success: true,
         authorizationUrl: response.data.authorization_url,
