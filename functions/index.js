@@ -2237,9 +2237,9 @@ async function auditLog(entry) {
  * Enforces that a user has completed KYC verification.
  * Must be called in ALL Cloud Functions that handle financial operations.
  *
- * Checks the canonical 'kycStatus' field on the user document.
- * Falls back to legacy 'kycCompleted' + 'kycVerified' for existing users,
- * and auto-migrates them to the new kycStatus field.
+ * Checks email verification via Firebase Auth, then checks the canonical
+ * 'kycStatus' field on the user document. Legacy 'kycCompleted' fields
+ * are NOT auto-migrated — users must re-verify through Smile ID.
  *
  * @param {string} userId - The Firebase Auth UID
  * @throws {HttpsError} permission-denied with code KYC_REQUIRED if not verified
