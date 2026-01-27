@@ -1674,23 +1674,24 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
         accountName: virtualAccount.accountName,
       };
     } else {
-      // Return mock for development/test mode
+      logInfo('Virtual account creation returned non-success', {
+        userId,
+        dvaStatus: dvaResponse.status,
+      });
       return {
-        success: true,
-        bankName: 'Test Bank (Development)',
-        accountNumber: '0000000000',
-        accountName: name,
-        note: 'Virtual accounts are only available in live mode',
+        success: false,
+        error: 'Virtual accounts are only available in live mode',
+        code: 'VIRTUAL_ACCOUNT_UNAVAILABLE',
+        message: 'Please use mobile money or card payment instead.',
       };
     }
   } catch (error) {
-    logError('Virtual account error', { error: error.message });
+    logError('Virtual account error', { userId, error: error.message });
     return {
-      success: true,
-      bankName: 'Test Bank (Development)',
-      accountNumber: '0000000000',
-      accountName: name || 'Test Account',
-      note: 'Virtual accounts require live mode activation',
+      success: false,
+      error: 'Unable to create virtual account at this time',
+      code: 'VIRTUAL_ACCOUNT_ERROR',
+      message: 'Please try again later or use an alternative payment method.',
     };
   }
 });
