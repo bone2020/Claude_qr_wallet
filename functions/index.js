@@ -176,6 +176,38 @@ function throwServiceError(serviceName, originalError, context = {}) {
 }
 
 // ============================================================
+// TIMING-SAFE COMPARISON HELPER
+// ============================================================
+
+/**
+ * Performs timing-safe string comparison to prevent timing attacks.
+ * Returns true if strings are equal, false otherwise.
+ *
+ * @param {string} a - First string (typically computed hash)
+ * @param {string} b - Second string (typically provided hash)
+ * @param {string} encoding - Encoding of strings ('hex', 'utf8', etc.)
+ * @returns {boolean}
+ */
+function timingSafeCompare(a, b, encoding = 'hex') {
+  try {
+    if (!a || !b) return false;
+
+    const bufA = Buffer.from(String(a), encoding);
+    const bufB = Buffer.from(String(b), encoding);
+
+    if (bufA.length !== bufB.length) {
+      // Perform dummy comparison to maintain constant time
+      crypto.timingSafeEqual(bufA, bufA);
+      return false;
+    }
+
+    return crypto.timingSafeEqual(bufA, bufB);
+  } catch (error) {
+    return false;
+  }
+}
+
+// ============================================================
 // STRUCTURED LOGGING FRAMEWORK
 // ============================================================
 
@@ -920,8 +952,11 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
     .update(JSON.stringify(req.body))
     .digest('hex');
 
-  if (hash !== req.headers['x-paystack-signature']) {
-    logSecurityEvent('paystack_webhook_invalid_signature', 'high', { correlationId: webhookCorrelationId });
+  if (!timingSafeCompare(hash, req.headers['x-paystack-signature'], 'hex')) {
+    logSecurityEvent('paystack_webhook_invalid_signature', 'high', {
+      correlationId: webhookCorrelationId,
+      ip: req.ip,
+    });
     return res.status(400).send('Invalid signature');
   }
 
@@ -2375,14 +2410,19 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   }
   
   const { payload, signature } = data;
-  
+  const correlationId = getCorrelationId(context);
+
   if (!payload || !signature) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Missing payload or signature.');
   }
-  
-  // Verify signature
+
+  // Verify signature (timing-safe)
   const expectedSignature = generateQrSignature(payload);
-  if (signature !== expectedSignature) {
+  if (!timingSafeCompare(signature, expectedSignature, 'hex')) {
+    logSecurityEvent('qr_invalid_signature', 'medium', {
+      correlationId,
+      userId: context.auth.uid,
+    });
     return { valid: false, reason: 'Invalid signature' };
   }
   
@@ -3432,8 +3472,12 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
   // Only MoMo (which received the URL) should know the token.
   if (MOMO_WEBHOOK_SECRET) {
     const token = req.query.token;
-    if (!token || token !== MOMO_WEBHOOK_SECRET) {
-      logSecurityEvent('momo_webhook_invalid_token', 'high', { correlationId: webhookCorrelationId });
+    if (!token || !timingSafeCompare(token, MOMO_WEBHOOK_SECRET, 'utf8')) {
+      logSecurityEvent('momo_webhook_invalid_token', 'high', {
+        correlationId: webhookCorrelationId,
+        ip: req.ip,
+        hasToken: !!token,
+      });
       return res.status(403).send('Forbidden');
     }
   } else if (MOMO_CONFIG.environment === 'production') {
