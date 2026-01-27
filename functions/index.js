@@ -2236,13 +2236,10 @@ async function enforceKyc(userId) {
     return;
   }
 
-  // Backward compatibility: trust legacy fields if kycStatus not yet set
-  // This covers existing users who completed KYC before this enforcement was added
-  if (!userData.kycStatus && userData.kycCompleted === true && userData.kycVerified === true) {
-    // Auto-migrate: set canonical kycStatus for this user
-    await db.collection('users').doc(userId).update({ kycStatus: 'verified' });
-    logInfo('Auto-migrated kycStatus to verified', { userId });
-    return;
+  // Legacy kycCompleted/kycVerified fields are no longer trusted for auto-migration.
+  // Users with legacy fields must re-verify through Smile ID to get kycStatus: 'verified'.
+  if (!userData.kycStatus && userData.kycCompleted === true) {
+    logInfo('User has legacy KYC fields but no canonical kycStatus — re-verification required', { userId });
   }
 
   // KYC not verified — block the operation
