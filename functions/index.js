@@ -2167,6 +2167,30 @@ exports.cleanupIdempotencyKeys = functions.pubsub
     return null;
   });
 
+// Cleanup expired QR nonces (runs hourly)
+exports.cleanupExpiredQrNonces = functions.pubsub
+  .schedule('every 1 hours')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    const expiredNonces = await db.collection('qr_nonces')
+      .where('expiresAt', '<', now)
+      .limit(500)
+      .get();
+
+    if (expiredNonces.empty) {
+      logInfo('No expired QR nonces to clean up');
+      return null;
+    }
+
+    const batch = db.batch();
+    expiredNonces.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+
+    logInfo('Cleaned expired QR nonces', { count: expiredNonces.size });
+    return null;
+  });
+
 // ============================================================
 // TRANSACTION STATE MACHINE
 // ============================================================
@@ -2307,53 +2331,80 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
 // QR CODE SIGNING & VERIFICATION
 // ============================================================
 
-// Sign QR payload for payment requests
+// Sign QR payload for payment requests (with nonce for replay protection)
 exports.signQrPayload = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
+  const userId = context.auth.uid;
+
   // Enforce KYC verification before financial operation
-  await enforceKyc(context.auth.uid);
+  await enforceKyc(userId);
 
   const { walletId, amount, note } = data;
 
   if (!walletId || typeof walletId !== 'string') {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid wallet ID.');
   }
-  
+
   // Verify the wallet belongs to the user
-  const walletDoc = await db.collection('wallets').doc(context.auth.uid).get();
+  const walletDoc = await db.collection('wallets').doc(userId).get();
   if (!walletDoc.exists || walletDoc.data().walletId !== walletId) {
     throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Wallet does not belong to user.');
   }
-  
+
+  // Generate unique nonce for one-time use
+  const nonce = crypto.randomUUID();
   const timestamp = Date.now();
+  const expiresAt = timestamp + QR_EXPIRY_MS;
+
   const payload = {
     walletId,
     amount: amount || 0,
     note: note || '',
+    nonce,
     timestamp,
-    userId: context.auth.uid
+    userId,
   };
-  
+
   const payloadString = JSON.stringify(payload);
   const signature = generateQrSignature(payloadString);
-  
+
+  // Store nonce for one-time use verification
+  await db.collection('qr_nonces').doc(nonce).set({
+    nonce,
+    walletId,
+    amount: amount || 0,
+    createdBy: userId,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt),
+    used: false,
+  });
+
+  logInfo('QR code generated', {
+    userId,
+    walletId,
+    hasAmount: !!amount,
+    nonce,
+  });
+
   return {
     payload: payloadString,
     signature,
-    expiresAt: timestamp + QR_EXPIRY_MS
+    expiresAt,
+    nonce,
   };
 });
 
-// Verify QR signature before processing payment
+// Verify QR signature before processing payment (with nonce replay protection)
 exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
-  
+
   const { payload, signature } = data;
+  const userId = context.auth.uid;
   const correlationId = getCorrelationId(context);
 
   if (!payload || !signature) {
@@ -2365,11 +2416,11 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   if (!timingSafeCompare(signature, expectedSignature, 'hex')) {
     logSecurityEvent('qr_invalid_signature', 'medium', {
       correlationId,
-      userId: context.auth.uid,
+      userId,
     });
     return { valid: false, reason: 'Invalid signature' };
   }
-  
+
   // Parse and check expiry
   let parsedPayload;
   try {
@@ -2377,32 +2428,97 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   } catch (e) {
     return { valid: false, reason: 'Invalid payload format' };
   }
-  
+
   const now = Date.now();
   if (parsedPayload.timestamp && (now - parsedPayload.timestamp) > QR_EXPIRY_MS) {
     return { valid: false, reason: 'QR code expired' };
   }
-  
+
+  // Check nonce for one-time use (replay protection)
+  const nonce = parsedPayload.nonce;
+  if (!nonce) {
+    // Legacy QR without nonce — reject
+    logSecurityEvent('qr_missing_nonce', 'medium', {
+      correlationId,
+      userId,
+      walletId: parsedPayload.walletId,
+    });
+    return { valid: false, reason: 'Invalid QR code format' };
+  }
+
+  // Atomic check-and-mark using Firestore transaction
+  const nonceRef = db.collection('qr_nonces').doc(nonce);
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const nonceDoc = await transaction.get(nonceRef);
+
+      if (!nonceDoc.exists) {
+        throw new Error('NONCE_NOT_FOUND');
+      }
+
+      const nonceData = nonceDoc.data();
+
+      if (nonceData.used) {
+        throw new Error('NONCE_ALREADY_USED');
+      }
+
+      // Mark as used atomically
+      transaction.update(nonceRef, {
+        used: true,
+        usedBy: userId,
+        usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        usedCorrelationId: correlationId,
+      });
+    });
+  } catch (error) {
+    if (error.message === 'NONCE_ALREADY_USED') {
+      logSecurityEvent('qr_replay_attempt', 'high', {
+        correlationId,
+        userId,
+        nonce,
+        walletId: parsedPayload.walletId,
+      });
+      return { valid: false, reason: 'This QR code has already been used' };
+    }
+    if (error.message === 'NONCE_NOT_FOUND') {
+      logSecurityEvent('qr_unknown_nonce', 'medium', {
+        correlationId,
+        userId,
+        nonce,
+      });
+      return { valid: false, reason: 'Invalid QR code' };
+    }
+    throw error;
+  }
+
   // Verify wallet exists
   const walletQuery = await db.collection('wallets')
     .where('walletId', '==', parsedPayload.walletId)
     .limit(1)
     .get();
-  
+
   if (walletQuery.empty) {
     return { valid: false, reason: 'Wallet not found' };
   }
-  
+
   const walletData = walletQuery.docs[0].data();
   const userDoc = await db.collection('users').doc(walletQuery.docs[0].id).get();
-  
+
+  logInfo('QR code verified', {
+    correlationId,
+    userId,
+    walletId: parsedPayload.walletId,
+    nonce,
+  });
+
   return {
     valid: true,
     walletId: parsedPayload.walletId,
     amount: parsedPayload.amount,
     note: parsedPayload.note,
     recipientName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
-    profilePhotoUrl: userDoc.exists ? userDoc.data().profilePhotoUrl : null
+    nonce,
   };
 });
 

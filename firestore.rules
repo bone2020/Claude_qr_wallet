@@ -104,5 +104,15 @@ service cloud.firestore {
     match /withdrawals/{withdrawalId} {
       allow read, write: if false;
     }
+
+    // QR nonces - Cloud Functions only (replay protection)
+    match /qr_nonces/{nonceId} {
+      allow read, write: if false;
+    }
+
+    // Flagged transactions - Cloud Functions only (fraud review)
+    match /flagged_transactions/{txId} {
+      allow read, write: if false;
+    }
   }
 }
