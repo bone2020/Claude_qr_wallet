@@ -2207,6 +2207,22 @@ async function auditLog(entry) {
  * @throws {HttpsError} permission-denied with code KYC_REQUIRED if not verified
  */
 async function enforceKyc(userId) {
+  // Check email verification via Firebase Auth
+  try {
+    const userRecord = await admin.auth().getUser(userId);
+    if (!userRecord.emailVerified) {
+      throwAppError(ERROR_CODES.KYC_REQUIRED,
+        'Email verification required. Please verify your email before performing financial operations.');
+    }
+  } catch (error) {
+    // If error is our own throwAppError, re-throw it
+    if (error.code === 'functions/failed-precondition' || error.code === 'functions/permission-denied') {
+      throw error;
+    }
+    // Firebase Auth error — log but don't block (fail open for auth service issues)
+    logError('Email verification check failed', { userId, error: error.message });
+  }
+
   const userDoc = await db.collection('users').doc(userId).get();
 
   if (!userDoc.exists) {
