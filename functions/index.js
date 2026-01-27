@@ -2072,6 +2072,7 @@ const RATE_LIMITS = {
   momoRequestToPay:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many MoMo payment requests. Please try again later.' },
   momoTransfer:       { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many MoMo transfers. Please try again later.' },
   lookupWallet:       { windowMs: 5 * 60 * 1000,  maxRequests: 30, message: 'Too many wallet lookups. Please wait a few minutes.' },
+  exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
 };
 
 /**
@@ -2288,6 +2289,179 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
     success: true,
     kycStatus: status,
   };
+});
+
+// ============================================================
+// GDPR DATA EXPORT & DELETION
+// ============================================================
+
+/**
+ * Export all user data (GDPR Article 20 — Data Portability).
+ * Returns a JSON object containing all data associated with the user.
+ */
+exports.exportUserData = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const correlationId = getCorrelationId(context);
+
+  // Rate limit data exports (2 per day)
+  await enforceRateLimit(userId, 'exportUserData');
+
+  logInfo('User data export requested', { userId, correlationId });
+
+  try {
+    // Collect all user data from all collections
+    const userDoc = await db.collection('users').doc(userId).get();
+    const walletDoc = await db.collection('wallets').doc(userId).get();
+
+    // Sub-collections
+    const transactions = await db.collection('users').doc(userId)
+      .collection('transactions').orderBy('createdAt', 'desc').limit(1000).get();
+    const notifications = await db.collection('users').doc(userId)
+      .collection('notifications').orderBy('createdAt', 'desc').limit(500).get();
+    const linkedAccounts = await db.collection('users').doc(userId)
+      .collection('linkedAccounts').get();
+    const bankAccounts = await db.collection('users').doc(userId)
+      .collection('bankAccounts').get();
+    const cards = await db.collection('users').doc(userId)
+      .collection('cards').get();
+
+    // Withdrawals
+    const withdrawals = await db.collection('withdrawals')
+      .where('userId', '==', userId).limit(500).get();
+
+    // MoMo transactions
+    const momoTxns = await db.collection('momo_transactions')
+      .where('userId', '==', userId).limit(500).get();
+
+    // Audit logs
+    const auditLogs = await db.collection('audit_logs')
+      .where('userId', '==', userId).orderBy('timestamp', 'desc').limit(500).get();
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      userId,
+      profile: userDoc.exists ? userDoc.data() : null,
+      wallet: walletDoc.exists ? walletDoc.data() : null,
+      transactions: transactions.docs.map(d => ({ id: d.id, ...d.data() })),
+      notifications: notifications.docs.map(d => ({ id: d.id, ...d.data() })),
+      linkedAccounts: linkedAccounts.docs.map(d => ({ id: d.id, ...d.data() })),
+      bankAccounts: bankAccounts.docs.map(d => ({ id: d.id, ...d.data() })),
+      cards: cards.docs.map(d => ({ id: d.id, ...d.data() })),
+      withdrawals: withdrawals.docs.map(d => ({ id: d.id, ...d.data() })),
+      momoTransactions: momoTxns.docs.map(d => ({ id: d.id, ...d.data() })),
+      auditLogs: auditLogs.docs.map(d => ({ id: d.id, ...d.data() })),
+    };
+
+    await auditLog({
+      userId, operation: 'exportUserData', result: 'success',
+      metadata: { correlationId },
+    });
+
+    return { success: true, data: exportData };
+  } catch (error) {
+    logError('User data export failed', { userId, error: error.message });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Data export failed. Please try again.');
+  }
+});
+
+/**
+ * Delete user account and all associated data (GDPR Article 17 — Right to Erasure).
+ * Requires re-authentication confirmation.
+ */
+exports.deleteUserData = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { confirmDeletion } = data;
+
+  if (confirmDeletion !== 'DELETE_MY_ACCOUNT') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      'Must confirm deletion with confirmDeletion: "DELETE_MY_ACCOUNT"');
+  }
+
+  logSecurityEvent('user_data_deletion_requested', 'high', { userId });
+
+  try {
+    // Check for pending transactions
+    const pendingWithdrawals = await db.collection('withdrawals')
+      .where('userId', '==', userId)
+      .where('status', '==', 'pending')
+      .limit(1)
+      .get();
+
+    if (!pendingWithdrawals.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with pending withdrawals. Please wait for them to complete.');
+    }
+
+    const pendingMomo = await db.collection('momo_transactions')
+      .where('userId', '==', userId)
+      .where('status', '==', 'pending')
+      .limit(1)
+      .get();
+
+    if (!pendingMomo.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with pending MoMo transactions. Please wait for them to complete.');
+    }
+
+    // Check wallet balance
+    const walletDoc = await db.collection('wallets').doc(userId).get();
+    if (walletDoc.exists && walletDoc.data().balance > 0) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with remaining balance. Please withdraw all funds first.');
+    }
+
+    // Delete user sub-collections
+    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc'];
+    for (const subCol of subCollections) {
+      const docs = await db.collection('users').doc(userId).collection(subCol).limit(500).get();
+      const batch = db.batch();
+      docs.forEach(doc => batch.delete(doc.ref));
+      if (!docs.empty) await batch.commit();
+    }
+
+    // Delete user document
+    await db.collection('users').doc(userId).delete();
+
+    // Delete wallet
+    if (walletDoc.exists) {
+      await db.collection('wallets').doc(userId).delete();
+    }
+
+    // Anonymize audit logs (retain for compliance but remove PII)
+    const auditLogs = await db.collection('audit_logs')
+      .where('userId', '==', userId).limit(500).get();
+    if (!auditLogs.empty) {
+      const batch = db.batch();
+      auditLogs.forEach(doc => {
+        batch.update(doc.ref, {
+          userId: 'DELETED_USER',
+          anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    }
+
+    // Delete Firebase Auth account
+    await admin.auth().deleteUser(userId);
+
+    logSecurityEvent('user_data_deleted', 'high', { userId: 'DELETED_USER' });
+
+    return { success: true, message: 'Account and all associated data have been deleted.' };
+  } catch (error) {
+    if (error.code && error.code.startsWith('functions/')) {
+      throw error; // Re-throw our own errors
+    }
+    logError('User data deletion failed', { userId, error: error.message });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Account deletion failed. Please contact support.');
+  }
 });
 
 // ============================================================
