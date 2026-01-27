@@ -41,19 +41,25 @@ service cloud.firestore {
         allow create, delete: if false;
       }
 
-      // Linked accounts
+      // Linked accounts — read only from client
+      // Writes via Cloud Functions with verification
       match /linkedAccounts/{accountId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
 
-      // Bank accounts
+      // Bank accounts — read only from client
+      // Adding bank accounts requires verification via Cloud Function
       match /bankAccounts/{accountId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
 
-      // Cards
+      // Payment cards — read only from client
+      // Card tokenization handled by Paystack, not stored directly
       match /cards/{cardId} {
-        allow read, write: if isOwner(userId);
+        allow read: if isOwner(userId);
+        allow write: if false;
       }
     }
 
