@@ -522,6 +522,31 @@ function safeSubtract(base, subtrahend, context = 'balance debit') {
 }
 
 /**
+ * Supported currencies whitelist.
+ * Only these currencies are accepted for transactions.
+ */
+const VALID_CURRENCIES = new Set([
+  'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
+  'USD', 'EUR', 'GBP',
+  'XOF', 'XAF', 'EGP',
+]);
+
+/**
+ * Validate that a currency code is in the whitelist.
+ * @param {string} currency - Currency code to validate
+ * @param {string} defaultCurrency - Default if not provided
+ * @returns {string} Validated currency code (uppercase)
+ */
+function validateCurrency(currency, defaultCurrency = 'GHS') {
+  const code = (currency || defaultCurrency).toUpperCase().trim();
+  if (!VALID_CURRENCIES.has(code)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      `Unsupported currency: ${code}. Supported: ${[...VALID_CURRENCIES].join(', ')}`);
+  }
+  return code;
+}
+
+/**
  * Validate and normalize a phone number to E.164 format.
  *
  * @param {string} phone - Phone number to validate
@@ -1702,7 +1727,8 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Provider and phone number are required.');
   }
 
-  // Validate phone number format
+  // Validate currency and phone number format
+  const validatedCurrency = validateCurrency(currency, 'GHS');
   const validatedPhone = validatePhoneNumber(phoneNumber);
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
@@ -1908,16 +1934,19 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Email is required.');
   }
 
+  // Validate currency
+  const validatedCurrency = validateCurrency(currency, 'GHS');
+
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
   try {
     const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
       amount: Math.round(amount * 100), // Convert to smallest unit
-      currency: currency || 'GHS',
+      currency: validatedCurrency,
       reference: reference,
       callback_url: 'https://qr-wallet-1993.web.app/payment-callback',
       metadata: {
@@ -3503,7 +3532,8 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
-  // Validate phone number format
+  // Validate currency and phone number format
+  const validatedCurrency = validateCurrency(currency, 'EUR');
   const validatedPhone = validatePhoneNumber(phoneNumber);
 
   // Enforce KYC verification before financial operation
@@ -3723,7 +3753,8 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
 
-  // Validate phone number format
+  // Validate currency and phone number format
+  const validatedCurrency = validateCurrency(currency, 'EUR');
   const validatedPhone = validatePhoneNumber(phoneNumber);
 
   // Enforce KYC verification before financial operation
