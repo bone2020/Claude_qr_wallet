@@ -1101,6 +1101,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     };
 
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Payment verification error', { error: error.message });
     await auditLog({
       userId, operation: 'verifyPayment', result: 'failure',
@@ -1108,7 +1109,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Payment verification failed. Please try again.');
   }
   });
 });
@@ -1571,6 +1572,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     };
 
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Withdrawal error', { error: error.message });
     await auditLog({
       userId, operation: 'initiateWithdrawal', result: 'failure',
@@ -1579,7 +1581,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Withdrawal failed. Please try again.');
   }
   });
 });
@@ -1643,8 +1645,9 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Finalize transfer error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Transfer finalization failed. Please try again.');
   }
   });
 });
@@ -1668,8 +1671,9 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
       })),
     };
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Get banks error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Unable to retrieve bank list. Please try again.');
   }
 });
 
@@ -1810,8 +1814,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Mobile Money charge error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Payment failed.');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Payment failed. Please try again.');
   }
   });
 });
@@ -1984,8 +1989,9 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
       };
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Initialize transaction error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Transaction initialization failed. Please try again.');
   }
 });
 
@@ -3268,8 +3274,9 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
     return result;
 
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('Phone verification error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Verification failed.');
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Verification failed. Please try again.');
   }
 });
 
@@ -3781,6 +3788,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to initiate payment'), { responseData: response.data });
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('MoMo RequestToPay error', { error: error.message });
     await auditLog({
       userId, operation: 'momoRequestToPay', result: 'failure',
@@ -3789,7 +3797,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Mobile money payment failed. Please try again.');
   }
   });
 });
@@ -3912,8 +3920,9 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
       };
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('MoMo status check error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Unable to check transaction status. Please try again.');
   }
 });
 
@@ -4054,6 +4063,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to initiate transfer'), { responseData: response.data });
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('MoMo Transfer error', { error: error.message });
     await auditLog({
       userId, operation: 'momoTransfer', result: 'failure',
@@ -4062,7 +4072,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
       error: error.message,
       ipHash: hashIp(context),
     });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Mobile money transfer failed. Please try again.');
   }
   });
 });
@@ -4096,8 +4106,9 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
       throwServiceError('momo', new Error('Failed to get balance'));
     }
   } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
     logError('MoMo balance error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Unable to retrieve balance. Please try again.');
   }
 });
 
