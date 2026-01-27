@@ -3157,14 +3157,37 @@ const MOMO_CONFIG = {
     apiUser: functions.config().momo?.disbursements_api_user || '',
     apiKey: functions.config().momo?.disbursements_api_key || '',
   },
-  baseUrl: functions.config().momo?.environment === 'production'
-    ? 'proxy.momoapi.mtn.com'
-    : 'sandbox.momodeveloper.mtn.com',
-  environment: functions.config().momo?.environment || 'sandbox',
+  environment: (() => {
+    const momoEnv = functions.config().momo?.environment;
+    const appEnv = functions.config().app?.environment;
+
+    if (momoEnv) {
+      // Prevent sandbox in production
+      if (appEnv === 'production' && momoEnv === 'sandbox') {
+        logError('CRITICAL: Cannot use MoMo sandbox in production');
+        return 'production'; // Fail secure: use production
+      }
+      return momoEnv;
+    }
+
+    // No explicit momo.environment set
+    if (appEnv === 'production') {
+      logError('CRITICAL: momo.environment not set in production — defaulting to production');
+      return 'production';
+    }
+
+    logWarning('MoMo environment not set, defaulting to sandbox for development');
+    return 'sandbox';
+  })(),
   callbackUrl: MOMO_WEBHOOK_SECRET
     ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}`
     : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
 };
+
+// Set baseUrl based on resolved environment
+MOMO_CONFIG.baseUrl = MOMO_CONFIG.environment === 'production'
+  ? 'proxy.momoapi.mtn.com'
+  : 'sandbox.momodeveloper.mtn.com';
 
 // Helper function to get MTN MoMo access token
 async function getMomoAccessToken(product) {
