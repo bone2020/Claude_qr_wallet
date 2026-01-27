@@ -3416,6 +3416,11 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
+  const userId = context.auth.uid;
+
+  // KYC required — this function can credit wallets on SUCCESSFUL status
+  await enforceKyc(userId);
+
   const { referenceId, type } = data;
 
   if (!referenceId) {
