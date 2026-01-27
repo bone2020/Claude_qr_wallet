@@ -2468,7 +2468,32 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
 
 const SMILE_ID_API_KEY = functions.config().smileid?.api_key || '';
 const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
-const SMILE_ID_BASE_URL = 'testapi.smileidentity.com'; // Change to 'api.smileidentity.com' for production
+
+/**
+ * Smile ID API base URL — environment-aware.
+ * Set via: firebase functions:config:set smileid.environment="production"
+ * Fails secure: production deployment requires explicit config.
+ */
+const SMILE_ID_BASE_URL = (() => {
+  const smileEnv = functions.config().smileid?.environment;
+  const appEnv = functions.config().app?.environment;
+
+  if (smileEnv === 'production') {
+    return 'api.smileidentity.com';
+  } else if (smileEnv === 'sandbox' || smileEnv === 'test') {
+    return 'testapi.smileidentity.com';
+  } else {
+    // No explicit smileid.environment set
+    if (appEnv === 'production') {
+      // FAIL SECURE: Don't allow production without explicit Smile ID config
+      logError('CRITICAL: smileid.environment not set in production deployment');
+      // Return production URL to avoid silent test-API usage in prod
+      return 'api.smileidentity.com';
+    }
+    // Default to sandbox for development
+    return 'testapi.smileidentity.com';
+  }
+})();
 
 // Helper: Generate Smile ID signature
 function generateSmileIdSignature(timestamp) {
@@ -2532,6 +2557,15 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
   // Validate required fields
   if (!phoneNumber || !country) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number and country are required.');
+  }
+
+  // Validate Smile ID is properly configured
+  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+    logError('Smile ID configuration missing', {
+      hasApiKey: !!SMILE_ID_API_KEY,
+      hasPartnerId: !!SMILE_ID_PARTNER_ID,
+    });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'KYC service not properly configured');
   }
 
   // Check if country supports phone verification
