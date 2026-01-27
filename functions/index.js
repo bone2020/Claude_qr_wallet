@@ -3170,15 +3170,15 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const walletDoc = walletQuery.docs[0];
   const walletData = walletDoc.data();
   
-  // Get user info
+  // Get user info — only retrieve the minimum fields needed for recipient confirmation
   const userDoc = await db.collection('users').doc(walletDoc.id).get();
   const userData = userDoc.exists ? userDoc.data() : {};
-  
+
+  // Return only wallet ID and display name — no profile photo, email, phone, or other PII
   return {
     found: true,
     walletId: walletData.walletId,
     recipientName: userData.fullName || 'QR Wallet User',
-    profilePhotoUrl: userData.profilePhotoUrl || null
   };
 });
 
