@@ -663,9 +663,72 @@ exports.updateExchangeRatesDaily = functions.pubsub
     }
   });
 
-// HTTP function - manual trigger
+// HTTP function - manual trigger (Admin-Only, Signature-Protected)
 exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  // Validate admin secret is configured
+  const adminSecret = functions.config().admin?.exchange_rate_secret;
+  if (!adminSecret) {
+    logError('Exchange rate endpoint called but admin secret not configured');
+    res.status(503).json({ error: 'Service not configured' });
+    return;
+  }
+
+  const providedSignature = req.headers['x-admin-signature'];
+  const providedTimestamp = req.headers['x-timestamp'];
+
+  if (!providedSignature || !providedTimestamp) {
+    logSecurityEvent('exchange_rate_unauthorized', 'high', {
+      ip: req.ip,
+      reason: 'Missing signature or timestamp',
+    });
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  // Validate timestamp (within 5 minutes to prevent replay)
+  const timestampMs = parseInt(providedTimestamp, 10);
+  const now = Date.now();
+  if (isNaN(timestampMs) || Math.abs(now - timestampMs) > 5 * 60 * 1000) {
+    logSecurityEvent('exchange_rate_unauthorized', 'high', {
+      ip: req.ip,
+      reason: 'Invalid or expired timestamp',
+    });
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  // Verify HMAC signature (timing-safe)
+  const expectedSignature = crypto
+    .createHmac('sha256', adminSecret)
+    .update(providedTimestamp)
+    .digest('hex');
+
+  const sigBuffer = Buffer.from(providedSignature, 'hex');
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+
+  if (sigBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    logSecurityEvent('exchange_rate_unauthorized', 'high', {
+      ip: req.ip,
+      reason: 'Invalid signature',
+    });
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  // Authorized — proceed with rate update
   try {
+    logInfo('Exchange rate update initiated', {
+      initiator: 'admin',
+      ip: req.ip,
+    });
+
     const allRates = await fetchRates();
 
     const rates = { 'USD': 1.0 };
@@ -682,9 +745,23 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
       source: 'exchangerate.host'
     });
 
-    res.json({ success: true, count: Object.keys(rates).length, rates });
+    logInfo('Exchange rates updated successfully', {
+      currencyCount: Object.keys(rates).length,
+    });
+
+    // Don't leak actual rates in response
+    res.json({
+      success: true,
+      message: 'Rates updated',
+      count: Object.keys(rates).length,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    logError('Exchange rate update failed', { error: error.message });
+    // Don't leak error details
+    res.status(500).json({
+      success: false,
+      error: 'Rate update failed. Check server logs.',
+    });
   }
 });
 
