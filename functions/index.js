@@ -2700,6 +2700,101 @@ exports.resetMonthlySpendingLimits = functions.pubsub
     return null;
   });
 
+/**
+ * Data Retention TTL Cleanup — runs daily at 3:00 AM UTC.
+ * Enforces retention policies to limit stored PII and reduce storage costs.
+ *
+ * Retention periods:
+ *   - Notifications: 90 days
+ *   - Rate limit entries: 24 hours
+ *   - Pending transactions (resolved): 7 days
+ *   - Flagged transactions (resolved): 180 days
+ *   - Audit logs: 365 days (regulatory minimum)
+ */
+exports.cleanupExpiredData = functions.pubsub
+  .schedule('0 3 * * *')  // Daily at 3:00 AM UTC
+  .timeZone('UTC')
+  .onRun(async () => {
+    const now = Date.now();
+    const BATCH_LIMIT = 400; // Firestore batch limit is 500, keep margin
+
+    const retentionPolicies = [
+      {
+        name: 'rate_limits',
+        collection: 'rate_limits',
+        field: 'updatedAt',
+        maxAgeMs: 24 * 60 * 60 * 1000, // 24 hours
+      },
+      {
+        name: 'pending_transactions',
+        collection: 'pending_transactions',
+        field: 'createdAt',
+        maxAgeMs: 7 * 24 * 60 * 60 * 1000, // 7 days
+      },
+      {
+        name: 'flagged_transactions',
+        collection: 'flagged_transactions',
+        field: 'flaggedAt',
+        maxAgeMs: 180 * 24 * 60 * 60 * 1000, // 180 days
+      },
+      {
+        name: 'audit_logs',
+        collection: 'audit_logs',
+        field: 'timestamp',
+        maxAgeMs: 365 * 24 * 60 * 60 * 1000, // 365 days
+      },
+    ];
+
+    let totalDeleted = 0;
+
+    for (const policy of retentionPolicies) {
+      try {
+        const cutoff = admin.firestore.Timestamp.fromMillis(now - policy.maxAgeMs);
+        const snapshot = await db.collection(policy.collection)
+          .where(policy.field, '<', cutoff)
+          .limit(BATCH_LIMIT)
+          .get();
+
+        if (!snapshot.empty) {
+          const batch = db.batch();
+          snapshot.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+          totalDeleted += snapshot.size;
+          logInfo(`TTL cleanup: ${policy.name}`, { deleted: snapshot.size, cutoffDays: Math.round(policy.maxAgeMs / (24 * 60 * 60 * 1000)) });
+        }
+      } catch (error) {
+        logError(`TTL cleanup failed: ${policy.name}`, { error: error.message });
+      }
+    }
+
+    // Clean up old notifications across all users (sub-collection cleanup)
+    try {
+      const notifCutoff = admin.firestore.Timestamp.fromMillis(now - 90 * 24 * 60 * 60 * 1000); // 90 days
+      const usersSnapshot = await db.collection('users').select().limit(500).get();
+
+      for (const userDoc of usersSnapshot.docs) {
+        const oldNotifs = await db.collection('users').doc(userDoc.id)
+          .collection('notifications')
+          .where('createdAt', '<', notifCutoff)
+          .limit(100)
+          .get();
+
+        if (!oldNotifs.empty) {
+          const batch = db.batch();
+          oldNotifs.docs.forEach(doc => batch.delete(doc.ref));
+          await batch.commit();
+          totalDeleted += oldNotifs.size;
+        }
+      }
+      logInfo('TTL cleanup: notifications', { usersProcessed: usersSnapshot.size });
+    } catch (error) {
+      logError('TTL cleanup failed: notifications', { error: error.message });
+    }
+
+    logInfo('Data retention cleanup complete', { totalDeleted });
+    return null;
+  });
+
 // ============================================================
 // TRANSACTION STATE MACHINE
 // ============================================================
