@@ -2012,53 +2012,84 @@ function generateQrSignature(payload) {
     .digest('hex');
 }
 
-// Rate limiting storage (in-memory, resets on cold start)
+// In-memory burst limiter — supplementary first-line defense per Cloud Function instance.
+// NOTE: Resets on cold starts. All critical rate limiting uses Firestore-backed persistent
+// limiter below. This only provides fast burst protection within a single instance.
 const rateLimitStore = {};
-const failedLookupStore = {};
 
-// Helper: Check rate limit
 function checkRateLimit(key, maxRequests, windowMs) {
   const now = Date.now();
   if (!rateLimitStore[key]) {
     rateLimitStore[key] = { count: 1, resetTime: now + windowMs };
     return true;
   }
-  
+
   if (now > rateLimitStore[key].resetTime) {
     rateLimitStore[key] = { count: 1, resetTime: now + windowMs };
     return true;
   }
-  
+
   if (rateLimitStore[key].count >= maxRequests) {
     return false;
   }
-  
+
   rateLimitStore[key].count++;
   return true;
 }
 
-// Helper: Check failed lookup limit
-function checkFailedLookups(ip) {
-  const now = Date.now();
-  const windowMs = 5 * 60 * 1000; // 5 minutes
-  const maxFailures = 10;
-  
-  if (!failedLookupStore[ip]) {
-    failedLookupStore[ip] = { count: 0, resetTime: now + windowMs };
+// Persistent failed lookup tracking (Firestore-backed, survives cold starts)
+const FAILED_LOOKUP_MAX = 10;
+const FAILED_LOOKUP_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+async function checkFailedLookups(hashedIp) {
+  const docRef = db.collection('rate_limits').doc(`failed_lookup_${hashedIp}`);
+  try {
+    const doc = await docRef.get();
+    if (!doc.exists) return true;
+    const data = doc.data();
+    const windowStart = Date.now() - FAILED_LOOKUP_WINDOW_MS;
+    // Window expired — allow
+    if (data.resetTime && data.resetTime.toMillis() < windowStart) return true;
+    return (data.count || 0) < FAILED_LOOKUP_MAX;
+  } catch (error) {
+    logError('Failed lookup check error', { error: error.message });
+    return true; // Fail open on error
   }
-  
-  if (now > failedLookupStore[ip].resetTime) {
-    failedLookupStore[ip] = { count: 0, resetTime: now + windowMs };
-  }
-  
-  return failedLookupStore[ip].count < maxFailures;
 }
 
-function recordFailedLookup(ip) {
-  if (!failedLookupStore[ip]) {
-    failedLookupStore[ip] = { count: 0, resetTime: Date.now() + 5 * 60 * 1000 };
+async function recordFailedLookup(hashedIp) {
+  const docRef = db.collection('rate_limits').doc(`failed_lookup_${hashedIp}`);
+  try {
+    await db.runTransaction(async (transaction) => {
+      const doc = await transaction.get(docRef);
+      const now = Date.now();
+      if (!doc.exists) {
+        transaction.set(docRef, {
+          count: 1,
+          resetTime: admin.firestore.Timestamp.fromMillis(now + FAILED_LOOKUP_WINDOW_MS),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        const data = doc.data();
+        const windowStart = now - FAILED_LOOKUP_WINDOW_MS;
+        if (data.resetTime && data.resetTime.toMillis() < windowStart) {
+          // Window expired, reset
+          transaction.set(docRef, {
+            count: 1,
+            resetTime: admin.firestore.Timestamp.fromMillis(now + FAILED_LOOKUP_WINDOW_MS),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          transaction.update(docRef, {
+            count: (data.count || 0) + 1,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    });
+  } catch (error) {
+    logError('Failed lookup record error', { error: error.message });
   }
-  failedLookupStore[ip].count++;
 }
 
 // ============================================================
@@ -3018,8 +3049,8 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.RATE_LIMIT_EXCEEDED, 'Too many requests from this location.');
   }
 
-  // Check failed lookup limit (in-memory, per IP)
-  if (!checkFailedLookups(hashedIp)) {
+  // Check failed lookup limit (persistent, per IP)
+  if (!(await checkFailedLookups(hashedIp))) {
     throwAppError(ERROR_CODES.RATE_COOLDOWN_ACTIVE, 'Too many failed attempts. Please wait 5 minutes.');
   }
 
@@ -3037,7 +3068,7 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     .get();
   
   if (walletQuery.empty) {
-    recordFailedLookup(hashedIp);
+    await recordFailedLookup(hashedIp);
     return { found: false };
   }
   
