@@ -689,6 +689,8 @@ const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // Helper function for Paystack API calls
+const HTTP_TIMEOUT_MS = 15000; // 15 seconds for all external API calls
+
 function paystackRequest(method, path, data = null) {
   requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
   return new Promise((resolve, reject) => {
@@ -701,6 +703,7 @@ function paystackRequest(method, path, data = null) {
         'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
+      timeout: HTTP_TIMEOUT_MS,
     };
 
     const req = https.request(options, (res) => {
@@ -716,7 +719,18 @@ function paystackRequest(method, path, data = null) {
       });
     });
 
-    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`Paystack request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
+    });
+
+    req.on('error', (error) => {
+      if (error.code === 'ECONNRESET') {
+        reject(new Error(`Paystack connection reset: ${method} ${path}`));
+      } else {
+        reject(error);
+      }
+    });
 
     if (data) {
       req.write(JSON.stringify(data));
@@ -740,7 +754,7 @@ const CURRENCIES = [
 function fetchRates() {
   return new Promise((resolve, reject) => {
     const url = 'https://api.exchangerate.host/latest?base=USD';
-    https.get(url, (res) => {
+    const req = https.get(url, { timeout: HTTP_TIMEOUT_MS }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -749,13 +763,18 @@ function fetchRates() {
           if (json.success !== false && json.rates) {
             resolve(json.rates);
           } else {
-            reject(new Error('API returned error'));
+            reject(new Error('Exchange rate API returned error'));
           }
         } catch (e) {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`Exchange rate request timed out after ${HTTP_TIMEOUT_MS}ms`));
+    });
+    req.on('error', reject);
   });
 }
 
@@ -2734,6 +2753,7 @@ function smileIdRequest(method, path, data = null) {
         'smileid-source-sdk': 'cloud_functions',
         'smileid-source-sdk-version': '1.0.0',
       },
+      timeout: HTTP_TIMEOUT_MS,
     };
 
     const req = https.request(options, (res) => {
@@ -2744,9 +2764,14 @@ function smileIdRequest(method, path, data = null) {
           const json = JSON.parse(responseData);
           resolve(json);
         } catch (e) {
-          reject(new Error('Failed to parse Smile ID response: ' + responseData));
+          reject(new Error('Failed to parse Smile ID response'));
         }
       });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`Smile ID request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
     });
 
     req.on('error', reject);
@@ -3208,6 +3233,7 @@ async function getMomoAccessToken(product) {
         'Ocp-Apim-Subscription-Key': config.subscriptionKey,
         'Content-Type': 'application/json',
       },
+      timeout: HTTP_TIMEOUT_MS,
     };
 
     const req = https.request(options, (res) => {
@@ -3219,12 +3245,17 @@ async function getMomoAccessToken(product) {
           if (json.access_token) {
             resolve(json.access_token);
           } else {
-            reject(new Error('Failed to get access token: ' + data));
+            reject(new Error('Failed to get MoMo access token'));
           }
         } catch (e) {
-          reject(new Error('Failed to parse token response: ' + data));
+          reject(new Error('Failed to parse MoMo token response'));
         }
       });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`MoMo token request timed out after ${HTTP_TIMEOUT_MS}ms`));
     });
 
     req.on('error', reject);
@@ -3250,6 +3281,7 @@ async function momoRequest(product, method, path, data, referenceId) {
         'Ocp-Apim-Subscription-Key': config.subscriptionKey,
         'Content-Type': 'application/json',
       },
+      timeout: HTTP_TIMEOUT_MS,
     };
 
     if (MOMO_CONFIG.environment !== 'sandbox') {
@@ -3265,6 +3297,11 @@ async function momoRequest(product, method, path, data, referenceId) {
           data: responseData ? JSON.parse(responseData) : null,
         });
       });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error(`MoMo API request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
     });
 
     req.on('error', reject);
