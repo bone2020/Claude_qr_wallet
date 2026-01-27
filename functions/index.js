@@ -699,7 +699,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const { reference } = data;
+  const { reference, idempotencyKey } = data;
   if (!reference) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Payment reference is required.');
   }
@@ -713,6 +713,13 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Enforce persistent rate limiting (30 verifications per hour)
+  await enforceRateLimit(userId, 'verifyPayment');
+
+  // Use reference as idempotency key if none provided (natural idempotency)
+  const effectiveIdempotencyKey = idempotencyKey || `verifyPayment_${reference}`;
+
+  return withIdempotency(effectiveIdempotencyKey, 'verifyPayment', userId, async () => {
   try {
     // Verify with Paystack
     const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
@@ -726,7 +733,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     const amount = amountInKobo / 100; // Convert from kobo to naira
     const currency = paymentData.currency;
 
-    // Check if payment already processed (idempotency)
+    // Secondary idempotency check via payments collection (defense in depth)
     const paymentRef = db.collection('payments').doc(reference);
     const paymentDoc = await paymentRef.get();
 
@@ -815,6 +822,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message);
   }
+  });
 });
 
 // Handle Paystack webhook events
@@ -1767,6 +1775,7 @@ function recordFailedLookup(ip) {
  * message: user-facing error message when rate limited
  */
 const RATE_LIMITS = {
+  verifyPayment:      { windowMs: 60 * 60 * 1000, maxRequests: 30, message: 'Too many payment verifications. Please wait before trying again.' },
   sendMoney:          { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many transfers. Please wait before sending again.' },
   initiateWithdrawal: { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many withdrawal attempts. Please try again later.' },
   momoRequestToPay:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many MoMo payment requests. Please try again later.' },
