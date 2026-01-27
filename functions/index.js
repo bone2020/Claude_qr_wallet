@@ -249,12 +249,107 @@ function logInfo(message, data = {}) { logStructured(LOG_LEVELS.INFO, message, d
 function logWarning(message, data = {}) { logStructured(LOG_LEVELS.WARNING, message, data); }
 function logError(message, data = {}) { logStructured(LOG_LEVELS.ERROR, message, data); }
 
+// ============================================================
+// PII MASKING UTILITIES
+// ============================================================
+
+/**
+ * Masks sensitive data for logging purposes.
+ * Preserves enough information for debugging without exposing full PII.
+ */
+const maskPii = {
+  /** Mask phone number: +233501234567 → +233****4567 */
+  phone: (phone) => {
+    if (!phone || typeof phone !== 'string') return '[no phone]';
+    const cleaned = phone.replace(/\s/g, '');
+    if (cleaned.length < 6) return '****';
+    return cleaned.slice(0, 4) + '****' + cleaned.slice(-4);
+  },
+
+  /** Mask bank account: 1234567890 → ******7890 */
+  account: (account) => {
+    if (!account || typeof account !== 'string') return '[no account]';
+    const cleaned = account.replace(/\s/g, '');
+    if (cleaned.length < 4) return '****';
+    return '******' + cleaned.slice(-4);
+  },
+
+  /** Mask name: John Doe → J*** D** */
+  name: (name) => {
+    if (!name || typeof name !== 'string') return '[no name]';
+    return name.split(' ')
+      .map(part => part.charAt(0) + '***')
+      .join(' ');
+  },
+
+  /** Mask email: john.doe@example.com → j***@e***.com */
+  email: (email) => {
+    if (!email || typeof email !== 'string') return '[no email]';
+    const [local, domain] = email.split('@');
+    if (!domain) return '***@***';
+    const domainParts = domain.split('.');
+    const maskedLocal = local.charAt(0) + '***';
+    const maskedDomain = domainParts[0].charAt(0) + '***.' + domainParts.slice(1).join('.');
+    return `${maskedLocal}@${maskedDomain}`;
+  },
+
+  /** Mask ID number: GHA-123456789 → *****6789 */
+  idNumber: (id) => {
+    if (!id || typeof id !== 'string') return '[no id]';
+    if (id.length < 4) return '****';
+    return '*****' + id.slice(-4);
+  },
+
+  /**
+   * Auto-mask known PII fields in a data object.
+   * Recognizes common field names and applies appropriate masking.
+   */
+  object: (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+
+    const masked = { ...obj };
+
+    const fieldMasks = {
+      phoneNumber: maskPii.phone,
+      phone: maskPii.phone,
+      phone_number: maskPii.phone,
+      formattedPhone: maskPii.phone,
+      accountNumber: maskPii.account,
+      account_number: maskPii.account,
+      bankAccount: maskPii.account,
+      accountName: maskPii.name,
+      account_name: maskPii.name,
+      fullName: maskPii.name,
+      full_name: maskPii.name,
+      firstName: maskPii.name,
+      first_name: maskPii.name,
+      lastName: maskPii.name,
+      last_name: maskPii.name,
+      email: maskPii.email,
+      idNumber: maskPii.idNumber,
+      id_number: maskPii.idNumber,
+      nin: maskPii.idNumber,
+      bvn: maskPii.idNumber,
+    };
+
+    for (const [key, maskFn] of Object.entries(fieldMasks)) {
+      if (key in masked && masked[key]) {
+        masked[key] = maskFn(masked[key]);
+      }
+    }
+
+    return masked;
+  },
+};
+
 /**
  * Log a financial operation with required context.
  * Flagged for Cloud Logging filters: jsonPayload.financial=true
+ * Automatically masks PII fields in data.
  */
 function logFinancialOperation(operation, status, data = {}) {
-  logInfo(`Financial: ${operation} ${status}`, { operation, status, financial: true, ...data });
+  const maskedData = maskPii.object(data);
+  logInfo(`Financial: ${operation} ${status}`, { operation, status, financial: true, ...maskedData });
 }
 
 /**
@@ -1471,7 +1566,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    logInfo('Calling Paystack to verify account', { accountNumber, bankCode });
+    logInfo('Calling Paystack to verify account', { accountNumber: maskPii.account(accountNumber), bankCode });
     const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
 
     logInfo('Paystack verifyAccount response', { status: response.status });
@@ -2696,7 +2791,7 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    logInfo('Verifying phone', { phoneNumber, country });
+    logInfo('Verifying phone', { phoneNumber: maskPii.phone(phoneNumber), country });
 
     // Format phone number (remove country code prefix if present)
     let formattedPhone = phoneNumber.replace(/\s+/g, '');
@@ -2722,7 +2817,11 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
       requestBody.match_fields = matchFields;
     }
 
-    logInfo('Smile ID request', { requestBody });
+    logInfo('Smile ID request', {
+      country: requestBody.country,
+      idType: requestBody.id_type,
+      jobType: requestBody.sec_params?.job_type,
+    });
 
     const response = await smileIdRequest('POST', '/v2/verify-phone-number', requestBody);
 
