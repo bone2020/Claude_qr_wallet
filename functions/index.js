@@ -2397,6 +2397,56 @@ exports.cleanupExpiredQrNonces = functions.pubsub
     return null;
   });
 
+// Reset daily spending counters at midnight UTC
+exports.resetDailySpendingLimits = functions.pubsub
+  .schedule('0 0 * * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const walletsSnapshot = await db.collection('wallets')
+      .where('dailySpent', '>', 0)
+      .limit(500)
+      .get();
+
+    if (walletsSnapshot.empty) {
+      logInfo('No daily spending counters to reset');
+      return null;
+    }
+
+    const batch = db.batch();
+    walletsSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, { dailySpent: 0 });
+    });
+    await batch.commit();
+
+    logInfo('Reset daily spending counters', { count: walletsSnapshot.size });
+    return null;
+  });
+
+// Reset monthly spending counters on 1st of each month
+exports.resetMonthlySpendingLimits = functions.pubsub
+  .schedule('0 0 1 * *')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const walletsSnapshot = await db.collection('wallets')
+      .where('monthlySpent', '>', 0)
+      .limit(500)
+      .get();
+
+    if (walletsSnapshot.empty) {
+      logInfo('No monthly spending counters to reset');
+      return null;
+    }
+
+    const batch = db.batch();
+    walletsSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, { monthlySpent: 0 });
+    });
+    await batch.commit();
+
+    logInfo('Reset monthly spending counters', { count: walletsSnapshot.size });
+    return null;
+  });
+
 // ============================================================
 // TRANSACTION STATE MACHINE
 // ============================================================
@@ -3101,6 +3151,21 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // Calculate fee (1% with min 10, max 100)
       const fee = Math.min(Math.max(amount * 0.01, 10), 100);
       const totalDebit = amount + fee;
+
+      // Enforce daily/monthly spending limits
+      const DAILY_LIMIT = 50000;   // Local currency units
+      const MONTHLY_LIMIT = 500000;
+      const currentDailySpent = Number(senderData.dailySpent) || 0;
+      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
+
+      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
 
       // Check balance (safeSubtract validates the arithmetic)
       safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
