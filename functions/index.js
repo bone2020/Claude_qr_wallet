@@ -1754,63 +1754,6 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 });
 
 // ============================================================
-// INITIALIZE TRANSACTION (For Card Payment via Browser)
-// ============================================================
-exports.initializeTransaction = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
-
-  const { email, amount, currency } = data;
-  const userId = context.auth.uid;
-
-  if (!amount || amount <= 0) {
-    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
-  }
-
-  if (!email) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Email is required.');
-  }
-
-  // Enforce KYC verification before financial operation
-  await enforceKyc(userId);
-
-  try {
-    const reference = 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    
-    const response = await paystackRequest('POST', '/transaction/initialize', {
-      email: email,
-      amount: Math.round(amount * 100),
-      currency: currency || 'GHS',
-      reference: reference,
-      metadata: {
-        userId: userId,
-        type: 'deposit',
-      },
-    });
-
-    logInfo('Initialize transaction response', { status: response.status });
-
-    if (response.status && response.data) {
-      return {
-        success: true,
-        authorizationUrl: response.data.authorization_url,
-        reference: response.data.reference,
-        accessCode: response.data.access_code,
-      };
-    } else {
-      return {
-        success: false,
-        error: response.message || 'Failed to initialize transaction',
-      };
-    }
-  } catch (error) {
-    logError('Initialize transaction error', { error: error.message });
-    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, error.message || 'Transaction initialization failed.');
-  }
-});
-
-// ============================================================
 // QR CODE SIGNING & VERIFICATION
 // ============================================================
 
