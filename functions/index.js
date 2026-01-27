@@ -3074,6 +3074,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'Amount must be positive.');
   }
 
+  if (amount < 1) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_SMALL, 'Minimum transfer amount is 1.');
+  }
+
   if (amount > 10000000) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE);
   }
