@@ -88,7 +88,7 @@ class UserModel {
 
   /// Convert user to JSON for Firestore
   Map<String, dynamic> toJson() {
-    return {
+    final json = <String, dynamic>{
       'id': id,
       'fullName': fullName,
       'email': email,
@@ -102,8 +102,13 @@ class UserModel {
       'country': country,
       'currency': currency,
       'businessLogoUrl': businessLogoUrl,
-      'kycStatus': kycStatus,
     };
+    // Only include kycStatus when non-null — Firestore security rules block
+    // user document creation if the kycStatus key is present (server-only field)
+    if (kycStatus != null) {
+      json['kycStatus'] = kycStatus;
+    }
+    return json;
   }
 
   /// Copy with new values

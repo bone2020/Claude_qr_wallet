@@ -44,6 +44,7 @@ enum AuthState {
 class AuthNotifier extends StateNotifier<AuthStateData> {
   final AuthService _authService;
   final LocalStorageService _localStorage;
+  bool _isSigningUp = false;
 
   AuthNotifier(this._authService, this._localStorage)
       : super(AuthStateData.initial()) {
@@ -54,8 +55,12 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     // Listen to auth state changes
     FirebaseAuth.instance.authStateChanges().listen((user) async {
       if (user != null) {
-        // User is signed in, fetch their data
-        await _loadUserData();
+        // Skip loading user data during signup — the user document doesn't
+        // exist yet and would cause a Firestore PERMISSION_DENIED error.
+        // The signup method handles setting the authenticated state itself.
+        if (!_isSigningUp) {
+          await _loadUserData();
+        }
       } else {
         // User is signed out
         state = AuthStateData.unauthenticated();
@@ -110,24 +115,29 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     String? currencyCode,
   }) async {
     state = state.copyWith(authState: AuthState.loading);
+    _isSigningUp = true;
 
-    final result = await _authService.signUpWithEmail(
-      email: email,
-      password: password,
-      fullName: fullName,
-      phoneNumber: phoneNumber,
-      countryCode: countryCode,
-      currencyCode: currencyCode,
-    );
+    try {
+      final result = await _authService.signUpWithEmail(
+        email: email,
+        password: password,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        countryCode: countryCode,
+        currencyCode: currencyCode,
+      );
 
-    if (result.success && result.user != null) {
-      await _localStorage.saveUser(result.user!);
-      state = AuthStateData.authenticated(result.user!);
-    } else {
-      state = state.copyWith(authState: AuthState.unauthenticated);
+      if (result.success && result.user != null) {
+        await _localStorage.saveUser(result.user!);
+        state = AuthStateData.authenticated(result.user!);
+      } else {
+        state = state.copyWith(authState: AuthState.unauthenticated);
+      }
+
+      return result;
+    } finally {
+      _isSigningUp = false;
     }
-
-    return result;
   }
 
   /// Sign in with email
