@@ -44,11 +44,10 @@ class FirebaseConfig {
     storageBucket: 'qr-wallet-1993.firebasestorage.app',
   );
 
-  /// iOS Firebase options
-  /// TODO: Update with values from GoogleService-Info.plist when you add iOS
+  /// iOS Firebase options (from GoogleService-Info.plist)
   static const FirebaseOptions _iosOptions = FirebaseOptions(
-    apiKey: 'AIzaSyB961nijBwZ0vrgULyERZUtDNI2-hhQRRY',
-    appId: '1:123632722078:ios:YOUR_IOS_APP_ID',
+    apiKey: 'AIzaSyDcb51TcRslogM2NPcHK64eD1NI8J8G4sI',
+    appId: '1:123632722078:ios:f0d3c4a5339da7cc7a5b8f',
     messagingSenderId: '123632722078',
     projectId: 'qr-wallet-1993',
     storageBucket: 'qr-wallet-1993.firebasestorage.app',
