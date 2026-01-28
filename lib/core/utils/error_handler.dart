@@ -11,8 +11,14 @@ class ErrorHandler {
       return 'Unable to connect. Please check your internet connection and try again.';
     }
 
-    // Permission errors
-    if (_isPermissionError(errorString)) {
+    // Firebase/Firestore errors — check BEFORE generic permission check
+    // so Firestore PERMISSION_DENIED is not misidentified as a camera error
+    if (_isFirebaseError(errorString)) {
+      return _getFirebaseUserFriendlyMessage(errorString);
+    }
+
+    // Camera permission errors (camera-specific only)
+    if (_isCameraPermissionError(errorString)) {
       return 'Camera access is required for verification. Please enable camera permissions in your device settings.';
     }
 
@@ -54,11 +60,6 @@ class ErrorHandler {
     // Authentication errors
     if (_isAuthError(errorString)) {
       return 'Your session has expired. Please sign in again to continue.';
-    }
-
-    // Firebase errors
-    if (_isFirebaseError(errorString)) {
-      return _getFirebaseUserFriendlyMessage(errorString);
     }
 
     // Default message for unknown errors
@@ -157,10 +158,10 @@ class ErrorHandler {
         error.contains('failed host lookup');
   }
 
-  static bool _isPermissionError(String error) {
-    return error.contains('permission') ||
-        error.contains('camera_access') ||
-        error.contains('denied') && error.contains('camera');
+  static bool _isCameraPermissionError(String error) {
+    return error.contains('camera_access') ||
+        error.contains('camera_permission') ||
+        (error.contains('denied') && error.contains('camera'));
   }
 
   static bool _isUserCancelled(String error) {
