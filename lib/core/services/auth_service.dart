@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -494,34 +495,12 @@ class AuthService {
   // HELPER METHODS
   // ============================================================
 
-  /// Generate unique wallet ID with Firestore uniqueness check
-  /// Generate unique wallet ID with Firestore uniqueness check
-  /// Uses alphanumeric format with ~60 bits entropy for security
+  /// Generate unique wallet ID via Cloud Function
+  /// Uses server-side uniqueness check to bypass client security rules
   Future<String> _generateUniqueWalletId() async {
-    // Alphanumeric charset (excludes confusing chars: 0, 1, I, L, O)
-    const charset = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-    final random = Random.secure();
-    
-    String generatePart(int length) {
-      return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
-    }
-    
-    while (true) {
-      // Generate: QRW-XXXX-XXXX-XXXX (12 random chars = ~60 bits entropy)
-      final walletId = 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
-
-      // Check if wallet ID already exists in Firestore
-      final querySnapshot = await _firestore
-          .collection('wallets')
-          .where('walletId', isEqualTo: walletId)
-          .limit(1)
-          .get();
-
-      // Return if unique, otherwise loop again
-      if (querySnapshot.docs.isEmpty) {
-        return walletId;
-      }
-    }
+    final callable = FirebaseFunctions.instance.httpsCallable('generateWalletId');
+    final result = await callable.call<Map<String, dynamic>>({});
+    return result.data['walletId'] as String;
   }
 
   /// Get user-friendly error message

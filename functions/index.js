@@ -3182,6 +3182,44 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   };
 });
 
+// Generate unique wallet ID (for use during signup)
+// Uses Admin SDK to check uniqueness, bypassing client security rules
+exports.generateWalletId = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  // Alphanumeric charset (excludes confusing chars: 0, 1, I, L, O)
+  const charset = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+  const generatePart = (length) => {
+    let result = '';
+    const randomBytes = crypto.randomBytes(length);
+    for (let i = 0; i < length; i++) {
+      result += charset[randomBytes[i] % charset.length];
+    }
+    return result;
+  };
+
+  // Try up to 10 times to generate a unique ID
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const walletId = `QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}`;
+
+    // Check if wallet ID already exists
+    const querySnapshot = await db.collection('wallets')
+      .where('walletId', '==', walletId)
+      .limit(1)
+      .get();
+
+    if (querySnapshot.empty) {
+      return { walletId };
+    }
+  }
+
+  // Extremely unlikely to reach here (collision probability is astronomically low)
+  throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Failed to generate unique wallet ID. Please try again.');
+});
+
 
 // ============================================================
 // SMILE ID PHONE VERIFICATION
