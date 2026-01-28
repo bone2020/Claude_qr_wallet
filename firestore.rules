@@ -63,10 +63,11 @@ service cloud.firestore {
       }
     }
 
-    // Wallets - read own only, writes via Cloud Functions
+    // Wallets - read own only, create during signup, updates via Cloud Functions
     match /wallets/{walletId} {
       allow read: if isAuthenticated() && request.auth.uid == walletId;
-      allow write: if false;
+      allow create: if isAuthenticated() && request.auth.uid == walletId;
+      allow update, delete: if false;
     }
 
     // Exchange rates - read only

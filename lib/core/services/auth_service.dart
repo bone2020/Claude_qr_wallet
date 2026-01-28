@@ -56,7 +56,7 @@ class AuthService {
       await user.updateDisplayName(fullName);
 
       // Generate unique wallet ID
-      final walletId = await _generateUniqueWalletId();
+      final walletId = _generateUniqueWalletId();
 
       // Create user document in Firestore
       final userModel = UserModel(
@@ -164,7 +164,7 @@ class AuthService {
         return AuthResult.success(userModel);
       } else {
         // New user - create documents
-        final walletId = await _generateUniqueWalletId();
+        final walletId = _generateUniqueWalletId();
 
         final userModel = UserModel(
           id: user.uid,
@@ -254,7 +254,7 @@ class AuthService {
         return AuthResult.success(userModel);
       } else {
         // New user - create documents
-        final walletId = await _generateUniqueWalletId();
+        final walletId = _generateUniqueWalletId();
 
         // Apple may not return name on subsequent sign-ins, so we use what we have
         final fullName = appleCredential.givenName != null && appleCredential.familyName != null
@@ -494,34 +494,20 @@ class AuthService {
   // HELPER METHODS
   // ============================================================
 
-  /// Generate unique wallet ID with Firestore uniqueness check
-  /// Generate unique wallet ID with Firestore uniqueness check
-  /// Uses alphanumeric format with ~60 bits entropy for security
-  Future<String> _generateUniqueWalletId() async {
+  /// Generate unique wallet ID using cryptographically secure random values
+  /// Uses alphanumeric format with ~59 bits entropy (30^12 ≈ 5.3 × 10^17)
+  /// Collision probability is negligible — no Firestore uniqueness check needed
+  String _generateUniqueWalletId() {
     // Alphanumeric charset (excludes confusing chars: 0, 1, I, L, O)
     const charset = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
     final random = Random.secure();
-    
+
     String generatePart(int length) {
       return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
     }
-    
-    while (true) {
-      // Generate: QRW-XXXX-XXXX-XXXX (12 random chars = ~60 bits entropy)
-      final walletId = 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
 
-      // Check if wallet ID already exists in Firestore
-      final querySnapshot = await _firestore
-          .collection('wallets')
-          .where('walletId', isEqualTo: walletId)
-          .limit(1)
-          .get();
-
-      // Return if unique, otherwise loop again
-      if (querySnapshot.docs.isEmpty) {
-        return walletId;
-      }
-    }
+    // Generate: QRW-XXXX-XXXX-XXXX (12 random chars from 30-char set)
+    return 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
   }
 
   /// Get user-friendly error message
