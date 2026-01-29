@@ -2,6 +2,15 @@
 class ErrorHandler {
   ErrorHandler._();
 
+  /// Check if the error is a SmileID "already enrolled" error
+  /// This error means the user has already been verified, so we should treat it as success
+  static bool isAlreadyEnrolledError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('already enrolled') ||
+        errorString.contains('user is already enrolled') ||
+        errorString.contains('wrong job type') && errorString.contains('enrolled');
+  }
+
   /// Convert technical error messages to user-friendly messages
   static String getUserFriendlyMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
