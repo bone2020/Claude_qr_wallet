@@ -61,6 +61,14 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow write: if false;
       }
+
+      // KYC documents — user can read and write their own KYC data
+      // Note: kycStatus on user doc is still server-only (handled by kycStatusUnchanged)
+      match /kyc/{docId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId);
+        allow delete: if false;
+      }
     }
 
     // Wallets - read own only, create during signup, updates via Cloud Functions
