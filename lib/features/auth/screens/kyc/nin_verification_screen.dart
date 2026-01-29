@@ -294,19 +294,27 @@ class _SmileIdBiometricScreen extends StatelessWidget {
         onSuccess: (result) {
           Navigator.pop(context, result);
         },
-        onError: (error) {
+        onError: (error) async {
           // Check if this is an "already enrolled" error - treat as success
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            Navigator.pop(context, 'already_enrolled');
+            // User was previously verified - update their KYC status immediately
+            await UserService().markKycVerifiedForAlreadyEnrolledUser(
+              idType: idType,
+            );
+            if (context.mounted) {
+              Navigator.pop(context, 'already_enrolled');
+            }
             return;
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Verification failed: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          Navigator.pop(context);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Verification failed: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            Navigator.pop(context);
+          }
         },
       ),
     );
