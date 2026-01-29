@@ -9,6 +9,7 @@ import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/user_service.dart';
+import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
@@ -268,6 +269,11 @@ class _SmileIdDocumentScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) {
+          // Check if this is an "already enrolled" error - treat as success
+          if (ErrorHandler.isAlreadyEnrolledError(error)) {
+            Navigator.pop(context, 'already_enrolled');
+            return;
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Verification failed: $error'),
