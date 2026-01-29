@@ -145,6 +145,70 @@ class UserService {
     }
   }
 
+  /// Mark user as KYC verified when SmileID returns "already enrolled" error.
+  /// This means the user was previously verified via SmileID, so we should
+  /// immediately set their kycStatus to 'verified' without requiring them
+  /// to complete the full KYC flow again.
+  Future<UserResult> markKycVerifiedForAlreadyEnrolledUser({
+    String? idType,
+    DateTime? dateOfBirth,
+  }) async {
+    if (_userId == null) {
+      return UserResult.failure('User not authenticated');
+    }
+
+    try {
+      // Update user's KYC status fields
+      final updates = <String, dynamic>{
+        'kycCompleted': true,
+        'kycVerified': true,
+      };
+      if (dateOfBirth != null) {
+        updates['dateOfBirth'] = dateOfBirth.toIso8601String();
+      }
+
+      await NetworkRetry.execute(
+        () => _firestore.collection('users').doc(_userId).update(updates),
+        config: RetryConfig.network,
+      );
+
+      // Update KYC documents subcollection if it doesn't exist or update status
+      final kycDocRef = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('kyc')
+          .doc('documents');
+
+      final kycDoc = await kycDocRef.get();
+      if (!kycDoc.exists) {
+        // Create a new KYC document for already enrolled users
+        await kycDocRef.set({
+          'idType': idType ?? 'SMILE_ID_ENROLLED',
+          'status': 'verified',
+          'verificationMethod': 'smile_id_already_enrolled',
+          'submittedAt': DateTime.now().toIso8601String(),
+          'smileIdVerified': true,
+          if (dateOfBirth != null) 'dateOfBirth': dateOfBirth.toIso8601String(),
+        });
+      } else {
+        // Update existing document
+        await kycDocRef.update({
+          'status': 'verified',
+          'smileIdVerified': true,
+        });
+      }
+
+      // Set canonical kycStatus via Cloud Function (server-authoritative)
+      // This is critical - the Cloud Function enforces this field
+      await _setKycStatusOnServer('verified');
+
+      final updatedUser = await getCurrentUser();
+      return UserResult.success(updatedUser);
+    } catch (e) {
+      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
   /// Upload KYC documents
   Future<UserResult> uploadKycDocuments({
     File? idFront,
