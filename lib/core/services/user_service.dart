@@ -149,6 +149,9 @@ class UserService {
   /// This means the user was previously verified via SmileID, so we should
   /// immediately set their kycStatus to 'verified' without requiring them
   /// to complete the full KYC flow again.
+  ///
+  /// This calls the markUserAlreadyEnrolled Cloud Function which handles
+  /// all the server-side updates atomically.
   Future<UserResult> markKycVerifiedForAlreadyEnrolledUser({
     String? idType,
     DateTime? dateOfBirth,
@@ -158,53 +161,31 @@ class UserService {
     }
 
     try {
-      // Update user's KYC status fields
-      final updates = <String, dynamic>{
-        'kycCompleted': true,
-        'kycVerified': true,
-      };
+      // Call the dedicated Cloud Function for "already enrolled" users
+      // This function sets kycStatus: 'verified' directly without requiring
+      // prior KYC document approval (since SmileID already verified them)
+      final callable = FirebaseFunctions.instance.httpsCallable('markUserAlreadyEnrolled');
+      final result = await callable.call({
+        'idType': idType,
+      });
+
+      final data = result.data as Map<String, dynamic>;
+      if (data['success'] != true) {
+        return UserResult.failure(data['error'] ?? 'Failed to update KYC status');
+      }
+
+      // Update date of birth locally if provided
       if (dateOfBirth != null) {
-        updates['dateOfBirth'] = dateOfBirth.toIso8601String();
-      }
-
-      await NetworkRetry.execute(
-        () => _firestore.collection('users').doc(_userId).update(updates),
-        config: RetryConfig.network,
-      );
-
-      // Update KYC documents subcollection if it doesn't exist or update status
-      final kycDocRef = _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('kyc')
-          .doc('documents');
-
-      final kycDoc = await kycDocRef.get();
-      if (!kycDoc.exists) {
-        // Create a new KYC document for already enrolled users
-        await kycDocRef.set({
-          'idType': idType ?? 'SMILE_ID_ENROLLED',
-          'status': 'verified',
-          'verificationMethod': 'smile_id_already_enrolled',
-          'submittedAt': DateTime.now().toIso8601String(),
-          'smileIdVerified': true,
-          if (dateOfBirth != null) 'dateOfBirth': dateOfBirth.toIso8601String(),
-        });
-      } else {
-        // Update existing document
-        await kycDocRef.update({
-          'status': 'verified',
-          'smileIdVerified': true,
+        await _firestore.collection('users').doc(_userId).update({
+          'dateOfBirth': dateOfBirth.toIso8601String(),
         });
       }
-
-      // Set canonical kycStatus via Cloud Function (server-authoritative)
-      // This is critical - the Cloud Function enforces this field
-      await _setKycStatusOnServer('verified');
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser);
     } catch (e) {
+      // ignore: avoid_print
+      print('Error in markKycVerifiedForAlreadyEnrolledUser: $e');
       return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }

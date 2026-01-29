@@ -2328,6 +2328,63 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
   };
 });
 
+/**
+ * Mark user as KYC verified when SmileID returns "already enrolled" error.
+ * This indicates the user was previously verified by SmileID, so we can
+ * trust that verification and set kycStatus: 'verified' directly.
+ *
+ * Unlike updateKycStatus, this function doesn't require prior KYC document
+ * approval because SmileID has already verified the user's identity.
+ */
+exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { idType } = data || {};
+
+  logInfo('Processing SmileID already enrolled user', { userId, idType });
+
+  // Create or update the KYC documents subcollection
+  const kycDocRef = db.collection('users').doc(userId).collection('kyc').doc('documents');
+  const kycDoc = await kycDocRef.get();
+
+  if (!kycDoc.exists) {
+    // Create a new KYC document for already enrolled users
+    await kycDocRef.set({
+      idType: idType || 'SMILE_ID_ENROLLED',
+      status: 'verified',
+      verificationMethod: 'smile_id_already_enrolled',
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      smileIdVerified: true,
+    });
+  } else {
+    // Update existing document to verified status
+    await kycDocRef.update({
+      status: 'verified',
+      smileIdVerified: true,
+      verificationMethod: 'smile_id_already_enrolled',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Set the canonical kycStatus field
+  await db.collection('users').doc(userId).update({
+    kycStatus: 'verified',
+    kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    kycCompleted: true,
+    kycVerified: true,
+  });
+
+  logInfo('User marked as KYC verified (SmileID already enrolled)', { userId });
+
+  return {
+    success: true,
+    kycStatus: 'verified',
+  };
+});
+
 // ============================================================
 // GDPR DATA EXPORT & DELETION
 // ============================================================
