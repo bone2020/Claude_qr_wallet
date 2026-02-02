@@ -3806,7 +3806,7 @@ async function getMomoAccessToken(product) {
     const options = {
       hostname: MOMO_CONFIG.baseUrl,
       port: 443,
-      path: `/${product}/token/`,
+      path: `/${product === 'collections' ? 'collection' : 'disbursement'}/token/`,
       method: 'POST',
       headers: {
         'Authorization': `Basic ${credentials}`,
@@ -3852,7 +3852,7 @@ async function momoRequest(product, method, path, data, referenceId) {
     const options = {
       hostname: MOMO_CONFIG.baseUrl,
       port: 443,
-      path: `/${product}${path}`,
+      path: `/${product === 'collections' ? 'collection' : 'disbursement'}${path}`,
       method: method,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
