@@ -11,6 +11,50 @@ class ErrorHandler {
         errorString.contains('wrong job type') && errorString.contains('enrolled');
   }
 
+  /// Check if the error is a MoMo service not configured error
+  static bool isMomoNotConfiguredError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('momo') &&
+        (errorString.contains('not configured') ||
+         errorString.contains('coming soon') ||
+         errorString.contains('not yet available'));
+  }
+
+  /// Get user-friendly message for MoMo/Mobile Money errors
+  static String getMomoUserFriendlyMessage(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    // Service not configured
+    if (isMomoNotConfiguredError(error) ||
+        errorString.contains('config_missing') ||
+        errorString.contains('service unavailable')) {
+      return 'Mobile Money is coming soon! This feature is not yet available. Please use Card or Bank Transfer instead.';
+    }
+
+    // Payment rejected/failed
+    if (errorString.contains('rejected') || errorString.contains('declined')) {
+      return 'Payment was declined. Please check your Mobile Money balance and try again.';
+    }
+
+    // Insufficient funds
+    if (errorString.contains('insufficient') || errorString.contains('not enough')) {
+      return 'Insufficient funds in your Mobile Money account.';
+    }
+
+    // Invalid phone number
+    if (errorString.contains('invalid') && errorString.contains('phone')) {
+      return 'Invalid phone number. Please check and try again.';
+    }
+
+    // Timeout/pending
+    if (errorString.contains('timeout') || errorString.contains('timed out')) {
+      return 'Payment request timed out. Please check your phone for approval prompt and try again.';
+    }
+
+    // Default
+    return getUserFriendlyMessage(error);
+  }
+
   /// Convert technical error messages to user-friendly messages
   static String getUserFriendlyMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();

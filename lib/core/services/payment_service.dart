@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:math';
 
+import '../utils/error_handler.dart';
 import 'wallet_service.dart';
 import 'momo_service.dart';
 
@@ -420,15 +421,21 @@ class PaymentService {
           completed: false, // Needs user approval
         );
       } else {
+        // Use MoMo-specific error handler for better messages
+        final errorMessage = ErrorHandler.getMomoUserFriendlyMessage(
+          result.error ?? 'MTN MoMo payment failed',
+        );
         return MobileMoneyPaymentResult(
           success: false,
-          error: result.error ?? 'MTN MoMo payment failed',
+          error: errorMessage,
         );
       }
     } catch (e) {
+      // Use MoMo-specific error handler for better messages
+      final errorMessage = ErrorHandler.getMomoUserFriendlyMessage(e);
       return MobileMoneyPaymentResult(
         success: false,
-        error: e.toString(),
+        error: errorMessage,
       );
     }
   }
@@ -477,15 +484,21 @@ class PaymentService {
           message: result.message,
         );
       } else {
+        // Use MoMo-specific error handler for better messages
+        final errorMessage = ErrorHandler.getMomoUserFriendlyMessage(
+          result.error ?? 'MTN MoMo withdrawal failed',
+        );
         return WithdrawalResult(
           success: false,
-          error: result.error ?? 'MTN MoMo withdrawal failed',
+          error: errorMessage,
         );
       }
     } catch (e) {
+      // Use MoMo-specific error handler for better messages
+      final errorMessage = ErrorHandler.getMomoUserFriendlyMessage(e);
       return WithdrawalResult(
         success: false,
-        error: e.toString(),
+        error: errorMessage,
       );
     }
   }

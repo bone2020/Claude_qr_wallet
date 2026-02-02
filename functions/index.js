@@ -740,7 +740,14 @@ function requireServiceReady(serviceName) {
 
   const missing = requiredKeys.filter(key => MISSING_CRITICAL_CONFIGS.has(key));
   if (missing.length > 0) {
-    throwAppError(ERROR_CODES.CONFIG_MISSING, `Service unavailable: ${serviceName} is not configured. Contact support.`);
+    // Provide user-friendly messages based on service type
+    let userMessage;
+    if (serviceName.startsWith('momo')) {
+      userMessage = 'Mobile Money is coming soon! This feature is not yet available in your region.';
+    } else {
+      userMessage = `Service temporarily unavailable. Please try again later or use a different payment method.`;
+    }
+    throwAppError(ERROR_CODES.CONFIG_MISSING, userMessage);
   }
 }
 
@@ -3799,7 +3806,7 @@ async function getMomoAccessToken(product) {
     const options = {
       hostname: MOMO_CONFIG.baseUrl,
       port: 443,
-      path: `/${product}/token/`,
+      path: `/${product === 'collections' ? 'collection' : 'disbursement'}/token/`,
       method: 'POST',
       headers: {
         'Authorization': `Basic ${credentials}`,
@@ -3845,7 +3852,7 @@ async function momoRequest(product, method, path, data, referenceId) {
     const options = {
       hostname: MOMO_CONFIG.baseUrl,
       port: 443,
-      path: `/${product}${path}`,
+      path: `/${product === 'collections' ? 'collection' : 'disbursement'}${path}`,
       method: method,
       headers: {
         'Authorization': `Bearer ${accessToken}`,
