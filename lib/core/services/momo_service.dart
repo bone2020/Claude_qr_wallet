@@ -39,7 +39,7 @@ class MomoService {
         'idempotencyKey': idempotencyKey,
       });
 
-      final data = result.data as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(result.data as Map);
 
       if (data['success'] == true) {
         return MomoPaymentResult(
@@ -85,7 +85,7 @@ class MomoService {
         'idempotencyKey': idempotencyKey,
       });
 
-      final data = result.data as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(result.data as Map);
 
       if (data['success'] == true) {
         return MomoPaymentResult(
@@ -125,12 +125,12 @@ class MomoService {
         'type': type,
       });
 
-      final data = result.data as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(result.data as Map);
 
       return MomoStatusResult(
         success: data['success'] as bool? ?? false,
         status: data['status'] as String?,
-        data: data['data'] as Map<String, dynamic>?,
+        data: data['data'] != null ? Map<String, dynamic>.from(data['data'] as Map) : null,
         error: data['error'] as String?,
       );
     } catch (e) {
@@ -152,7 +152,7 @@ class MomoService {
       final callable = _functions.httpsCallable('momoGetBalance');
       final result = await callable.call({'product': product});
 
-      final data = result.data as Map<String, dynamic>;
+      final data = Map<String, dynamic>.from(result.data as Map);
 
       if (data['success'] == true) {
         final balance = data['balance'] as Map<String, dynamic>?;

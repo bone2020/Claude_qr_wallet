@@ -3932,9 +3932,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
     const referenceId = crypto.randomUUID();
 
     // Create request to pay
-    const response = await momoRequest('collection', 'POST', '/v1_0/requesttopay', {
+    const response = await momoRequest('collections', 'POST', '/v1_0/requesttopay', {
       amount: amount.toString(),
-      currency: currency || 'EUR', // Sandbox only supports EUR
+      currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payer: {
         partyIdType: 'MSISDN',
@@ -4013,7 +4013,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    const product = type === 'disbursement' ? 'disbursement' : 'collection';
+    const product = type === 'disbursement' ? 'disbursements' : 'collections';
     const path = type === 'disbursement' ? `/v1_0/transfer/${referenceId}` : `/v1_0/requesttopay/${referenceId}`;
 
     const response = await momoRequest(product, 'GET', path, null, referenceId);
@@ -4199,9 +4199,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
     });
 
     // Create transfer request
-    const response = await momoRequest('disbursement', 'POST', '/v1_0/transfer', {
+    const response = await momoRequest('disbursements', 'POST', '/v1_0/transfer', {
       amount: amount.toString(),
-      currency: currency || 'EUR', // Sandbox only supports EUR
+      currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payee: {
         partyIdType: 'MSISDN',
