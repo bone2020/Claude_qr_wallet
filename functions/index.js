@@ -2327,6 +2327,80 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Complete KYC verification after client successfully uploads KYC documents.
+ *
+ * This function is called by the Flutter client after KYC documents have been
+ * uploaded to Firestore. It validates that documents exist and sets kycStatus
+ * using the Admin SDK (which bypasses Firestore security rules).
+ *
+ * Security: Only the authenticated user can complete their own KYC.
+ * The kycStatus field is protected by Firestore rules and can only be
+ * written by Cloud Functions using Admin SDK.
+ */
+exports.completeKycVerification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  logInfo('Completing KYC verification', { userId });
+
+  // Check if user document exists
+  const userRef = db.collection('users').doc(userId);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.USER_NOT_FOUND, 'User document not found.');
+  }
+
+  const userData = userDoc.data();
+
+  // If already verified, return success (idempotent)
+  if (userData.kycStatus === 'verified') {
+    logInfo('User already KYC verified, no action needed', { userId });
+    return {
+      success: true,
+      kycStatus: 'verified',
+      message: 'Already verified',
+    };
+  }
+
+  // Check if KYC documents exist
+  const kycDocRef = userRef.collection('kyc').doc('documents');
+  const kycDoc = await kycDocRef.get();
+
+  if (!kycDoc.exists) {
+    throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'No KYC documents found. Please complete identity verification first.');
+  }
+
+  const kycData = kycDoc.data();
+
+  // Validate KYC document status - accept verified, approved, or smileIdVerified
+  const validStatuses = ['verified', 'approved'];
+  const isValidStatus = validStatuses.includes(kycData.status) || kycData.smileIdVerified === true;
+
+  if (!isValidStatus) {
+    logInfo('KYC documents not yet verified', { userId, status: kycData.status, smileIdVerified: kycData.smileIdVerified });
+    throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'KYC documents have not been verified yet.');
+  }
+
+  // Set kycStatus using Admin SDK (bypasses Firestore rules)
+  await userRef.update({
+    kycStatus: 'verified',
+    kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    kycCompleted: true,
+    kycVerified: true,
+  });
+
+  logInfo('KYC verification completed successfully', { userId });
+
+  return {
+    success: true,
+    kycStatus: 'verified',
+  };
+});
+
+/**
  * Mark user as KYC verified when SmileID returns "already enrolled" error.
  * This indicates the user was previously verified by SmileID, so we can
  * trust that verification and set kycStatus: 'verified' directly.
