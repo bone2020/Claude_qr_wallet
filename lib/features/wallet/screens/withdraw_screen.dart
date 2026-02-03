@@ -239,6 +239,23 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   }
 
   Future<void> _handleWithdraw() async {
+    // ========== DEBUG LOGGING - START ==========
+    debugPrint('========== WITHDRAW DEBUG ==========');
+    debugPrint('🏦 _selectedBank: ${_selectedBank?.name}');
+    debugPrint('🔢 _selectedBank.code: ${_selectedBank?.code}');
+    debugPrint('📋 Total banks in list: ${_banks.length}');
+    debugPrint('📋 First 5 banks in _banks:');
+    for (var i = 0; i < _banks.length && i < 5; i++) {
+      debugPrint('   [$i] ${_banks[i].name} -> code: ${_banks[i].code}');
+    }
+    debugPrint('🔍 Checking if _selectedBank exists in _banks list...');
+    final matchByCode = _banks.where((b) => b.code == _selectedBank?.code).toList();
+    final matchByIdentity = _banks.where((b) => identical(b, _selectedBank)).toList();
+    debugPrint('   Matches by CODE: ${matchByCode.length}');
+    debugPrint('   Matches by IDENTITY (memory): ${matchByIdentity.length}');
+    debugPrint('====================================');
+    // ========== DEBUG LOGGING - END ==========
+
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.parse(_amountController.text.replaceAll(',', ''));
@@ -275,6 +292,20 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       WithdrawalResult result;
 
       if (isBankWithdrawal) {
+        // ========== BANK VALIDATION - START ==========
+        // Verify the selected bank exists in our list (safety check)
+        final bankExistsInList = _banks.any((b) => b.code == _selectedBank?.code);
+        if (!bankExistsInList) {
+          debugPrint('❌ ERROR: Selected bank code ${_selectedBank?.code} not found in banks list!');
+          if (mounted) {
+            _showError('Bank selection error. Please re-select your bank and try again.');
+            setState(() => _isLoading = false);
+          }
+          return;
+        }
+        debugPrint('✅ Bank validation passed: ${_selectedBank?.name} (${_selectedBank?.code})');
+        // ========== BANK VALIDATION - END ==========
+
         result = await _paymentService.initiateWithdrawal(
           amount: amount,
           bankCode: _selectedBank!.code,

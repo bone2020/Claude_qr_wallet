@@ -551,6 +551,19 @@ class Bank {
   final String type;
 
   Bank({required this.name, required this.code, required this.type});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Bank &&
+          runtimeType == other.runtimeType &&
+          code == other.code;
+
+  @override
+  int get hashCode => code.hashCode;
+
+  @override
+  String toString() => 'Bank(name: $name, code: $code, type: $type)';
 }
 
 class BankAccountVerification {
