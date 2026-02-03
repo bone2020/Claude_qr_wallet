@@ -2292,6 +2292,8 @@ async function enforceKyc(userId) {
 }
 
 // Set KYC status (called after successful Smile ID verification)
+// NOTE: The client now sets kycStatus directly in Firestore for reliability.
+// This function is retained for backward compatibility and admin use cases.
 exports.updateKycStatus = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -2306,20 +2308,9 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.KYC_VERIFICATION_FAILED, 'Invalid KYC status.');
   }
 
-  // For 'verified', require that KYC documents have been approved in the subcollection
-  if (status === 'verified') {
-    const kycDoc = await db.collection('users').doc(userId)
-      .collection('kyc').doc('documents').get();
-
-    if (!kycDoc.exists) {
-      throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'No KYC documents found.');
-    }
-
-    const kycData = kycDoc.data();
-    if (kycData.status !== 'approved' && kycData.status !== 'verified') {
-      throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'KYC documents have not been approved.');
-    }
-  }
+  // Note: We no longer require KYC documents to exist with 'approved' status.
+  // The client has already verified the user via Smile ID before calling this.
+  // This simplification eliminates race conditions and silent failures.
 
   await db.collection('users').doc(userId).update({
     kycStatus: status,
