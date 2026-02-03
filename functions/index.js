@@ -1087,6 +1087,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
         currency: currency,
         status: 'completed',
         reference: reference,
+        method: 'Bank Card',
         description: 'Wallet top-up via Paystack',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1275,6 +1276,7 @@ async function handleSuccessfulCharge(data) {
       currency: currency,
       status: 'completed',
       reference: reference,
+      method: 'Bank Card',
       description: `Deposit via ${data.channel}`,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -1507,6 +1509,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         currency: walletData.currency || 'NGN',
         status: 'pending',
         reference: reference,
+        method: type === 'mobile_money' ? 'Mobile Money' : 'Bank Transfer',
         description: `Withdrawal to ${type === 'mobile_money' ? 'Mobile Money' : 'Bank'} - ${accountName}`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });

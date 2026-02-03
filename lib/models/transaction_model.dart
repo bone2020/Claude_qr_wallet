@@ -89,6 +89,9 @@ class TransactionModel {
   @HiveField(18)
   final double? exchangeRate;
 
+  @HiveField(19)
+  final String? method;
+
   TransactionModel({
     required this.id,
     required this.senderWalletId,
@@ -109,6 +112,7 @@ class TransactionModel {
     this.receiverCurrency,
     this.convertedAmount,
     this.exchangeRate,
+    this.method,
   });
 
   /// Create transaction from Firestore document
@@ -149,6 +153,7 @@ class TransactionModel {
       receiverCurrency: json['receiverCurrency'] as String?,
       convertedAmount: (json['convertedAmount'] as num?)?.toDouble(),
       exchangeRate: (json['exchangeRate'] as num?)?.toDouble(),
+      method: json['method'] as String?,
     );
   }
 
@@ -174,6 +179,7 @@ class TransactionModel {
       'receiverCurrency': receiverCurrency,
       'convertedAmount': convertedAmount,
       'exchangeRate': exchangeRate,
+      'method': method,
     };
   }
 
@@ -198,6 +204,7 @@ class TransactionModel {
     String? receiverCurrency,
     double? convertedAmount,
     double? exchangeRate,
+    String? method,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -219,6 +226,7 @@ class TransactionModel {
       receiverCurrency: receiverCurrency ?? this.receiverCurrency,
       convertedAmount: convertedAmount ?? this.convertedAmount,
       exchangeRate: exchangeRate ?? this.exchangeRate,
+      method: method ?? this.method,
     );
   }
 
@@ -237,8 +245,16 @@ class TransactionModel {
     return '$sign$symbol${amount.toStringAsFixed(2)}';
   }
 
-  /// Get counterparty name
+  /// Get counterparty name or method for deposits/withdrawals
   String getCounterpartyName(String currentWalletId) {
+    // For deposits and withdrawals, show method or type name
+    if (type == TransactionType.deposit) {
+      return method ?? 'Deposit';
+    }
+    if (type == TransactionType.withdraw) {
+      return method ?? 'Withdrawal';
+    }
+    // For send/receive, use counterparty name
     if (isCredit(currentWalletId)) {
       return senderName ?? 'Unknown';
     }

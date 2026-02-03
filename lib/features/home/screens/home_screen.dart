@@ -96,7 +96,7 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: AppDimensions.spaceXXL),
 
                 // Recent Transactions
-                _buildRecentTransactions(context, recentTransactions, currency)
+                _buildRecentTransactions(context, recentTransactions, currency, walletId)
                     .animate()
                     .fadeIn(delay: 300.ms, duration: 400.ms),
 
@@ -200,7 +200,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentTransactions(BuildContext context, List<dynamic> transactions, String currency) {
+  Widget _buildRecentTransactions(BuildContext context, List<dynamic> transactions, String currency, String walletId) {
     return Column(
       children: [
         Row(
@@ -231,7 +231,7 @@ class HomeScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               final transaction = transactions[index];
               return TransactionTile(
-                name: transaction.receiverName ?? transaction.senderName ?? 'Unknown',
+                name: transaction.getCounterpartyName(walletId),
                 type: _getTransactionType(transaction.type),
                 amount: transaction.amount,
                 currency: currency,
