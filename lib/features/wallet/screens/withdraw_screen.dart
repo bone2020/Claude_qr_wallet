@@ -50,7 +50,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   // Configuration for bank account verification
   static const int _minDigitsToVerify = 10;
   static const int _maxAccountDigits = 20;
-  static const Duration _debounceDuration = Duration(milliseconds: 1000);
+  static const Duration _debounceDuration = Duration(milliseconds: 2500);
 
   @override
   void initState() {
