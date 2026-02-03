@@ -1678,6 +1678,7 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
         name: bank.name,
         code: bank.code,
         type: bank.type,
+        currency: bank.currency || 'NGN',
       })),
     };
   } catch (error) {

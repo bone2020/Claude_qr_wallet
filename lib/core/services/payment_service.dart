@@ -204,6 +204,7 @@ class PaymentService {
                   name: b['name'] as String,
                   code: b['code'] as String,
                   type: b['type'] as String? ?? 'nuban',
+                  currency: b['currency'] as String? ?? 'NGN',
                 ))
             .toList();
         return banks;
@@ -549,21 +550,23 @@ class Bank {
   final String name;
   final String code;
   final String type;
+  final String currency;
 
-  Bank({required this.name, required this.code, required this.type});
+  Bank({required this.name, required this.code, required this.type, required this.currency});
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Bank &&
           runtimeType == other.runtimeType &&
-          code == other.code;
+          code == other.code &&
+          currency == other.currency;
 
   @override
-  int get hashCode => code.hashCode;
+  int get hashCode => Object.hash(code, currency);
 
   @override
-  String toString() => 'Bank(name: $name, code: $code, type: $type)';
+  String toString() => 'Bank(name: $name, code: $code, type: $type, currency: $currency)';
 }
 
 class BankAccountVerification {

@@ -85,11 +85,13 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       if (currency == 'ZAR') country = 'south africa';
 
       final banks = await _paymentService.getBanks(country: country);
+      // Filter banks by wallet currency
+      final filteredBanks = banks.where((bank) => bank.currency == currency).toList();
       if (mounted) {
         setState(() {
           _banks = [
-            Bank(name: 'Test Bank (Development)', code: '001', type: 'nuban'),
-            ...banks,
+            Bank(name: 'Test Bank (Development)', code: '001', type: 'nuban', currency: currency),
+            ...filteredBanks,
           ];
           _isLoadingBanks = false;
         });
