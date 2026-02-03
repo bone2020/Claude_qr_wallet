@@ -1021,21 +1021,19 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             // Manual verify button - shows when conditions are met but not yet verified
             if (showVerifyButton) ...[
               const SizedBox(width: AppDimensions.spaceSM),
-              SizedBox(
-                height: 56, // Match text field height
-                child: ElevatedButton(
-                  onPressed: _verifyBankAccount,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.spaceMD),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-                    ),
+              ElevatedButton(
+                onPressed: _verifyBankAccount,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  minimumSize: const Size(0, 56), // Match text field height
+                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.spaceMD),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
                   ),
-                  child: Text(
-                    'Verify',
-                    style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
-                  ),
+                ),
+                child: Text(
+                  'Verify',
+                  style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
                 ),
               ),
             ],
