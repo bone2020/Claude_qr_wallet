@@ -132,17 +132,17 @@ class UserService {
   // ============================================================
 
   /// Set KYC status on the server via Cloud Function.
-  /// This sets the canonical kycStatus field that Cloud Functions enforce.
+  ///
+  /// @deprecated This method is no longer used in the primary KYC flow.
+  /// kycStatus is now set directly in Firestore during document upload.
+  /// This method is retained for potential future server-side validation needs.
+  ///
+  /// Note: This method now throws errors instead of silently catching them.
+  // ignore: unused_element
   Future<void> _setKycStatusOnServer(String status) async {
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable('updateKycStatus');
-      await callable.call({'status': status});
-    } catch (e) {
-      // Log but don't fail the entire KYC flow — the legacy kycCompleted
-      // field still provides backward-compatible enforcement
-      // ignore: avoid_print
-      print('Warning: Failed to set kycStatus via Cloud Function: $e');
-    }
+    final callable = FirebaseFunctions.instance.httpsCallable('updateKycStatus');
+    await callable.call({'status': status});
+    // Errors are now propagated to the caller instead of being silently caught
   }
 
   /// Mark user as KYC verified when SmileID returns "already enrolled" error.
@@ -265,22 +265,18 @@ class UserService {
         config: RetryConfig.network,
       );
 
-      // Update user's KYC status with retry (legacy fields for backward compat)
+      // Update user's KYC status directly - set kycStatus along with legacy fields
+      // This ensures kycStatus is always set when KYC verification completes
       await NetworkRetry.execute(
         () => _firestore.collection('users').doc(_userId).update({
+          'kycStatus': smileIdVerified ? 'verified' : 'pending',
+          'kycStatusUpdatedAt': FieldValue.serverTimestamp(),
           'kycCompleted': true,
           'kycVerified': smileIdVerified,
           'dateOfBirth': dateOfBirth.toIso8601String(),
         }),
         config: RetryConfig.network,
       );
-
-      // Set canonical kycStatus via Cloud Function (server-authoritative)
-      if (smileIdVerified) {
-        await _setKycStatusOnServer('verified');
-      } else {
-        await _setKycStatusOnServer('pending');
-      }
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
@@ -377,8 +373,11 @@ class UserService {
         config: RetryConfig.network,
       );
 
-      // Update user's KYC status and country
+      // Update user's KYC status and country - set kycStatus directly
+      // This ensures kycStatus is always set when Smile ID verification completes
       final userUpdates = <String, dynamic>{
+        'kycStatus': 'verified',
+        'kycStatusUpdatedAt': FieldValue.serverTimestamp(),
         'kycCompleted': true,
         'kycVerified': true,
         'dateOfBirth': dateOfBirth.toIso8601String(),
@@ -397,9 +396,6 @@ class UserService {
         () => _firestore.collection('users').doc(_userId).update(userUpdates),
         config: RetryConfig.network,
       );
-
-      // Set canonical kycStatus via Cloud Function (server-authoritative)
-      await _setKycStatusOnServer('verified');
 
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
