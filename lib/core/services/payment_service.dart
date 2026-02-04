@@ -220,12 +220,14 @@ class PaymentService {
   Future<BankAccountVerification> verifyBankAccount({
     required String accountNumber,
     required String bankCode,
+    String country = 'ghana',
   }) async {
     try {
       final callable = _functions.httpsCallable('verifyBankAccount');
       final result = await callable.call({
         'accountNumber': accountNumber,
         'bankCode': bankCode,
+        'country': country,
       });
 
       final data = result.data as Map<String, dynamic>;
@@ -256,6 +258,7 @@ class PaymentService {
     required String bankCode,
     required String accountNumber,
     required String accountName,
+    String country = 'ghana',
   }) async {
     try {
       final idempotencyKey = _generateIdempotencyKey('initiateWithdrawal');
@@ -267,6 +270,7 @@ class PaymentService {
         'accountName': accountName,
         'type': 'bank',
         'idempotencyKey': idempotencyKey,
+        'country': country,
       });
 
       final data = result.data as Map<String, dynamic>;

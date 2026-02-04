@@ -755,16 +755,35 @@ function requireServiceReady(serviceName) {
 // PAYSTACK CONFIGURATION
 // ============================================================
 
-// Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
-// REQUIRED: Must be configured. Functions will fail with clear errors if missing.
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
+// Paystack configuration - country-specific keys
+// Ghana key: firebase functions:config:set paystack.secret_key="sk_xxx"
+// Nigeria key: firebase functions:config:set paystack.ng_key="sk_xxx"
+const PAYSTACK_KEYS = {
+  ghana: functions.config().paystack?.secret_key || '',
+  nigeria: functions.config().paystack?.ng_key || '',
+};
 const PAYSTACK_BASE_URL = 'api.paystack.co';
+
+/**
+ * Get the appropriate Paystack key for a country
+ * @param {string} country - Country name (ghana, nigeria)
+ * @returns {string} Paystack secret key
+ */
+function getPaystackKey(country) {
+  const normalizedCountry = (country || 'ghana').toLowerCase();
+  const key = PAYSTACK_KEYS[normalizedCountry];
+  if (!key) {
+    logError('No Paystack key configured for country', { country: normalizedCountry });
+    throwAppError(ERROR_CODES.SYSTEM_CONFIG_MISSING, `Payment service not configured for ${country}`);
+  }
+  return key;
+}
 
 // Helper function for Paystack API calls
 const HTTP_TIMEOUT_MS = 15000; // 15 seconds for all external API calls
 
-function paystackRequest(method, path, data = null) {
-  requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
+function paystackRequest(method, path, data = null, country = 'ghana') {
+  const secretKey = getPaystackKey(country);
   return new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
@@ -772,7 +791,7 @@ function paystackRequest(method, path, data = null) {
       path: path,
       method: method,
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
       timeout: HTTP_TIMEOUT_MS,
@@ -1386,7 +1405,8 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey } = data;
+  const { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber, idempotencyKey, country } = data;
+  const paystackCountry = country || 'ghana';
   const userId = context.auth.uid;
   const correlation = createCorrelationContext(context, 'initiateWithdrawal');
 
@@ -1460,8 +1480,8 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     }
 
     // Create recipient
-    const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData);
-    logInfo('Paystack recipient response', { response: recipientResponse });
+    const recipientResponse = await paystackRequest('POST', '/transferrecipient', recipientData, paystackCountry);
+    logInfo('Paystack recipient response', { response: recipientResponse, country: paystackCountry });
 
     if (!recipientResponse.status) {
       throwServiceError('paystack', new Error('Failed to create transfer recipient'));
@@ -1522,9 +1542,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       recipient: recipientCode,
       reference: reference,
       reason: `Wallet withdrawal - ${reference}`,
-    });
+    }, paystackCountry);
 
-    logInfo('Paystack transfer response', { response: transferResponse });
+    logInfo('Paystack transfer response', { response: transferResponse, country: paystackCountry });
     if (!transferResponse.status) {
       // Refund if transfer initiation fails
       await db.runTransaction(async (transaction) => {
@@ -1666,7 +1686,7 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 exports.getBanks = functions.https.onCall(async (data, context) => {
   try {
     const country = data.country || 'nigeria';
-    const response = await paystackRequest('GET', `/bank?country=${country}`);
+    const response = await paystackRequest('GET', `/bank?country=${country}`, null, country);
     logInfo('Paystack getBanks response', { status: response.status });
     if (!response.status) {
       throw new Error('Failed to fetch banks');
@@ -1694,15 +1714,16 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const { accountNumber, bankCode } = data;
+  const { accountNumber, bankCode, country } = data;
+  const paystackCountry = country || 'ghana';
 
   if (!accountNumber || !bankCode) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Account number and bank code required.');
   }
 
   try {
-    logInfo('Calling Paystack to verify account', { accountNumber: maskPii.account(accountNumber), bankCode });
-    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
+    logInfo('Calling Paystack to verify account', { accountNumber: maskPii.account(accountNumber), bankCode, country: paystackCountry });
+    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`, null, paystackCountry);
 
     logInfo('Paystack verifyAccount response', { status: response.status });
     if (!response.status) {

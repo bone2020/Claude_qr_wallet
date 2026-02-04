@@ -87,12 +87,21 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       final banks = await _paymentService.getBanks(country: country);
       // Filter banks by wallet currency
       final filteredBanks = banks.where((bank) => bank.currency == currency).toList();
+
+      debugPrint('📋 Loaded ${banks.length} total banks');
+      debugPrint('📋 Filtered to ${filteredBanks.length} banks for currency: $currency');
+
       if (mounted) {
         setState(() {
-          _banks = [
-            Bank(name: 'Test Bank (Development)', code: '001', type: 'nuban', currency: currency),
-            ...filteredBanks,
-          ];
+          // Only add Test Bank for Nigeria (Zenith Bank test account)
+          if (currency == 'NGN') {
+            _banks = [
+              Bank(name: 'Test Bank - Zenith (Development)', code: '057', type: 'nuban', currency: 'NGN'),
+              ...filteredBanks,
+            ];
+          } else {
+            _banks = filteredBanks;
+          }
           _isLoadingBanks = false;
         });
       }
@@ -207,9 +216,15 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     });
 
     try {
+      // Determine country from currency
+      final currency = ref.read(walletNotifierProvider).currency;
+      String country = 'nigeria';
+      if (currency == 'GHS') country = 'ghana';
+
       final result = await _paymentService.verifyBankAccount(
         accountNumber: accountNumber,
         bankCode: _selectedBank!.code,
+        country: country,
       );
 
       if (mounted) {
@@ -308,11 +323,17 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         debugPrint('✅ Bank validation passed: ${_selectedBank?.name} (${_selectedBank?.code})');
         // ========== BANK VALIDATION - END ==========
 
+        // Determine country from currency
+        final currency = ref.read(walletNotifierProvider).currency;
+        String country = 'nigeria';
+        if (currency == 'GHS') country = 'ghana';
+
         result = await _paymentService.initiateWithdrawal(
           amount: amount,
           bankCode: _selectedBank!.code,
           accountNumber: _accountNumberController.text.replaceAll(' ', ''),
           accountName: _verifiedAccountName!,
+          country: country,
         );
       } else {
         // Check if MTN provider - use direct MTN API
