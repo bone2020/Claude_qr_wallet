@@ -7,6 +7,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/smile_id_service.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/pending_signup_provider.dart';
 import '../widgets/kyc_verification_card.dart';
 
 /// KYC Selection Screen - Choose ID type for verification
@@ -43,6 +44,47 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     setState(() {
       _idTypes = _smileIdService.getIdTypesForCountry(_userCountryCode);
     });
+  }
+
+  Future<bool> _onWillPop() async {
+    final pendingData = ref.read(pendingSignupProvider);
+
+    if (pendingData != null) {
+      // Show confirmation dialog
+      final shouldLeave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          title: Text(
+            'Cancel Verification?',
+            style: AppTextStyles.headlineSmall(),
+          ),
+          content: Text(
+            'You need to complete identity verification to create your account. '
+            'Your information will be saved if you go back.',
+            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Continue Verification',
+                style: AppTextStyles.labelMedium(color: AppColors.primary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Go Back',
+                style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+              ),
+            ),
+          ],
+        ),
+      );
+      return shouldLeave ?? false;
+    }
+    return true;
   }
 
   void _navigateToVerification(String idType) {
@@ -116,9 +158,11 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: SafeArea(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
           child: Column(
@@ -154,6 +198,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

@@ -23,8 +23,8 @@ service cloud.firestore {
     // Users collection - own data only
     match /users/{userId} {
       allow read: if isOwner(userId);
-      // Allow create without kycStatus (new user signup)
-      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus']);
+      // Allow create only with verified kycStatus (user must complete KYC first)
+      allow create: if isOwner(userId) && request.resource.data.kycStatus == 'verified';
       // Allow update but kycStatus must not be modified (server-only field)
       allow update: if isOwner(userId) && kycStatusUnchanged();
       allow delete: if isOwner(userId);

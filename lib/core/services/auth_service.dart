@@ -92,6 +92,72 @@ class AuthService {
     }
   }
 
+  /// Create a verified user account AFTER KYC has passed
+  /// This is called only after successful KYC verification
+  Future<AuthResult> createVerifiedUser({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+    required String kycStatus,
+    String? countryCode,
+    String? currencyCode,
+  }) async {
+    try {
+      // Create user in Firebase Auth
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = credential.user;
+      if (user == null) {
+        return AuthResult.failure('Failed to create user');
+      }
+
+      // Update display name
+      await user.updateDisplayName(fullName);
+
+      // Generate unique wallet ID
+      final walletId = await _generateUniqueWalletId();
+
+      // Create user document in Firestore WITH kycStatus
+      final userModel = UserModel(
+        id: user.uid,
+        fullName: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+        walletId: walletId,
+        country: countryCode ?? 'GH',
+        currency: currencyCode ?? 'GHS',
+        createdAt: DateTime.now(),
+        kycStatus: kycStatus,
+        kycCompleted: true,
+        isVerified: true,
+      );
+
+      await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+
+      // Create wallet document with user's currency
+      final walletModel = WalletModel(
+        id: user.uid,
+        walletId: walletId,
+        userId: user.uid,
+        currency: currencyCode ?? 'GHS',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+
+      return AuthResult.success(userModel);
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_getAuthErrorMessage(e.code));
+    } catch (e) {
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
   /// Sign in with email and password
   Future<AuthResult> signInWithEmail({
     required String email,

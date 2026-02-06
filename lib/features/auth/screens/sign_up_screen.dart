@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../providers/pending_signup_provider.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/phone_input_field.dart';
 import '../widgets/country_codes.dart';
@@ -91,59 +92,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Store signup data in memory (don't create account yet)
+    ref.read(pendingSignupProvider.notifier).setSignupData(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      fullName: _fullNameController.text.trim(),
+      phoneNumber: _fullPhoneNumber,
+      countryCode: _selectedCountry.code,
+      currencyCode: _selectedCountry.currency,
+    );
 
-    try {
-      final authNotifier = ref.read(authNotifierProvider.notifier);
-      final result = await authNotifier.signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        fullName: _fullNameController.text.trim(),
-        phoneNumber: _fullPhoneNumber,
-        countryCode: _selectedCountry.code,
-        currencyCode: _selectedCountry.currency,
-      );
-
-      if (!mounted) return;
-
-      if (result.success) {
-        // Send email verification
-        await authNotifier.sendEmailVerification();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created! Please verify your email.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
-        // Navigate to email verification screen
-        context.push(
-          AppRoutes.otpVerification,
-          extra: {
-            'email': _emailController.text.trim(),
-            'phoneNumber': _fullPhoneNumber,
-            'isEmailVerification': true,
-          },
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.error ?? AppStrings.errorGeneric),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    // Navigate to KYC - account will be created AFTER KYC passes
+    if (mounted) {
+      context.push(AppRoutes.kyc);
     }
   }
 

@@ -130,6 +130,38 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     return result;
   }
 
+  /// Create verified user after KYC passes
+  Future<AuthResult> createVerifiedUser({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phoneNumber,
+    required String kycStatus,
+    String? countryCode,
+    String? currencyCode,
+  }) async {
+    state = state.copyWith(authState: AuthState.loading);
+
+    final result = await _authService.createVerifiedUser(
+      email: email,
+      password: password,
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      kycStatus: kycStatus,
+      countryCode: countryCode,
+      currencyCode: currencyCode,
+    );
+
+    if (result.success && result.user != null) {
+      await _localStorage.saveUser(result.user!);
+      state = AuthStateData.authenticated(result.user!);
+    } else {
+      state = state.copyWith(authState: AuthState.unauthenticated);
+    }
+
+    return result;
+  }
+
   /// Sign in with email
   Future<AuthResult> signIn({
     required String email,

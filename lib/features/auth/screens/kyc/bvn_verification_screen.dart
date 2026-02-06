@@ -12,6 +12,7 @@ import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
+import '../../../../providers/pending_signup_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 
 class BvnVerificationScreen extends ConsumerStatefulWidget {
@@ -123,25 +124,56 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final userService = UserService();
-      final result = await userService.uploadKycDocuments(
-        idType: 'BVN',
-        idNumber: _idNumberController.text.trim(),
-        dateOfBirth: _dateOfBirth!,
-        smileIdVerified: true,
-        smileIdResult: _verificationResult,
-      );
+      // Check if this is a new signup (pending data exists)
+      final pendingData = ref.read(pendingSignupProvider);
 
-      if (!mounted) return;
+      if (pendingData != null) {
+        // New user - create account now that KYC passed
+        final authNotifier = ref.read(authNotifierProvider.notifier);
+        final result = await authNotifier.createVerifiedUser(
+          email: pendingData.email,
+          password: pendingData.password,
+          fullName: pendingData.fullName,
+          phoneNumber: pendingData.phoneNumber,
+          kycStatus: 'verified',
+          countryCode: pendingData.countryCode,
+          currencyCode: pendingData.currencyCode,
+        );
 
-      if (result.success) {
-        if (result.user != null) {
-          ref.read(authNotifierProvider.notifier).updateUser(result.user!);
+        // Clear pending signup data
+        ref.read(pendingSignupProvider.notifier).clear();
+
+        if (!mounted) return;
+
+        if (result.success) {
+          _showSuccess('Account created successfully!');
+          await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+          context.go(AppRoutes.main);
+        } else {
+          _showError(result.error ?? 'Failed to create account');
         }
-        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
-        context.go(AppRoutes.main);
       } else {
-        _showError(result.error ?? 'Failed to complete verification');
+        // Existing user - update KYC status via Cloud Function
+        final userService = UserService();
+        final result = await userService.uploadKycDocuments(
+          idType: 'BVN',
+          idNumber: _idNumberController.text.trim(),
+          dateOfBirth: _dateOfBirth!,
+          smileIdVerified: true,
+          smileIdResult: _verificationResult,
+        );
+
+        if (!mounted) return;
+
+        if (result.success) {
+          if (result.user != null) {
+            ref.read(authNotifierProvider.notifier).updateUser(result.user!);
+          }
+          await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+          context.go(AppRoutes.main);
+        } else {
+          _showError(result.error ?? 'Failed to complete verification');
+        }
       }
     } catch (e) {
       if (!mounted) return;
