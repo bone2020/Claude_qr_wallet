@@ -30,12 +30,21 @@ class _KycScreenState extends ConsumerState<KycScreen> {
   }
 
   void _loadUserCountry() {
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      _userCountryCode = user.country;
-
+    // First check if there's pending signup data (new user flow)
+    final pendingData = ref.read(pendingSignupProvider);
+    if (pendingData != null) {
+      _userCountryCode = pendingData.countryCode;
       if (_userCountryCode == null || _userCountryCode!.isEmpty) {
-        _userCountryCode = _smileIdService.extractCountryCode(user.phoneNumber);
+        _userCountryCode = _smileIdService.extractCountryCode(pendingData.phoneNumber);
+      }
+    } else {
+      // Existing user flow
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        _userCountryCode = user.country;
+        if (_userCountryCode == null || _userCountryCode!.isEmpty) {
+          _userCountryCode = _smileIdService.extractCountryCode(user.phoneNumber);
+        }
       }
     }
 
@@ -45,6 +54,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       _idTypes = _smileIdService.getIdTypesForCountry(_userCountryCode);
     });
   }
+
 
   Future<bool> _onWillPop() async {
     final pendingData = ref.read(pendingSignupProvider);

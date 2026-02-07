@@ -56,6 +56,12 @@ class SmileIDService {
     return phoneVerificationCountries.contains(countryCode.toUpperCase());
   }
 
+
+  /// Check if country is supported by SmileID for KYC
+  bool isCountrySupported(String? countryCode) {
+    if (countryCode == null) return false;
+    return countryIdTypes.containsKey(countryCode.toUpperCase());
+  }
   /// Get country code from phone number
   String? extractCountryCode(String? phoneNumber) {
     if (phoneNumber == null || phoneNumber.isEmpty) return null;

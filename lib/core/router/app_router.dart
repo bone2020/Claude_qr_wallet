@@ -97,14 +97,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
 
       // Routes accessible without authentication
+      // KYC routes included for new signup flow (KYC before account creation)
       const publicRoutes = {
         AppRoutes.splash,
         AppRoutes.welcome,
         AppRoutes.signUp,
         AppRoutes.login,
         AppRoutes.forgotPassword,
+        AppRoutes.kyc,
+        AppRoutes.kycPassport,
+        AppRoutes.kycNin,
+        AppRoutes.kycBvn,
+        AppRoutes.kycDriversLicense,
+        AppRoutes.kycVotersCard,
+        AppRoutes.kycNationalId,
+        AppRoutes.kycSsnit,
+        AppRoutes.kycPhoneVerification,
       };
-
       // Routes that require auth but NOT KYC completion
       // (user is completing verification/KYC flow)
       const verificationRoutes = {
@@ -133,7 +142,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               .get();
           if (userDoc.exists) {
             final data = userDoc.data()!;
-            final kycVerified = data['kycStatus'] == 'verified' ||
+            final kycVerified = data['kycStatus'] == 'verified' || data['kycStatus'] == 'pending_manual' ||
                 data['kycCompleted'] == true;
             if (!kycVerified) return AppRoutes.kyc;
           }
@@ -190,7 +199,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
 
         final data = userDoc.data()!;
-        final kycVerified = data['kycStatus'] == 'verified' ||
+        final kycVerified = data['kycStatus'] == 'verified' || data['kycStatus'] == 'pending_manual' ||
             data['kycCompleted'] == true;
 
         if (!kycVerified) {

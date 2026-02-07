@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/services/smile_id_service.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -102,9 +103,63 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       currencyCode: _selectedCountry.currency,
     );
 
-    // Navigate to KYC - account will be created AFTER KYC passes
-    if (mounted) {
-      context.push(AppRoutes.kyc);
+    // Check if country is supported by SmileID
+    final smileIdService = SmileIDService.instance;
+    final isCountrySupported = smileIdService.isCountrySupported(_selectedCountry.code);
+
+    if (isCountrySupported) {
+      // Navigate to KYC - account will be created AFTER KYC passes
+      if (mounted) {
+        context.push(AppRoutes.kyc);
+      }
+    } else {
+      // Country not supported by SmileID - create account with pending_manual status
+      setState(() => _isLoading = true);
+      
+      try {
+        final authNotifier = ref.read(authNotifierProvider.notifier);
+        final result = await authNotifier.createVerifiedUser(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim(),
+          phoneNumber: _fullPhoneNumber,
+          kycStatus: 'pending_manual',
+          countryCode: _selectedCountry.code,
+          currencyCode: _selectedCountry.currency,
+        );
+
+        // Clear pending signup data
+        ref.read(pendingSignupProvider.notifier).clear();
+
+        if (!mounted) return;
+
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created! Verification pending.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          context.go(AppRoutes.main);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.error ?? 'Failed to create account'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 

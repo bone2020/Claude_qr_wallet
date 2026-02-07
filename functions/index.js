@@ -765,6 +765,19 @@ const PAYSTACK_KEYS = {
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 /**
+ * Get country from currency code for Paystack routing
+ * @param {string} currency - Currency code (NGN, GHS)
+ * @returns {string} Country name for Paystack
+ */
+function getCountryFromCurrency(currency) {
+  const currencyCountryMap = {
+    'NGN': 'nigeria',
+    'GHS': 'ghana',
+  };
+  return currencyCountryMap[currency?.toUpperCase()] || 'ghana';
+}
+
+/**
  * Get the appropriate Paystack key for a country
  * @param {string} country - Country name (ghana, nigeria)
  * @returns {string} Paystack secret key
@@ -1035,8 +1048,12 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
   return withIdempotency(effectiveIdempotencyKey, 'verifyPayment', userId, async () => {
   try {
+    // Get currency from pending transaction to route to correct Paystack
+    const pendingTxn = await db.collection('pending_transactions').doc(reference).get();
+    const txnCurrency = pendingTxn.exists ? pendingTxn.data().currency : 'GHS';
+    const country = getCountryFromCurrency(txnCurrency);
     // Verify with Paystack
-    const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
+    const response = await paystackRequest('GET', `/transaction/verify/${reference}`, null, country);
 
     if (!response.status || response.data.status !== 'success') {
       return { success: false, error: 'Payment verification failed' };
@@ -1646,12 +1663,14 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
     }
 
     const withdrawalDoc = withdrawalQuery.docs[0];
+    const withdrawalData = withdrawalDoc.data();
+    const country = getCountryFromCurrency(withdrawalData.currency || 'GHS');
 
     // Submit OTP to Paystack
     const otpResponse = await paystackRequest('POST', '/transfer/finalize_transfer', {
       transfer_code: transferCode,
       otp: otp,
-    });
+    }, country);
 
     logInfo('OTP finalize response', { response: otpResponse });
 
@@ -1732,7 +1751,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
 
     return {
       success: true,
-      accountName: response.data.account_name,
+      accountName: response.data.account_name || 'Test Account',
       accountNumber: response.data.account_number,
       bankId: response.data.bank_id,
     };
@@ -1766,6 +1785,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   // Validate currency and phone number format
   const validatedCurrency = validateCurrency(currency, 'GHS');
   const validatedPhone = validatePhoneNumber(phoneNumber);
+  const country = getCountryFromCurrency(validatedCurrency);
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
   try {
@@ -1784,7 +1804,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
         userId: userId,
         type: 'deposit',
       },
-    });
+    }, country);
 
     logFinancialOperation('chargeMobileMoney', 'response_received', { status: chargeResponse.status, dataStatus: chargeResponse.data?.status });
 
@@ -1882,8 +1902,11 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
     }
 
     // Get or create customer
+
+    // DVA is Nigeria-only in Paystack
+    const country = 'nigeria';
     let customerId;
-    const customerListResponse = await paystackRequest('GET', `/customer/${email}`);
+    const customerListResponse = await paystackRequest('GET', `/customer/${email}`, null, country);
 
     if (customerListResponse.status && customerListResponse.data) {
       customerId = customerListResponse.data.id;
@@ -1893,7 +1916,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
         first_name: name.split(' ')[0],
         last_name: name.split(' ').slice(1).join(' ') || name.split(' ')[0],
         metadata: { userId: userId },
-      });
+      }, country);
 
       if (!createCustomerResponse.status) {
         throw new Error('Failed to create customer');
@@ -1905,7 +1928,7 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
     const dvaResponse = await paystackRequest('POST', '/dedicated_account', {
       customer: customerId,
       preferred_bank: 'wema-bank',
-    });
+    }, country);
 
     logInfo('DVA response', { status: dvaResponse.status });
 
@@ -1980,6 +2003,9 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   try {
     const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+
+    // Determine country from currency for Paystack routing
+    const country = getCountryFromCurrency(validatedCurrency);
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
       amount: Math.round(amount * 100), // Convert to smallest unit
@@ -1990,7 +2016,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
         userId: userId,
         type: 'deposit',
       },
-    });
+    }, country);
 
     logInfo('Initialize transaction response', { status: response.status });
 

@@ -93,15 +93,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
       if (mounted) {
         setState(() {
-          // Only add Test Bank for Nigeria (Zenith Bank test account)
-          if (currency == 'NGN') {
-            _banks = [
-              Bank(name: 'Test Bank - Zenith (Development)', code: '057', type: 'nuban', currency: 'NGN'),
-              ...filteredBanks,
-            ];
-          } else {
-            _banks = filteredBanks;
-          }
+          _banks = filteredBanks;
           _isLoadingBanks = false;
         });
       }

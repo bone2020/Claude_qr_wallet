@@ -78,7 +78,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         // Check if KYC is completed (defense in depth - server also enforces)
         // Accept both canonical kycStatus and legacy kycCompleted
-        final kycVerified = userData.kycStatus == 'verified' || userData.kycCompleted;
+        final kycVerified = userData.kycStatus == 'verified' || userData.kycStatus == 'pending_manual' || userData.kycCompleted;
         if (!kycVerified) {
           // User hasn't completed KYC
           context.go(AppRoutes.kyc);

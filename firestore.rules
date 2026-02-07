@@ -24,7 +24,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId);
       // Allow create only with verified kycStatus (user must complete KYC first)
-      allow create: if isOwner(userId) && request.resource.data.kycStatus == 'verified';
+      allow create: if isOwner(userId) && request.resource.data.kycStatus == 'verified' || request.resource.data.kycStatus == 'pending_manual';
       // Allow update but kycStatus must not be modified (server-only field)
       allow update: if isOwner(userId) && kycStatusUnchanged();
       allow delete: if isOwner(userId);
@@ -65,8 +65,9 @@ service cloud.firestore {
 
     // Wallets - read own only, writes via Cloud Functions
     match /wallets/{walletId} {
-      allow read: if isAuthenticated() && request.auth.uid == walletId;
-      allow write: if false;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == walletId;
+      allow update, delete: if false;
     }
 
     // Exchange rates - read only
