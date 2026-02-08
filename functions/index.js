@@ -1744,7 +1744,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
     logInfo('Calling Paystack to verify account', { accountNumber: maskPii.account(accountNumber), bankCode, country: paystackCountry });
     const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`, null, paystackCountry);
 
-    logInfo('Paystack verifyAccount response', { status: response.status });
+    logInfo('Paystack verifyAccount response', { status: response.status, message: response.message, data: response.data });
     if (!response.status) {
       return { success: false, error: 'Could not verify account' };
     }
