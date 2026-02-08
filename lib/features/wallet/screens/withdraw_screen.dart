@@ -93,7 +93,15 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
       if (mounted) {
         setState(() {
-          _banks = filteredBanks;
+          // Add test bank for Ghana (Paystack test mode requires bank code 001)
+          if (currency == 'GHS') {
+            _banks = [
+              Bank(name: 'Test Bank (Development)', code: '001', type: 'ghipss', currency: 'GHS'),
+              ...filteredBanks,
+            ];
+          } else {
+            _banks = filteredBanks;
+          }
           _isLoadingBanks = false;
         });
       }
