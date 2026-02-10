@@ -262,7 +262,15 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(6, (index) {
-                    return SizedBox(
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme.copyWith(
+                          bodyLarge: const TextStyle(fontFamily: 'sans-serif'),
+                          bodyMedium: const TextStyle(fontFamily: 'sans-serif'),
+                          titleMedium: const TextStyle(fontFamily: 'sans-serif'),
+                        ),
+                      ),
+                      child: SizedBox(
                       width: 45,
                       height: 55,
                       child: TextField(
@@ -275,7 +283,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                         // GoogleFonts.outfit() causes rendering issues with single-digit
                         // inputs in TextFields due to async font loading and glyph rendering
                         style: TextStyle(
-                          fontFamily: 'Roboto',
+                          fontFamily: 'monospace',
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           textBaseline: TextBaseline.alphabetic,
@@ -303,6 +311,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                         ],
                         onChanged: (value) => _onOtpChanged(index, value),
                       ),
+                    ),
                     );
                   }),
                 ).animate().fadeIn(delay: 300.ms),
