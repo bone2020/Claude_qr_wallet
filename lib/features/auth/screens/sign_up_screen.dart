@@ -63,7 +63,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value.length < 9) return AppStrings.errorInvalidPhone;
+    if (value.length < 7) return AppStrings.errorInvalidPhone;
     return null;
   }
 
