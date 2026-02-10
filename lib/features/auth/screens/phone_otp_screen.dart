@@ -241,9 +241,18 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         maxLength: 1,
-                        style: const TextStyle(
+                        // IMPORTANT: Explicitly use system font for OTP inputs
+                        // GoogleFonts.outfit() causes rendering issues with single-digit
+                        // inputs in TextFields due to async font loading and glyph rendering
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
+                          // Prevent any font inheritance from theme
+                          inherit: false,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
                         ),
                         decoration: InputDecoration(
                           counterText: '',
