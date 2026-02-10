@@ -63,7 +63,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value.length < 9) return AppStrings.errorInvalidPhone;
+    if (value.length < 7 || value.length > 10) return AppStrings.errorInvalidPhone;
     return null;
   }
 
@@ -113,7 +113,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         context.push(AppRoutes.kyc);
       }
     } else {
-      // Country not supported by SmileID - create account with pending_manual status
+      // Country not supported by SmileID - create account and verify via phone OTP
       setState(() => _isLoading = true);
       
       try {
@@ -123,7 +123,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           password: _passwordController.text,
           fullName: _fullNameController.text.trim(),
           phoneNumber: _fullPhoneNumber,
-          kycStatus: 'pending_manual',
+          kycStatus: 'pending_phone',
           countryCode: _selectedCountry.code,
           currencyCode: _selectedCountry.currency,
         );
@@ -132,15 +132,16 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ref.read(pendingSignupProvider.notifier).clear();
 
         if (!mounted) return;
+        print("DEBUG: result.success = ${result.success}, error = ${result.error}");
 
         if (result.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created! Verification pending.'),
+              content: Text('Account created! Please verify your phone.'),
               backgroundColor: AppColors.success,
             ),
           );
-          context.go(AppRoutes.main);
+          context.push(AppRoutes.phoneOtp, extra: {'phoneNumber': _fullPhoneNumber});
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

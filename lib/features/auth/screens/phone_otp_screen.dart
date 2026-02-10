@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -35,11 +37,39 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   int _resendSeconds = 60;
   Timer? _resendTimer;
   String? _errorMessage;
+  String _phoneNumber = "";
 
   @override
   void initState() {
     super.initState();
-    _sendOtp();
+    _initializePhone();
+  }
+
+  Future<void> _initializePhone() async {
+    if (widget.phoneNumber.isNotEmpty) {
+      _phoneNumber = widget.phoneNumber;
+      _sendOtp();
+    } else {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection("users")
+              .doc(user.uid)
+              .get();
+          if (doc.exists && mounted) {
+            setState(() {
+              _phoneNumber = doc.data()?["phoneNumber"] ?? "";
+            });
+            if (_phoneNumber.isNotEmpty) {
+              _sendOtp();
+            }
+          }
+        } catch (e) {
+          debugPrint("Error fetching phone: $e");
+        }
+      }
+    }
   }
 
   @override
@@ -76,7 +106,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final success = await authNotifier.sendPhoneOtp(
-      phoneNumber: widget.phoneNumber,
+      phoneNumber: _phoneNumber,
       onError: (error) {
         if (mounted) {
           setState(() {
@@ -213,7 +243,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 4),
 
               Text(
-                widget.phoneNumber,
+                _phoneNumber,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -242,8 +272,13 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                         textAlign: TextAlign.center,
                         maxLength: 1,
                         style: const TextStyle(
+                          inherit: false,
+                          color: Colors.white,
+                          fontFamily: null,
+                          fontFamilyFallback: ['Roboto', 'sans-serif'],
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
+                          textBaseline: TextBaseline.alphabetic,
                         ),
                         decoration: InputDecoration(
                           counterText: '',

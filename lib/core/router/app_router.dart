@@ -145,6 +145,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             final kycVerified = data['kycStatus'] == 'verified' || data['kycStatus'] == 'pending_manual' ||
                 data['kycCompleted'] == true;
             if (!kycVerified) return AppRoutes.kyc;
+            // Check if user needs phone verification
+            if (data['kycStatus'] == 'pending_phone') return AppRoutes.phoneOtp;
           }
         } catch (e) {
           debugPrint('Route guard: KYC check failed: $e');

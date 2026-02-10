@@ -211,7 +211,7 @@ class ErrorHandler {
   }
 
   static bool _isPermissionError(String error) {
-    return error.contains('permission') ||
+    return (error.contains('permission') && error.contains('camera')) ||
         error.contains('camera_access') ||
         error.contains('denied') && error.contains('camera');
   }
