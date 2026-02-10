@@ -123,7 +123,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           password: _passwordController.text,
           fullName: _fullNameController.text.trim(),
           phoneNumber: _fullPhoneNumber,
-          kycStatus: 'pending_manual',
+          kycStatus: 'pending_phone',
           countryCode: _selectedCountry.code,
           currencyCode: _selectedCountry.currency,
         );
@@ -140,7 +140,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               backgroundColor: AppColors.success,
             ),
           );
-          context.go(AppRoutes.main);
+          context.go(AppRoutes.phoneOtp);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

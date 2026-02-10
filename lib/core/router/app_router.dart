@@ -144,6 +144,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             final data = userDoc.data()!;
             final kycVerified = data['kycStatus'] == 'verified' || data['kycStatus'] == 'pending_manual' ||
                 data['kycCompleted'] == true;
+            // Check if user needs phone verification
+            if (data['kycStatus'] == 'pending_phone') return AppRoutes.phoneOtp;
             if (!kycVerified) return AppRoutes.kyc;
           }
         } catch (e) {
