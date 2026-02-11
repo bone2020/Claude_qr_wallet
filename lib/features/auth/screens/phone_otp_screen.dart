@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pinput/pinput.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -30,6 +31,8 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
     (_) => TextEditingController(),
   );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isSendingOtp = false;
@@ -61,12 +64,20 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             setState(() {
               _phoneNumber = doc.data()?["phoneNumber"] ?? "";
             });
+            debugPrint("Phone from Firestore: $_phoneNumber");
             if (_phoneNumber.isNotEmpty) {
               _sendOtp();
+            } else {
+              setState(() {
+                _errorMessage = "Phone number not found. Please go back and try again.";
+              });
             }
           }
         } catch (e) {
           debugPrint("Error fetching phone: $e");
+          setState(() {
+            _errorMessage = "Error fetching phone number: $e";
+          });
         }
       }
     }
@@ -80,6 +91,8 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
     for (var node in _focusNodes) {
       node.dispose();
     }
+    _pinController.dispose();
+    _pinFocusNode.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
@@ -135,7 +148,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   }
 
   String get _otpCode {
-    return _otpControllers.map((c) => c.text).join();
+    return _pinController.text;
   }
 
   Future<void> _verifyOtp() async {
@@ -165,7 +178,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             backgroundColor: AppColors.success,
           ),
         );
-        context.go(AppRoutes.kyc);
+        context.go(AppRoutes.main);
       } else {
         setState(() {
           _errorMessage = result.error ?? 'Invalid OTP. Please try again.';
@@ -258,62 +271,45 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                   child: CircularProgressIndicator(),
                 )
               else if (_otpSent) ...[
-                // OTP Input Fields
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(6, (index) {
-                    return Theme(
-                      data: Theme.of(context).copyWith(
-                        textTheme: Theme.of(context).textTheme.copyWith(
-                          bodyLarge: const TextStyle(fontFamily: 'sans-serif'),
-                          bodyMedium: const TextStyle(fontFamily: 'sans-serif'),
-                          titleMedium: const TextStyle(fontFamily: 'sans-serif'),
-                        ),
-                      ),
-                      child: SizedBox(
-                      width: 45,
-                      height: 55,
-                      child: TextField(
-                        controller: _otpControllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        // IMPORTANT: Explicitly use system font for OTP inputs
-                        // GoogleFonts.outfit() causes rendering issues with single-digit
-                        // inputs in TextFields due to async font loading and glyph rendering
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          textBaseline: TextBaseline.alphabetic,
-                          // Prevent any font inheritance from theme
-                          inherit: false,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
-                        ),
-                        decoration: InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (value) => _onOtpChanged(index, value),
-                      ),
+                // OTP Input Fields using Pinput
+                Pinput(
+                  length: 6,
+                  controller: _pinController,
+                  focusNode: _pinFocusNode,
+                  defaultPinTheme: PinTheme(
+                    width: 50,
+                    height: 56,
+                    textStyle: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
                     ),
-                    );
-                  }),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  focusedPinTheme: PinTheme(
+                    width: 50,
+                    height: 56,
+                    textStyle: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    debugPrint("Pinput value: $value");
+                  },
+                  onCompleted: (value) {
+                    debugPrint("Pinput completed: $value");
+                    _verifyOtp();
+                  },
                 ).animate().fadeIn(delay: 300.ms),
 
                 const SizedBox(height: 24),

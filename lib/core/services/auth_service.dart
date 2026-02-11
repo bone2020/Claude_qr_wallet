@@ -405,6 +405,7 @@ class AuthService {
         // Update user's phone verification status
         await _firestore.collection('users').doc(currentUser!.uid).update({
           'isVerified': true,
+          'kycStatus': 'pending_manual',
         });
 
         final userDoc = await _firestore.collection('users').doc(currentUser!.uid).get();
