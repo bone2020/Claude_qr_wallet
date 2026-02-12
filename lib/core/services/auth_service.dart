@@ -92,6 +92,105 @@ class AuthService {
     }
   }
 
+
+  /// Create Firebase Auth user only (no Firestore) - for phone verification countries
+  /// Firestore user and wallet will be created after phone verification
+  Future<AuthResult> createAuthUserOnly({
+    required String email,
+    required String password,
+    required String fullName,
+  }) async {
+    try {
+      // Create user in Firebase Auth only
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = credential.user;
+      if (user == null) {
+        return AuthResult.failure('Failed to create user');
+      }
+
+      // Update display name
+      await user.updateDisplayName(fullName);
+
+      // Send email verification
+      await user.sendEmailVerification();
+
+      // Return success with minimal user model (no Firestore data yet)
+      final tempUserModel = UserModel(
+        id: user.uid,
+        fullName: fullName,
+        email: email,
+        phoneNumber: '',
+        walletId: '',
+        country: '',
+        currency: '',
+        createdAt: DateTime.now(),
+      );
+
+      return AuthResult.success(tempUserModel);
+    } on FirebaseAuthException catch (e) {
+      return AuthResult.failure(_getAuthErrorMessage(e.code));
+    } catch (e) {
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
+
+  /// Create Firestore user document and wallet for EXISTING Firebase Auth user
+  /// Used after phone verification when Auth user already exists
+  Future<AuthResult> createFirestoreUserAndWallet({
+    required String phoneNumber,
+    required String kycStatus,
+    String? countryCode,
+    String? currencyCode,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        return AuthResult.failure('No authenticated user found');
+      }
+
+      // Generate unique wallet ID
+      final walletId = await _generateUniqueWalletId();
+
+      // Create user document in Firestore
+      final userModel = UserModel(
+        id: user.uid,
+        fullName: user.displayName ?? '',
+        email: user.email ?? '',
+        phoneNumber: phoneNumber,
+        walletId: walletId,
+        country: countryCode ?? 'GH',
+        currency: currencyCode ?? 'GHS',
+        createdAt: DateTime.now(),
+        kycStatus: kycStatus,
+        kycCompleted: true,
+        isVerified: true,
+      );
+
+      await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
+
+      // Create wallet document
+      final walletModel = WalletModel(
+        id: user.uid,
+        walletId: walletId,
+        userId: user.uid,
+        currency: currencyCode ?? 'GHS',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+
+      return AuthResult.success(userModel);
+    } catch (e) {
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
   /// Create a verified user account AFTER KYC has passed
   /// This is called only after successful KYC verification
   Future<AuthResult> createVerifiedUser({
@@ -402,15 +501,32 @@ class AuthService {
       if (currentUser != null) {
         await currentUser!.linkWithCredential(credential);
         
-        // Update user's phone verification status
-        await _firestore.collection('users').doc(currentUser!.uid).update({
-          'isVerified': true,
-          'kycStatus': 'pending_manual',
-        });
-
+        // Check if Firestore document exists (new phone verification flow may not have it yet)
         final userDoc = await _firestore.collection('users').doc(currentUser!.uid).get();
-        final userModel = UserModel.fromJson(userDoc.data()!);
-        return AuthResult.success(userModel);
+        
+        if (userDoc.exists) {
+          // Existing user - update phone verification status
+          await _firestore.collection('users').doc(currentUser!.uid).update({
+            'isVerified': true,
+            'kycStatus': 'pending_manual',
+          });
+          final userModel = UserModel.fromJson(userDoc.data()!);
+          return AuthResult.success(userModel);
+        } else {
+          // New user (phone verification flow) - just return success
+          // Firestore doc will be created after phone verification completes
+          final tempUserModel = UserModel(
+            id: currentUser!.uid,
+            fullName: currentUser!.displayName ?? '',
+            email: currentUser!.email ?? '',
+            phoneNumber: currentUser!.phoneNumber ?? '',
+            walletId: '',
+            country: '',
+            currency: '',
+            createdAt: DateTime.now(),
+          );
+          return AuthResult.success(tempUserModel);
+        }
       } else {
         final userCredential = await _auth.signInWithCredential(credential);
         final user = userCredential.user;

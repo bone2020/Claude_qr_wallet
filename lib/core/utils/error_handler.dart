@@ -211,9 +211,9 @@ class ErrorHandler {
   }
 
   static bool _isPermissionError(String error) {
-    return error.contains('permission') ||
+    return error.toLowerCase().contains('camera') && error.contains('permission') ||
         error.contains('camera_access') ||
-        error.contains('denied') && error.contains('camera');
+        error.toLowerCase().contains('camera') && error.toLowerCase().contains('denied');
   }
 
   static bool _isUserCancelled(String error) {

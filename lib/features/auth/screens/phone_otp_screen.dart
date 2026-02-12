@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/pending_signup_provider.dart';
 import '../../../providers/auth_provider.dart';
 
 /// Phone OTP verification screen
@@ -49,37 +50,57 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   }
 
   Future<void> _initializePhone() async {
+    // First check widget.phoneNumber
     if (widget.phoneNumber.isNotEmpty) {
       _phoneNumber = widget.phoneNumber;
       _sendOtp();
-    } else {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection("users")
-              .doc(user.uid)
-              .get();
-          if (doc.exists && mounted) {
-            setState(() {
-              _phoneNumber = doc.data()?["phoneNumber"] ?? "";
-            });
-            debugPrint("Phone from Firestore: $_phoneNumber");
-            if (_phoneNumber.isNotEmpty) {
-              _sendOtp();
-            } else {
-              setState(() {
-                _errorMessage = "Phone number not found. Please go back and try again.";
-              });
-            }
-          }
-        } catch (e) {
-          debugPrint("Error fetching phone: $e");
+      return;
+    }
+    
+    // Then check pendingSignupProvider (new flow)
+    final pendingData = ref.read(pendingSignupProvider);
+    if (pendingData != null && pendingData.phoneNumber.isNotEmpty) {
+      _phoneNumber = pendingData.phoneNumber;
+      debugPrint("Phone from pendingSignupProvider: $_phoneNumber");
+      _sendOtp();
+      return;
+    }
+    
+    // Finally check Firestore (existing user flow)
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection("users")
+            .doc(user.uid)
+            .get();
+        if (doc.exists && mounted) {
           setState(() {
-            _errorMessage = "Error fetching phone number: $e";
+            _phoneNumber = doc.data()?["phoneNumber"] ?? "";
+          });
+          debugPrint("Phone from Firestore: $_phoneNumber");
+          if (_phoneNumber.isNotEmpty) {
+            _sendOtp();
+          } else {
+            setState(() {
+              _errorMessage = "Phone number not found. Please go back and try again.";
+            });
+          }
+        } else {
+          setState(() {
+            _errorMessage = "User data not found. Please go back and try again.";
           });
         }
+      } catch (e) {
+        debugPrint("Error fetching phone: $e");
+        setState(() {
+          _errorMessage = "Error fetching phone number: $e";
+        });
       }
+    } else {
+      setState(() {
+        _errorMessage = "No user logged in. Please go back and try again.";
+      });
     }
   }
 
@@ -172,13 +193,46 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone verified successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        context.go(AppRoutes.main);
+        // Get pending signup data and create full account
+        final pendingData = ref.read(pendingSignupProvider);
+        
+        if (pendingData != null) {
+          // Create full Firestore user and wallet
+          final createResult = await authNotifier.createFirestoreUserAndWallet(
+            phoneNumber: pendingData.phoneNumber,
+            kycStatus: 'pending_manual',
+            countryCode: pendingData.countryCode,
+            currencyCode: pendingData.currencyCode,
+          );
+          
+          // Clear pending data
+          ref.read(pendingSignupProvider.notifier).clear();
+          
+          if (!mounted) return;
+          
+          if (createResult.success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Account created successfully!'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+            context.go(AppRoutes.main);
+          } else {
+            setState(() {
+              _errorMessage = createResult.error ?? 'Failed to create account';
+            });
+          }
+        } else {
+          // No pending data - just show success (existing user flow)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Phone verified successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          context.go(AppRoutes.main);
+        }
       } else {
         setState(() {
           _errorMessage = result.error ?? 'Invalid OTP. Please try again.';
@@ -392,18 +446,6 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 ),
               ],
 
-              const SizedBox(height: 32),
-
-              // Skip button (optional - for testing)
-              TextButton(
-                onPressed: () => context.go(AppRoutes.kyc),
-                child: Text(
-                  'Skip for now',
-                  style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ),
             ],
           ),
         ),

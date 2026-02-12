@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/services/smile_id_service.dart';
+import '../../../providers/pending_signup_provider.dart';
 
 /// Email verification screen with auto-detect and manual check
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -106,7 +108,18 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           ),
         );
 
-        context.go(AppRoutes.kyc);
+        // Check if country needs phone verification or KYC
+        final pendingData = ref.read(pendingSignupProvider);
+        final smileIdService = SmileIDService.instance;
+        final isCountrySupported = pendingData != null && 
+            smileIdService.isCountrySupported(pendingData.countryCode ?? 'GH');
+        
+        if (isCountrySupported) {
+          context.go(AppRoutes.kyc);
+        } else {
+          // Phone verification country - go to phone OTP
+          context.go(AppRoutes.phoneOtp);
+        }
       } else if (showError) {
         setState(() {
           _errorMessage = 'Email not verified yet. Please check your inbox and click the verification link.';
@@ -334,7 +347,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           const SizedBox(height: AppDimensions.spaceSM),
           _buildInstructionItem(3, 'Click the verification link'),
           const SizedBox(height: AppDimensions.spaceSM),
-          _buildInstructionItem(4, 'Check spam folder if not found'),
+          _buildInstructionItem(4, 'Check spam folder if not found in inbox'),
+          const SizedBox(height: 8),
+          _buildInstructionItem(5, "If not found, wait 1 min, tap Resend, then check again"),
         ],
       ),
     );

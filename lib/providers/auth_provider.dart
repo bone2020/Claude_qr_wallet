@@ -130,6 +130,57 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     return result;
   }
 
+  /// Create Firebase Auth user only (for phone verification countries)
+  Future<AuthResult> createAuthUserOnly({
+    required String email,
+    required String password,
+    required String fullName,
+  }) async {
+    state = state.copyWith(authState: AuthState.loading);
+
+    final result = await _authService.createAuthUserOnly(
+      email: email,
+      password: password,
+      fullName: fullName,
+    );
+
+    if (result.success) {
+      state = state.copyWith(authState: AuthState.unauthenticated);
+    } else {
+      state = state.copyWith(authState: AuthState.unauthenticated);
+    }
+
+    return result;
+  }
+
+  /// Create Firestore user and wallet for existing Auth user (phone verification flow)
+  Future<AuthResult> createFirestoreUserAndWallet({
+    required String phoneNumber,
+    required String kycStatus,
+    String? countryCode,
+    String? currencyCode,
+  }) async {
+    state = state.copyWith(authState: AuthState.loading);
+
+    final result = await _authService.createFirestoreUserAndWallet(
+      phoneNumber: phoneNumber,
+      kycStatus: kycStatus,
+      countryCode: countryCode,
+      currencyCode: currencyCode,
+    );
+
+    if (result.success && result.user != null) {
+      await _localStorage.saveUser(result.user!);
+      state = AuthStateData.authenticated(result.user!);
+    } else {
+      state = state.copyWith(authState: AuthState.unauthenticated);
+    }
+
+    return result;
+  }
+
+
+
   /// Create verified user after KYC passes
   Future<AuthResult> createVerifiedUser({
     required String email,

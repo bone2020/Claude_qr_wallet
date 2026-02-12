@@ -113,34 +113,28 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         context.push(AppRoutes.kyc);
       }
     } else {
-      // Country not supported by SmileID - create account with pending_manual status
+      // Country not supported by SmileID - create Auth user only, verify email first
       setState(() => _isLoading = true);
       
       try {
         final authNotifier = ref.read(authNotifierProvider.notifier);
-        final result = await authNotifier.createVerifiedUser(
+        final result = await authNotifier.createAuthUserOnly(
           email: _emailController.text.trim(),
           password: _passwordController.text,
           fullName: _fullNameController.text.trim(),
-          phoneNumber: _fullPhoneNumber,
-          kycStatus: 'pending_phone',
-          countryCode: _selectedCountry.code,
-          currencyCode: _selectedCountry.currency,
         );
-
-        // Clear pending signup data
-        ref.read(pendingSignupProvider.notifier).clear();
 
         if (!mounted) return;
 
         if (result.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created! Verification pending.'),
+              content: Text('Verification email sent! Please check your inbox.'),
               backgroundColor: AppColors.success,
             ),
           );
-          context.go(AppRoutes.phoneOtp);
+          // Go to email verification - pendingSignupProvider still has the data
+          context.go(AppRoutes.otpVerification);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
