@@ -1,4 +1,23 @@
 {
+
+
+"hosting": {
+  "public": "public",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ],
+  "rewrites": [
+    {
+      "source": "/payment-callback",
+      "destination": "/payment-callback.html"
+    }
+  ]
+},
+
+
+
   "functions": {
     "source": "functions",
     "runtime": "nodejs20"
@@ -41,3 +60,5 @@
     }
   }
 }
+
+
