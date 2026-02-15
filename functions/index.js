@@ -763,6 +763,7 @@ const PAYSTACK_KEYS = {
   nigeria: functions.config().paystack?.ng_key || '',
 };
 const PAYSTACK_BASE_URL = 'api.paystack.co';
+const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || ''; 
 
 /**
  * Get country from currency code for Paystack routing
