@@ -2264,11 +2264,9 @@ async function enforceKyc(userId) {
         'Email verification required. Please verify your email before performing financial operations.');
     }
   } catch (error) {
-    // If error is our own throwAppError, re-throw it
     if (error.code === 'functions/failed-precondition' || error.code === 'functions/permission-denied') {
       throw error;
     }
-    // Firebase Auth error — log but don't block (fail open for auth service issues)
     logError('Email verification check failed', { userId, error: error.message });
   }
 
@@ -2280,13 +2278,40 @@ async function enforceKyc(userId) {
 
   const userData = userDoc.data();
 
-  // Check canonical kycStatus field (authoritative, set by Cloud Functions only)
+  // Check canonical kycStatus field (authoritative)
   if (userData.kycStatus === 'verified') {
     return;
   }
 
+  // ── AUTO-VERIFY for countries without Smile ID document verification ──
+  // These countries have configured Smile ID KYC flows (BVN, NIN, SSNIT, etc.)
+  // Users in these countries MUST complete Smile ID verification.
+  const smileIdCountries = [
+    'ghana', 'nigeria', 'kenya', 'south africa', 'uganda',
+  ];
+
+  const userCountry = (userData.country || '').toLowerCase().trim();
+  const userPhoneVerified = userData.phoneVerified === true || userData.phone != null;
+
+  // If user is NOT in a Smile ID country and has verified email + phone,
+  // auto-verify their KYC status so they can use financial services.
+  if (userCountry && !smileIdCountries.includes(userCountry) && userPhoneVerified) {
+    logInfo('Auto-verifying KYC for user in non-Smile-ID country', {
+      userId,
+      country: userCountry,
+    });
+
+    // Set kycStatus to verified so this check passes next time
+    await db.collection('users').doc(userId).update({
+      kycStatus: 'verified',
+      kycVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      kycMethod: 'phone_email_auto',
+    });
+
+    return;
+  }
+
   // Legacy kycCompleted/kycVerified fields are no longer trusted for auto-migration.
-  // Users with legacy fields must re-verify through Smile ID to get kycStatus: 'verified'.
   if (!userData.kycStatus && userData.kycCompleted === true) {
     logInfo('User has legacy KYC fields but no canonical kycStatus — re-verification required', { userId });
   }
