@@ -608,9 +608,122 @@ class MobileMoneyProvider {
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
           MobileMoneyProvider(name: 'Airtel Money', code: 'AIRTEL'),
         ];
+      case 'rwanda':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'cameroon':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'benin':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'ivory coast':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'congo':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'guinea':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'liberia':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'zambia':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'south africa':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'eswatini':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'south sudan':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'guinea-bissau':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'sierra leone':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'nigeria':
+        return [
+          MobileMoneyProvider(name: 'MTN MoMo PSB', code: 'MTN'),
+        ];
+      case 'dr congo':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'sudan':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
       default:
         return [];
     }
+  }
+
+  /// Map currency code to country name for MoMo routing
+  static String? getCountryFromCurrency(String currencyCode) {
+    const map = {
+      'GHS': 'ghana',
+      'NGN': 'nigeria',
+      'KES': 'kenya',
+      'UGX': 'uganda',
+      'RWF': 'rwanda',
+      'XAF': 'cameroon',
+      'XOF': 'benin',
+      'GNF': 'guinea',
+      'LRD': 'liberia',
+      'ZMW': 'zambia',
+      'ZAR': 'south africa',
+      'SZL': 'eswatini',
+      'SSP': 'south sudan',
+      'SLL': 'sierra leone',
+      'CDF': 'dr congo',
+      'SDG': 'sudan',
+    };
+    return map[currencyCode.toUpperCase()];
+  }
+
+  /// Map ISO 3166-1 alpha-2 country code to country name for MoMo routing
+  static String? getCountryFromIsoCode(String isoCode) {
+    const map = {
+      'GH': 'ghana',
+      'NG': 'nigeria',
+      'KE': 'kenya',
+      'UG': 'uganda',
+      'RW': 'rwanda',
+      'CM': 'cameroon',
+      'BJ': 'benin',
+      'CI': 'ivory coast',
+      'CG': 'congo',
+      'GN': 'guinea',
+      'LR': 'liberia',
+      'ZM': 'zambia',
+      'ZA': 'south africa',
+      'SZ': 'eswatini',
+      'SS': 'south sudan',
+      'GW': 'guinea-bissau',
+      'SL': 'sierra leone',
+      'CD': 'dr congo',
+      'SD': 'sudan',
+    };
+    return map[isoCode.toUpperCase()];
   }
 }
 

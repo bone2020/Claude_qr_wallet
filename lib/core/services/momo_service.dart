@@ -181,6 +181,7 @@ class MomoService {
       'ivory coast', 'cote d\'ivoire', 'congo', 'guinea',
       'liberia', 'zambia', 'south africa', 'eswatini',
       'south sudan', 'guinea-bissau',
+      'nigeria', 'sierra leone', 'dr congo', 'sudan',
     ];
     return mtnCountries.contains(country.toLowerCase());
   }
