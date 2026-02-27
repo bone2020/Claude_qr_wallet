@@ -599,6 +599,17 @@ class MobileMoneyProvider {
           MobileMoneyProvider(name: 'Vodafone Cash', code: 'VOD'),
           MobileMoneyProvider(name: 'AirtelTigo Money', code: 'ATL'),
         ];
+      case 'nigeria':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+          MobileMoneyProvider(name: 'Airtel Money', code: 'AIRTEL'),
+          MobileMoneyProvider(name: '9mobile Money', code: '9MOBILE'),
+        ];
+      case 'sierra leone':
+        return [
+          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
+          MobileMoneyProvider(name: 'Africell Money', code: 'AFRICELL'),
+        ];
       case 'kenya':
         return [
           MobileMoneyProvider(name: 'M-Pesa', code: 'MPESA'),

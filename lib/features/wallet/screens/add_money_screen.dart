@@ -74,6 +74,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     if (currency == 'GHS') country = 'ghana';
     if (currency == 'KES') country = 'kenya';
     if (currency == 'UGX') country = 'uganda';
+    if (currency == 'NGN') country = 'nigeria';
+    if (currency == 'SLL' || currency == 'SLE') country = 'sierra leone';
 
     _momoProviders = MobileMoneyProvider.getProviders(country);
     if (_momoProviders.isNotEmpty) {
