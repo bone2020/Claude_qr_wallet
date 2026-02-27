@@ -591,37 +591,149 @@ class MobileMoneyProvider {
 
   MobileMoneyProvider({required this.name, required this.code});
 
+  /// Get available mobile money providers for a given country.
+  /// Returns providers for both Paystack-routed and MTN MoMo Direct API countries.
   static List<MobileMoneyProvider> getProviders(String country) {
     switch (country.toLowerCase()) {
+      // ── Paystack-supported MoMo countries ──
       case 'ghana':
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
           MobileMoneyProvider(name: 'Vodafone Cash', code: 'VOD'),
           MobileMoneyProvider(name: 'AirtelTigo Money', code: 'ATL'),
         ];
-      case 'nigeria':
-        return [
-          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
-          MobileMoneyProvider(name: 'Airtel Money', code: 'AIRTEL'),
-          MobileMoneyProvider(name: '9mobile Money', code: '9MOBILE'),
-        ];
-      case 'sierra leone':
-        return [
-          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
-          MobileMoneyProvider(name: 'Africell Money', code: 'AFRICELL'),
-        ];
       case 'kenya':
         return [
           MobileMoneyProvider(name: 'M-Pesa', code: 'MPESA'),
         ];
+
+      // ── MTN MoMo Direct API countries ──
       case 'uganda':
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
           MobileMoneyProvider(name: 'Airtel Money', code: 'AIRTEL'),
         ];
+      case 'rwanda':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'cameroon':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
+        ];
+      case 'benin':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'ivory coast':
+      case 'cote d\'ivoire':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
+        ];
+      case 'congo':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'guinea':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'liberia':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'zambia':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'south africa':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'eswatini':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'south sudan':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'guinea-bissau':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
       default:
         return [];
     }
+  }
+
+  /// Maps a currency code to a country name for payment routing.
+  ///
+  /// IMPORTANT: Some currencies (XAF, XOF) are shared by multiple countries.
+  /// For those, this returns the most common MTN country for that currency.
+  /// For precise routing when a user's ISO country code is available,
+  /// use [getCountryFromIsoCode] instead.
+  static String getCountryFromCurrency(String currencyCode) {
+    const map = {
+      // Paystack countries
+      'NGN': 'nigeria',
+      'GHS': 'ghana',
+      'KES': 'kenya',
+      // MTN MoMo Direct API countries
+      'UGX': 'uganda',
+      'RWF': 'rwanda',
+      'XAF': 'cameroon',     // Also: Congo, Gabon, Chad, CAR, Eq. Guinea
+      'XOF': 'ivory coast',  // Also: Benin, Senegal, Togo, Guinea-Bissau, etc.
+      'ZAR': 'south africa',
+      'ZMW': 'zambia',
+      'GNF': 'guinea',
+      'LRD': 'liberia',
+      'SZL': 'eswatini',
+      'SSP': 'south sudan',
+    };
+    return map[currencyCode.toUpperCase()] ?? 'nigeria';
+  }
+
+  /// Maps an ISO 3166-1 alpha-2 country code to a country name.
+  /// More precise than [getCountryFromCurrency] for shared-currency regions.
+  static String getCountryFromIsoCode(String isoCode) {
+    const map = {
+      'GH': 'ghana',
+      'NG': 'nigeria',
+      'KE': 'kenya',
+      'UG': 'uganda',
+      'RW': 'rwanda',
+      'CM': 'cameroon',
+      'BJ': 'benin',
+      'CI': 'ivory coast',
+      'CG': 'congo',
+      'GN': 'guinea',
+      'LR': 'liberia',
+      'ZM': 'zambia',
+      'ZA': 'south africa',
+      'SZ': 'eswatini',
+      'SS': 'south sudan',
+      'GW': 'guinea-bissau',
+      // Non-MTN African countries (for bank routing)
+      'TZ': 'tanzania',
+      'ET': 'ethiopia',
+      'EG': 'egypt',
+      'MA': 'morocco',
+      'DZ': 'algeria',
+      'TN': 'tunisia',
+      'ZW': 'zimbabwe',
+      'BW': 'botswana',
+      'NA': 'namibia',
+      'MZ': 'mozambique',
+      'AO': 'angola',
+      'CD': 'dr congo',
+      'SD': 'sudan',
+      'LY': 'libya',
+      'SN': 'senegal',
+    };
+    return map[isoCode.toUpperCase()] ?? 'nigeria';
   }
 }
 

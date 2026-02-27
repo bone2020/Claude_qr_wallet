@@ -70,14 +70,23 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
   void _loadMomoProviders() {
     final currency = ref.read(walletNotifierProvider).currency;
-    String country = 'nigeria';
-    if (currency == 'GHS') country = 'ghana';
-    if (currency == 'KES') country = 'kenya';
-    if (currency == 'UGX') country = 'uganda';
-    if (currency == 'NGN') country = 'nigeria';
-    if (currency == 'SLL' || currency == 'SLE') country = 'sierra leone';
 
+    // Use the expanded currency-to-country mapping
+    final country = MobileMoneyProvider.getCountryFromCurrency(currency);
+
+    // Get providers for this country (now covers all 14+ MTN countries)
     _momoProviders = MobileMoneyProvider.getProviders(country);
+
+    // Safety net: if no providers found but MomoService says MTN is available
+    // for this country, add MTN as the default provider.
+    // This handles any edge cases where getProviders() might miss a country
+    // but MomoService.isAvailable() has it listed.
+    if (_momoProviders.isEmpty && MomoService.isAvailable(country)) {
+      _momoProviders = [
+        MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+      ];
+    }
+
     if (_momoProviders.isNotEmpty) {
       _selectedMomoProvider = _momoProviders.first;
     }
