@@ -664,6 +664,22 @@ class MobileMoneyProvider {
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
         ];
+      case 'sierra leone':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'nigeria':
+        return [
+          MobileMoneyProvider(name: 'MTN MoMo PSB', code: 'MTN'),
+        ];
+      case 'dr congo':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
+      case 'sudan':
+        return [
+          MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+        ];
       default:
         return [];
     }
@@ -692,6 +708,9 @@ class MobileMoneyProvider {
       'LRD': 'liberia',
       'SZL': 'eswatini',
       'SSP': 'south sudan',
+      'SLL': 'sierra leone',
+      'CDF': 'dr congo',
+      'SDG': 'sudan',
     };
     return map[currencyCode.toUpperCase()] ?? 'nigeria';
   }
@@ -716,6 +735,9 @@ class MobileMoneyProvider {
       'SZ': 'eswatini',
       'SS': 'south sudan',
       'GW': 'guinea-bissau',
+      'SL': 'sierra leone',
+      'CD': 'dr congo',
+      'SD': 'sudan',
       // Non-MTN African countries (for bank routing)
       'TZ': 'tanzania',
       'ET': 'ethiopia',
@@ -728,8 +750,6 @@ class MobileMoneyProvider {
       'NA': 'namibia',
       'MZ': 'mozambique',
       'AO': 'angola',
-      'CD': 'dr congo',
-      'SD': 'sudan',
       'LY': 'libya',
       'SN': 'senegal',
     };

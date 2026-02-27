@@ -529,6 +529,7 @@ const VALID_CURRENCIES = new Set([
   'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
   'USD', 'EUR', 'GBP',
   'XOF', 'XAF', 'EGP',
+  'GNF', 'LRD', 'ZMW', 'SZL', 'SSP', 'SLL', 'CDF',
 ]);
 
 /**
