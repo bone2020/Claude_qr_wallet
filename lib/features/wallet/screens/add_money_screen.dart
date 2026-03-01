@@ -142,7 +142,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     if (value == null || value.isEmpty) {
       return 'Please enter phone number';
     }
-    if (value.length < 10) {
+    if (value.length < 7) {
       return 'Please enter a valid phone number';
     }
     return null;
