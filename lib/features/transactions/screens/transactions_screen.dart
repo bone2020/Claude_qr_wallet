@@ -49,9 +49,13 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
                 t.type == TransactionType.receive ||
                 t.type == TransactionType.deposit)
             .toList();
-      case 'pending':
+     case 'pending':
         return allTransactions
             .where((t) => t.status == TransactionStatus.pending)
+            .toList();
+      case 'failed':
+        return allTransactions
+            .where((t) => t.status == TransactionStatus.failed)
             .toList();
       default:
         return allTransactions;
@@ -107,6 +111,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             Tab(text: AppStrings.sent),
             Tab(text: AppStrings.received),
             Tab(text: AppStrings.pending),
+            Tab(text: 'Failed'),
           ],
         ),
       ),
@@ -193,6 +198,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
         break;
       case 'pending':
         message = 'No pending transactions';
+        break;
+      case 'failed':
+        message = 'No failed transactions';
         break;
       default:
         message = AppStrings.noTransactions;
