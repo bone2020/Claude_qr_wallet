@@ -2285,6 +2285,33 @@ async function enforceKyc(userId) {
     return;
   }
 
+  // ── AUTO-VERIFY for countries without Smile ID document verification ──
+  // These countries have configured Smile ID KYC flows (BVN, NIN, SSNIT, etc.)
+  // Users in these countries MUST complete Smile ID verification.
+  // NOTE: Uses ISO codes because that's what the Flutter client stores in Firestore.
+  const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+
+  const userCountry = (userData.country || '').toUpperCase().trim();
+  const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');
+
+  // If user is NOT in a Smile ID country and has verified email + phone,
+  // auto-verify their KYC status so they can use financial services.
+  if (userCountry && !smileIdCountries.includes(userCountry) && userPhoneVerified) {
+    logInfo('Auto-verifying KYC for user in non-Smile-ID country', {
+      userId,
+      country: userCountry,
+    });
+
+    // Set kycStatus to verified so this check passes next time
+    await db.collection('users').doc(userId).update({
+      kycStatus: 'verified',
+      kycVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      kycMethod: 'phone_email_auto',
+    });
+
+    return;
+  }
+
   // Legacy kycCompleted/kycVerified fields are no longer trusted for auto-migration.
   // Users with legacy fields must re-verify through Smile ID to get kycStatus: 'verified'.
   if (!userData.kycStatus && userData.kycCompleted === true) {
