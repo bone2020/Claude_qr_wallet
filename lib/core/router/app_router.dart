@@ -135,7 +135,27 @@ final routerProvider = Provider<GoRouter>((ref) {
             final data = userDoc.data()!;
             final kycVerified = data['kycStatus'] == 'verified' ||
                 data['kycCompleted'] == true;
-            if (!kycVerified) return AppRoutes.kyc;
+
+            if (!kycVerified) {
+              // Countries with Smile ID KYC configured — must complete Smile ID
+              const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+              final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
+
+              if (smileIdCountries.contains(userCountry)) {
+                return AppRoutes.kyc;
+              }
+
+              // Non-Smile-ID countries: check if phone is verified
+              final phoneVerified = data['phoneVerified'] == true;
+              if (!phoneVerified) {
+                // Need phone verification first — send to phone OTP
+                return AppRoutes.phoneOtp;
+              }
+
+              // Phone + email verified for non-Smile-ID country
+              // Backend will auto-set kycStatus on first financial operation
+              return AppRoutes.main;
+            }
           }
         } catch (e) {
           debugPrint('Route guard: KYC check failed: $e');
@@ -194,7 +214,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             data['kycCompleted'] == true;
 
         if (!kycVerified) {
-          return AppRoutes.kyc;
+          // Countries with Smile ID KYC configured — must complete Smile ID
+          const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+          final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
+
+          if (smileIdCountries.contains(userCountry)) {
+            return AppRoutes.kyc;
+          }
+
+          // Non-Smile-ID countries: check if phone is verified
+          final phoneVerified = data['phoneVerified'] == true;
+          if (!phoneVerified) {
+            return AppRoutes.phoneOtp;
+          }
+
+          // Phone + email verified — backend auto-verifies on first financial op
+          return null;
         }
       } catch (e) {
         // On error, allow navigation — server-side enforcement (Issue 1)
@@ -262,7 +297,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return PhoneOtpScreen(
-            phoneNumber: extras?['phoneNumber'] ?? '',
+            phoneNumber: extras?['phoneNumber'],
           );
         },
       ),
