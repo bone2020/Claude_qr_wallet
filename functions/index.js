@@ -1505,7 +1505,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       const txRef = db.collection('users').doc(userId).collection('transactions').doc();
       transaction.set(txRef, {
         id: txRef.id,
-        type: 'withdrawal',
+        type: 'withdraw',
         amount: amount,
         currency: walletData.currency || 'NGN',
         status: 'pending',
@@ -4162,7 +4162,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
                 // Disbursement already debited wallet, just record completion
                 transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId), {
                   id: referenceId,
-                  type: 'withdrawal',
+                  type: 'withdraw',
                   amount: txData.amount,
                   currency: txData.currency,
                   method: 'MTN MoMo',
@@ -4181,8 +4181,48 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           });
+          } else if (status === 'FAILED' || status === 'REJECTED') {
+          // Update momo transaction status
+          await updateTransactionState(txRef, status, {
+            providerStatus: status,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Update user transaction to failed
+          const userTxRef = db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId);
+          const userTxDoc = await userTxRef.get();
+          if (userTxDoc.exists) {
+            await userTxRef.update({
+              status: 'failed',
+              failedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          // Refund wallet for failed disbursements (money was already debited)
+          if (txData.type === 'disbursement') {
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
+
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
+              const walletData = walletDoc.data();
+              const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus refund');
+              await walletDoc.ref.update({
+                balance: refundBalance,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+
+              logInfo('Refunded wallet for failed MoMo disbursement', {
+                userId: txData.userId,
+                amount: txData.amount,
+                referenceId,
+              });
+            }
+          }
         } else {
-          // Just update status with state machine validation
+          // Other statuses (PENDING etc) - just update momo transaction
           await updateTransactionState(txRef, status, {
             providerStatus: status,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -4289,6 +4329,32 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
+
+      // Store pending withdrawal
+      transaction.set(db.collection('momo_transactions').doc(referenceId), {
+        type: 'disbursement',
+        userId: userId,
+        amount: amount,
+        currency: currency || 'EUR',
+        phoneNumber: validatedPhone,
+        status: TRANSACTION_STATES.PENDING,
+        referenceId: referenceId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
+      });
+
+      // Record in user's transactions subcollection for UI display
+      transaction.set(db.collection('users').doc(userId).collection('transactions').doc(referenceId), {
+        id: referenceId,
+        type: 'withdraw',
+        amount: amount,
+        currency: currency || 'EUR',
+        method: 'MTN MoMo',
+        phoneNumber: validatedPhone,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
     });
 
     // Create transfer request

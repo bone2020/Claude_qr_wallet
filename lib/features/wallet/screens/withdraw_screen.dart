@@ -296,6 +296,33 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             accountName: _momoAccountName,
             currency: ref.read(walletNotifierProvider).currency,
           );
+
+          // Check MoMo transfer status after short delay
+          if (result.success && result.reference != null) {
+            await Future.delayed(const Duration(seconds: 3));
+            if (!mounted) return;
+
+            final statusResult = await _paymentService.checkMtnMomoStatus(
+              result.reference!,
+              type: 'disbursement',
+            );
+
+            if (!mounted) return;
+            setState(() => _isLoading = false);
+
+            ref.read(walletNotifierProvider.notifier).refreshWallet();
+            ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+
+            if (statusResult.completed) {
+              _showSuccessDialog(amount, result.reference!);
+            } else if (statusResult.status == 'FAILED' || statusResult.status == 'REJECTED') {
+              _showError('Withdrawal failed. Your balance has been refunded.');
+            } else {
+              // Still pending — show success, status will update later
+              _showSuccessDialog(amount, result.reference!);
+            }
+            return;
+          }
         } else {
           // Use Paystack for non-MTN providers
           result = await _paymentService.initiateMobileMoneyWithdrawal(
