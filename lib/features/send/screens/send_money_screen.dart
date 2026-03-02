@@ -48,7 +48,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     if (value == null || value.isEmpty) {
       return AppStrings.errorFieldRequired;
     }
-    if (value.length < 10) {
+    if (value.length < 18) {
       return 'Please enter a valid wallet ID';
     }
     return null;
@@ -72,7 +72,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     _debounceTimer?.cancel();
 
     // Clear previous lookup if wallet ID is too short
-    if (walletId.length < 10) {
+    if (walletId.length < 18) {
       setState(() {
         _recipientName = null;
         _recipientWalletId = null;
