@@ -126,6 +126,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
                 _buildTransactionList('sent', transactionsState.transactions),
                 _buildTransactionList('received', transactionsState.transactions),
                 _buildTransactionList('pending', transactionsState.transactions),
+                _buildTransactionList('failed', transactionsState.transactions),
               ],
             ),
     );
