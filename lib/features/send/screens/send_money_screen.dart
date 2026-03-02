@@ -103,6 +103,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
           _recipientWalletId = result.walletId;
           _recipientCurrency = result.currency;
           _recipientCurrencySymbol = result.currencySymbol;
+          _lookupError = null;
           _isLookingUp = false;
         });
       } else {
