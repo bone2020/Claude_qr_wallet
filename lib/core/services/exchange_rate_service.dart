@@ -46,6 +46,7 @@ class ExchangeRateService {
     'SSP': 130.0,
     'LSL': 18.5,
     'SZL': 18.5,
+    'ZWG': 14.0,
     'MGA': 4500.0,
     'SCR': 13.0,
     'KMF': 450.0,

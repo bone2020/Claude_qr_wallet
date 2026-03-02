@@ -20,6 +20,7 @@ import '../../features/auth/screens/kyc/drivers_license_verification_screen.dart
 import '../../features/auth/screens/kyc/voters_card_verification_screen.dart';
 import '../../features/auth/screens/kyc/national_id_verification_screen.dart';
 import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
+import '../../features/auth/screens/kyc/uganda_nin_verification_screen.dart';
 import '../../features/auth/screens/kyc/phone_verification_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
@@ -61,6 +62,7 @@ class AppRoutes {
   static const String kycVotersCard = '/kyc-voters-card';
   static const String kycNationalId = '/kyc-national-id';
   static const String kycSsnit = '/kyc-ssnit';
+  static const String kycUgandaNin = '/kyc-uganda-nin';
   static const String kycPhoneVerification = '/kyc-phone-verification';
   static const String main = '/main';
   static const String home = '/home';
@@ -118,6 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.kycVotersCard,
         AppRoutes.kycNationalId,
         AppRoutes.kycSsnit,
+        AppRoutes.kycUgandaNin,
         AppRoutes.kycPhoneVerification,
       };
 
@@ -138,7 +141,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
             if (!kycVerified) {
               // Countries with Smile ID KYC configured — must complete Smile ID
-              const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+              const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
               final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
 
               if (smileIdCountries.contains(userCountry)) {
@@ -215,7 +218,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         if (!kycVerified) {
           // Countries with Smile ID KYC configured — must complete Smile ID
-          const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+          const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
           final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
 
           if (smileIdCountries.contains(userCountry)) {
@@ -388,6 +391,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extras = state.extra as Map<String, dynamic>?;
           return SsnitVerificationScreen(
             countryCode: extras?['countryCode'] ?? 'GH',
+          );
+        },
+      ),
+
+      // KYC Uganda NIN Verification
+      GoRoute(
+        path: AppRoutes.kycUgandaNin,
+        name: 'kycUgandaNin',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return UgandaNinVerificationScreen(
+            countryCode: extras?['countryCode'] ?? 'UG',
           );
         },
       ),

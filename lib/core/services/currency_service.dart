@@ -21,6 +21,7 @@ class CurrencyService {
     CurrencyModel(code: 'GNF', symbol: 'FG', name: 'Guinean Franc', countryCode: '+224', flag: '🇬🇳'),
     CurrencyModel(code: 'LRD', symbol: 'L\$', name: 'Liberian Dollar', countryCode: '+231', flag: '🇱🇷'),
     CurrencyModel(code: 'ZMW', symbol: 'ZK', name: 'Zambian Kwacha', countryCode: '+260', flag: '🇿🇲'),
+    CurrencyModel(code: 'ZWG', symbol: 'ZiG', name: 'Zimbabwe Gold', countryCode: '+263', flag: '🇿🇼'),
     CurrencyModel(code: 'SZL', symbol: 'E', name: 'Swazi Lilangeni', countryCode: '+268', flag: '🇸🇿'),
     CurrencyModel(code: 'SSP', symbol: 'SS£', name: 'South Sudanese Pound', countryCode: '+211', flag: '🇸🇸'),
     CurrencyModel(code: 'CDF', symbol: 'FC', name: 'Congolese Franc', countryCode: '+243', flag: '🇨🇩'),

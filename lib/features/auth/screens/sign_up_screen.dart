@@ -157,7 +157,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
       if (result.success) {
         // Route based on country
-        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
         final user = ref.read(currentUserProvider);
         final countryCode = (user?.country ?? 'GH').toUpperCase().trim();
 

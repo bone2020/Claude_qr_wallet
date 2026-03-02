@@ -62,6 +62,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
 
       if (data['found'] != true) {
         return WalletLookupResult.notFound();
@@ -125,6 +126,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get sender's wallet for currency info
@@ -203,6 +205,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get wallet info for transaction model
