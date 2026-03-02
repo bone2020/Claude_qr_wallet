@@ -223,9 +223,11 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             _verifiedAccountName = result.accountName;
           } else {
             _verifiedAccountName = null;
-            _showError(result.error ?? 'Could not verify account');
           }
         });
+        if (!result.success) {
+          _showError(result.error ?? 'Could not verify account');
+        }
       }
     } catch (e) {
       if (mounted) {
