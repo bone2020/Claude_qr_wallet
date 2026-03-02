@@ -180,7 +180,8 @@ class MomoService {
       'ghana', 'nigeria', 'uganda', 'rwanda', 'cameroon', 'benin',
       'ivory coast', 'cote d\'ivoire', 'congo', 'guinea',
       'liberia', 'zambia', 'south africa', 'eswatini',
-      'south sudan', 'guinea-bissau', 'sierra leone','dr congo', 'sudan',
+      'south sudan', 'guinea-bissau',
+      'nigeria', 'sierra leone', 'dr congo', 'sudan',
     ];
     return mtnCountries.contains(country.toLowerCase());
   }

@@ -620,17 +620,14 @@ class MobileMoneyProvider {
       case 'cameroon':
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
-          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
         ];
       case 'benin':
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
         ];
       case 'ivory coast':
-      case 'cote d\'ivoire':
         return [
           MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
-          MobileMoneyProvider(name: 'Orange Money', code: 'ORANGE'),
         ];
       case 'congo':
         return [
@@ -685,39 +682,31 @@ class MobileMoneyProvider {
     }
   }
 
-  /// Maps a currency code to a country name for payment routing.
-  ///
-  /// IMPORTANT: Some currencies (XAF, XOF) are shared by multiple countries.
-  /// For those, this returns the most common MTN country for that currency.
-  /// For precise routing when a user's ISO country code is available,
-  /// use [getCountryFromIsoCode] instead.
-  static String getCountryFromCurrency(String currencyCode) {
+  /// Map currency code to country name for MoMo routing
+  static String? getCountryFromCurrency(String currencyCode) {
     const map = {
-      // Paystack countries
-      'NGN': 'nigeria',
       'GHS': 'ghana',
+      'NGN': 'nigeria',
       'KES': 'kenya',
-      // MTN MoMo Direct API countries
       'UGX': 'uganda',
       'RWF': 'rwanda',
-      'XAF': 'cameroon',     // Also: Congo, Gabon, Chad, CAR, Eq. Guinea
-      'XOF': 'ivory coast',  // Also: Benin, Senegal, Togo, Guinea-Bissau, etc.
-      'ZAR': 'south africa',
-      'ZMW': 'zambia',
+      'XAF': 'cameroon',
+      'XOF': 'benin',
       'GNF': 'guinea',
       'LRD': 'liberia',
+      'ZMW': 'zambia',
+      'ZAR': 'south africa',
       'SZL': 'eswatini',
       'SSP': 'south sudan',
       'SLL': 'sierra leone',
       'CDF': 'dr congo',
       'SDG': 'sudan',
     };
-    return map[currencyCode.toUpperCase()] ?? 'nigeria';
+    return map[currencyCode.toUpperCase()];
   }
 
-  /// Maps an ISO 3166-1 alpha-2 country code to a country name.
-  /// More precise than [getCountryFromCurrency] for shared-currency regions.
-  static String getCountryFromIsoCode(String isoCode) {
+  /// Map ISO 3166-1 alpha-2 country code to country name for MoMo routing
+  static String? getCountryFromIsoCode(String isoCode) {
     const map = {
       'GH': 'ghana',
       'NG': 'nigeria',
@@ -738,22 +727,8 @@ class MobileMoneyProvider {
       'SL': 'sierra leone',
       'CD': 'dr congo',
       'SD': 'sudan',
-      // Non-MTN African countries (for bank routing)
-      'TZ': 'tanzania',
-      'ET': 'ethiopia',
-      'EG': 'egypt',
-      'MA': 'morocco',
-      'DZ': 'algeria',
-      'TN': 'tunisia',
-      'ZW': 'zimbabwe',
-      'BW': 'botswana',
-      'NA': 'namibia',
-      'MZ': 'mozambique',
-      'AO': 'angola',
-      'LY': 'libya',
-      'SN': 'senegal',
     };
-    return map[isoCode.toUpperCase()] ?? 'nigeria';
+    return map[isoCode.toUpperCase()];
   }
 }
 

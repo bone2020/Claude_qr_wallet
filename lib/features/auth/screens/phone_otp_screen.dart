@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -11,11 +13,11 @@ import '../../../providers/auth_provider.dart';
 
 /// Phone OTP verification screen
 class PhoneOtpScreen extends ConsumerStatefulWidget {
-  final String phoneNumber;
+  final String? phoneNumber;
 
   const PhoneOtpScreen({
     super.key,
-    required this.phoneNumber,
+    this.phoneNumber,
   });
 
   @override
@@ -35,6 +37,15 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   int _resendSeconds = 60;
   Timer? _resendTimer;
   String? _errorMessage;
+
+  String get _resolvedPhoneNumber {
+    if (widget.phoneNumber != null && widget.phoneNumber!.isNotEmpty) {
+      return widget.phoneNumber!;
+    }
+    // Fallback: read from user provider
+    final user = ref.read(currentUserProvider);
+    return user?.phoneNumber ?? '';
+  }
 
   @override
   void initState() {
@@ -76,7 +87,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final success = await authNotifier.sendPhoneOtp(
-      phoneNumber: widget.phoneNumber,
+      phoneNumber: _resolvedPhoneNumber,
       onError: (error) {
         if (mounted) {
           setState(() {
@@ -135,7 +146,21 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             backgroundColor: AppColors.success,
           ),
         );
-        context.go(AppRoutes.kyc);
+        // Write phoneVerified flag to Firestore
+        try {
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(firebaseUser.uid)
+                .update({'phoneVerified': true});
+          }
+        } catch (e) {
+          debugPrint('Failed to update phoneVerified: $e');
+        }
+
+        if (!mounted) return;
+        context.go(AppRoutes.main);
       } else {
         setState(() {
           _errorMessage = result.error ?? 'Invalid OTP. Please try again.';
@@ -213,7 +238,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 4),
 
               Text(
-                widget.phoneNumber,
+                _resolvedPhoneNumber,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -351,7 +376,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
               // Skip button (optional - for testing)
               TextButton(
-                onPressed: () => context.go(AppRoutes.kyc),
+                onPressed: () => context.go(AppRoutes.main),
                 child: Text(
                   'Skip for now',
                   style: TextStyle(

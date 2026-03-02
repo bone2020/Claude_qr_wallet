@@ -1,221 +1,272 @@
-# CLAUDE.md - QR Wallet Codebase Guide
+# CLAUDE.md — QR Wallet
 
 ## Project Overview
 
-QR Wallet is a cross-platform mobile wallet app built with **Flutter** for iOS and Android. It enables cashless transactions via QR codes across multiple African countries (Nigeria, Ghana, Kenya, Sierra Leone, Uganda, etc.). The backend uses **Firebase** (Auth, Firestore, Cloud Functions, Storage) with **Paystack** for card/bank payments and **MTN MoMo** for direct mobile money integration.
+QR Wallet is a production-grade fintech mobile application enabling cashless transactions via QR codes, built for African markets. It is a **Flutter app** (iOS + Android) backed by **Firebase** services and **Cloud Functions** (Node.js).
+
+**Firebase Project:** `qr-wallet-1993` | **Region:** `africa-south1`
+
+---
 
 ## Tech Stack
 
-- **Framework**: Flutter 3.x (Dart SDK >=3.2.0 <4.0.0)
-- **State Management**: Riverpod (`flutter_riverpod`, `StateNotifier` pattern)
-- **Routing**: GoRouter with auth/KYC route guards
-- **Backend**: Firebase (Auth, Cloud Firestore, Cloud Functions, Storage, App Check)
-- **Local Storage**: Hive (with generated adapters) + `flutter_secure_storage`
-- **Payments**: Paystack (card/bank), MTN MoMo (direct API via Cloud Functions)
-- **KYC**: SmileID (`smile_id` package)
-- **QR Codes**: `qr_flutter` (generation), `mobile_scanner` (scanning)
-- **Network**: Dio for HTTP, Cloud Functions callable for server operations
-- **Cloud Functions**: Node.js 20 (`functions/index.js`)
+| Layer | Technology |
+|-------|-----------|
+| Mobile framework | Flutter 3.x / Dart >=3.2.0 |
+| State management | Riverpod 2.x (with code generation) |
+| Local storage | Hive 2.x (with code generation) |
+| Routing | GoRouter 13.x |
+| Backend | Firebase (Auth, Firestore, Storage, App Check, Cloud Functions) |
+| Cloud Functions | Node.js 20, firebase-functions 4.5, firebase-admin 11.11 |
+| Payments | Paystack, Flutterwave, MTN Mobile Money |
+| KYC | SmileID (facial recognition, document verification) |
+| Networking | Dio 5.x |
+| QR codes | qr_flutter (generation), mobile_scanner (scanning) |
+
+---
 
 ## Project Structure
 
 ```
-lib/
-├── main.dart                          # App entry point (Firebase init, SmileID, Hive)
-├── firebase_options.dart              # Firebase config (auto-generated)
-├── core/
-│   ├── constants/
-│   │   ├── african_countries.dart     # Country data (dial codes, currencies, flags)
-│   │   ├── app_colors.dart            # Color constants
-│   │   ├── app_dimensions.dart        # Spacing/sizing constants
-│   │   ├── app_strings.dart           # String constants
-│   │   ├── app_text_styles.dart       # Typography
-│   │   ├── constants.dart             # Barrel export
-│   │   └── error_codes.dart           # Error code constants
-│   ├── models/
-│   │   └── currency_model.dart        # Currency data model
-│   ├── router/
-│   │   └── app_router.dart            # GoRouter config with auth/KYC guards
-│   ├── services/
-│   │   ├── services.dart              # Barrel export for all services
-│   │   ├── auth_service.dart          # Firebase Auth operations
-│   │   ├── wallet_service.dart        # Wallet CRUD, send money, transactions
-│   │   ├── payment_service.dart       # Paystack + MoMo payment orchestration
-│   │   ├── momo_service.dart          # MTN MoMo direct API (via Cloud Functions)
-│   │   ├── user_service.dart          # User profile operations
-│   │   ├── currency_service.dart      # Currency config and formatting
-│   │   ├── exchange_rate_service.dart  # FX rate lookups
-│   │   ├── biometric_service.dart     # Fingerprint/Face ID
-│   │   ├── local_storage_service.dart # Hive-based caching
-│   │   ├── secure_storage_service.dart # flutter_secure_storage wrapper
-│   │   ├── qr_signing_service.dart    # QR code signing/verification
-│   │   ├── deep_link_service.dart     # qrwallet:// deep link handling
-│   │   ├── smile_id_service.dart      # SmileID KYC integration
-│   │   ├── screenshot_prevention_service.dart # Screenshot blocking
-│   │   └── firebase_config.dart       # Firebase instance access
-│   ├── theme/
-│   │   └── app_theme.dart             # Light/dark theme definitions
-│   ├── utils/
-│   │   ├── error_handler.dart         # Centralized error handling + MoMo errors
-│   │   └── network_retry.dart         # Retry logic with exponential backoff
-│   └── widgets/
-│       └── screenshot_protected_screen.dart  # Widget wrapper for sensitive screens
-├── features/
-│   ├── auth/
-│   │   ├── screens/                   # Login, SignUp, OTP, KYC, ForgotPassword
-│   │   │   └── kyc/                   # Country-specific KYC: NIN, BVN, Passport, etc.
-│   │   └── widgets/                   # Reusable auth widgets
-│   ├── home/
-│   │   ├── screens/                   # HomeScreen, MainNavigationScreen (bottom nav)
-│   │   └── widgets/                   # BalanceCard, QuickActionButton, TransactionTile
-│   ├── send/screens/                  # SendMoney, ScanQR, ConfirmSend
-│   ├── receive/screens/               # ReceiveMoney, RequestPayment (merchant QR)
-│   ├── wallet/screens/                # AddMoney, Withdraw, PaymentResult
-│   ├── transactions/screens/          # TransactionsList, TransactionDetails
-│   ├── profile/
-│   │   ├── screens/                   # Profile, EditProfile, Settings, etc.
-│   │   └── widgets/                   # BusinessLogoSection
-│   ├── settings/screens/              # CurrencySelector
-│   ├── notifications/screens/         # NotificationsScreen
-│   └── splash/                        # SplashScreen
-├── models/
-│   ├── models.dart                    # Barrel export
-│   ├── user_model.dart                # UserModel (with .g.dart Hive adapter)
-│   ├── wallet_model.dart              # WalletModel (with .g.dart Hive adapter)
-│   ├── transaction_model.dart         # TransactionModel (with .g.dart Hive adapter)
-│   └── notification_model.dart        # NotificationModel
-└── providers/
-    ├── providers.dart                 # Barrel export
-    ├── auth_provider.dart             # Auth state + current user provider
-    ├── wallet_provider.dart           # Wallet, Transactions, SendMoney state
-    ├── currency_provider.dart         # Currency selection state
-    └── theme_provider.dart            # Theme mode state
-
-functions/                             # Firebase Cloud Functions (Node.js 20)
-├── index.js                           # All cloud functions (payments, MoMo, KYC, etc.)
-├── package.json                       # Node dependencies
-├── MOMO_SETUP.md                      # MTN MoMo API setup guide
-└── scripts/                           # Utility scripts
-
-firestore.rules                        # Firestore security rules
-storage.rules                          # Firebase Storage security rules
-firebase.json                          # Firebase project config (africa-south1)
+/
+├── lib/                          # Flutter app source
+│   ├── main.dart                 # Entry point (Firebase init, App Check, SmileID, Hive)
+│   ├── firebase_options.dart     # Generated Firebase config
+│   ├── core/
+│   │   ├── constants/            # Colors, strings, dimensions, text styles, error codes, country data
+│   │   ├── router/app_router.dart  # GoRouter route definitions (~19KB)
+│   │   ├── services/             # 16 service classes (auth, payments, wallet, KYC, etc.)
+│   │   ├── theme/app_theme.dart  # Light & dark theme definitions
+│   │   ├── utils/                # error_handler.dart, network_retry.dart
+│   │   └── widgets/              # screenshot_protected_screen.dart
+│   ├── features/                 # Feature modules (vertical slices)
+│   │   ├── auth/                 # Signup, login, OTP, KYC screens & widgets
+│   │   ├── home/                 # Dashboard with balance, quick actions
+│   │   ├── wallet/               # Balance management, add/withdraw money
+│   │   ├── send/                 # Send money via QR scan or manual entry
+│   │   ├── receive/              # Display QR code for receiving payments
+│   │   ├── transactions/         # Transaction history and detail views
+│   │   ├── profile/              # User profile, edit, change password/PIN
+│   │   ├── settings/             # Theme toggle, notifications, help
+│   │   ├── notifications/        # Notification list
+│   │   └── splash/               # Splash/loading screen
+│   ├── models/                   # Data models (User, Wallet, Transaction, Notification)
+│   │   └── *.g.dart              # Generated Hive adapters — do NOT hand-edit
+│   └── providers/                # Riverpod providers (auth, wallet, currency, theme)
+├── functions/                    # Firebase Cloud Functions (Node.js)
+│   ├── index.js                  # All 32 cloud functions (~4,559 lines)
+│   ├── package.json              # Node.js deps
+│   └── MOMO_SETUP.md             # MTN MoMo integration guide
+├── test/                         # Flutter tests (minimal — 1 smoke test)
+├── android/                      # Android native config (Gradle/Kotlin DSL)
+├── ios/                          # iOS native config (CocoaPods, Xcode)
+├── assets/                       # Images and icons
+│   ├── images/
+│   └── icons/
+├── public/                       # Firebase Hosting assets
+├── firestore.rules               # Firestore security rules (139 lines)
+├── storage.rules                 # Cloud Storage security rules
+├── firestore.indexes.json        # Firestore composite indexes
+├── firebase.json                 # Firebase project configuration
+├── .firebaserc                   # Firebase project alias
+├── pubspec.yaml                  # Flutter dependencies
+└── analysis_options.yaml         # Dart linting (flutter_lints)
 ```
 
-## Key Commands
+---
+
+## Build & Run Commands
+
+### Flutter App
 
 ```bash
-# Install Flutter dependencies
+# Install dependencies
 flutter pub get
 
-# Generate Hive adapters (required after model changes)
+# Run code generation (Hive adapters + Riverpod providers)
 flutter pub run build_runner build --delete-conflicting-outputs
 
-# Run the app
+# Run the app (debug)
 flutter run
+
+# Static analysis
+flutter analyze
 
 # Run tests
 flutter test
+```
 
-# Analyze code
-flutter analyze
+### Cloud Functions
 
-# Deploy Cloud Functions
-cd functions && firebase deploy --only functions
+```bash
+cd functions/
 
+# Install dependencies
+npm install
+
+# Local emulator
+npm run serve              # or: firebase emulators:start --only functions
+
+# Deploy to Firebase
+npm run deploy             # or: firebase deploy --only functions
+
+# View logs
+npm run logs
+```
+
+### Firebase Rules & Indexes
+
+```bash
 # Deploy Firestore rules
 firebase deploy --only firestore:rules
 
 # Deploy Storage rules
 firebase deploy --only storage
 
-# Run Cloud Functions locally
-cd functions && firebase emulators:start --only functions
+# Deploy indexes
+firebase deploy --only firestore:indexes
 ```
+
+---
 
 ## Architecture & Patterns
 
-### State Management
-- **Riverpod** with `StateNotifier` + `StateNotifierProvider` pattern
-- Providers are in `lib/providers/` with barrel export via `providers.dart`
-- Services are instantiated in providers (not dependency injected)
-- Wallet state uses real-time Firestore streams (`watchWallet()`, `watchTransactions()`)
-- Offline-first: Hive caches wallet/transactions locally; fresh data fetched on init
+### Flutter Client
 
-### Routing
-- **GoRouter** configured in `lib/core/router/app_router.dart`
-- Route names defined in `AppRoutes` class as static constants
-- Global redirect handles auth guards:
-  - Unauthenticated users -> welcome/login
-  - Unverified email -> OTP screen
-  - KYC not completed -> KYC screen
-  - Deep links (`qrwallet://`) require auth
-- Screen data passed via `state.extra` as `Map<String, dynamic>`
+- **Clean Architecture (modified):** `core/` for shared infrastructure, `features/` for vertical feature slices each containing `screens/` and `widgets/` subdirectories.
+- **State Management:** Riverpod with annotations. Providers live in `lib/providers/`. Some use code generation (`riverpod_generator` + `build_runner`).
+- **Routing:** GoRouter with `routerProvider` defined in `core/router/app_router.dart`. Deep links handled via `DeepLinkWrapper` in `main.dart`.
+- **Services:** Singleton-style service classes in `core/services/` handle all external integrations (Firebase, payment APIs, biometrics, KYC).
+- **Models:** Dart classes in `lib/models/` with Hive type adapters. Files ending in `.g.dart` are auto-generated — never edit them manually.
+- **Theme:** `AppTheme.lightTheme` and `AppTheme.darkTheme` defined in `core/theme/app_theme.dart`, toggled via `themeNotifierProvider`.
+
+### Cloud Functions (functions/index.js)
+
+- **Single file:** All 32 functions are in `index.js`. They are plain JavaScript (no TypeScript).
+- **Error framework:** Standardized error codes with HTTP status mapping.
+- **Structured logging:** JSON logging with severity levels and automatic PII masking (phone, email, account numbers, IDs).
+- **Financial safety:** Idempotency keys prevent duplicate transactions, QR nonces prevent replay attacks, rate limiting per user, fraud detection flagging, defensive arithmetic.
+- **Timing-safe comparisons** used for cryptographic operations.
 
 ### Security Model
-- **Firestore rules** enforce server-side access control
-- `kycStatus` is a **server-only field** -- clients cannot modify it (enforced in rules)
-- Financial writes (transactions, withdrawals, payments) go through **Cloud Functions only**
-- Clients have read-only access to transactions, bank accounts, linked accounts
-- Idempotency keys prevent duplicate financial operations
-- QR nonces prevent replay attacks
-- `FirebaseAppCheck` enabled (debug mode in dev, PlayIntegrity/DeviceCheck in prod)
-- Sensitive screens wrapped with `ScreenshotProtectedScreen`
 
-### Multi-Country Support
-- Countries defined in `lib/core/constants/african_countries.dart` (`AfricanCountries.all`)
-- Each country has: name, ISO code, dial code, flag emoji, currency code/symbol/name
-- Currency determines available payment methods and MoMo providers
-- Exchange rates handled by `ExchangeRateService` for cross-currency sends
+- **Client writes are restricted.** Wallets, transactions, payments, and most subcollections are write-protected in Firestore rules — only Cloud Functions (Admin SDK) can write.
+- **kycStatus** is a server-only field. Firestore rules enforce that clients cannot modify it; only Cloud Functions can set it.
+- **Firebase App Check** is enabled (Play Integrity on Android, DeviceCheck on iOS; debug providers in development).
+- **Screenshot prevention** via `no_screenshot` package.
+- **Biometric auth** via `local_auth`.
 
-### Payment Flow
-1. **Card payments**: Paystack via Cloud Function (`initializeTransaction` -> browser checkout)
-2. **Mobile Money (Paystack)**: Cloud Function `chargeMobileMoney` for supported regions
-3. **MTN MoMo Direct**: `MomoService` -> Cloud Functions (`momoRequestToPay`, `momoTransfer`, `momoCheckStatus`)
-4. **Bank Transfer**: Virtual account via `getOrCreateVirtualAccount` Cloud Function
-5. **Bank Withdrawal**: `initiateWithdrawal` -> optional OTP -> `finalizeTransfer`
+---
 
-### MoMo Provider Configuration
-- `MobileMoneyProvider.getProviders(country)` in `payment_service.dart` returns available providers per country
-- `MomoService.isAvailable(country)` checks if MTN MoMo direct API is available
-- Currency-to-country mapping in `_loadMomoProviders()` (in `add_money_screen.dart` and `withdraw_screen.dart`)
+## Key Firestore Collections
 
-## Known Issues & Gotchas
+| Collection | Client Access | Purpose |
+|------------|---------------|---------|
+| `users/{userId}` | Owner R/W (kycStatus protected) | User profile data |
+| `users/{userId}/transactions` | Owner R | Transaction history |
+| `users/{userId}/notifications` | Owner R/Update | Push notifications |
+| `users/{userId}/kyc` | Owner R/W | KYC documents |
+| `users/{userId}/linkedAccounts` | Owner R | External accounts |
+| `users/{userId}/bankAccounts` | Owner R | Bank references |
+| `users/{userId}/cards` | Owner R | Card references |
+| `wallets/{walletId}` | Owner R, Create only | Wallet balance |
+| `exchange_rates/{rateId}` | Authenticated R | Currency rates |
+| `app_config/{doc}` | Authenticated R | App settings |
+| `transactions/{txId}` | CF only | Transaction records |
+| `payments/{paymentId}` | CF only | Payment tracking |
+| `idempotency_keys/{keyId}` | CF only | Duplicate prevention |
+| `momo_transactions/{txId}` | CF only | MoMo records |
+| `withdrawals/{id}` | CF only | Withdrawal records |
+| `qr_nonces/{nonceId}` | CF only | QR replay protection |
+| `flagged_transactions/{txId}` | CF only | Fraud review |
+| `rate_limits/{userId}` | CF only | Rate limiting |
+| `audit_logs/{logId}` | CF only | Audit trail |
 
-- **MoMo provider mapping**: When adding new country support, you must update THREE places:
-  1. `MobileMoneyProvider.getProviders()` in `payment_service.dart` (provider list)
-  2. `_loadMomoProviders()` in `add_money_screen.dart` (currency-to-country mapping)
-  3. `_loadMomoProviders()` in `withdraw_screen.dart` (same currency-to-country mapping)
-- The default country fallback in `_loadMomoProviders()` is `'nigeria'` but `'nigeria'` has no providers in `getProviders()`, causing the "Mobile Money Not Available" message for unmapped currencies
-- SmileID is initialized in **sandbox mode** (`useSandbox: true`) in `main.dart`
-- MoMo sandbox uses EUR currency by default
-- Hive adapters (`.g.dart` files) must be regenerated with `build_runner` after model changes
+**CF = Cloud Functions (Admin SDK only, no client access)**
 
-## Coding Conventions
+---
 
-- **File naming**: `snake_case.dart` for all files
-- **Class naming**: `PascalCase`
-- **Feature structure**: `features/<name>/screens/` and `features/<name>/widgets/`
-- **Service pattern**: Plain Dart classes with Firebase/API calls, no DI framework
-- **Barrel exports**: `services.dart`, `providers.dart`, `models.dart`, `constants.dart`
-- **Constants**: Dedicated files per type (`app_colors.dart`, `app_strings.dart`, etc.)
-- **Route extras**: Pass data between screens via `GoRouter`'s `extra` parameter as `Map<String, dynamic>`
-- **Error handling**: Centralized in `ErrorHandler` class with user-friendly message mapping
-- **Linting**: `package:flutter_lints/flutter.yaml` (standard Flutter lint rules)
+## Cloud Functions Overview (32 functions)
 
-## Firebase Configuration
+**Payment Processing:** `verifyPayment`, `paystackWebhook`, `initiateWithdrawal`, `finalizeTransfer`, `getBanks`, `verifyBankAccount`, `signQrPayload`, `verifyQrSignature`
 
-- **Project**: `qr-wallet-1993`
-- **Firestore location**: `africa-south1`
-- **Cloud Functions runtime**: Node.js 20
-- **Platforms**: Android + iOS
-- **Auth providers**: Email/Password, Phone, Google Sign-In, Apple Sign-In
+**Mobile Money (MTN MoMo):** `chargeMobileMoney`, `momoRequestToPay`, `momoCheckStatus`, `momoTransfer`, `momoGetBalance`, `momoWebhook`, `getOrCreateVirtualAccount`
 
-## Development Notes
+**Transactions:** `initializeTransaction`, `sendMoney`, `lookupWallet`
 
-- The app uses portrait-only orientation (set in `main.dart`)
-- Deep links use `qrwallet://` scheme via `app_links` package
-- Theme supports light and dark modes via `ThemeNotifier`
-- Transaction fees: 1% of amount, clamped between 10-100 (in sender's currency)
-- Wallet IDs match Firebase Auth UIDs
-- The `flutter_paystack_plus` package is included but payments primarily use the browser checkout flow via Cloud Functions
+**KYC/Verification:** `updateKycStatus`, `completeKycVerification`, `markUserAlreadyEnrolled`, `verifyPhoneNumber`, `checkPhoneVerificationSupport`
+
+**Exchange Rates:** `updateExchangeRatesDaily` (scheduled), `updateExchangeRatesNow`
+
+**Data Management:** `exportUserData`, `deleteUserData`
+
+**Scheduled Cleanup:** `cleanupIdempotencyKeys`, `cleanupExpiredQrNonces`, `resetDailySpendingLimits`, `resetMonthlySpendingLimits`, `cleanupExpiredData`
+
+---
+
+## Development Conventions
+
+### Dart/Flutter
+
+- Linting follows `package:flutter_lints/flutter.yaml` (see `analysis_options.yaml`).
+- Run `flutter analyze` before committing to catch lint issues.
+- Feature modules follow the pattern: `lib/features/<feature>/screens/` and `lib/features/<feature>/widgets/`.
+- All data models with Hive annotations require running `build_runner` after changes.
+- Constants (colors, strings, dimensions, text styles) are centralized in `lib/core/constants/`.
+- Use `ConsumerWidget` / `ConsumerStatefulWidget` for widgets that need Riverpod state.
+
+### Cloud Functions (JavaScript)
+
+- All functions live in `functions/index.js` — there is no multi-file split.
+- Follow the existing error framework and structured logging patterns.
+- Financial operations must use idempotency keys.
+- Always mask PII in log output.
+- Use the existing `safeAdd` / `safeSubtract` helper functions for monetary arithmetic.
+
+### Git Conventions
+
+- Commit messages use conventional format: `fix:`, `feat:`, `docs:`, `refactor:`, etc.
+- Branch from `master` for new features.
+
+---
+
+## Important Files to Know
+
+| File | Why It Matters |
+|------|---------------|
+| `lib/main.dart` | App entry point — Firebase, App Check, SmileID, Hive init |
+| `lib/core/router/app_router.dart` | All route definitions and navigation guards |
+| `lib/core/services/auth_service.dart` | Firebase Auth, phone verification, biometric login |
+| `lib/core/services/wallet_service.dart` | Wallet operations and balance management |
+| `lib/core/services/payment_service.dart` | Paystack & Flutterwave integration |
+| `lib/core/services/momo_service.dart` | MTN Mobile Money integration |
+| `lib/core/services/smile_id_service.dart` | SmileID KYC facial verification |
+| `lib/core/services/qr_signing_service.dart` | Cryptographic QR code signing |
+| `lib/providers/wallet_provider.dart` | Wallet state management (~15KB) |
+| `lib/providers/auth_provider.dart` | Auth state management (~9KB) |
+| `functions/index.js` | All 32 Cloud Functions (~4,559 lines) |
+| `firestore.rules` | Firestore security rules (critical for access control) |
+| `storage.rules` | Cloud Storage security rules |
+
+---
+
+## Testing
+
+Testing coverage is minimal. There is one smoke test in `test/widget_test.dart` that verifies the app loads with a splash screen.
+
+```bash
+flutter test
+```
+
+When adding new features, consider adding widget tests in `test/` following the existing pattern of wrapping with `ProviderScope`.
+
+---
+
+## Common Pitfalls
+
+1. **Never hand-edit `.g.dart` files.** These are generated by `build_runner` for Hive adapters and Riverpod. Run `flutter pub run build_runner build --delete-conflicting-outputs` to regenerate.
+2. **kycStatus is server-only.** Never attempt to write `kycStatus` from the Flutter client — Firestore rules will reject it. Use Cloud Functions (`updateKycStatus`, `completeKycVerification`, `markUserAlreadyEnrolled`).
+3. **Wallet writes are server-only.** Wallet balances can only be modified via Cloud Functions. The client can only read and create (during signup).
+4. **Financial arithmetic.** Use the `safeAdd`/`safeSubtract` helpers in Cloud Functions to avoid floating-point errors with currency amounts.
+5. **App Check.** Debug providers are used in `kDebugMode`; production uses Play Integrity (Android) and DeviceCheck (iOS).
+6. **SmileID is initialized in sandbox mode** (`useSandbox: true` in `main.dart`). Switch to production before release.

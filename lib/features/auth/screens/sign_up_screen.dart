@@ -156,7 +156,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        context.go(AppRoutes.kyc); // complete profile/KYC
+        // Route based on country
+        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+        final user = ref.read(currentUserProvider);
+        final countryCode = (user?.country ?? 'GH').toUpperCase().trim();
+
+        if (smileIdCountries.contains(countryCode)) {
+          context.go(AppRoutes.kyc);
+        } else {
+          context.go(
+            AppRoutes.phoneOtp,
+            extra: {'phoneNumber': user?.phoneNumber ?? ''},
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

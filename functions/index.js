@@ -529,7 +529,7 @@ const VALID_CURRENCIES = new Set([
   'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
   'USD', 'EUR', 'GBP',
   'XOF', 'XAF', 'EGP',
-  'GNF', 'LRD', 'ZMW', 'SZL', 'SSP', 'SLL', 'CDF',
+  'GNF', 'LRD', 'ZMW', 'SZL', 'SSP', 'SLL', 'CDF', 'SDG',
 ]);
 
 /**
@@ -2286,12 +2286,11 @@ async function enforceKyc(userId) {
   // ── AUTO-VERIFY for countries without Smile ID document verification ──
   // These countries have configured Smile ID KYC flows (BVN, NIN, SSNIT, etc.)
   // Users in these countries MUST complete Smile ID verification.
-  const smileIdCountries = [
-    'ghana', 'nigeria', 'kenya', 'south africa', 'uganda',
-  ];
+  // NOTE: Uses ISO codes because that's what the Flutter client stores in Firestore.
+  const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
 
-  const userCountry = (userData.country || '').toLowerCase().trim();
-  const userPhoneVerified = userData.phoneVerified === true || userData.phone != null;
+  const userCountry = (userData.country || '').toUpperCase().trim();
+  const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');
 
   // If user is NOT in a Smile ID country and has verified email + phone,
   // auto-verify their KYC status so they can use financial services.
