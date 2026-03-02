@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../providers/currency_provider.dart';
 import '../../../providers/auth_provider.dart';
 
 /// Phone OTP verification screen
@@ -202,6 +203,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             backgroundColor: AppColors.success,
           ),
         );
+        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
         context.go(AppRoutes.main);
       } else {
         setState(() {
@@ -404,18 +406,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 ),
               ],
 
-              const SizedBox(height: 32),
 
-              // Skip button
-              TextButton(
-                onPressed: () => context.go(AppRoutes.main),
-                child: Text(
-                  'Skip for now',
-                  style: TextStyle(
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ),
             ],
           ),
         ),
