@@ -68,6 +68,12 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       case 'SSNIT':
         context.push(AppRoutes.kycSsnit, extra: {'countryCode': _userCountryCode});
         break;
+      case 'UGANDA_NIN':
+        context.push(AppRoutes.kycUgandaNin, extra: {'countryCode': _userCountryCode});
+        break;
+      case 'TPIN':
+        context.push(AppRoutes.kycNationalId, extra: {'countryCode': _userCountryCode});
+        break;
     }
   }
 
@@ -87,6 +93,10 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         return Icons.credit_card_rounded;
       case 'SSNIT':
         return Icons.security_rounded;
+      case 'UGANDA_NIN':
+        return Icons.badge_rounded;
+      case 'TPIN':
+        return Icons.receipt_long_rounded;
       default:
         return Icons.badge_rounded;
     }
@@ -109,6 +119,10 @@ class _KycScreenState extends ConsumerState<KycScreen> {
         return AppStrings.nationalIdDescription;
       case 'SSNIT':
         return AppStrings.ssnitDescription;
+      case 'UGANDA_NIN':
+        return 'Verify your identity with your Uganda National Identification Number';
+      case 'TPIN':
+        return 'Verify your identity with your Zambian Taxpayer PIN';
       default:
         return 'Verify your identity';
     }

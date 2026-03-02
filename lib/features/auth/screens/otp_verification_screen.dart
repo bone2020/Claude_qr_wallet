@@ -108,7 +108,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
         // Route based on country — Smile ID countries go to KYC,
         // others go to phone verification then home
-        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
         final user = ref.read(currentUserProvider);
         final countryCode = (user?.country ?? 'GH').toUpperCase().trim();
 

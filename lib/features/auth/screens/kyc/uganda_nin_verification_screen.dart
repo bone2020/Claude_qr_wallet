@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
-import 'package:smile_id/products/document/smile_id_document_verification.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -15,68 +14,31 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 
-class NationalIdVerificationScreen extends ConsumerStatefulWidget {
+/// Dedicated verification screen for Uganda National ID (NIN).
+/// Uganda requires 3 fields: NIN (id_number), Card Number (secondary_id_number), and DOB.
+/// This is separate from NationalIdVerificationScreen to avoid complicating the shared screen.
+class UgandaNinVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
 
-  const NationalIdVerificationScreen({
+  const UgandaNinVerificationScreen({
     super.key,
     required this.countryCode,
   });
 
   @override
-  ConsumerState<NationalIdVerificationScreen> createState() => _NationalIdVerificationScreenState();
+  ConsumerState<UgandaNinVerificationScreen> createState() => _UgandaNinVerificationScreenState();
 }
 
-class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerificationScreen> {
+class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificationScreen> {
   final _smileIdService = SmileIDService.instance;
-  final _idNumberController = TextEditingController();
+  final _ninController = TextEditingController();
+  final _cardNumberController = TextEditingController();
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
   bool _isVerified = false;
   String? _verificationResult;
   String? _userId;
-
-  // South Africa requires ID number
-  bool get _requiresIdNumber => widget.countryCode == 'ZA' || widget.countryCode == 'ZM';
-
-  String get _documentType {
-    switch (widget.countryCode) {
-      case 'GH':
-        return 'GHANA_CARD';
-      case 'KE':
-        return 'NATIONAL_ID';
-      case 'ZA':
-        return 'NATIONAL_ID';
-      case 'CI':
-        return 'NATIONAL_ID';
-      case 'ZM':
-        return 'TPIN';
-      case 'ZW':
-        return 'NATIONAL_ID_NO_PHOTO';
-      default:
-        return 'NATIONAL_ID';
-    }
-  }
-
-  String get _countryName {
-    switch (widget.countryCode) {
-      case 'GH':
-        return 'National ID';
-      case 'KE':
-        return 'National ID';
-      case 'ZA':
-        return 'National ID';
-      case 'CI':
-        return 'National ID';
-      case 'ZM':
-        return 'Taxpayer PIN (TPIN)';
-      case 'ZW':
-        return 'National ID';
-      default:
-        return 'National ID';
-    }
-  }
 
   @override
   void initState() {
@@ -86,7 +48,8 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
   @override
   void dispose() {
-    _idNumberController.dispose();
+    _ninController.dispose();
+    _cardNumberController.dispose();
     super.dispose();
   }
 
@@ -96,56 +59,40 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   }
 
   Future<void> _startVerification() async {
-    // Validate ID number if required (South Africa)
-    if (_requiresIdNumber) {
-      final idNumber = _idNumberController.text.trim();
-      final validation = _smileIdService.validateIdNumber(idNumber, 'NATIONAL_ID', widget.countryCode);
-      if (!validation.isValid) {
-        _showError(validation.error ?? 'Invalid ID number');
-        return;
-      }
+    final nin = _ninController.text.trim();
+    final cardNumber = _cardNumberController.text.trim();
 
-      // Use Biometric KYC for South Africa
-      final result = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => _SmileIdBiometricScreen(
-            userId: _userId!,
-            countryCode: widget.countryCode,
-            idType: 'NATIONAL_ID',
-            idNumber: idNumber,
-          ),
+    // Validate NIN
+    final validation = _smileIdService.validateIdNumber(nin, 'UGANDA_NIN', 'UG');
+    if (!validation.isValid) {
+      _showError(validation.error ?? 'Invalid NIN');
+      return;
+    }
+
+    // Validate Card Number
+    if (cardNumber.isEmpty) {
+      _showError('Please enter your card number');
+      return;
+    }
+
+    // Use Biometric KYC with NIN
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _UgandaSmileIdBiometricScreen(
+          userId: _userId!,
+          idNumber: nin,
+          secondaryIdNumber: cardNumber,
         ),
-      );
+      ),
+    );
 
-      if (result != null) {
-        setState(() {
-          _isVerified = true;
-          _verificationResult = result;
-        });
-        _showSuccess(AppStrings.verificationSuccessful);
-      }
-    } else {
-      // Use Document Verification for other countries
-      final result = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => _SmileIdDocumentScreen(
-            userId: _userId!,
-            countryCode: widget.countryCode,
-            documentType: _documentType,
-            captureBothSides: true,
-          ),
-        ),
-      );
-
-      if (result != null) {
-        setState(() {
-          _isVerified = true;
-          _verificationResult = result;
-        });
-        _showSuccess(AppStrings.verificationSuccessful);
-      }
+    if (result != null) {
+      setState(() {
+        _isVerified = true;
+        _verificationResult = result;
+      });
+      _showSuccess(AppStrings.verificationSuccessful);
     }
   }
 
@@ -195,7 +142,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
           'countryCode': widget.countryCode,
           'firstName': null,
           'lastName': null,
-          'idNumber': _requiresIdNumber ? _idNumberController.text.trim() : null,
+          'idNumber': _ninController.text.trim(),
         },
       );
 
@@ -203,8 +150,8 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
-        idType: 'NATIONAL_ID',
-        idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
+        idType: 'NATIONAL_ID_NO_PHOTO',
+        idNumber: _ninController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         smileIdVerified: true,
         smileIdResult: _verificationResult,
@@ -254,7 +201,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        title: Text(AppStrings.verifyNationalId, style: AppTextStyles.headlineSmall()),
+        title: Text('Uganda National ID', style: AppTextStyles.headlineSmall()),
       ),
       body: SafeArea(
         child: Column(
@@ -266,44 +213,50 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$_countryName Verification',
+                      'National ID Verification',
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
                     Text(
-                      AppStrings.nationalIdDescription,
+                      'Verify your identity using your Uganda National Identification Number (NIN) and card number.',
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                     ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
-                    if (_requiresIdNumber) ...[
-                      KycIdNumberInput(
-                        controller: _idNumberController,
-                        label: widget.countryCode == 'ZM' ? 'TPIN' : 'ID Number',
-                        hint: widget.countryCode == 'ZM'
-                            ? 'Enter your 10-digit TPIN'
-                            : 'Enter your 13-digit ID number',
-                        helperText: widget.countryCode == 'ZM'
-                            ? 'Your Zambian Taxpayer Identification Number'
-                            : 'Your South African ID number',
-                      ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
-                      const SizedBox(height: AppDimensions.spaceXL),
-                    ],
+                    // NIN Input
+                    KycIdNumberInput(
+                      controller: _ninController,
+                      label: 'National Identification Number (NIN)',
+                      hint: 'Enter your 14-character NIN',
+                      helperText: 'Your NIN is 14 alphanumeric characters',
+                    ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
 
-                    KycVerificationCard(
-                      title: _isVerified ? 'Verified with Smile ID' : 'Verify Your $_countryName',
-                      description: _isVerified
-                          ? 'Your $_countryName has been verified successfully'
-                          : _requiresIdNumber
-                              ? 'We will verify your ID number and take a selfie for confirmation'
-                              : 'We will capture both sides of your ID and take a selfie',
-                      isVerified: _isVerified,
-                      onStartVerification: _startVerification,
+                    const SizedBox(height: AppDimensions.spaceLG),
+
+                    // Card Number Input
+                    KycIdNumberInput(
+                      controller: _cardNumberController,
+                      label: 'Card Number',
+                      hint: 'Enter the card number on your National ID',
+                      helperText: 'The number printed on your physical ID card',
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
+                    // Smile ID Verification
+                    KycVerificationCard(
+                      title: _isVerified ? 'Verified with Smile ID' : 'Verify Your National ID',
+                      description: _isVerified
+                          ? 'Your National ID has been verified successfully'
+                          : 'We will verify your NIN against the national database and take a selfie for confirmation',
+                      isVerified: _isVerified,
+                      onStartVerification: _startVerification,
+                    ).animate().fadeIn(delay: 250.ms, duration: 400.ms),
+
+                    const SizedBox(height: AppDimensions.spaceXL),
+
+                    // Date of Birth
                     KycDateOfBirthPicker(
                       selectedDate: _dateOfBirth,
                       onTap: _selectDateOfBirth,
@@ -351,81 +304,25 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   }
 }
 
-/// Internal Smile ID Document Verification Screen
-class _SmileIdDocumentScreen extends StatelessWidget {
+/// Internal Smile ID Biometric KYC Screen for Uganda
+/// Sends NIN as id_number and card number as secondary_id_number
+class _UgandaSmileIdBiometricScreen extends StatelessWidget {
   final String userId;
-  final String countryCode;
-  final String documentType;
-  final bool captureBothSides;
-
-  const _SmileIdDocumentScreen({
-    required this.userId,
-    required this.countryCode,
-    required this.documentType,
-    required this.captureBothSides,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SmileIDDocumentVerification(
-        countryCode: countryCode,
-        documentType: documentType,
-        userId: userId,
-        captureBothSides: captureBothSides,
-        allowAgentMode: false,
-        showAttribution: true,
-        showInstructions: true,
-        onSuccess: (result) {
-          Navigator.pop(context, result);
-        },
-        onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
-          if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: documentType,
-            );
-            if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
-            }
-            return;
-          }
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Verification failed: $error'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            Navigator.pop(context);
-          }
-        },
-      ),
-    );
-  }
-}
-
-/// Internal Smile ID Biometric KYC Screen
-class _SmileIdBiometricScreen extends StatelessWidget {
-  final String userId;
-  final String countryCode;
-  final String idType;
   final String idNumber;
+  final String secondaryIdNumber;
 
-  const _SmileIdBiometricScreen({
+  const _UgandaSmileIdBiometricScreen({
     required this.userId,
-    required this.countryCode,
-    required this.idType,
     required this.idNumber,
+    required this.secondaryIdNumber,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SmileIDBiometricKYC(
-        country: countryCode,
-        idType: idType,
+        country: 'UG',
+        idType: 'NATIONAL_ID_NO_PHOTO',
         idNumber: idNumber,
         userId: userId,
         allowAgentMode: false,
@@ -435,11 +332,9 @@ class _SmileIdBiometricScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
             await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: idType,
+              idType: 'NATIONAL_ID_NO_PHOTO',
             );
             if (context.mounted) {
               Navigator.pop(context, 'already_enrolled');

@@ -2287,7 +2287,7 @@ async function enforceKyc(userId) {
   // These countries have configured Smile ID KYC flows (BVN, NIN, SSNIT, etc.)
   // Users in these countries MUST complete Smile ID verification.
   // NOTE: Uses ISO codes because that's what the Flutter client stores in Firestore.
-  const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI'];
+  const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
 
   const userCountry = (userData.country || '').toUpperCase().trim();
   const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');

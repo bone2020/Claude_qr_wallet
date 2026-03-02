@@ -17,6 +17,7 @@ class CurrencyService {
     CurrencyModel(code: 'MAD', symbol: 'DH', name: 'Moroccan Dirham', countryCode: '+212', flag: '🇲🇦'),
     CurrencyModel(code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc', countryCode: '+225', flag: '🇨🇮'),
     CurrencyModel(code: 'XAF', symbol: 'FCFA', name: 'Central African CFA Franc', countryCode: '+237', flag: '🇨🇲'),
+    CurrencyModel(code: 'ZWG', symbol: 'ZiG', name: 'Zimbabwe Gold', countryCode: '+263', flag: '🇿🇼'),
 
     // International currencies
     CurrencyModel(code: 'USD', symbol: '\$', name: 'US Dollar', countryCode: '+1', flag: '🇺🇸'),

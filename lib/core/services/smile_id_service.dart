@@ -39,6 +39,16 @@ class SmileIDService {
       {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
     ],
+    'UG': [
+      {'value': 'UGANDA_NIN', 'label': 'National ID (NIN)', 'requiresNumber': true, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+    ],
+    'ZM': [
+      {'value': 'TPIN', 'label': 'Taxpayer PIN (TPIN)', 'requiresNumber': true, 'smileIdType': 'TPIN'},
+    ],
+    'ZW': [
+      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
+    ],
   };
 
   /// Countries that support phone number verification
@@ -66,6 +76,9 @@ class SmileIDService {
       '+254': 'KE',
       '+27': 'ZA',
       '+225': 'CI',
+      '+256': 'UG',
+      '+260': 'ZM',
+      '+263': 'ZW',
     };
 
     for (final entry in dialCodeMap.entries) {
@@ -139,6 +152,24 @@ class SmileIDService {
               expectedFormat: '1234567890123',
             );
           }
+        }
+        break;
+      case 'UGANDA_NIN':
+        if (!RegExp(r'^[A-Z0-9]{14}$', caseSensitive: false).hasMatch(idNumber)) {
+          return IdValidationResult(
+            isValid: false,
+            error: 'Uganda NIN must be exactly 14 alphanumeric characters',
+            expectedFormat: 'CM12345678901X',
+          );
+        }
+        break;
+      case 'TPIN':
+        if (!RegExp(r'^\d{10}$').hasMatch(idNumber)) {
+          return IdValidationResult(
+            isValid: false,
+            error: 'TPIN must be exactly 10 digits',
+            expectedFormat: '1234567890',
+          );
         }
         break;
     }
