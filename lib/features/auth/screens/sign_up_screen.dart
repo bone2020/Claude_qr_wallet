@@ -61,7 +61,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value.length < 9) return AppStrings.errorInvalidPhone;
+    if (value.length < 7) return AppStrings.errorInvalidPhone;
     return null;
   }
 
@@ -156,7 +156,19 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        context.go(AppRoutes.kyc); // complete profile/KYC
+        // Route based on country
+        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
+        final user = ref.read(currentUserProvider);
+        final countryCode = (user?.country ?? 'GH').toUpperCase().trim();
+
+        if (smileIdCountries.contains(countryCode)) {
+          context.go(AppRoutes.kyc);
+        } else {
+          context.go(
+            AppRoutes.phoneOtp,
+            extra: {'phoneNumber': user?.phoneNumber ?? ''},
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

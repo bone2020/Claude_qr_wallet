@@ -77,12 +77,9 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   Future<void> _loadBanks() async {
     setState(() => _isLoadingBanks = true);
     try {
-      // Determine country from currency
+      // Determine country from currency using centralized mapping
       final currency = ref.read(walletNotifierProvider).currency;
-      String country = 'nigeria';
-      if (currency == 'GHS') country = 'ghana';
-      if (currency == 'KES') country = 'kenya';
-      if (currency == 'ZAR') country = 'south africa';
+      final country = MobileMoneyProvider.getCountryFromCurrency(currency);
 
       final banks = await _paymentService.getBanks(country: country);
       if (mounted) {
@@ -103,12 +100,21 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
   void _loadMomoProviders() {
     final currency = ref.read(walletNotifierProvider).currency;
-    String country = 'nigeria';
-    if (currency == 'GHS') country = 'ghana';
-    if (currency == 'KES') country = 'kenya';
-    if (currency == 'UGX') country = 'uganda';
 
+    // Use the expanded currency-to-country mapping
+    final country = MobileMoneyProvider.getCountryFromCurrency(currency);
+
+    // Get providers for this country (now covers all 14+ MTN countries)
     _momoProviders = MobileMoneyProvider.getProviders(country);
+
+    // Safety net: if no providers found but MomoService says MTN is available
+    // for this country, add MTN as the default provider.
+    if (_momoProviders.isEmpty && MomoService.isAvailable(country)) {
+      _momoProviders = [
+        MobileMoneyProvider(name: 'MTN Mobile Money', code: 'MTN'),
+      ];
+    }
+
     if (_momoProviders.isNotEmpty) {
       _selectedMomoProvider = _momoProviders.first;
     }
@@ -217,9 +223,11 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             _verifiedAccountName = result.accountName;
           } else {
             _verifiedAccountName = null;
-            _showError(result.error ?? 'Could not verify account');
           }
         });
+        if (!result.success) {
+          _showError(result.error ?? 'Could not verify account');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -290,6 +298,33 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             accountName: _momoAccountName,
             currency: ref.read(walletNotifierProvider).currency,
           );
+
+          // Check MoMo transfer status after short delay
+          if (result.success && result.reference != null) {
+            await Future.delayed(const Duration(seconds: 3));
+            if (!mounted) return;
+
+            final statusResult = await _paymentService.checkMtnMomoStatus(
+              result.reference!,
+              type: 'disbursement',
+            );
+
+            if (!mounted) return;
+            setState(() => _isLoading = false);
+
+            ref.read(walletNotifierProvider.notifier).refreshWallet();
+            ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
+
+            if (statusResult.completed) {
+              _showSuccessDialog(amount, result.reference!);
+            } else if (statusResult.status == 'FAILED' || statusResult.status == 'REJECTED') {
+              _showError('Withdrawal failed. Your balance has been refunded.');
+            } else {
+              // Still pending — show success, status will update later
+              _showSuccessDialog(amount, result.reference!);
+            }
+            return;
+          }
         } else {
           // Use Paystack for non-MTN providers
           result = await _paymentService.initiateMobileMoneyWithdrawal(

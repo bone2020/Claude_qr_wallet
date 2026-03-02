@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/models/currency_model.dart';
 import '../core/services/currency_service.dart';
 
+
 // ============================================================
 // CURRENCY STATE
 // ============================================================

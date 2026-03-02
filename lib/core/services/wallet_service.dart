@@ -54,21 +54,24 @@ class WalletService {
 
   /// Get wallet by wallet ID (for recipient lookup)
   /// Uses Cloud Function with rate limiting to prevent enumeration attacks
-  Future<WalletLookupResult> lookupWallet(String walletId) async {
+Future<WalletLookupResult> lookupWallet(String walletId) async {
     try {
-      // Use Cloud Function for rate-limited lookup
-      // This prevents wallet ID enumeration attacks
       final callable = FirebaseFunctions.instance.httpsCallable('lookupWallet');
       final result = await callable.call<Map<String, dynamic>>({
         'walletId': walletId,
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
+
+      if (data['found'] != true) {
+        return WalletLookupResult.notFound();
+      }
 
       return WalletLookupResult.found(
         walletId: data['walletId'] as String,
-        userId: '', // Not exposed for privacy
-        fullName: data['userName'] as String? ?? 'Unknown',
+        userId: '',
+        fullName: data['recipientName'] as String? ?? 'Unknown',
         profilePhotoUrl: data['profilePhotoUrl'] as String?,
         currency: data['currency'] as String? ?? 'GHS',
         currencySymbol: _getCurrencySymbol(data['currency'] as String? ?? 'GHS'),
@@ -123,6 +126,7 @@ class WalletService {
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get sender's wallet for currency info
@@ -201,6 +205,7 @@ class WalletService {
       });
 
       final data = result.data;
+      print('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get wallet info for transaction model

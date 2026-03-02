@@ -529,6 +529,7 @@ const VALID_CURRENCIES = new Set([
   'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
   'USD', 'EUR', 'GBP',
   'XOF', 'XAF', 'EGP',
+  'GNF', 'LRD', 'ZMW', 'SZL', 'SSP', 'SLL', 'CDF',
 ]);
 
 /**
@@ -1504,7 +1505,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       const txRef = db.collection('users').doc(userId).collection('transactions').doc();
       transaction.set(txRef, {
         id: txRef.id,
-        type: 'withdrawal',
+        type: 'withdraw',
         amount: amount,
         currency: walletData.currency || 'NGN',
         status: 'pending',
@@ -2263,11 +2264,9 @@ async function enforceKyc(userId) {
         'Email verification required. Please verify your email before performing financial operations.');
     }
   } catch (error) {
-    // If error is our own throwAppError, re-throw it
     if (error.code === 'functions/failed-precondition' || error.code === 'functions/permission-denied') {
       throw error;
     }
-    // Firebase Auth error — log but don't block (fail open for auth service issues)
     logError('Email verification check failed', { userId, error: error.message });
   }
 
@@ -2279,13 +2278,39 @@ async function enforceKyc(userId) {
 
   const userData = userDoc.data();
 
-  // Check canonical kycStatus field (authoritative, set by Cloud Functions only)
+  // Check canonical kycStatus field (authoritative)
   if (userData.kycStatus === 'verified') {
     return;
   }
 
+  // ── AUTO-VERIFY for countries without Smile ID document verification ──
+  // These countries have configured Smile ID KYC flows (BVN, NIN, SSNIT, etc.)
+  // Users in these countries MUST complete Smile ID verification.
+  // NOTE: Uses ISO codes because that's what the Flutter client stores in Firestore.
+  const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
+
+  const userCountry = (userData.country || '').toUpperCase().trim();
+  const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');
+
+  // If user is NOT in a Smile ID country and has verified email + phone,
+  // auto-verify their KYC status so they can use financial services.
+  if (userCountry && !smileIdCountries.includes(userCountry) && userPhoneVerified) {
+    logInfo('Auto-verifying KYC for user in non-Smile-ID country', {
+      userId,
+      country: userCountry,
+    });
+
+    // Set kycStatus to verified so this check passes next time
+    await db.collection('users').doc(userId).update({
+      kycStatus: 'verified',
+      kycVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      kycMethod: 'phone_email_auto',
+    });
+
+    return;
+  }
+
   // Legacy kycCompleted/kycVerified fields are no longer trusted for auto-migration.
-  // Users with legacy fields must re-verify through Smile ID to get kycStatus: 'verified'.
   if (!userData.kycStatus && userData.kycCompleted === true) {
     logInfo('User has legacy KYC fields but no canonical kycStatus — re-verification required', { userId });
   }
@@ -4137,7 +4162,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
                 // Disbursement already debited wallet, just record completion
                 transaction.set(db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId), {
                   id: referenceId,
-                  type: 'withdrawal',
+                  type: 'withdraw',
                   amount: txData.amount,
                   currency: txData.currency,
                   method: 'MTN MoMo',
@@ -4156,8 +4181,48 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           });
+          } else if (status === 'FAILED' || status === 'REJECTED') {
+          // Update momo transaction status
+          await updateTransactionState(txRef, status, {
+            providerStatus: status,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Update user transaction to failed
+          const userTxRef = db.collection('users').doc(txData.userId).collection('transactions').doc(referenceId);
+          const userTxDoc = await userTxRef.get();
+          if (userTxDoc.exists) {
+            await userTxRef.update({
+              status: 'failed',
+              failedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+
+          // Refund wallet for failed disbursements (money was already debited)
+          if (txData.type === 'disbursement') {
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
+
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
+              const walletData = walletDoc.data();
+              const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus refund');
+              await walletDoc.ref.update({
+                balance: refundBalance,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+
+              logInfo('Refunded wallet for failed MoMo disbursement', {
+                userId: txData.userId,
+                amount: txData.amount,
+                referenceId,
+              });
+            }
+          }
         } else {
-          // Just update status with state machine validation
+          // Other statuses (PENDING etc) - just update momo transaction
           await updateTransactionState(txRef, status, {
             providerStatus: status,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -4264,6 +4329,32 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
+
+      // Store pending withdrawal
+      transaction.set(db.collection('momo_transactions').doc(referenceId), {
+        type: 'disbursement',
+        userId: userId,
+        amount: amount,
+        currency: currency || 'EUR',
+        phoneNumber: validatedPhone,
+        status: TRANSACTION_STATES.PENDING,
+        referenceId: referenceId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
+      });
+
+      // Record in user's transactions subcollection for UI display
+      transaction.set(db.collection('users').doc(userId).collection('transactions').doc(referenceId), {
+        id: referenceId,
+        type: 'withdraw',
+        amount: amount,
+        currency: currency || 'EUR',
+        method: 'MTN MoMo',
+        phoneNumber: validatedPhone,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
     });
 
     // Create transfer request

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,9 +33,11 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
   String? _recipientCurrency;
   String? _recipientCurrencySymbol;
   String? _lookupError;
+  Timer? _debounceTimer;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _walletIdController.dispose();
     _amountController.dispose();
     _noteController.dispose();
@@ -45,7 +48,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     if (value == null || value.isEmpty) {
       return AppStrings.errorFieldRequired;
     }
-    if (value.length < 10) {
+    if (value.length < 18) {
       return 'Please enter a valid wallet ID';
     }
     return null;
@@ -65,8 +68,11 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
   Future<void> _lookupRecipient() async {
     final walletId = _walletIdController.text.trim();
 
+    // Cancel any pending lookup
+    _debounceTimer?.cancel();
+
     // Clear previous lookup if wallet ID is too short
-    if (walletId.length < 10) {
+    if (walletId.length < 18) {
       setState(() {
         _recipientName = null;
         _recipientWalletId = null;
@@ -77,12 +83,16 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
       return;
     }
 
-    setState(() {
-      _isLookingUp = true;
-      _lookupError = null;
-    });
+    // Debounce: wait 800ms after user stops typing before looking up
+    _debounceTimer = Timer(const Duration(milliseconds: 800), () async {
+      if (!mounted) return;
 
-    try {
+      setState(() {
+        _isLookingUp = true;
+        _lookupError = null;
+      });
+
+      try {
       final result = await ref.read(walletNotifierProvider.notifier).lookupWallet(walletId);
 
       if (!mounted) return;
@@ -93,6 +103,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
           _recipientWalletId = result.walletId;
           _recipientCurrency = result.currency;
           _recipientCurrencySymbol = result.currencySymbol;
+          _lookupError = null;
           _isLookingUp = false;
         });
       } else {
@@ -116,6 +127,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
         _isLookingUp = false;
       });
     }
+    });
   }
 
   Future<void> _handleContinue() async {

@@ -4,6 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pinput/pinput.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -11,11 +14,11 @@ import '../../../providers/auth_provider.dart';
 
 /// Phone OTP verification screen
 class PhoneOtpScreen extends ConsumerStatefulWidget {
-  final String phoneNumber;
+  final String? phoneNumber;
 
   const PhoneOtpScreen({
     super.key,
-    required this.phoneNumber,
+    this.phoneNumber,
   });
 
   @override
@@ -23,11 +26,8 @@ class PhoneOtpScreen extends ConsumerStatefulWidget {
 }
 
 class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
-  final List<TextEditingController> _otpControllers = List.generate(
-    6,
-    (_) => TextEditingController(),
-  );
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isSendingOtp = false;
@@ -35,21 +35,73 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   int _resendSeconds = 60;
   Timer? _resendTimer;
   String? _errorMessage;
+  String _phoneNumber = "";
 
   @override
   void initState() {
     super.initState();
-    _sendOtp();
+    _initializePhone();
+  }
+
+  Future<void> _initializePhone() async {
+    // First check widget.phoneNumber
+    if (widget.phoneNumber != null && widget.phoneNumber!.isNotEmpty) {
+      _phoneNumber = widget.phoneNumber!;
+      _sendOtp();
+      return;
+    }
+
+    // Then check currentUserProvider
+    final user = ref.read(currentUserProvider);
+    if (user != null && user.phoneNumber.isNotEmpty) {
+      _phoneNumber = user.phoneNumber;
+      debugPrint("Phone from currentUserProvider: $_phoneNumber");
+      _sendOtp();
+      return;
+    }
+
+    // Finally check Firestore (existing user flow)
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection("users")
+            .doc(firebaseUser.uid)
+            .get();
+        if (doc.exists && mounted) {
+          setState(() {
+            _phoneNumber = doc.data()?["phoneNumber"] ?? "";
+          });
+          debugPrint("Phone from Firestore: $_phoneNumber");
+          if (_phoneNumber.isNotEmpty) {
+            _sendOtp();
+          } else {
+            setState(() {
+              _errorMessage = "Phone number not found. Please go back and try again.";
+            });
+          }
+        } else {
+          setState(() {
+            _errorMessage = "User data not found. Please go back and try again.";
+          });
+        }
+      } catch (e) {
+        debugPrint("Error fetching phone: $e");
+        setState(() {
+          _errorMessage = "Error fetching phone number: $e";
+        });
+      }
+    } else {
+      setState(() {
+        _errorMessage = "No user logged in. Please go back and try again.";
+      });
+    }
   }
 
   @override
   void dispose() {
-    for (var controller in _otpControllers) {
-      controller.dispose();
-    }
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
+    _pinController.dispose();
+    _pinFocusNode.dispose();
     _resendTimer?.cancel();
     super.dispose();
   }
@@ -76,7 +128,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
     final authNotifier = ref.read(authNotifierProvider.notifier);
     final success = await authNotifier.sendPhoneOtp(
-      phoneNumber: widget.phoneNumber,
+      phoneNumber: _phoneNumber,
       onError: (error) {
         if (mounted) {
           setState(() {
@@ -105,7 +157,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
   }
 
   String get _otpCode {
-    return _otpControllers.map((c) => c.text).join();
+    return _pinController.text;
   }
 
   Future<void> _verifyOtp() async {
@@ -129,13 +181,28 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
       if (!mounted) return;
 
       if (result.success) {
+        // Write phoneVerified flag to Firestore
+        try {
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(firebaseUser.uid)
+                .update({'phoneVerified': true});
+          }
+        } catch (e) {
+          debugPrint('Failed to update phoneVerified: $e');
+        }
+
+        if (!mounted) return;
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Phone verified successfully!'),
             backgroundColor: AppColors.success,
           ),
         );
-        context.go(AppRoutes.kyc);
+        context.go(AppRoutes.main);
       } else {
         setState(() {
           _errorMessage = result.error ?? 'Invalid OTP. Please try again.';
@@ -151,18 +218,6 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  void _onOtpChanged(int index, String value) {
-    if (value.length == 1 && index < 5) {
-      _focusNodes[index + 1].requestFocus();
-    } else if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
-    }
-
-    if (_otpCode.length == 6) {
-      _verifyOtp();
     }
   }
 
@@ -213,7 +268,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 4),
 
               Text(
-                widget.phoneNumber,
+                _phoneNumber,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -228,43 +283,45 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                   child: CircularProgressIndicator(),
                 )
               else if (_otpSent) ...[
-                // OTP Input Fields
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(6, (index) {
-                    return SizedBox(
-                      width: 45,
-                      height: 55,
-                      child: TextField(
-                        controller: _otpControllers[index],
-                        focusNode: _focusNodes[index],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        maxLength: 1,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: AppColors.primary,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (value) => _onOtpChanged(index, value),
-                      ),
-                    );
-                  }),
+                // OTP Input Fields using Pinput
+                Pinput(
+                  length: 6,
+                  controller: _pinController,
+                  focusNode: _pinFocusNode,
+                  defaultPinTheme: PinTheme(
+                    width: 50,
+                    height: 56,
+                    textStyle: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  focusedPinTheme: PinTheme(
+                    width: 50,
+                    height: 56,
+                    textStyle: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    debugPrint("Pinput value: $value");
+                  },
+                  onCompleted: (value) {
+                    debugPrint("Pinput completed: $value");
+                    _verifyOtp();
+                  },
                 ).animate().fadeIn(delay: 300.ms),
 
                 const SizedBox(height: 24),
@@ -349,9 +406,9 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
               const SizedBox(height: 32),
 
-              // Skip button (optional - for testing)
+              // Skip button
               TextButton(
-                onPressed: () => context.go(AppRoutes.kyc),
+                onPressed: () => context.go(AppRoutes.main),
                 child: Text(
                   'Skip for now',
                   style: TextStyle(

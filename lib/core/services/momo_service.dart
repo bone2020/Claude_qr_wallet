@@ -177,10 +177,10 @@ class MomoService {
   /// Check if MTN MoMo direct API is available for the given country
   static bool isAvailable(String country) {
     const mtnCountries = [
-      'ghana', 'uganda', 'rwanda', 'cameroon', 'benin',
+      'ghana', 'nigeria', 'uganda', 'rwanda', 'cameroon', 'benin',
       'ivory coast', 'cote d\'ivoire', 'congo', 'guinea',
       'liberia', 'zambia', 'south africa', 'eswatini',
-      'south sudan', 'guinea-bissau',
+      'south sudan', 'guinea-bissau', 'sierra leone','dr congo', 'sudan',
     ];
     return mtnCountries.contains(country.toLowerCase());
   }
