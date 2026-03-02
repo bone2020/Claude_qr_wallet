@@ -171,7 +171,7 @@ class AfricanCountries {
       code: 'ZW',
       dialCode: '+263',
       flag: '🇿🇼',
-      currencyCode: 'ZWL',
+      currencyCode: 'ZWG',
       currencySymbol: 'Z\$',
       currencyName: 'Zimbabwean Dollar',
     ),

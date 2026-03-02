@@ -529,7 +529,7 @@ const VALID_CURRENCIES = new Set([
   'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
   'USD', 'EUR', 'GBP',
   'XOF', 'XAF', 'EGP',
-  'GNF', 'LRD', 'ZMW', 'SZL', 'SSP', 'SLL', 'CDF',
+  'GNF', 'LRD', 'ZMW', 'ZWG', 'SZL', 'SSP', 'SLL', 'CDF',
 ]);
 
 /**
@@ -818,7 +818,7 @@ function paystackRequest(method, path, data = null) {
 
 const CURRENCIES = [
   'USD', 'NGN', 'ZAR', 'KES', 'GHS', 'EGP', 'TZS', 'UGX', 'RWF', 'ETB',
-  'MAD', 'DZD', 'TND', 'XAF', 'XOF', 'ZWL', 'ZMW', 'BWP', 'NAD', 'MZN',
+  'MAD', 'DZD', 'TND', 'XAF', 'XOF', 'ZWG', 'ZMW', 'BWP', 'NAD', 'MZN',
   'AOA', 'CDF', 'SDG', 'LYD', 'MUR', 'MWK', 'SLL', 'LRD', 'GMD', 'GNF',
   'BIF', 'ERN', 'DJF', 'SOS', 'SSP', 'LSL', 'SZL', 'MGA', 'SCR', 'KMF',
   'MRU', 'CVE', 'STN', 'GBP', 'EUR'

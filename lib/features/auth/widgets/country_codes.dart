@@ -34,7 +34,7 @@ class AfricanCountryCodes {
     CountryCode(name: 'Cameroon', code: 'CM', dialCode: '+237', flag: '🇨🇲', currency: 'XAF'),
     CountryCode(name: 'Ivory Coast', code: 'CI', dialCode: '+225', flag: '🇨🇮', currency: 'XOF'),
     CountryCode(name: 'Senegal', code: 'SN', dialCode: '+221', flag: '🇸🇳', currency: 'XOF'),
-    CountryCode(name: 'Zimbabwe', code: 'ZW', dialCode: '+263', flag: '🇿🇼', currency: 'ZWL'),
+    CountryCode(name: 'Zimbabwe', code: 'ZW', dialCode: '+263', flag: '🇿🇼', currency: 'ZWG'),
     CountryCode(name: 'Rwanda', code: 'RW', dialCode: '+250', flag: '🇷🇼', currency: 'RWF'),
     CountryCode(name: 'Tunisia', code: 'TN', dialCode: '+216', flag: '🇹🇳', currency: 'TND'),
     CountryCode(name: 'Libya', code: 'LY', dialCode: '+218', flag: '🇱🇾', currency: 'LYD'),

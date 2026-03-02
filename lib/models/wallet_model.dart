@@ -157,7 +157,7 @@ class WalletModel {
       'TND': 'DT',     // Tunisian Dinar
       'XAF': 'FCFA',   // Central African CFA Franc
       'XOF': 'CFA',    // West African CFA Franc
-      'ZWL': 'Z\$',    // Zimbabwean Dollar
+      'ZWG': 'ZiG',    // Zimbabwean Dollar
       'ZMW': 'ZK',     // Zambian Kwacha
       'BWP': 'P',      // Botswana Pula
       'NAD': 'N\$',    // Namibian Dollar
