@@ -4647,4 +4647,87 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     logError('MoMo webhook error', { error: error.message, correlationId: webhookCorrelationId });
     res.status(500).send('Error');
   }
+  
+});
+
+// ============================================================
+// SMILE ID WEBHOOK — Receives verification results from Smile ID
+// ============================================================
+exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  try {
+    const data = req.body;
+    logInfo('Smile ID webhook received', {
+      jobId: data.job_id,
+      jobType: data.job_type,
+      resultCode: data.result_code,
+    });
+
+    const partnerId = data.partner_id;
+    const jobId = data.job_id;
+    const userId = data.partner_params?.user_id;
+    const resultCode = data.result_code;
+    const resultText = data.result_text;
+    const smileJobId = data.smile_job_id;
+
+    if (!userId || !jobId) {
+      logError('Smile ID webhook: missing userId or jobId', { data });
+      res.status(400).send('Missing required fields');
+      return;
+    }
+
+    // Store full result in Firestore
+    await admin.firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('kyc')
+      .doc('smile_id_results')
+      .set({
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+        [`jobs.${jobId}`]: {
+          jobId,
+          smileJobId,
+          partnerId,
+          resultCode,
+          resultText,
+          jobType: data.job_type,
+          actions: data.actions || {},
+          confidence: data.confidence_value || null,
+          livenessScore: data.actions?.Liveness || null,
+          documentCheck: data.actions?.Document_Verification || null,
+          humanReview: data.actions?.Human_Review_Compare || null,
+          selfieMatch: data.actions?.Selfie_Check || null,
+          antifraud: data.actions?.Anti_Spoofing || null,
+          fullResult: data,
+          receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      }, { merge: true });
+
+    // If verification passed, update user's KYC status
+    if (resultCode === '0220' || resultCode === '0120') {
+      await admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .update({
+          kycVerified: true,
+          isVerified: true,
+          'kycDetails.smileIdConfirmed': true,
+          'kycDetails.smileIdResultCode': resultCode,
+          'kycDetails.smileIdJobId': smileJobId,
+          'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
+        });
+      logInfo('Smile ID webhook: user verified', { userId, resultCode });
+    } else {
+      logInfo('Smile ID webhook: verification not passed', { userId, resultCode, resultText });
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    logError('Smile ID webhook error', { error: error.message });
+    res.status(500).send('Error');
+  }
 });
