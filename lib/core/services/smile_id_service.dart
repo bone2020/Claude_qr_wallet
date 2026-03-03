@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
@@ -97,6 +100,24 @@ class SmileIDService {
   /// Generate a unique job ID for Smile ID jobs
   String generateJobId() {
     return 'job_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+    /// Parse Smile ID onSuccess result JSON to extract captured file paths.
+  /// The SDK returns: {"selfieFile": "/path/...", "documentFrontFile": "/path/...", "documentBackFile": "/path/..."}
+  SmileIdFiles? parseResultFiles(String? result) {
+    if (result == null || result == 'already_enrolled') return null;
+
+    try {
+      final Map<String, dynamic> data = jsonDecode(result);
+      return SmileIdFiles(
+        selfie: data['selfieFile'] != null ? File(data['selfieFile'] as String) : null,
+        documentFront: data['documentFrontFile'] != null ? File(data['documentFrontFile'] as String) : null,
+        documentBack: data['documentBackFile'] != null ? File(data['documentBackFile'] as String) : null,
+      );
+    } catch (e) {
+      debugPrint('Failed to parse Smile ID result files: $e');
+      return null;
+    }
   }
 
   /// Get the Smile ID document type string for a given ID type
@@ -366,5 +387,18 @@ class PhoneVerificationSupport {
     this.country,
     this.operators,
     this.message,
+  });
+}
+
+/// Parsed file paths from Smile ID verification result
+class SmileIdFiles {
+  final File? selfie;
+  final File? documentFront;
+  final File? documentBack;
+
+  SmileIdFiles({
+    this.selfie,
+    this.documentFront,
+    this.documentBack,
   });
 }

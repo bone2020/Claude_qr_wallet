@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,10 +30,11 @@ class PassportVerificationScreen extends ConsumerStatefulWidget {
 class _PassportVerificationScreenState extends ConsumerState<PassportVerificationScreen> {
   final _smileIdService = SmileIDService.instance;
 
-  DateTime? _dateOfBirth;
+   DateTime? _dateOfBirth;
   bool _isLoading = false;
   bool _isVerified = false;
   String? _verificationResult;
+  SmileIdFiles? _smileIdFiles;
   String? _userId;
 
   @override
@@ -63,6 +65,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
       setState(() {
         _isVerified = true;
         _verificationResult = result;
+        _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
       });
       _showSuccess(AppStrings.verificationSuccessful);
     }
@@ -106,11 +109,14 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
 
     setState(() => _isLoading = true);
 
-    try {
+   try {
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: 'PASSPORT',
         dateOfBirth: _dateOfBirth!,
+        selfie: _smileIdFiles?.selfie,
+        idFront: _smileIdFiles?.documentFront,
+        idBack: _smileIdFiles?.documentBack,
         smileIdVerified: true,
         smileIdResult: _verificationResult,
       );

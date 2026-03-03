@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   bool _isLoading = false;
   bool _isVerified = false;
   String? _verificationResult;
+  SmileIdFiles? _smileIdFiles;
   String? _userId;
 
   @override
@@ -79,6 +81,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       setState(() {
         _isVerified = true;
         _verificationResult = result;
+        _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
       });
       _showSuccess(AppStrings.verificationSuccessful);
     }
@@ -128,6 +131,9 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         idType: 'NIN',
         idNumber: _idNumberController.text.trim(),
         dateOfBirth: _dateOfBirth!,
+        selfie: _smileIdFiles?.selfie,
+        idFront: _smileIdFiles?.documentFront,
+        idBack: _smileIdFiles?.documentBack,
         smileIdVerified: true,
         smileIdResult: _verificationResult,
       );
