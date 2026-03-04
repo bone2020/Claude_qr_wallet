@@ -3313,7 +3313,7 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid wallet ID.');
   }
   
-  // Find wallet
+// Find wallet
   const walletQuery = await db.collection('wallets')
     .where('walletId', '==', walletId)
     .limit(1)
