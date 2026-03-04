@@ -3332,10 +3332,11 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const userData = userDoc.exists ? userDoc.data() : {};
 
   // Return only wallet ID and display name — no profile photo, email, phone, or other PII
-  return {
+return {
     found: true,
     walletId: walletData.walletId,
     recipientName: userData.fullName || 'QR Wallet User',
+    currency: walletData.currency || 'NGN',
   };
 });
 
