@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/services/screenshot_prevention_service.dart';
 import 'home_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -14,14 +15,38 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  final _screenshotService = ScreenshotPreventionService();
 
   final List<Widget> _screens = const [
     HomeScreen(),
     TransactionsScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _screenshotService.enableProtection();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _screenshotService.disableProtection();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-enable protection when app comes back to foreground
+    if (state == AppLifecycleState.resumed) {
+      _screenshotService.enableProtection();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +105,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     required int index,
   }) {
     final isSelected = _currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,

@@ -426,9 +426,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.main,
         name: 'main',
-        builder: (context, state) => const ScreenshotProtectedScreen(
-          child: MainNavigationScreen(),
-        ),
+       builder: (context, state) => const MainNavigationScreen(),
       ),
 
       // Send Money Screen
