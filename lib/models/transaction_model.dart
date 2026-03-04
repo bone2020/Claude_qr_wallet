@@ -133,7 +133,7 @@ class TransactionModel {
       receiverName: json['receiverName'] as String?,
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       fee: (json['fee'] as num?)?.toDouble() ?? 0.0,
-      currency: json['currency'] as String? ?? 'GHS',
+      currency: json['currency'] as String? ?? 'NGN',
       type: TransactionType.values.firstWhere(
         (e) => e.name == json['type'],
         orElse: () => TransactionType.deposit,
@@ -276,24 +276,54 @@ class TransactionModel {
   }
 
   /// Get currency symbol
-  String get currencySymbol {
-    switch (currency) {
-      case 'NGN':
-        return '₦';
-      case 'GHS':
-        return 'GH₵';
-      case 'KES':
-        return 'KSh';
-      case 'ZAR':
-        return 'R';
-      case 'USD':
-        return '\$';
-      case 'EUR':
-        return '€';
-      case 'GBP':
-        return '£';
-      default:
-        return currency;
-    }
+String get currencySymbol {
+    const symbols = {
+      'NGN': '₦',
+      'GHS': 'GH₵',
+      'KES': 'KSh',
+      'ZAR': 'R',
+      'EGP': 'E£',
+      'TZS': 'TSh',
+      'UGX': 'USh',
+      'RWF': 'FRw',
+      'ETB': 'Br',
+      'MAD': 'DH',
+      'DZD': 'DA',
+      'TND': 'DT',
+      'XAF': 'FCFA',
+      'XOF': 'CFA',
+      'ZWG': 'ZiG',
+      'ZMW': 'ZK',
+      'BWP': 'P',
+      'NAD': 'N\$',
+      'MZN': 'MT',
+      'AOA': 'Kz',
+      'CDF': 'FC',
+      'SDG': 'SDG',
+      'LYD': 'LD',
+      'MUR': 'Rs',
+      'MWK': 'MK',
+      'SLL': 'Le',
+      'LRD': 'L\$',
+      'GMD': 'D',
+      'GNF': 'FG',
+      'BIF': 'FBu',
+      'ERN': 'Nfk',
+      'DJF': 'Fdj',
+      'SOS': 'Sh.So.',
+      'SSP': 'SSP',
+      'LSL': 'L',
+      'SZL': 'E',
+      'MGA': 'Ar',
+      'SCR': 'Rs',
+      'KMF': 'CF',
+      'MRU': 'UM',
+      'CVE': '\$',
+      'STN': 'Db',
+      'USD': '\$',
+      'GBP': '£',
+      'EUR': '€',
+    };
+    return symbols[currency] ?? currency;
   }
 }
