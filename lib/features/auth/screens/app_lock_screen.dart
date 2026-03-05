@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:pinput/pinput.dart';
@@ -21,12 +22,15 @@ class AppLockScreen extends ConsumerStatefulWidget {
 
 class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   final _pinController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _biometricService = BiometricService();
   bool _isLoading = false;
   String? _errorMessage;
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
   int _failedAttempts = 0;
+  bool _usePassword = false; // Toggle between PIN and password
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -37,6 +41,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   @override
   void dispose() {
     _pinController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -50,7 +55,6 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         _biometricEnabled = isEnabled;
       });
 
-      // Auto-trigger biometric if available and enabled
       if (isAvailable && isEnabled) {
         _authenticateWithBiometric();
       }
@@ -73,7 +77,6 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
       final storedPinHash = await SecureStorageService.getPinHash();
 
       if (storedPinHash == null) {
-        // No PIN stored locally, allow access
         if (mounted) _navigateToMain();
         return;
       }
@@ -88,7 +91,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         setState(() {
           _isLoading = false;
           _errorMessage = _failedAttempts >= 3
-              ? 'Too many failed attempts. Try biometric or wait.'
+              ? 'Too many failed attempts. Try biometric or password.'
               : 'Incorrect PIN. ${3 - _failedAttempts} attempts remaining.';
           _pinController.clear();
         });
@@ -98,6 +101,58 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         _isLoading = false;
         _errorMessage = 'Error verifying PIN';
         _pinController.clear();
+      });
+    }
+  }
+
+  Future<void> _verifyPassword() async {
+    final password = _passwordController.text.trim();
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your password');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null || user.email == null) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'User not found. Please restart the app.';
+        });
+        return;
+      }
+
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      _failedAttempts = 0;
+      if (mounted) _navigateToMain();
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _isLoading = false;
+        _failedAttempts++;
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          _errorMessage = 'Incorrect password';
+        } else if (e.code == 'too-many-requests') {
+          _errorMessage = 'Too many attempts. Please try again later.';
+        } else {
+          _errorMessage = 'Authentication failed';
+        }
+        _passwordController.clear();
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Authentication failed';
+        _passwordController.clear();
       });
     }
   }
@@ -112,6 +167,15 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
   void _navigateToMain() {
     context.go(AppRoutes.main);
+  }
+
+  void _toggleMode() {
+    setState(() {
+      _usePassword = !_usePassword;
+      _errorMessage = null;
+      _pinController.clear();
+      _passwordController.clear();
+    });
   }
 
   @override
@@ -149,6 +213,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Spacer(flex: 2),
 
@@ -172,25 +237,87 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
               Text('Welcome Back', style: AppTextStyles.headlineMedium()),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Enter your PIN to unlock',
+                _usePassword ? 'Enter your password to unlock' : 'Enter your PIN to unlock',
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               ),
 
               const SizedBox(height: AppDimensions.spaceXXL),
 
-              // PIN input
+              // PIN or Password input
               if (_isLoading)
                 const CircularProgressIndicator(color: AppColors.primary)
+              else if (_usePassword)
+                // Password input
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        style: AppTextStyles.bodyMedium(),
+                        decoration: InputDecoration(
+                          hintText: 'Enter your password',
+                          hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
+                          filled: true,
+                          fillColor: AppColors.surfaceDark,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                            borderSide: BorderSide(color: _errorMessage != null ? AppColors.error : AppColors.inputBorderDark),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                            borderSide: BorderSide(color: _errorMessage != null ? AppColors.error : AppColors.inputBorderDark),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                          ),
+                          prefixIcon: const Icon(Iconsax.lock, color: AppColors.textSecondaryDark),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Iconsax.eye_slash : Iconsax.eye,
+                              color: AppColors.textSecondaryDark,
+                            ),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        onSubmitted: (_) => _verifyPassword(),
+                      ),
+                      const SizedBox(height: AppDimensions.spaceMD),
+                      SizedBox(
+                        width: double.infinity,
+                        height: AppDimensions.buttonHeightLG,
+                        child: ElevatedButton(
+                          onPressed: _verifyPassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                            ),
+                          ),
+                          child: Text(
+                            'Unlock',
+                            style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
               else
-                Pinput(
-                  controller: _pinController,
-                  length: 4,
-                  obscureText: true,
-                  obscuringCharacter: '\u25CF',
-                  defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,
-                  focusedPinTheme: focusedPinTheme,
-                  onCompleted: _verifyPin,
-                  keyboardType: TextInputType.number,
+                // PIN input - centered
+                Center(
+                  child: Pinput(
+                    controller: _pinController,
+                    length: 4,
+                    obscureText: true,
+                    obscuringCharacter: '\u25CF',
+                    defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,
+                    focusedPinTheme: focusedPinTheme,
+                    onCompleted: _verifyPin,
+                    keyboardType: TextInputType.number,
+                  ),
                 ),
 
               // Error message
@@ -206,7 +333,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
               const SizedBox(height: AppDimensions.spaceXXL),
 
               // Biometric button
-              if (_biometricAvailable && _biometricEnabled)
+              if (_biometricAvailable && _biometricEnabled && !_usePassword)
                 GestureDetector(
                   onTap: _authenticateWithBiometric,
                   child: Column(
@@ -233,6 +360,17 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                     ],
                   ),
                 ),
+
+              const SizedBox(height: AppDimensions.spaceLG),
+
+              // Toggle PIN/Password
+              GestureDetector(
+                onTap: _toggleMode,
+                child: Text(
+                  _usePassword ? 'Use PIN instead' : 'Use Password instead',
+                  style: AppTextStyles.labelMedium(color: AppColors.primary),
+                ),
+              ),
 
               const Spacer(flex: 3),
             ],
