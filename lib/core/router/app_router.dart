@@ -21,6 +21,7 @@ import '../../features/auth/screens/kyc/voters_card_verification_screen.dart';
 import '../../features/auth/screens/kyc/national_id_verification_screen.dart';
 import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
 import '../../features/auth/screens/kyc/uganda_nin_verification_screen.dart';
+import '../../features/auth/screens/app_lock_screen.dart';
 import '../../features/auth/screens/kyc/phone_verification_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
@@ -87,6 +88,7 @@ class AppRoutes {
   static const String notificationSettings = '/notification-settings';
   static const String themeSettings = '/theme-settings';
   static const String notifications = '/notifications';
+  static const String appLock = '/app-lock';
 }
 
 /// Router provider
@@ -122,6 +124,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.kycSsnit,
         AppRoutes.kycUgandaNin,
         AppRoutes.kycPhoneVerification,
+        AppRoutes.appLock,
       };
 
       // Helper: determine correct destination for an authenticated user
@@ -248,6 +251,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.splash,
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+
+      // App Lock Screen
+      GoRoute(
+        path: AppRoutes.appLock,
+        name: 'appLock',
+        builder: (context, state) => const AppLockScreen(),
       ),
 
       // Welcome Screen

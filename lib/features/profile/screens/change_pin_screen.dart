@@ -10,6 +10,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/services/secure_storage_service.dart';
 
 class ChangePinScreen extends ConsumerStatefulWidget {
   const ChangePinScreen({super.key});
@@ -129,6 +130,9 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           .collection('users')
           .doc(user.uid)
           .update({'pinHash': newPinHash});
+
+      // Also save to secure storage for offline app lock
+      await SecureStorageService.savePinHash(newPinHash);
 
       if (!mounted) return;
       setState(() => _isLoading = false);

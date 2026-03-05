@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/screenshot_prevention_service.dart';
+import '../../../core/services/secure_storage_service.dart';
 import 'home_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -42,9 +45,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-enable protection when app comes back to foreground
     if (state == AppLifecycleState.resumed) {
       _screenshotService.enableProtection();
+      _checkAppLock();
+    }
+  }
+
+  Future<void> _checkAppLock() async {
+    final pinHash = await SecureStorageService.getPinHash();
+    if (pinHash != null && pinHash.isNotEmpty && mounted) {
+      context.go(AppRoutes.appLock);
     }
   }
 
