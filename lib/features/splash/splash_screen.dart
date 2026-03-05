@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/constants.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/exchange_rate_service.dart';
+import '../../core/services/secure_storage_service.dart';
 import '../../providers/currency_provider.dart';
 import '../../models/user_model.dart';
 
@@ -76,6 +77,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // Parse user data
         final userData = UserModel.fromJson(userDoc.data()!);
 
+        // Sync PIN hash to secure storage for app lock
+        final firestorePinHash = userDoc.data()?['pinHash'] as String?;
+        if (firestorePinHash != null && firestorePinHash.isNotEmpty) {
+          await SecureStorageService.savePinHash(firestorePinHash);
+        }
+
         // Check if KYC is completed (defense in depth - server also enforces)
         // Accept both canonical kycStatus and legacy kycCompleted
         final kycVerified = userData.kycStatus == 'verified' || userData.kycCompleted;
@@ -93,8 +100,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
         if (!mounted) return;
 
-        // User is fully verified, navigate to main screen
-        context.go(AppRoutes.main);
+        // Check if user has a PIN set (app lock)
+        final pinHash = await SecureStorageService.getPinHash();
+        if (!mounted) return;
+
+        if (pinHash != null && pinHash.isNotEmpty) {
+          // PIN is set, show lock screen
+          context.go(AppRoutes.appLock);
+        } else {
+          // No PIN, go directly to main screen
+          context.go(AppRoutes.main);
+        }
       } catch (e) {
         // Error fetching user data, sign out and go to welcome
         debugPrint('Error checking user status: $e');

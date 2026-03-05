@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/router/app_router.dart';
+import '../../../core/services/secure_storage_service.dart';
 import 'home_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -14,8 +17,34 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkAppLock();
+    }
+  }
+
+  Future<void> _checkAppLock() async {
+    final pinHash = await SecureStorageService.getPinHash();
+    if (pinHash != null && pinHash.isNotEmpty && mounted) {
+      context.go(AppRoutes.appLock);
+    }
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),

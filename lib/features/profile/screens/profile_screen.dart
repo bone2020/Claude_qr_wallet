@@ -6,6 +6,8 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/secure_storage_service.dart';
+import '../../../core/services/biometric_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
 import '../widgets/business_logo_section.dart';
@@ -19,7 +21,20 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _biometricEnabled = true;
+  bool _biometricEnabled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricSetting();
+  }
+
+  Future<void> _loadBiometricSetting() async {
+    final enabled = await SecureStorageService.isBiometricEnabled();
+    if (mounted) {
+      setState(() => _biometricEnabled = enabled);
+    }
+  }
 
   void _handleLogout() {
     showDialog(
@@ -138,7 +153,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   icon: Iconsax.finger_scan,
                   title: AppStrings.biometricLogin,
                   value: _biometricEnabled,
-                  onChanged: (value) {
+                  onChanged: (value) async {
+                    if (value) {
+                      // Verify biometric is available before enabling
+                      final bioService = BiometricService();
+                      final canCheck = await bioService.canCheckBiometrics();
+                      if (!canCheck) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                    }
+                    await SecureStorageService.setBiometricEnabled(value);
                     setState(() => _biometricEnabled = value);
                   },
                 ),
