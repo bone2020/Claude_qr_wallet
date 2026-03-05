@@ -10,6 +10,8 @@ import '../../../core/router/app_router.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/services/secure_storage_service.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
@@ -142,6 +144,122 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     return '$integerPart.${parts[1]}';
   }
 
+ String _hashPin(String pin) {
+    final bytes = utf8.encode(pin);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  Future<bool> _verifyTransactionPin() async {
+    final storedPinHash = await SecureStorageService.getPinHash();
+
+    // If no PIN is set, skip verification
+    if (storedPinHash == null || storedPinHash.isEmpty) return true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String? error;
+        bool isVerifying = false;
+        final pinController = TextEditingController();
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Iconsax.lock, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 12),
+                  Text('Transaction PIN', style: AppTextStyles.headlineSmall()),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Enter your 4-digit PIN to confirm this transfer',
+                    style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                  ),
+                  const SizedBox(height: 20),
+                  if (isVerifying)
+                    const CircularProgressIndicator(color: AppColors.primary)
+                  else
+                    TextField(
+                      controller: pinController,
+                      obscureText: true,
+                      textAlign: TextAlign.center,
+                      maxLength: 4,
+                      keyboardType: TextInputType.number,
+                      style: AppTextStyles.headlineMedium(),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        counterText: '',
+                        hintText: '●  ●  ●  ●',
+                        hintStyle: AppTextStyles.headlineMedium(color: AppColors.textTertiaryDark),
+                        filled: true,
+                        fillColor: AppColors.inputBackgroundDark,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                          borderSide: BorderSide(color: error != null ? AppColors.error : AppColors.inputBorderDark),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                          borderSide: BorderSide(color: error != null ? AppColors.error : AppColors.inputBorderDark),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                        ),
+                      ),
+                      autofocus: true,
+                      onChanged: (value) {
+                        if (value.length == 4) {
+                          final enteredHash = _hashPin(value);
+                          if (enteredHash == storedPinHash) {
+                            Navigator.of(dialogContext).pop(true);
+                          } else {
+                            setDialogState(() {
+                              error = 'Incorrect PIN';
+                              pinController.clear();
+                            });
+                          }
+                        } else if (error != null) {
+                          setDialogState(() => error = null);
+                        }
+                      },
+                    ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      error!,
+                      style: AppTextStyles.bodySmall(color: AppColors.error),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return result == true;
+  }
+
   Future<void> _handleSend() async {
     if (_amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +270,10 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       );
       return;
     }
+
+    // Verify transaction PIN first
+    final pinVerified = await _verifyTransactionPin();
+    if (!pinVerified) return;
 
     setState(() => _isLoading = true);
 
