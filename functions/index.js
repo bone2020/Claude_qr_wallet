@@ -1009,6 +1009,12 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const payUserDoc = await db.collection('users').doc(userId).get();
+  if (payUserDoc.exists && payUserDoc.data().accountBlocked === true) {
+    throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to add money.');
+  }
+
   // Enforce persistent rate limiting (30 verifications per hour)
   await enforceRateLimit(userId, 'verifyPayment');
 
@@ -1396,6 +1402,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
+
+  // Check if account is blocked
+  const withdrawUserDoc = await db.collection('users').doc(userId).get();
+  if (withdrawUserDoc.exists && withdrawUserDoc.data().accountBlocked === true) {
+    throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to make withdrawals.');
+  }
 
   // Enforce persistent rate limiting (5 withdrawals per hour)
   await enforceRateLimit(userId, 'initiateWithdrawal');
@@ -2193,6 +2205,31 @@ async function enforceRateLimit(userId, operation) {
   if (!allowed) {
     const config = RATE_LIMITS[operation];
     throwAppError(ERROR_CODES.RATE_LIMIT_EXCEEDED, config?.message, { operation, userId });
+  }
+}
+
+// ============================================================
+// IN-APP NOTIFICATION HELPER
+// ============================================================
+/**
+ * Create an in-app notification for a user.
+ * Writes to the users/{userId}/notifications subcollection.
+ */
+async function createNotification(userId, { title, body, type = 'security', data = null }) {
+  try {
+    const notifRef = db.collection('users').doc(userId).collection('notifications').doc();
+    await notifRef.set({
+      id: notifRef.id,
+      title,
+      body,
+      type,
+      isRead: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      data: data || null,
+    });
+  } catch (error) {
+    // Notification creation must never block the main operation
+    logError('Failed to create notification', { userId, title, error: error.message });
   }
 }
 
@@ -3341,6 +3378,115 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
 
 
 // ============================================================
+// ACCOUNT BLOCKING
+// ============================================================
+/**
+ * Block user's account - prevents all financial operations.
+ * Requires PIN verification for security.
+ * Sets blockedBy to 'user' so the user can unblock themselves.
+ */
+exports.blockAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+  const userId = context.auth.uid;
+  const { pinHash } = data;
+  if (!pinHash || typeof pinHash !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'PIN is required to block account.');
+  }
+  // Verify PIN
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
+  }
+  const userData = userDoc.data();
+  if (userData.pinHash && userData.pinHash !== pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
+  }
+  // Check if already blocked
+  if (userData.accountBlocked === true) {
+    return { success: true, message: 'Account is already blocked.' };
+  }
+  // Block account
+  await db.collection('users').doc(userId).update({
+    accountBlocked: true,
+    accountBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+    accountBlockedBy: 'user',
+  });
+  // Create notification
+  await createNotification(userId, {
+    title: 'Account Blocked',
+    body: 'Your account has been blocked. All transactions are disabled. You can unblock your account from your profile at any time.',
+    type: 'security',
+    data: { action: 'account_blocked', blockedBy: 'user' },
+  });
+  await auditLog({
+    userId,
+    operation: 'blockAccount',
+    result: 'success',
+    metadata: { blockedBy: 'user' },
+    ipHash: hashIp(context),
+  });
+  return { success: true, message: 'Account blocked successfully.' };
+});
+
+/**
+ * Unblock user's account.
+ * Requires PIN verification.
+ * Only allows unblock if the account was blocked by the user (not admin).
+ */
+exports.unblockAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+  const userId = context.auth.uid;
+  const { pinHash } = data;
+  if (!pinHash || typeof pinHash !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'PIN is required to unblock account.');
+  }
+  // Get user data
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
+  }
+  const userData = userDoc.data();
+  // Check if account is actually blocked
+  if (userData.accountBlocked !== true) {
+    return { success: true, message: 'Account is not blocked.' };
+  }
+  // Check if blocked by admin - user cannot unblock admin blocks
+  if (userData.accountBlockedBy === 'admin') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      'Your account was blocked by support. Please contact customer support to unblock your account.');
+  }
+  // Verify PIN
+  if (userData.pinHash && userData.pinHash !== pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
+  }
+  // Unblock account
+  await db.collection('users').doc(userId).update({
+    accountBlocked: false,
+    accountUnblockedAt: admin.firestore.FieldValue.serverTimestamp(),
+    accountBlockedBy: admin.firestore.FieldValue.delete(),
+  });
+  // Create notification
+  await createNotification(userId, {
+    title: 'Account Unblocked',
+    body: 'Your account has been unblocked. All transactions are now enabled.',
+    type: 'security',
+    data: { action: 'account_unblocked' },
+  });
+  await auditLog({
+    userId,
+    operation: 'unblockAccount',
+    result: 'success',
+    metadata: {},
+    ipHash: hashIp(context),
+  });
+  return { success: true, message: 'Account unblocked successfully.' };
+});
+
+// ============================================================
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
@@ -3654,6 +3800,12 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const validatedSender = validateWalletDocument(senderData, 'sendMoney sender wallet');
       const senderBalance = validatedSender.balance;
 
+      // Check if sender account is blocked
+      const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
+      if (senderUserDoc.exists && senderUserDoc.data().accountBlocked === true) {
+        throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to make transfers.');
+      }
+
       // Calculate fee (1% with min 10, max 100)
       const fee = Math.min(Math.max(amount * 0.01, 10), 100);
       const totalDebit = amount + fee;
@@ -3698,7 +3850,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       validateWalletDocument(recipientData, 'sendMoney recipient wallet');
 
       // Get user names
-      const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
+      // senderUserDoc already fetched above for block check
       const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
 
       const senderName = senderUserDoc.exists ? senderUserDoc.data().fullName : 'Unknown';

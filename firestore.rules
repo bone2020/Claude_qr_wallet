@@ -20,13 +20,21 @@ service cloud.firestore {
         : request.resource.data.kycStatus == resource.data.kycStatus;
     }
 
+    // Helper: Ensure accountBlocked field is not modified by client
+    // accountBlocked can only be set by Cloud Functions (Admin SDK)
+    function accountBlockedUnchanged() {
+      return !('accountBlocked' in resource.data)
+        ? !request.resource.data.keys().hasAny(['accountBlocked', 'accountBlockedAt', 'accountBlockedBy', 'accountUnblockedAt'])
+        : request.resource.data.accountBlocked == resource.data.accountBlocked;
+    }
+
     // Users collection - own data only
     match /users/{userId} {
       allow read: if isOwner(userId);
       // Allow create without kycStatus (new user signup)
       allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus']);
-      // Allow update but kycStatus must not be modified (server-only field)
-      allow update: if isOwner(userId) && kycStatusUnchanged();
+      // Allow update but kycStatus and accountBlocked must not be modified (server-only fields)
+      allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged();
       allow delete: if isOwner(userId);
 
       // Transactions - read only (writes via Cloud Functions)

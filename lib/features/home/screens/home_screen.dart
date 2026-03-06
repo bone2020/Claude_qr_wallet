@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,6 +64,44 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Account blocked banner
+                StreamBuilder<DocumentSnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(FirebaseAuth.instance.currentUser?.uid)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data?.data() as Map<String, dynamic>?;
+                    final isBlocked = data != null && data['accountBlocked'] == true;
+                    if (!isBlocked) return const SizedBox.shrink();
+                    final blockedBy = data?['accountBlockedBy'] as String?;
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block, color: AppColors.error, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              blockedBy == 'admin'
+                                  ? 'Account blocked by support \u2014 contact us to unblock'
+                                  : 'Account blocked \u2014 all transactions are disabled',
+                              style: AppTextStyles.bodySmall(color: AppColors.error),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
                 const SizedBox(height: AppDimensions.spaceSM),
 
                 // Header with greeting

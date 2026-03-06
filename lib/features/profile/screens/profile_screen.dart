@@ -1,7 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:crypto/crypto.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
@@ -22,17 +28,244 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _biometricEnabled = false;
+  bool _accountBlocked = false;
+  String? _accountBlockedBy;
 
   @override
   void initState() {
     super.initState();
     _loadBiometricSetting();
+    _loadAccountBlockedState();
   }
 
   Future<void> _loadBiometricSetting() async {
     final enabled = await SecureStorageService.isBiometricEnabled();
     if (mounted) {
       setState(() => _biometricEnabled = enabled);
+    }
+  }
+
+  Future<void> _loadAccountBlockedState() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    if (doc.exists && mounted) {
+      setState(() {
+        _accountBlocked = doc.data()?['accountBlocked'] as bool? ?? false;
+        _accountBlockedBy = doc.data()?['accountBlockedBy'] as String?;
+      });
+    }
+  }
+
+  String _hashPin(String pin) {
+    final bytes = utf8.encode(pin);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  Future<String?> _requestPin(String title) async {
+    String? resultHash;
+    final pinController = TextEditingController();
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        String? error;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppColors.surfaceDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+              ),
+              title: Text(title, style: AppTextStyles.headlineSmall()),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: pinController,
+                    obscureText: true,
+                    textAlign: TextAlign.center,
+                    maxLength: 4,
+                    keyboardType: TextInputType.number,
+                    style: AppTextStyles.headlineMedium(),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: '\u25CF  \u25CF  \u25CF  \u25CF',
+                      hintStyle: AppTextStyles.headlineMedium(color: AppColors.textTertiaryDark),
+                      filled: true,
+                      fillColor: AppColors.inputBackgroundDark,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: BorderSide(color: error != null ? AppColors.error : AppColors.inputBorderDark),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: BorderSide(color: error != null ? AppColors.error : AppColors.inputBorderDark),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                      ),
+                    ),
+                    autofocus: true,
+                    onChanged: (value) {
+                      if (value.length == 4) {
+                        resultHash = _hashPin(value);
+                        Navigator.of(dialogContext).pop();
+                      } else if (error != null) {
+                        setDialogState(() => error = null);
+                      }
+                    },
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!, style: AppTextStyles.bodySmall(color: AppColors.error)),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    resultHash = null;
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: Text('Cancel', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    pinController.dispose();
+    return resultHash;
+  }
+
+  Future<void> _handleBlockAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.block, color: AppColors.error, size: 24),
+            const SizedBox(width: 12),
+            Text('Block Account', style: AppTextStyles.headlineSmall()),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n\u2022 Sending money\n\u2022 Withdrawing funds\n\u2022 Adding money\n\nYou can unblock anytime with your PIN.',
+          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Block Account', style: AppTextStyles.labelMedium(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final pinHash = await _requestPin('Enter PIN to block your account');
+    if (pinHash == null) return;
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('blockAccount');
+      await callable.call({'pinHash': pinHash});
+
+      if (mounted) {
+        setState(() {
+          _accountBlocked = true;
+          _accountBlockedBy = 'user';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account blocked successfully. All transactions are disabled.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = 'Failed to block account';
+        if (e.toString().contains('Incorrect PIN')) {
+          message = 'Incorrect PIN. Please try again.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleUnblockAccount() async {
+    // Check if admin-blocked
+    if (_accountBlockedBy == 'admin') {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+          ),
+          title: Text('Account Blocked by Support', style: AppTextStyles.headlineSmall()),
+          content: Text(
+            'Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.',
+            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('OK', style: AppTextStyles.labelMedium(color: AppColors.primary)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final pinHash = await _requestPin('Enter PIN to unblock your account');
+    if (pinHash == null) return;
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('unblockAccount');
+      await callable.call({'pinHash': pinHash});
+
+      if (mounted) {
+        setState(() {
+          _accountBlocked = false;
+          _accountBlockedBy = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account unblocked successfully. All transactions are now enabled.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = 'Failed to unblock account';
+        if (e.toString().contains('Incorrect PIN')) {
+          message = 'Incorrect PIN. Please try again.';
+        } else if (e.toString().contains('blocked by support')) {
+          message = 'Your account was blocked by support. Please contact customer support.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -206,6 +439,83 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ],
             ).animate().fadeIn(delay: 350.ms, duration: 400.ms),
+
+            const SizedBox(height: AppDimensions.spaceLG),
+
+            // Account Safety Section
+            _buildSection(
+              title: 'Account Safety',
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _accountBlocked ? _handleUnblockAccount : _handleBlockAccount,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppDimensions.spaceMD),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: _accountBlocked
+                                  ? AppColors.error.withOpacity(0.1)
+                                  : AppColors.inputBackgroundDark,
+                              borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                            ),
+                            child: Icon(
+                              _accountBlocked ? Icons.lock_open : Icons.block,
+                              color: _accountBlocked ? AppColors.error : AppColors.textSecondaryDark,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppDimensions.spaceMD),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _accountBlocked ? 'Unblock Account' : 'Block Account',
+                                  style: AppTextStyles.bodyMedium(
+                                    color: _accountBlocked ? AppColors.error : null,
+                                  ),
+                                ),
+                                Text(
+                                  _accountBlocked
+                                      ? (_accountBlockedBy == 'admin'
+                                          ? 'Blocked by support \u2014 contact us to unblock'
+                                          : 'Your account is currently blocked')
+                                      : 'Temporarily disable all transactions',
+                                  style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_accountBlocked)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'BLOCKED',
+                                style: AppTextStyles.caption(color: AppColors.error),
+                              ),
+                            )
+                          else
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.textTertiaryDark,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
 
             const SizedBox(height: AppDimensions.spaceLG),
 
