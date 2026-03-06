@@ -139,8 +139,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       },
     );
-    pinController.dispose();
-    return resultHash;
+   return resultHash;
   }
 
   Future<void> _handleBlockAccount() async {
