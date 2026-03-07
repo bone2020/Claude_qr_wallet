@@ -22,6 +22,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _screenshotService = ScreenshotPreventionService();
+  DateTime? _backgroundTime;
+  static const _lockGracePeriod = Duration(seconds: 60);
 
   final List<Widget> _screens = const [
     HomeScreen(),
@@ -43,15 +45,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.dispose();
   }
 
-  @override
+@override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.paused) {
+      _backgroundTime = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
       _screenshotService.enableProtection();
       _checkAppLock();
     }
   }
 
   Future<void> _checkAppLock() async {
+    // Skip lock if app was in background for less than grace period
+    if (_backgroundTime != null) {
+      final elapsed = DateTime.now().difference(_backgroundTime!);
+      if (elapsed < _lockGracePeriod) return;
+    }
+
     final pinHash = await SecureStorageService.getPinHash();
     if (pinHash != null && pinHash.isNotEmpty && mounted) {
       context.go(AppRoutes.appLock);
