@@ -11,3 +11,4 @@ export 'secure_storage_service.dart';
 export 'screenshot_prevention_service.dart';
 export 'smile_id_service.dart';
 export 'momo_service.dart';
+export 'push_notification_service.dart';

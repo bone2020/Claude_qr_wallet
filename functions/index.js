@@ -1107,6 +1107,14 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       ipHash: hashIp(context),
     });
 
+    // Send push notification for deposit
+    await sendPushNotification(userId, {
+      title: 'Deposit Successful',
+      body: `${currency} ${amount.toFixed(2)} has been added to your wallet`,
+      type: 'transaction',
+      data: { action: 'deposit', amount: amount.toString(), reference },
+    });
+
     return {
       success: true,
       amount: amount,
@@ -1289,6 +1297,14 @@ async function handleSuccessfulCharge(data) {
     });
   });
 
+  // Send push notification for deposit via webhook
+  await sendPushNotification(userId, {
+    title: 'Deposit Successful',
+    body: `${currency} ${amount.toFixed(2)} has been added to your wallet via ${data.channel || 'card'}`,
+    type: 'transaction',
+    data: { action: 'deposit', amount: amount.toString(), reference },
+  });
+
   logFinancialOperation('creditWallet', 'success', { reference });
 }
 
@@ -1321,6 +1337,17 @@ async function handleSuccessfulTransfer(data) {
         { completedAt: admin.firestore.FieldValue.serverTimestamp() }
       );
     }
+  }
+
+  // Send push notification for withdrawal completed
+  if (withdrawalDoc.exists) {
+    const wdData = withdrawalDoc.data();
+    await sendPushNotification(wdData.userId, {
+      title: 'Withdrawal Completed',
+      body: `Your withdrawal of ${wdData.currency || ''} ${wdData.amount?.toFixed(2) || '0.00'} has been completed`,
+      type: 'transaction',
+      data: { action: 'withdrawal_completed', reference },
+    });
   }
 
   logFinancialOperation('withdrawal', 'completed', { reference });
@@ -1383,6 +1410,14 @@ async function handleFailedTransfer(data) {
       }
     });
   }
+
+  // Send push notification for withdrawal failed
+  await sendPushNotification(userId, {
+    title: 'Withdrawal Failed',
+    body: `Your withdrawal of ${withdrawalData.currency || ''} ${amount?.toFixed(2) || '0.00'} has failed. The amount has been refunded to your wallet.`,
+    type: 'transaction',
+    data: { action: 'withdrawal_failed', reference, reason: data.reason || 'Transfer failed' },
+  });
 
   logFinancialOperation('withdrawal', 'failed_refunded', { reference });
 }
@@ -1585,6 +1620,14 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       amount, currency: walletData.currency || 'NGN',
       metadata: { reference, type: type || 'bank', ...correlation.toAuditContext() },
       ipHash: hashIp(context),
+    });
+
+    // Send push notification for withdrawal initiated
+    await sendPushNotification(userId, {
+      title: 'Withdrawal Initiated',
+      body: `Your withdrawal of ${validated.currency || 'NGN'} ${amount.toFixed(2)} is being processed`,
+      type: 'transaction',
+      data: { action: 'withdrawal_initiated', amount: amount.toString(), reference },
     });
 
     return {
@@ -2230,6 +2273,77 @@ async function createNotification(userId, { title, body, type = 'security', data
   } catch (error) {
     // Notification creation must never block the main operation
     logError('Failed to create notification', { userId, title, error: error.message });
+  }
+}
+
+/**
+ * Send a push notification to a user via FCM.
+ * Also creates an in-app notification in Firestore.
+ * @param {string} userId - Target user ID
+ * @param {Object} options - Notification options
+ * @param {string} options.title - Notification title
+ * @param {string} options.body - Notification body text
+ * @param {string} [options.type='system'] - Notification type (transaction, security, system)
+ * @param {Object} [options.data=null] - Additional data payload
+ */
+async function sendPushNotification(userId, { title, body, type = 'system', data = null }) {
+  try {
+    // 1. Create in-app notification in Firestore
+    await createNotification(userId, { title, body, type, data });
+
+    // 2. Get user's FCM token
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) return;
+
+    const fcmToken = userDoc.data().fcmToken;
+    if (!fcmToken) {
+      logInfo('No FCM token for user, skipping push', { userId });
+      return;
+    }
+
+    // 3. Send push notification via FCM
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        type: type,
+        ...(data ? Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])) : {}),
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'qr_wallet_transactions',
+          priority: 'high',
+          sound: 'default',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    await admin.messaging().send(message);
+    logInfo('Push notification sent', { userId, title });
+  } catch (error) {
+    // Push notification must never block the main operation
+    if (error.code === 'messaging/registration-token-not-registered' ||
+        error.code === 'messaging/invalid-registration-token') {
+      // Token is invalid, remove it
+      try {
+        await db.collection('users').doc(userId).update({
+          fcmToken: admin.firestore.FieldValue.delete(),
+        });
+      } catch (e) { /* ignore cleanup errors */ }
+    }
+    logError('Failed to send push notification', { userId, title, error: error.message });
   }
 }
 
@@ -3413,8 +3527,8 @@ exports.blockAccount = functions.https.onCall(async (data, context) => {
     accountBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
     accountBlockedBy: 'user',
   });
-  // Create notification
-  await createNotification(userId, {
+  // Send push + in-app notification
+  await sendPushNotification(userId, {
     title: 'Account Blocked',
     body: 'Your account has been blocked. All transactions are disabled. You can unblock your account from your profile at any time.',
     type: 'security',
@@ -3469,8 +3583,8 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
     accountUnblockedAt: admin.firestore.FieldValue.serverTimestamp(),
     accountBlockedBy: admin.firestore.FieldValue.delete(),
   });
-  // Create notification
-  await createNotification(userId, {
+  // Send push + in-app notification
+  await sendPushNotification(userId, {
     title: 'Account Unblocked',
     body: 'Your account has been unblocked. All transactions are now enabled.',
     type: 'security',
@@ -3958,6 +4072,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         amount: amount,
         fee: fee,
         recipientName: recipientName,
+        senderName: senderName,
+        recipientUid: recipientUid,
+        senderCurrency: senderData.currency || 'GHS',
+        recipientCurrency: recipientData.currency || 'GHS',
         newBalance: senderBalance - totalDebit
       };
     });
@@ -3970,6 +4088,22 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee, ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
+
+    // Send push notifications to both parties
+    await Promise.all([
+      sendPushNotification(senderUid, {
+        title: 'Money Sent',
+        body: `You sent ${result.senderCurrency || ''}${amount.toFixed(2)} to ${result.recipientName || 'a wallet'}`,
+        type: 'transaction',
+        data: { action: 'money_sent', amount: amount.toString(), transactionId: result.transactionId },
+      }),
+      sendPushNotification(result.recipientUid, {
+        title: 'Money Received',
+        body: `You received ${result.recipientCurrency || ''}${amount.toFixed(2)} from ${result.senderName || 'a wallet'}`,
+        type: 'transaction',
+        data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
+      }),
+    ]);
 
     return { success: true, ...result, _correlationId: correlation.correlationId };
 
