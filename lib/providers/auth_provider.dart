@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/services/services.dart';
+import '../core/services/push_notification_service.dart';
 import '../models/user_model.dart';
 
 // ============================================================
@@ -197,6 +198,8 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
   /// Sign out
   Future<void> signOut() async {
     state = state.copyWith(authState: AuthState.loading);
+    // Remove FCM token before signing out
+    await PushNotificationService().removeToken();
     await _authService.signOut();
     await _localStorage.clearAll();
     state = AuthStateData.unauthenticated();

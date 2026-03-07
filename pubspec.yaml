@@ -22,6 +22,8 @@ dependencies:
   firebase_storage: ^12.4.0
   google_sign_in: ^6.2.2
   sign_in_with_apple: ^6.1.4
+  firebase_messaging: ^15.1.6
+  flutter_local_notifications: ^18.0.1
   crypto: ^3.0.6
   flutter_secure_storage: ^9.2.2
 

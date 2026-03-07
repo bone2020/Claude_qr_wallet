@@ -9,6 +9,7 @@ import '../../core/constants/constants.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/exchange_rate_service.dart';
 import '../../core/services/secure_storage_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../providers/currency_provider.dart';
 import '../../models/user_model.dart';
 
@@ -99,6 +100,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         await ExchangeRateService.preloadRates();
 
         if (!mounted) return;
+
+        // Save FCM token for push notifications
+        await PushNotificationService().saveTokenToFirestore();
 
         // Check if user has a PIN set (app lock)
         final pinHash = await SecureStorageService.getPinHash();

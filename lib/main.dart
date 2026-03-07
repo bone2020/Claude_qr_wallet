@@ -11,6 +11,7 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/services.dart';
 import 'core/services/deep_link_service.dart';
+import 'core/services/push_notification_service.dart';
 import 'providers/providers.dart';
 
 void main() async {
@@ -34,6 +35,10 @@ void main() async {
   //  appleProvider: AppleProvider.deviceCheck,
   //  );
   //}
+
+  // Initialize Push Notifications
+  final pushService = PushNotificationService();
+  await pushService.initialize();
 
   // Initialize Smile ID for KYC verification
   SmileID.initialize(useSandbox: true, enableCrashReporting: false);
