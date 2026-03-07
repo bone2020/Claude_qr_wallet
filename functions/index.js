@@ -4456,18 +4456,27 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
                   phoneNumber: txData.phoneNumber,
                   status: 'completed',
                   createdAt: txData.createdAt,
-                  completedAt: admin.firestore.FieldValue.serverTimestamp(),
+               completedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
               }
             }
 
-            // Update momo transaction status with state machine validation
             transaction.update(txRef, {
               ...buildStateTransitionFields(txData.status, status, referenceId),
               providerStatus: status,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           });
+
+          // Send push notification for completed MoMo transaction
+          const checkNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
+          await sendPushNotification(txData.userId, {
+            title: `${checkNotifType} Successful`,
+            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+            type: 'transaction',
+            data: { action: txData.type === 'collection' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId },
+          });
+
           } else if (status === 'FAILED' || status === 'REJECTED') {
           // Update momo transaction status
           await updateTransactionState(txRef, status, {
@@ -4665,6 +4674,14 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         amount, currency: currency || 'EUR',
         metadata: { referenceId, phoneNumber: validatedPhone, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
+      });
+
+     // Send push notification for MoMo withdrawal
+      await sendPushNotification(userId, {
+        title: 'Withdrawal Initiated',
+        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${amount.toFixed(2)} is being processed`,
+        type: 'transaction',
+        data: { action: 'withdrawal_initiated', amount: amount.toString(), referenceId },
       });
 
       return {
@@ -4877,14 +4894,14 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           });
         }
 
-        transaction.update(txRef, {
-          ...buildStateTransitionFields(txData.status, effectiveStatus, externalId),
-          providerStatus: effectiveStatus,
-          financialTransactionId: financialTransactionId,
-          callbackStatus: status,
-          verifiedStatus: verifiedStatus,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+      // Send push notification for completed MoMo transaction
+      const momoNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
+      await sendPushNotification(txData.userId, {
+        title: `${momoNotifType} Successful`,
+        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+        type: 'transaction',
+        data: { action: momoNotifType === 'Deposit' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId: externalId },
+      });
       });
     } else if (effectiveStatus === 'FAILED') {
       // Refund if disbursement failed
