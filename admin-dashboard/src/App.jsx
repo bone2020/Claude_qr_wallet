@@ -11,6 +11,7 @@ import RecoveryPage from './pages/RecoveryPage';
 import AdminManagementPage from './pages/AdminManagementPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import AuditLogPage from './pages/AuditLogPage';
+import RevenuePage from './pages/RevenuePage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="users/:uid" element={<UserDetailsPage />} />
             <Route path="recovery" element={<RecoveryPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
+            <Route path="revenue" element={<RevenuePage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
           </Route>

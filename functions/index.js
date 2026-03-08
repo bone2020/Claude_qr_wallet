@@ -4443,6 +4443,253 @@ exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================================
+// PLATFORM WALLET / REVENUE
+// ============================================================
+
+/**
+ * Admin: Get platform wallet overview — total revenue, per-currency balances.
+ */
+exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  try {
+    // Get platform wallet document
+    const platformDoc = await db.collection('wallets').doc('platform').get();
+    if (!platformDoc.exists) {
+      return { success: true, wallet: null, balances: [], message: 'Platform wallet not found.' };
+    }
+
+    const walletData = platformDoc.data();
+
+    // Get per-currency balances
+    const balancesSnapshot = await db.collection('wallets').doc('platform')
+      .collection('balances')
+      .orderBy('amount', 'desc')
+      .get();
+
+    const balances = balancesSnapshot.docs.map(doc => ({
+      currency: doc.id,
+      ...doc.data(),
+      lastTransactionAt: doc.data().lastTransactionAt?.toDate?.()?.toISOString() || null,
+      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || null,
+    }));
+
+    return {
+      success: true,
+      wallet: {
+        totalBalanceUSD: walletData.totalBalanceUSD || 0,
+        totalTransactions: walletData.totalTransactions || 0,
+        totalFeesCollected: walletData.totalFeesCollected || 0,
+        walletId: walletData.walletId,
+        name: walletData.name,
+        isActive: walletData.isActive,
+        updatedAt: walletData.updatedAt?.toDate?.()?.toISOString() || null,
+      },
+      balances,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get platform wallet: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Get platform fee history with pagination.
+ */
+exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { limit: queryLimit, currency: filterCurrency } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  try {
+    let query = db.collection('wallets').doc('platform')
+      .collection('fees')
+      .orderBy('createdAt', 'desc');
+
+    if (filterCurrency) {
+      query = query.where('currency', '==', filterCurrency);
+    }
+
+    query = query.limit(fetchLimit);
+
+    const snapshot = await query.get();
+    const fees = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+    }));
+
+    return { success: true, fees };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get fee history: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Record a platform withdrawal (manual withdrawal for operational expenses).
+ * Only super_admin can withdraw.
+ * This records the withdrawal — actual bank transfer is done manually.
+ */
+exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { amount, currency, purpose, bankDetails, notes } = data;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
+  }
+  if (!currency) {
+    throw new functions.https.HttpsError('invalid-argument', 'Currency is required.');
+  }
+  if (!purpose) {
+    throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
+  }
+
+  try {
+    // Verify sufficient balance in that currency
+    const balanceDoc = await db.collection('wallets').doc('platform')
+      .collection('balances').doc(currency).get();
+
+    if (!balanceDoc.exists) {
+      throw new functions.https.HttpsError('failed-precondition', `No balance found for ${currency}.`);
+    }
+
+    const currentBalance = balanceDoc.data().amount || 0;
+    if (currentBalance < amount) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+    }
+
+    // Get exchange rate for USD equivalent
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+    const exchangeRate = rates[currency] || 1;
+    const amountInUSD = amount / exchangeRate;
+
+    // Create withdrawal record
+    const withdrawalRef = db.collection('wallets').doc('platform')
+      .collection('withdrawals').doc();
+
+    const withdrawalId = withdrawalRef.id;
+
+    // Get caller email before transaction
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    await db.runTransaction(async (transaction) => {
+      // Deduct from currency balance
+      const freshBalance = await transaction.get(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency)
+      );
+      const freshAmount = freshBalance.data()?.amount || 0;
+
+      if (freshAmount < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
+      }
+
+      transaction.update(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency),
+        {
+          amount: admin.firestore.FieldValue.increment(-amount),
+          usdEquivalent: admin.firestore.FieldValue.increment(-amountInUSD),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      );
+
+      // Deduct from total USD balance
+      transaction.update(db.collection('wallets').doc('platform'), {
+        totalBalanceUSD: admin.firestore.FieldValue.increment(-amountInUSD),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Record withdrawal
+      transaction.set(withdrawalRef, {
+        id: withdrawalId,
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        exchangeRate,
+        purpose,
+        bankDetails: bankDetails || null,
+        notes: notes || null,
+        status: 'completed',
+        withdrawnBy: caller.uid,
+        withdrawnByEmail: callerEmail,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Audit log
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminPlatformWithdraw',
+      result: 'success',
+      amount,
+      currency,
+      metadata: { withdrawalId, purpose, amountInUSD, bankDetails },
+      ipHash: hashIp(context),
+    });
+
+    // Admin activity log
+    const callerEmailForLog = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmailForLog,
+      role: caller.role,
+      action: 'platform_withdrawal',
+      details: `Withdrew ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      withdrawal: {
+        id: withdrawalId,
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        purpose,
+        status: 'completed',
+      },
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Withdrawal failed: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Get platform withdrawal history.
+ */
+exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { limit: queryLimit } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  try {
+    const snapshot = await db.collection('wallets').doc('platform')
+      .collection('withdrawals')
+      .orderBy('createdAt', 'desc')
+      .limit(fetchLimit)
+      .get();
+
+    const withdrawals = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+    }));
+
+    return { success: true, withdrawals };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get withdrawals: ${error.message}`);
+  }
+});
+
+// ============================================================
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
