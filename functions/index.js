@@ -4690,6 +4690,348 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
 });
 
 // ============================================================
+// TRANSACTION MONITORING
+// ============================================================
+
+/**
+ * Admin: Get all transactions across the platform using collectionGroup query.
+ * Supports filtering by type, status, currency, and date range.
+ */
+exports.adminGetAllTransactions = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const {
+    limit: queryLimit,
+    type: filterType,
+    status: filterStatus,
+    currency: filterCurrency,
+    startDate,
+    endDate,
+  } = data || {};
+
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  try {
+    let query = db.collectionGroup('transactions').orderBy('createdAt', 'desc');
+
+    if (filterType) {
+      query = query.where('type', '==', filterType);
+    }
+
+    if (filterStatus) {
+      query = query.where('status', '==', filterStatus);
+    }
+
+    if (startDate) {
+      query = query.where('createdAt', '>=', admin.firestore.Timestamp.fromDate(new Date(startDate)));
+    }
+
+    if (endDate) {
+      query = query.where('createdAt', '<=', admin.firestore.Timestamp.fromDate(new Date(endDate)));
+    }
+
+    query = query.limit(fetchLimit);
+
+    const snapshot = await query.get();
+    const transactions = snapshot.docs.map(doc => {
+      const data = doc.data();
+      // Extract userId from the document path: users/{userId}/transactions/{txId}
+      const pathParts = doc.ref.path.split('/');
+      const userId = pathParts.length >= 2 ? pathParts[1] : null;
+
+      return {
+        id: doc.id,
+        userId,
+        type: data.type,
+        amount: data.amount,
+        fee: data.fee || 0,
+        currency: data.currency || data.senderCurrency,
+        senderCurrency: data.senderCurrency,
+        receiverCurrency: data.receiverCurrency,
+        status: data.status,
+        method: data.method,
+        senderName: data.senderName,
+        receiverName: data.receiverName,
+        senderWalletId: data.senderWalletId,
+        receiverWalletId: data.receiverWalletId,
+        note: data.note,
+        phoneNumber: data.phoneNumber,
+        createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
+        completedAt: data.completedAt?.toDate?.()?.toISOString() || null,
+      };
+    });
+
+    return { success: true, transactions, count: transactions.length };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+
+    // Check if index is needed
+    if (error.code === 9 || error.message?.includes('index')) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'A Firestore index is required. Check the Firebase Console logs for a link to create it.');
+    }
+
+    throw new functions.https.HttpsError('internal', `Failed to get transactions: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Get transaction volume statistics.
+ */
+exports.adminGetTransactionStats = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { days } = data || {};
+  const lookbackDays = Math.min(days || 7, 90);
+  const sinceDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+
+  try {
+    const snapshot = await db.collectionGroup('transactions')
+      .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(sinceDate))
+      .orderBy('createdAt', 'desc')
+      .limit(1000)
+      .get();
+
+    let totalVolume = 0;
+    let totalFees = 0;
+    let sendCount = 0;
+    let receiveCount = 0;
+    let depositCount = 0;
+    let withdrawCount = 0;
+    let completedCount = 0;
+    let failedCount = 0;
+    let pendingCount = 0;
+    const volumeByCurrency = {};
+    const volumeByDay = {};
+
+    snapshot.docs.forEach(doc => {
+      const tx = doc.data();
+      const amount = tx.amount || 0;
+      const fee = tx.fee || 0;
+      const currency = tx.currency || tx.senderCurrency || 'Unknown';
+      const type = tx.type || 'unknown';
+      const status = tx.status || 'unknown';
+
+      totalVolume += amount;
+      totalFees += fee;
+
+      // Count by type
+      if (type === 'send') sendCount++;
+      else if (type === 'receive') receiveCount++;
+      else if (type === 'deposit') depositCount++;
+      else if (type === 'withdraw' || type === 'withdrawal') withdrawCount++;
+
+      // Count by status
+      if (status === 'completed') completedCount++;
+      else if (status === 'failed') failedCount++;
+      else if (status === 'pending') pendingCount++;
+
+      // Volume by currency
+      if (!volumeByCurrency[currency]) {
+        volumeByCurrency[currency] = { amount: 0, count: 0, fees: 0 };
+      }
+      volumeByCurrency[currency].amount += amount;
+      volumeByCurrency[currency].count += 1;
+      volumeByCurrency[currency].fees += fee;
+
+      // Volume by day
+      if (tx.createdAt?.toDate) {
+        const dayKey = tx.createdAt.toDate().toISOString().split('T')[0];
+        if (!volumeByDay[dayKey]) {
+          volumeByDay[dayKey] = { amount: 0, count: 0 };
+        }
+        volumeByDay[dayKey].amount += amount;
+        volumeByDay[dayKey].count += 1;
+      }
+    });
+
+    return {
+      success: true,
+      stats: {
+        period: `${lookbackDays} days`,
+        totalTransactions: snapshot.size,
+        totalVolume,
+        totalFees,
+        byType: { send: sendCount, receive: receiveCount, deposit: depositCount, withdraw: withdrawCount },
+        byStatus: { completed: completedCount, failed: failedCount, pending: pendingCount },
+        volumeByCurrency,
+        volumeByDay,
+      },
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+
+    if (error.code === 9 || error.message?.includes('index')) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'A Firestore index is required. Check the Firebase Console logs for a link to create it.');
+    }
+
+    throw new functions.https.HttpsError('internal', `Failed to get transaction stats: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Flag a transaction for review.
+ */
+exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { userId, transactionId, reason } = data;
+
+  if (!userId || !transactionId) {
+    throw new functions.https.HttpsError('invalid-argument', 'userId and transactionId are required.');
+  }
+
+  if (!reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'Reason for flagging is required.');
+  }
+
+  try {
+    // Get the transaction
+    const txRef = db.collection('users').doc(userId).collection('transactions').doc(transactionId);
+    const txDoc = await txRef.get();
+
+    if (!txDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction not found.');
+    }
+
+    const txData = txDoc.data();
+
+    // Get caller email
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    // Create flagged transaction record
+    await db.collection('flagged_transactions').doc(transactionId).set({
+      transactionId,
+      userId,
+      type: txData.type,
+      amount: txData.amount,
+      currency: txData.currency || txData.senderCurrency,
+      status: txData.status,
+      senderName: txData.senderName || null,
+      receiverName: txData.receiverName || null,
+      reason,
+      flaggedBy: caller.uid,
+      flaggedByEmail: callerEmail,
+      flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      resolved: false,
+    });
+
+    // Update original transaction
+    await txRef.update({
+      flagged: true,
+      flaggedReason: reason,
+      flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Log activity
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'flag_transaction',
+      targetUserId: userId,
+      details: `Flagged transaction ${transactionId}: ${reason}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminFlagTransaction',
+      result: 'success',
+      metadata: { transactionId, userId, reason },
+      ipHash: hashIp(context),
+    });
+
+    return { success: true, message: 'Transaction flagged for review.' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to flag transaction: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Get flagged transactions.
+ */
+exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { limit: queryLimit, resolved } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  try {
+    let query = db.collection('flagged_transactions').orderBy('flaggedAt', 'desc');
+
+    if (resolved !== undefined) {
+      query = query.where('resolved', '==', resolved);
+    }
+
+    query = query.limit(fetchLimit);
+
+    const snapshot = await query.get();
+    const flagged = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      flaggedAt: doc.data().flaggedAt?.toDate?.()?.toISOString() || null,
+    }));
+
+    return { success: true, flagged };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get flagged transactions: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Resolve a flagged transaction.
+ */
+exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { transactionId, resolution } = data;
+
+  if (!transactionId || !resolution) {
+    throw new functions.https.HttpsError('invalid-argument', 'transactionId and resolution are required.');
+  }
+
+  try {
+    const flagRef = db.collection('flagged_transactions').doc(transactionId);
+    const flagDoc = await flagRef.get();
+
+    if (!flagDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Flagged transaction not found.');
+    }
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    await flagRef.update({
+      resolved: true,
+      resolution,
+      resolvedBy: caller.uid,
+      resolvedByEmail: callerEmail,
+      resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Log activity
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'resolve_flagged_transaction',
+      details: `Resolved flagged transaction ${transactionId}: ${resolution}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: 'Flagged transaction resolved.' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to resolve: ${error.message}`);
+  }
+});
+
+// ============================================================
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 

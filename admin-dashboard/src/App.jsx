@@ -12,6 +12,7 @@ import AdminManagementPage from './pages/AdminManagementPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RevenuePage from './pages/RevenuePage';
+import TransactionsPage from './pages/TransactionsPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="users" element={<UserSearchPage />} />
             <Route path="users/:uid" element={<UserDetailsPage />} />
             <Route path="recovery" element={<RecoveryPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="audit" element={<AuditLogPage />} />

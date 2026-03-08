@@ -28,6 +28,7 @@ function Sidebar() {
       <nav className="flex-1 p-4 space-y-1">
         <NavLink to="/" end className={linkClass}>Dashboard</NavLink>
         <NavLink to="/users" className={linkClass}>User Search</NavLink>
+        {isAdmin && <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>}
         <NavLink to="/recovery" className={linkClass}>Account Recovery</NavLink>
         <NavLink to="/activity" className={linkClass}>Activity Log</NavLink>
 
