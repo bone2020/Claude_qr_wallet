@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, functions } from '../firebase';
 
 const AuthContext = createContext(null);
 
@@ -20,15 +21,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Get custom claims to check admin role
-        const tokenResult = await firebaseUser.getIdTokenResult();
+        const tokenResult = await firebaseUser.getIdTokenResult(true);
         const userRole = tokenResult.claims.adminRole;
 
         if (userRole && ['super_admin', 'admin', 'support'].includes(userRole)) {
           setUser(firebaseUser);
           setRole(userRole);
         } else {
-          // Not an admin — sign them out
           await signOut(auth);
           setUser(null);
           setRole(null);
@@ -54,10 +53,27 @@ export function AuthProvider({ children }) {
     }
 
     setRole(userRole);
+
+    // Log login activity
+    try {
+      const logActivity = httpsCallable(functions, 'adminLogActivity');
+      await logActivity({ action: 'login', metadata: { timestamp: new Date().toISOString() } });
+    } catch (e) {
+      console.error('Failed to log login activity:', e);
+    }
+
     return credential.user;
   };
 
   const logout = async () => {
+    // Log logout activity before signing out
+    try {
+      const logActivity = httpsCallable(functions, 'adminLogActivity');
+      await logActivity({ action: 'logout', metadata: { timestamp: new Date().toISOString() } });
+    } catch (e) {
+      console.error('Failed to log logout activity:', e);
+    }
+
     await signOut(auth);
     setUser(null);
     setRole(null);

@@ -3719,6 +3719,18 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
     ipHash: hashIp(context),
   });
 
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'promote_user',
+    targetUid,
+    details: `Promoted to ${newRole}`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
   return { success: true, message: `User promoted to ${newRole}.` };
 });
 
@@ -3764,6 +3776,18 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
     result: 'success',
     metadata: { targetUid, previousRole: targetRole, callerRole: caller.role },
     ipHash: hashIp(context),
+  });
+
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'demote_user',
+    targetUid,
+    details: `Removed ${targetRole} role`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, message: `User demoted from ${targetRole}.` };
@@ -3972,6 +3996,19 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
     ipHash: hashIp(context),
   });
 
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'block_account',
+    targetUserId: targetUid,
+    targetInfo: userDoc.data().fullName || 'Unknown',
+    details: reason || 'No reason provided',
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
   return { success: true, message: 'Account blocked successfully.' };
 });
 
@@ -4014,6 +4051,19 @@ exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
     ipHash: hashIp(context),
   });
 
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'unblock_account',
+    targetUserId: targetUid,
+    targetInfo: userDoc.data().fullName || 'Unknown',
+    details: 'Account unblocked',
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
   return { success: true, message: 'Account unblocked successfully.' };
 });
 
@@ -4044,6 +4094,18 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
     result: 'success',
     metadata: { targetUid, newEmail, callerRole: caller.role },
     ipHash: hashIp(context),
+  });
+
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'update_email',
+    targetUserId: targetUid,
+    details: `Email changed to ${newEmail}`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, message: 'Email updated successfully.' };
@@ -4099,6 +4161,19 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     result: 'success',
     metadata: { targetUid, callerRole: caller.role },
     ipHash: hashIp(context),
+  });
+
+  // Log admin activity
+  const maskedPhone = phoneNumber.substring(0, 4) + '****' + phoneNumber.substring(phoneNumber.length - 2);
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'send_recovery_otp',
+    targetUserId: targetUid,
+    details: `OTP sent to ${maskedPhone}`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   // Return OTP to admin for manual delivery (secure internal process)
@@ -4168,6 +4243,18 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
     result: 'success',
     metadata: { targetUid, callerRole: caller.role },
     ipHash: hashIp(context),
+  });
+
+  // Log admin activity
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'verify_recovery_otp',
+    targetUserId: targetUid,
+    details: 'OTP verified successfully',
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, message: 'OTP verified successfully.' };
@@ -4250,6 +4337,109 @@ exports.adminGetStats = functions.https.onCall(async (data, context) => {
       flaggedTransactions,
     },
   };
+});
+
+/**
+ * Admin: Log a login or logout event.
+ * Called by the dashboard when an admin signs in or out.
+ */
+exports.adminLogActivity = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  }
+
+  const uid = context.auth.uid;
+  const { action, metadata } = data;
+
+  if (!action || !['login', 'logout'].includes(action)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid action.');
+  }
+
+  // Get IP address
+  const ip = context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
+  const userAgent = context.rawRequest?.headers?.['user-agent'] || 'unknown';
+
+  // Get admin info
+  let email = 'unknown';
+  let role = 'unknown';
+  try {
+    const userRecord = await admin.auth().getUser(uid);
+    email = userRecord.email || 'unknown';
+    role = userRecord.customClaims?.role || 'unknown';
+  } catch (e) {
+    // Ignore - just log with uid
+  }
+
+  await db.collection('admin_activity').add({
+    uid,
+    email,
+    role,
+    action,
+    ip,
+    userAgent,
+    metadata: metadata || {},
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+/**
+ * Admin: Get activity logs with filtering.
+ * Support can only see their own logs. Admin/super_admin can see all.
+ */
+exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { limit: queryLimit, filterUid, filterAction } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  let query = db.collection('admin_activity').orderBy('timestamp', 'desc');
+
+  // Support can only see their own activity
+  if (caller.role === 'support') {
+    query = query.where('uid', '==', caller.uid);
+  } else if (filterUid) {
+    query = query.where('uid', '==', filterUid);
+  }
+
+  query = query.limit(fetchLimit);
+
+  const snapshot = await query.get();
+  const logs = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || null,
+  }));
+
+  return { success: true, logs };
+});
+
+/**
+ * Admin: Get audit logs (admin and super_admin only).
+ */
+exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { limit: queryLimit, filterUserId, filterOperation } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  let query = db.collection('audit_logs').orderBy('timestamp', 'desc');
+
+  if (filterUserId) {
+    query = query.where('userId', '==', filterUserId);
+  }
+
+  query = query.limit(fetchLimit);
+
+  const snapshot = await query.get();
+  const logs = snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    timestamp: doc.data().timestamp?.toDate?.()?.toISOString() || null,
+  }));
+
+  return { success: true, logs };
 });
 
 // ============================================================

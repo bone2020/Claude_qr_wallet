@@ -9,6 +9,8 @@ import UserSearchPage from './pages/UserSearchPage';
 import UserDetailsPage from './pages/UserDetailsPage';
 import RecoveryPage from './pages/RecoveryPage';
 import AdminManagementPage from './pages/AdminManagementPage';
+import ActivityLogPage from './pages/ActivityLogPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 function App() {
   return (
@@ -16,18 +18,13 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
+          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index element={<DashboardPage />} />
             <Route path="users" element={<UserSearchPage />} />
             <Route path="users/:uid" element={<UserDetailsPage />} />
             <Route path="recovery" element={<RecoveryPage />} />
+            <Route path="activity" element={<ActivityLogPage />} />
+            <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
