@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
       if (firebaseUser) {
         // Get custom claims to check admin role
         const tokenResult = await firebaseUser.getIdTokenResult();
-        const userRole = tokenResult.claims.role;
+        const userRole = tokenResult.claims.adminRole;
 
         if (userRole && ['super_admin', 'admin', 'support'].includes(userRole)) {
           setUser(firebaseUser);
@@ -45,8 +45,8 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const credential = await signInWithEmailAndPassword(auth, email, password);
-    const tokenResult = await credential.user.getIdTokenResult();
-    const userRole = tokenResult.claims.role;
+    const tokenResult = await credential.user.getIdTokenResult(true);
+    const userRole = tokenResult.claims.adminRole;
 
     if (!userRole || !['super_admin', 'admin', 'support'].includes(userRole)) {
       await signOut(auth);

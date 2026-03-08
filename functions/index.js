@@ -3621,7 +3621,7 @@ async function verifyAdmin(context, requiredRole = 'support') {
 
   const uid = context.auth.uid;
   const claims = context.auth.token;
-  const role = claims.role;
+  const role = claims.adminRole;
 
   if (!role) {
     throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
