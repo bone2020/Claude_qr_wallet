@@ -3602,6 +3602,657 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
 });
 
 // ============================================================
+// ADMIN SYSTEM — ROLE-BASED ACCESS CONTROL
+// ============================================================
+
+/**
+ * Verifies that the calling user has admin privileges.
+ * Checks Firebase Auth custom claims for role-based access.
+ *
+ * @param {Object} context - Firebase callable context
+ * @param {string} requiredRole - Minimum role required ('support', 'admin', 'super_admin')
+ * @returns {Object} - { uid, role } of the verified admin
+ * @throws {HttpsError} permission-denied if not authorized
+ */
+async function verifyAdmin(context, requiredRole = 'support') {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  }
+
+  const uid = context.auth.uid;
+  const claims = context.auth.token;
+  const role = claims.role;
+
+  if (!role) {
+    throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
+  }
+
+  const roleHierarchy = { support: 1, admin: 2, super_admin: 3 };
+  const userLevel = roleHierarchy[role] || 0;
+  const requiredLevel = roleHierarchy[requiredRole] || 0;
+
+  if (userLevel < requiredLevel) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      `This action requires ${requiredRole} role. Your role: ${role}`
+    );
+  }
+
+  return { uid, role };
+}
+
+/**
+ * One-time setup to assign super_admin role to the initial admin user.
+ * Hardcoded UID for security — can only be called once.
+ */
+exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
+  const SUPER_ADMIN_UID = 'TBQolEM1nkejIU4W83vqhuhpyLx2';
+
+  if (!context.auth || context.auth.uid !== SUPER_ADMIN_UID) {
+    throw new functions.https.HttpsError('permission-denied', 'Not authorized to setup super admin.');
+  }
+
+  // Check if already set up
+  const userRecord = await admin.auth().getUser(SUPER_ADMIN_UID);
+  if (userRecord.customClaims && userRecord.customClaims.role === 'super_admin') {
+    return { success: true, message: 'Super admin already configured.' };
+  }
+
+  await admin.auth().setCustomUserClaims(SUPER_ADMIN_UID, { role: 'super_admin' });
+
+  // Update Firestore user document
+  await db.collection('users').doc(SUPER_ADMIN_UID).update({
+    role: 'super_admin',
+    roleUpdatedAt: timestamps.serverTimestamp(),
+  });
+
+  await auditLog({
+    userId: SUPER_ADMIN_UID,
+    operation: 'setupSuperAdmin',
+    result: 'success',
+    metadata: { targetUid: SUPER_ADMIN_UID },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'Super admin role assigned successfully.' };
+});
+
+/**
+ * Promote a user to admin or support role.
+ * Only super_admin can promote to admin; admin+ can promote to support.
+ */
+exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
+  const { targetUid, role: newRole } = data;
+
+  if (!targetUid || !newRole) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid and role are required.');
+  }
+
+  if (!['support', 'admin'].includes(newRole)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Role must be "support" or "admin".');
+  }
+
+  // Only super_admin can promote to admin; admin+ can promote to support
+  const requiredRole = newRole === 'admin' ? 'super_admin' : 'admin';
+  const caller = await verifyAdmin(context, requiredRole);
+
+  // Verify target user exists
+  try {
+    await admin.auth().getUser(targetUid);
+  } catch (e) {
+    throw new functions.https.HttpsError('not-found', 'Target user not found.');
+  }
+
+  await admin.auth().setCustomUserClaims(targetUid, { role: newRole });
+
+  await db.collection('users').doc(targetUid).update({
+    role: newRole,
+    roleUpdatedAt: timestamps.serverTimestamp(),
+    roleUpdatedBy: caller.uid,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminPromoteUser',
+    result: 'success',
+    metadata: { targetUid, newRole, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: `User promoted to ${newRole}.` };
+});
+
+/**
+ * Demote a user by removing their admin role.
+ * Only super_admin can demote admins; admin+ can demote support.
+ */
+exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
+  const { targetUid } = data;
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  // Get target's current role
+  const targetUser = await admin.auth().getUser(targetUid);
+  const targetRole = targetUser.customClaims?.role;
+
+  if (!targetRole) {
+    throw new functions.https.HttpsError('not-found', 'User does not have an admin role.');
+  }
+
+  // Only super_admin can demote admins
+  const requiredRole = targetRole === 'admin' ? 'super_admin' : 'admin';
+  const caller = await verifyAdmin(context, requiredRole);
+
+  // Cannot demote super_admin
+  if (targetRole === 'super_admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Cannot demote super_admin.');
+  }
+
+  await admin.auth().setCustomUserClaims(targetUid, {});
+
+  await db.collection('users').doc(targetUid).update({
+    role: admin.firestore.FieldValue.delete(),
+    roleUpdatedAt: timestamps.serverTimestamp(),
+    roleUpdatedBy: caller.uid,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminDemoteUser',
+    result: 'success',
+    metadata: { targetUid, previousRole: targetRole, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: `User demoted from ${targetRole}.` };
+});
+
+/**
+ * Search for users by email, phone, or name.
+ */
+exports.adminSearchUser = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'support');
+
+  const { query, searchType = 'email' } = data;
+
+  if (!query) {
+    throw new functions.https.HttpsError('invalid-argument', 'Search query is required.');
+  }
+
+  let results = [];
+
+  if (searchType === 'email') {
+    try {
+      const userRecord = await admin.auth().getUserByEmail(query);
+      const userDoc = await db.collection('users').doc(userRecord.uid).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        results.push({
+          uid: userRecord.uid,
+          email: userRecord.email,
+          fullName: userData.fullName || '',
+          phoneNumber: userData.phoneNumber || '',
+          kycStatus: userData.kycStatus || 'none',
+          accountBlocked: userData.accountBlocked || false,
+          createdAt: userData.createdAt,
+        });
+      }
+    } catch (e) {
+      // User not found — return empty results
+    }
+  } else if (searchType === 'phone') {
+    const snapshot = await db.collection('users')
+      .where('phoneNumber', '==', query)
+      .limit(10)
+      .get();
+
+    for (const doc of snapshot.docs) {
+      const userData = doc.data();
+      results.push({
+        uid: doc.id,
+        email: userData.email || '',
+        fullName: userData.fullName || '',
+        phoneNumber: userData.phoneNumber || '',
+        kycStatus: userData.kycStatus || 'none',
+        accountBlocked: userData.accountBlocked || false,
+        createdAt: userData.createdAt,
+      });
+    }
+  } else if (searchType === 'name') {
+    const snapshot = await db.collection('users')
+      .where('fullName', '>=', query)
+      .where('fullName', '<=', query + '\uf8ff')
+      .limit(10)
+      .get();
+
+    for (const doc of snapshot.docs) {
+      const userData = doc.data();
+      results.push({
+        uid: doc.id,
+        email: userData.email || '',
+        fullName: userData.fullName || '',
+        phoneNumber: userData.phoneNumber || '',
+        kycStatus: userData.kycStatus || 'none',
+        accountBlocked: userData.accountBlocked || false,
+        createdAt: userData.createdAt,
+      });
+    }
+  }
+
+  return { success: true, results };
+});
+
+/**
+ * Get detailed user information including wallet and recent transactions.
+ */
+exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'support');
+
+  const { targetUid } = data;
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  // Get user document
+  const userDoc = await db.collection('users').doc(targetUid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+  const userData = userDoc.data();
+
+  // Get wallet
+  const walletSnapshot = await db.collection('wallets')
+    .where('userId', '==', targetUid)
+    .limit(1)
+    .get();
+
+  let wallet = null;
+  if (!walletSnapshot.empty) {
+    const walletData = walletSnapshot.docs[0].data();
+    wallet = {
+      id: walletSnapshot.docs[0].id,
+      balance: walletData.balance || 0,
+      currency: walletData.currency || 'GHS',
+    };
+  }
+
+  // Get recent transactions
+  const txSnapshot = await db.collection('users').doc(targetUid)
+    .collection('transactions')
+    .orderBy('createdAt', 'desc')
+    .limit(20)
+    .get();
+
+  const transactions = txSnapshot.docs.map(doc => {
+    const txData = doc.data();
+    return {
+      id: doc.id,
+      type: txData.type || '',
+      amount: txData.amount || 0,
+      currency: txData.currency || '',
+      status: txData.status || '',
+      description: txData.description || '',
+      createdAt: txData.createdAt,
+    };
+  });
+
+  // Get KYC documents
+  const kycSnapshot = await db.collection('users').doc(targetUid)
+    .collection('kyc')
+    .get();
+
+  const kycDocuments = kycSnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
+
+  return {
+    success: true,
+    user: {
+      uid: targetUid,
+      email: userData.email || '',
+      fullName: userData.fullName || '',
+      phoneNumber: userData.phoneNumber || '',
+      kycStatus: userData.kycStatus || 'none',
+      accountBlocked: userData.accountBlocked || false,
+      accountBlockedBy: userData.accountBlockedBy || null,
+      role: userData.role || null,
+      createdAt: userData.createdAt,
+      lastLoginAt: userData.lastLoginAt || null,
+      countryCode: userData.countryCode || '',
+      currencyCode: userData.currencyCode || '',
+      profileImageUrl: userData.profileImageUrl || null,
+      emailVerified: userData.emailVerified || false,
+      phoneVerified: userData.phoneVerified || false,
+    },
+    wallet,
+    transactions,
+    kycDocuments,
+  };
+});
+
+/**
+ * Admin block account — blocks a user's account with admin authority.
+ */
+exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { targetUid, reason } = data;
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  const userDoc = await db.collection('users').doc(targetUid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+
+  await db.collection('users').doc(targetUid).update({
+    accountBlocked: true,
+    accountBlockedBy: 'admin',
+    accountBlockedReason: reason || 'Blocked by admin',
+    accountBlockedAt: timestamps.serverTimestamp(),
+    accountBlockedByUid: caller.uid,
+  });
+
+  await sendPushNotification(targetUid, {
+    title: 'Account Blocked',
+    body: 'Your account has been blocked by an administrator. Please contact support.',
+    type: 'security',
+    data: { action: 'account_blocked_by_admin' },
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminBlockAccount',
+    result: 'success',
+    metadata: { targetUid, reason: reason || 'No reason provided', callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'Account blocked successfully.' };
+});
+
+/**
+ * Admin unblock account — unblocks a user's account.
+ */
+exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { targetUid } = data;
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  const userDoc = await db.collection('users').doc(targetUid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+
+  await db.collection('users').doc(targetUid).update({
+    accountBlocked: false,
+    accountBlockedBy: admin.firestore.FieldValue.delete(),
+    accountBlockedReason: admin.firestore.FieldValue.delete(),
+    accountBlockedAt: admin.firestore.FieldValue.delete(),
+    accountBlockedByUid: admin.firestore.FieldValue.delete(),
+  });
+
+  await sendPushNotification(targetUid, {
+    title: 'Account Unblocked',
+    body: 'Your account has been unblocked. You can now use all features.',
+    type: 'security',
+    data: { action: 'account_unblocked_by_admin' },
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminUnblockAccount',
+    result: 'success',
+    metadata: { targetUid, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'Account unblocked successfully.' };
+});
+
+/**
+ * Admin update user email.
+ */
+exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { targetUid, newEmail } = data;
+  if (!targetUid || !newEmail) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid and newEmail are required.');
+  }
+
+  // Update in Firebase Auth
+  await admin.auth().updateUser(targetUid, { email: newEmail });
+
+  // Update in Firestore
+  await db.collection('users').doc(targetUid).update({
+    email: newEmail,
+    emailUpdatedAt: timestamps.serverTimestamp(),
+    emailUpdatedBy: caller.uid,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminUpdateUserEmail',
+    result: 'success',
+    metadata: { targetUid, newEmail, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'Email updated successfully.' };
+});
+
+/**
+ * Admin send recovery OTP to a user's phone number.
+ */
+exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { targetUid } = data;
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  const userDoc = await db.collection('users').doc(targetUid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+
+  const userData = userDoc.data();
+  const phoneNumber = userData.phoneNumber;
+  if (!phoneNumber) {
+    throw new functions.https.HttpsError('failed-precondition', 'User has no phone number on file.');
+  }
+
+  // Generate 6-digit OTP
+  const otp = crypto.randomInt(100000, 999999).toString();
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  // Store OTP in Firestore
+  await db.collection('recovery_otps').doc(targetUid).set({
+    otpHash,
+    expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+    createdAt: timestamps.serverTimestamp(),
+    createdBy: caller.uid,
+    attempts: 0,
+    verified: false,
+  });
+
+  // In production, send SMS via provider. For now, log it securely.
+  logStructured(LOG_LEVELS.INFO, 'Recovery OTP generated', {
+    targetUid,
+    phoneNumber: phoneNumber.substring(0, 4) + '****',
+    callerUid: caller.uid,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminSendRecoveryOTP',
+    result: 'success',
+    metadata: { targetUid, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  // Return OTP to admin for manual delivery (secure internal process)
+  return {
+    success: true,
+    message: 'Recovery OTP generated.',
+    otp,
+    phoneNumber: phoneNumber.substring(0, 4) + '****' + phoneNumber.substring(phoneNumber.length - 2),
+    expiresInMinutes: 10,
+  };
+});
+
+/**
+ * Admin verify recovery OTP.
+ */
+exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { targetUid, otp } = data;
+  if (!targetUid || !otp) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid and otp are required.');
+  }
+
+  const otpDoc = await db.collection('recovery_otps').doc(targetUid).get();
+  if (!otpDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'No OTP found for this user. Please generate a new one.');
+  }
+
+  const otpData = otpDoc.data();
+
+  // Check expiry
+  if (otpData.expiresAt.toDate() < new Date()) {
+    await db.collection('recovery_otps').doc(targetUid).delete();
+    throw new functions.https.HttpsError('deadline-exceeded', 'OTP has expired. Please generate a new one.');
+  }
+
+  // Check attempts
+  if (otpData.attempts >= 3) {
+    await db.collection('recovery_otps').doc(targetUid).delete();
+    throw new functions.https.HttpsError('resource-exhausted', 'Too many attempts. Please generate a new OTP.');
+  }
+
+  // Verify OTP
+  const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
+
+  // Timing-safe comparison
+  const expected = Buffer.from(otpData.otpHash, 'hex');
+  const received = Buffer.from(otpHash, 'hex');
+
+  if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+    await db.collection('recovery_otps').doc(targetUid).update({
+      attempts: admin.firestore.FieldValue.increment(1),
+    });
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid OTP.');
+  }
+
+  // Mark as verified
+  await db.collection('recovery_otps').doc(targetUid).update({
+    verified: true,
+    verifiedAt: timestamps.serverTimestamp(),
+    verifiedBy: caller.uid,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminVerifyRecoveryOTP',
+    result: 'success',
+    metadata: { targetUid, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'OTP verified successfully.' };
+});
+
+/**
+ * List all admin/support users.
+ */
+exports.adminListAdmins = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'admin');
+
+  const snapshot = await db.collection('users')
+    .where('role', 'in', ['super_admin', 'admin', 'support'])
+    .get();
+
+  const admins = snapshot.docs.map(doc => {
+    const userData = doc.data();
+    return {
+      uid: doc.id,
+      email: userData.email || '',
+      fullName: userData.fullName || '',
+      role: userData.role || '',
+      roleUpdatedAt: userData.roleUpdatedAt || null,
+    };
+  });
+
+  return { success: true, admins };
+});
+
+/**
+ * Get platform stats for admin dashboard.
+ */
+exports.adminGetStats = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'support');
+
+  // Total users
+  const usersSnapshot = await db.collection('users').count().get();
+  const totalUsers = usersSnapshot.data().count;
+
+  // Total wallets
+  const walletsSnapshot = await db.collection('wallets').count().get();
+  const totalWallets = walletsSnapshot.data().count;
+
+  // Blocked accounts
+  const blockedSnapshot = await db.collection('users')
+    .where('accountBlocked', '==', true)
+    .count()
+    .get();
+  const blockedAccounts = blockedSnapshot.data().count;
+
+  // KYC completed
+  const kycSnapshot = await db.collection('users')
+    .where('kycStatus', '==', 'completed')
+    .count()
+    .get();
+  const kycCompleted = kycSnapshot.data().count;
+
+  // Recent transactions (last 24 hours)
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentTxSnapshot = await db.collection('transactions')
+    .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneDayAgo))
+    .count()
+    .get();
+  const recentTransactions = recentTxSnapshot.data().count;
+
+  // Flagged transactions
+  const flaggedSnapshot = await db.collection('flagged_transactions')
+    .count()
+    .get();
+  const flaggedTransactions = flaggedSnapshot.data().count;
+
+  return {
+    success: true,
+    stats: {
+      totalUsers,
+      totalWallets,
+      blockedAccounts,
+      kycCompleted,
+      recentTransactions,
+      flaggedTransactions,
+    },
+  };
+});
+
+// ============================================================
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
