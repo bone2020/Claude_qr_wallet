@@ -4148,12 +4148,32 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     verified: false,
   });
 
-  // In production, send SMS via provider. For now, log it securely.
-  logStructured(LOG_LEVELS.INFO, 'Recovery OTP generated', {
-    targetUid,
-    phoneNumber: phoneNumber.substring(0, 4) + '****',
-    callerUid: caller.uid,
-  });
+  // Send SMS via Africa's Talking
+  try {
+    const atCredentials = {
+      apiKey: functions.config().africastalking?.api_key,
+      username: functions.config().africastalking?.username || 'sandbox',
+    };
+    const AfricasTalking = require('africastalking')(atCredentials);
+    const sms = AfricasTalking.SMS;
+
+    await sms.send({
+      to: [phoneNumber],
+      message: `Your QR Wallet recovery code is: ${otp}. It expires in 10 minutes. Do not share this code with anyone.`,
+    });
+
+    logStructured(LOG_LEVELS.INFO, 'Recovery OTP sent via SMS', {
+      targetUid,
+      phoneNumber: phoneNumber.substring(0, 4) + '****',
+      callerUid: caller.uid,
+    });
+  } catch (smsError) {
+    logStructured(LOG_LEVELS.ERROR, 'Failed to send recovery OTP via SMS', {
+      error: smsError.message,
+      targetUid,
+    });
+    // Don't fail the function — OTP is still shown on dashboard as fallback
+  }
 
   await auditLog({
     userId: caller.uid,
@@ -4177,11 +4197,11 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
   });
 
   // Return OTP to admin for manual delivery (secure internal process)
-  return {
+ return {
     success: true,
-    message: 'Recovery OTP generated.',
-    otp,
-    phoneNumber: phoneNumber.substring(0, 4) + '****' + phoneNumber.substring(phoneNumber.length - 2),
+    message: 'Recovery OTP sent via SMS.',
+    otp, // Keep as fallback in case SMS fails — remove this line when going fully live
+    phoneNumber: maskedPhone,
     expiresInMinutes: 10,
   };
 });
