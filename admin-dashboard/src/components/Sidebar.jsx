@@ -35,6 +35,7 @@ function Sidebar() {
         {isAdmin && (
           <>
             <NavLink to="/revenue" className={linkClass}>Revenue</NavLink>
+            <NavLink to="/reports" className={linkClass}>Reports</NavLink>
             <NavLink to="/audit" className={linkClass}>Audit Logs</NavLink>
             <NavLink to="/admins" className={linkClass}>Admin Management</NavLink>
           </>

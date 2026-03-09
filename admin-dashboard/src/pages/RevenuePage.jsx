@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToCSV } from '../utils/csvExport';
 
 const currencySymbols = {
   NGN: '\u20A6', GHS: 'GH\u20B5', KES: 'KSh', ZAR: 'R', UGX: 'USh',
@@ -80,6 +81,31 @@ function RevenuePage() {
     }
   };
 
+  const handleExportFees = () => {
+    exportToCSV(fees, 'fee_history', [
+      { key: 'createdAt', label: 'Date' },
+      { key: 'transactionId', label: 'Transaction ID' },
+      { key: 'originalAmount', label: 'Fee Amount' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'usdAmount', label: 'USD Equivalent' },
+      { key: 'senderName', label: 'Sender' },
+      { key: 'transferAmount', label: 'Transfer Amount' },
+    ]);
+  };
+
+  const handleExportWithdrawals = () => {
+    exportToCSV(withdrawals, 'platform_withdrawals', [
+      { key: 'createdAt', label: 'Date' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'usdEquivalent', label: 'USD Equivalent' },
+      { key: 'purpose', label: 'Purpose' },
+      { key: 'withdrawnByEmail', label: 'Withdrawn By' },
+      { key: 'status', label: 'Status' },
+      { key: 'notes', label: 'Notes' },
+    ]);
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString();
@@ -102,12 +128,21 @@ function RevenuePage() {
           <h2 className="text-2xl font-bold text-gray-900">Revenue</h2>
           <p className="text-gray-500 text-sm mt-1">Platform fee collection and withdrawals</p>
         </div>
-        <button
-          onClick={loadData}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          {activeTab === 'fees' && (
+            <button onClick={handleExportFees} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors">
+              Export Fees CSV
+            </button>
+          )}
+          {activeTab === 'withdrawals' && (
+            <button onClick={handleExportWithdrawals} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors">
+              Export Withdrawals CSV
+            </button>
+          )}
+          <button onClick={loadData} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg mb-6">{error}</div>}

@@ -4360,6 +4360,58 @@ exports.adminGetStats = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Admin: Export all users for CSV download.
+ */
+exports.adminExportUsers = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  try {
+    const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(5000).get();
+    const walletsSnapshot = await db.collection('wallets').get();
+
+    // Build wallet lookup
+    const walletMap = {};
+    walletsSnapshot.docs.forEach(doc => {
+      if (doc.id !== 'platform') {
+        walletMap[doc.id] = doc.data();
+      }
+    });
+
+    const users = usersSnapshot.docs.map(doc => {
+      const u = doc.data();
+      const w = walletMap[doc.id] || {};
+      return {
+        uid: doc.id,
+        fullName: u.fullName || '',
+        email: u.email || '',
+        phoneNumber: u.phoneNumber || '',
+        country: u.country || '',
+        currency: u.currency || '',
+        walletId: w.walletId || '',
+        balance: w.balance || 0,
+        kycStatus: u.kycStatus || 'not_started',
+        kycCompleted: u.kycCompleted || false,
+        accountBlocked: u.accountBlocked || false,
+        createdAt: u.createdAt || '',
+      };
+    });
+
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminExportUsers',
+      result: 'success',
+      metadata: { count: users.length },
+      ipHash: hashIp(context),
+    });
+
+    return { success: true, users };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Export failed: ${error.message}`);
+  }
+});
+
+/**
  * Admin: Log a login or logout event.
  * Called by the dashboard when an admin signs in or out.
  */

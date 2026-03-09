@@ -13,6 +13,7 @@ import ActivityLogPage from './pages/ActivityLogPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RevenuePage from './pages/RevenuePage';
 import TransactionsPage from './pages/TransactionsPage';
+import ReportsPage from './pages/ReportsPage';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
             <Route path="transactions" element={<TransactionsPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
             <Route path="revenue" element={<RevenuePage />} />
+            <Route path="reports" element={<ReportsPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
           </Route>

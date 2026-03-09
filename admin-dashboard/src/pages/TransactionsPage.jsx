@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToCSV } from '../utils/csvExport';
 
 const typeColors = {
   send: 'bg-red-100 text-red-700',
@@ -113,6 +114,22 @@ function TransactionsPage() {
     }
   };
 
+  const handleExportTransactions = () => {
+    exportToCSV(transactions, 'transactions', [
+      { key: 'createdAt', label: 'Date' },
+      { key: 'type', label: 'Type' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'fee', label: 'Fee' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'senderName', label: 'Sender' },
+      { key: 'receiverName', label: 'Receiver' },
+      { key: 'method', label: 'Method' },
+      { key: 'status', label: 'Status' },
+      { key: 'userId', label: 'User ID' },
+      { key: 'id', label: 'Transaction ID' },
+    ]);
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleString();
@@ -135,12 +152,20 @@ function TransactionsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Transaction Monitoring</h2>
           <p className="text-gray-500 text-sm mt-1">View and monitor all platform transactions</p>
         </div>
-        <button
-          onClick={loadData}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportTransactions}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg mb-6">{error}</div>}

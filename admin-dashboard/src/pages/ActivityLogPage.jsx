@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { exportToCSV } from '../utils/csvExport';
 
 const actionLabels = {
   login: { label: 'Login', color: 'bg-blue-100 text-blue-700' },
@@ -42,6 +43,19 @@ function ActivityLogPage() {
   const filteredLogs = filterAction === 'all'
     ? logs
     : logs.filter(log => log.action === filterAction);
+
+  const handleExportActivity = () => {
+    exportToCSV(filteredLogs, 'activity_logs', [
+      { key: 'timestamp', label: 'Date' },
+      { key: 'email', label: 'Staff Email' },
+      { key: 'role', label: 'Role' },
+      { key: 'action', label: 'Action' },
+      { key: 'details', label: 'Details' },
+      { key: 'targetUserId', label: 'Target User' },
+      { key: 'targetInfo', label: 'Target Info' },
+      { key: 'ip', label: 'IP Address' },
+    ]);
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -89,6 +103,12 @@ function ActivityLogPage() {
             <option value="promote_user">Promote Staff</option>
             <option value="demote_user">Demote Staff</option>
           </select>
+          <button
+            onClick={handleExportActivity}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Export CSV
+          </button>
           <button
             onClick={loadLogs}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"

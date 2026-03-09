@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
+import { exportToCSV } from '../utils/csvExport';
 
 function AuditLogPage() {
   const [logs, setLogs] = useState([]);
@@ -22,6 +23,19 @@ function AuditLogPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportAudit = () => {
+    exportToCSV(logs, 'audit_logs', [
+      { key: 'timestamp', label: 'Date' },
+      { key: 'operation', label: 'Operation' },
+      { key: 'result', label: 'Result' },
+      { key: 'userId', label: 'User ID' },
+      { key: 'amount', label: 'Amount' },
+      { key: 'currency', label: 'Currency' },
+      { key: 'error', label: 'Error' },
+      { key: 'metadata', label: 'Metadata' },
+    ]);
   };
 
   const formatDate = (dateStr) => {
@@ -49,12 +63,20 @@ function AuditLogPage() {
           <h2 className="text-2xl font-bold text-gray-900">Audit Logs</h2>
           <p className="text-gray-500 text-sm mt-1">System-wide operation logs</p>
         </div>
-        <button
-          onClick={loadLogs}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportAudit}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={loadLogs}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
