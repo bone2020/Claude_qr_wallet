@@ -4762,6 +4762,242 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
 });
 
 // ============================================================
+// ADMIN BANK TRANSFERS
+// ============================================================
+
+/**
+ * Admin: Get list of banks for a country (reuses Paystack API).
+ */
+exports.adminGetBanks = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'admin');
+
+  const country = data.country || 'nigeria';
+
+  try {
+    const response = await paystackRequest('GET', `/bank?country=${country}`);
+    if (!response.status) {
+      throw new functions.https.HttpsError('internal', 'Failed to fetch banks.');
+    }
+
+    return {
+      success: true,
+      banks: response.data.map(bank => ({
+        name: bank.name,
+        code: bank.code,
+        type: bank.type,
+        currency: bank.currency,
+      })),
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get banks: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Verify a bank account via Paystack.
+ */
+exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'admin');
+
+  const { accountNumber, bankCode } = data;
+  if (!accountNumber || !bankCode) {
+    throw new functions.https.HttpsError('invalid-argument', 'Account number and bank code are required.');
+  }
+
+  try {
+    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
+    if (!response.status) {
+      return { success: false, error: 'Could not verify account.' };
+    }
+
+    return {
+      success: true,
+      accountName: response.data.account_name,
+      accountNumber: response.data.account_number,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Verification failed: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Initiate a real bank transfer from platform wallet via Paystack.
+ * Only super_admin can initiate transfers.
+ */
+exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes } = data;
+
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
+  }
+  if (!currency) {
+    throw new functions.https.HttpsError('invalid-argument', 'Currency is required.');
+  }
+  if (!bankCode || !accountNumber || !accountName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Bank details are required.');
+  }
+  if (!purpose) {
+    throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
+  }
+
+  try {
+    // Verify sufficient platform balance
+    const balanceDoc = await db.collection('wallets').doc('platform')
+      .collection('balances').doc(currency).get();
+
+    if (!balanceDoc.exists) {
+      throw new functions.https.HttpsError('failed-precondition', `No balance found for ${currency}.`);
+    }
+
+    const currentBalance = balanceDoc.data().amount || 0;
+    if (currentBalance < amount) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+    }
+
+    // Get exchange rate for USD equivalent
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+    const exchangeRate = rates[currency] || 1;
+    const amountInUSD = amount / exchangeRate;
+
+    // Get caller email before transaction
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    // Step 1: Create transfer recipient on Paystack
+    const recipientResponse = await paystackRequest('POST', '/transferrecipient', {
+      type: 'nuban',
+      name: accountName,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: currency,
+    });
+
+    if (!recipientResponse.status) {
+      throw new functions.https.HttpsError('internal', 'Failed to create transfer recipient on Paystack.');
+    }
+
+    const recipientCode = recipientResponse.data.recipient_code;
+
+    // Step 2: Initiate transfer on Paystack (amount in kobo/pesewas)
+    const amountInSmallestUnit = Math.round(amount * 100);
+    const reference = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    const transferResponse = await paystackRequest('POST', '/transfer', {
+      source: 'balance',
+      amount: amountInSmallestUnit,
+      recipient: recipientCode,
+      reason: `Platform withdrawal: ${purpose}`,
+      reference: reference,
+    });
+
+    if (!transferResponse.status) {
+      throw new functions.https.HttpsError('internal', 'Failed to initiate transfer on Paystack.');
+    }
+
+    const transferCode = transferResponse.data.transfer_code;
+    const transferStatus = transferResponse.data.status;
+
+    // Step 3: Deduct from platform wallet
+    const withdrawalRef = db.collection('wallets').doc('platform')
+      .collection('withdrawals').doc(reference);
+
+    await db.runTransaction(async (transaction) => {
+      const freshBalance = await transaction.get(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency)
+      );
+      const freshAmount = freshBalance.data()?.amount || 0;
+
+      if (freshAmount < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
+      }
+
+      // Deduct from currency balance
+      transaction.update(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency),
+        {
+          amount: admin.firestore.FieldValue.increment(-amount),
+          usdEquivalent: admin.firestore.FieldValue.increment(-amountInUSD),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      );
+
+      // Deduct from total USD balance
+      transaction.update(db.collection('wallets').doc('platform'), {
+        totalBalanceUSD: admin.firestore.FieldValue.increment(-amountInUSD),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Record withdrawal
+      transaction.set(withdrawalRef, {
+        id: reference,
+        type: 'bank_transfer',
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        exchangeRate,
+        purpose,
+        notes: notes || null,
+        bankCode,
+        accountNumber,
+        accountName,
+        recipientCode,
+        transferCode,
+        paystackReference: reference,
+        paystackStatus: transferStatus,
+        status: transferStatus === 'success' ? 'completed' : 'pending',
+        withdrawnBy: caller.uid,
+        withdrawnByEmail: callerEmail,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Audit log
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminInitiateTransfer',
+      result: 'success',
+      amount,
+      currency,
+      metadata: { reference, purpose, bankCode, accountNumber, accountName, transferStatus },
+      ipHash: hashIp(context),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'bank_transfer',
+      details: `Transferred ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      transfer: {
+        reference,
+        transferCode,
+        status: transferStatus,
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        accountName,
+        purpose,
+      },
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Transfer failed: ${error.message}`);
+  }
+});
+
+// ============================================================
 // TRANSACTION MONITORING
 // ============================================================
 

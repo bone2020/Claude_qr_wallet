@@ -20,12 +20,19 @@ function RevenuePage() {
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Withdrawal form
+  // Bank transfer form
   const [wdAmount, setWdAmount] = useState('');
   const [wdCurrency, setWdCurrency] = useState('');
   const [wdPurpose, setWdPurpose] = useState('');
   const [wdNotes, setWdNotes] = useState('');
   const [wdLoading, setWdLoading] = useState(false);
+  const [banks, setBanks] = useState([]);
+  const [bankCode, setBankCode] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [verified, setVerified] = useState(false);
+  const [bankCountry, setBankCountry] = useState('nigeria');
 
   useEffect(() => {
     loadData();
@@ -53,29 +60,72 @@ function RevenuePage() {
     }
   };
 
-  const handleWithdraw = async (e) => {
+  const loadBanks = async (country) => {
+    try {
+      const result = await httpsCallable(functions, 'adminGetBanks')({ country });
+      setBanks(result.data.banks || []);
+      setBankCode('');
+      setAccountNumber('');
+      setAccountName('');
+      setVerified(false);
+    } catch (err) {
+      setError(err.message || 'Failed to load banks.');
+    }
+  };
+
+  const verifyAccount = async () => {
+    if (!accountNumber || !bankCode) return;
+
+    setVerifying(true);
+    setAccountName('');
+    setVerified(false);
+    setError('');
+
+    try {
+      const result = await httpsCallable(functions, 'adminVerifyBankAccount')({
+        accountNumber,
+        bankCode,
+      });
+      setAccountName(result.data.accountName);
+      setVerified(true);
+    } catch (err) {
+      setError(err.message || 'Account verification failed.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleBankTransfer = async (e) => {
     e.preventDefault();
-    if (!wdAmount || !wdCurrency || !wdPurpose) return;
+    if (!wdAmount || !wdCurrency || !wdPurpose || !bankCode || !accountNumber || !verified) return;
 
     setWdLoading(true);
     setError('');
     setMessage('');
 
     try {
-      const result = await httpsCallable(functions, 'adminPlatformWithdraw')({
+      const result = await httpsCallable(functions, 'adminInitiateTransfer')({
         amount: parseFloat(wdAmount),
         currency: wdCurrency,
+        bankCode,
+        accountNumber,
+        accountName,
         purpose: wdPurpose,
         notes: wdNotes || null,
       });
 
-      setMessage(`Withdrawal recorded: ${wdCurrency} ${parseFloat(wdAmount).toFixed(2)} ($${result.data.withdrawal.usdEquivalent.toFixed(2)} USD)`);
+      setMessage(`Transfer initiated: ${wdCurrency} ${parseFloat(wdAmount).toFixed(2)} to ${accountName}. Reference: ${result.data.transfer.reference}`);
       setWdAmount('');
+      setWdCurrency('');
       setWdPurpose('');
       setWdNotes('');
+      setBankCode('');
+      setAccountNumber('');
+      setAccountName('');
+      setVerified(false);
       await loadData();
     } catch (err) {
-      setError(err.message || 'Withdrawal failed.');
+      setError(err.message || 'Transfer failed.');
     } finally {
       setWdLoading(false);
     }
@@ -166,7 +216,7 @@ function RevenuePage() {
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
-        {['overview', 'fees', 'withdrawals', ...(isSuper ? ['withdraw'] : [])].map((tab) => (
+        {['overview', 'fees', 'withdrawals', ...(isSuper ? ['transfer'] : [])].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -285,15 +335,15 @@ function RevenuePage() {
         </div>
       )}
 
-      {/* Withdraw Tab (super_admin only) */}
-      {activeTab === 'withdraw' && isSuper && (
+      {/* Bank Transfer Tab (super_admin only) */}
+      {activeTab === 'transfer' && isSuper && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-w-xl">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Record Withdrawal</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Bank Transfer</h3>
           <p className="text-sm text-gray-500 mb-6">
-            Record a manual withdrawal from the platform wallet. The actual bank transfer is done separately.
+            Initiate a bank transfer from the platform wallet via Paystack.
           </p>
 
-          <form onSubmit={handleWithdraw} className="space-y-4">
+          <form onSubmit={handleBankTransfer} className="space-y-4">
             <div>
               <label className="text-sm text-gray-600 block mb-1">Currency</label>
               <select
@@ -310,6 +360,88 @@ function RevenuePage() {
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="text-sm text-gray-600 block mb-1">Country (for bank list)</label>
+              <select
+                value={bankCountry}
+                onChange={(e) => {
+                  setBankCountry(e.target.value);
+                  loadBanks(e.target.value);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="nigeria">Nigeria</option>
+                <option value="ghana">Ghana</option>
+                <option value="south-africa">South Africa</option>
+                <option value="kenya">Kenya</option>
+              </select>
+              {banks.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => loadBanks(bankCountry)}
+                  className="mt-2 text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  Load banks
+                </button>
+              )}
+            </div>
+
+            {banks.length > 0 && (
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Bank</label>
+                <select
+                  value={bankCode}
+                  onChange={(e) => {
+                    setBankCode(e.target.value);
+                    setVerified(false);
+                    setAccountName('');
+                  }}
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">Select bank</option>
+                  {banks.map((bank) => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {bankCode && (
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Account Number</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => {
+                      setAccountNumber(e.target.value);
+                      setVerified(false);
+                      setAccountName('');
+                    }}
+                    required
+                    placeholder="0123456789"
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyAccount}
+                    disabled={verifying || accountNumber.length < 10}
+                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+                  >
+                    {verifying ? 'Verifying...' : 'Verify'}
+                  </button>
+                </div>
+                {verified && accountName && (
+                  <p className="mt-2 text-sm text-green-600 font-medium">
+                    ✓ {accountName}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="text-sm text-gray-600 block mb-1">Amount</label>
@@ -358,11 +490,15 @@ function RevenuePage() {
 
             <button
               type="submit"
-              disabled={wdLoading}
+              disabled={wdLoading || !verified}
               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-3 font-medium transition-colors disabled:opacity-50"
             >
-              {wdLoading ? 'Processing...' : 'Record Withdrawal'}
+              {wdLoading ? 'Processing Transfer...' : 'Initiate Bank Transfer'}
             </button>
+
+            {!verified && bankCode && accountNumber && (
+              <p className="text-xs text-amber-600 text-center">Please verify the bank account before initiating the transfer.</p>
+            )}
           </form>
         </div>
       )}
