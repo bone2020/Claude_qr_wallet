@@ -14,6 +14,7 @@ import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
+import '../../../../providers/wallet_provider.dart'; 
 
 class VotersCardVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
@@ -127,7 +128,11 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
         if (result.user != null) {
           ref.read(authNotifierProvider.notifier).updateUser(result.user!);
         }
+      
+        // Refresh wallet and currency after verification
+        await ref.read(walletNotifierProvider.notifier).refreshWallet();
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+        if (!mounted) return;
         context.go(AppRoutes.main);
       } else {
         _showError(result.error ?? 'Failed to complete verification');
