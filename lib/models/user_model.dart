@@ -21,7 +21,7 @@ class UserModel {
   final String? profilePhotoUrl;
 
   @HiveField(5)
-  final String walletId;
+  final String? walletId;
 
   @HiveField(6)
   final bool isVerified;
@@ -59,7 +59,7 @@ class UserModel {
     required this.email,
     required this.phoneNumber,
     this.profilePhotoUrl,
-    required this.walletId,
+    this.walletId,
     this.isVerified = false,
     this.kycCompleted = false,
     required this.createdAt,
@@ -80,7 +80,7 @@ class UserModel {
       email: json['email'] as String,
       phoneNumber: json['phoneNumber'] as String,
       profilePhotoUrl: json['profilePhotoUrl'] as String?,
-      walletId: json['walletId'] as String,
+      walletId: json['walletId'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
       kycCompleted: json['kycCompleted'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),

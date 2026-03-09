@@ -44,6 +44,8 @@ class SmileIDService {
     ],
     'UG': [
       {'value': 'UGANDA_NIN', 'label': 'National ID (NIN)', 'requiresNumber': true, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': true, 'smileIdType': 'PASSPORT'},
+      {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': true, 'smileIdType': 'DRIVERS_LICENSE'},
     ],
     'ZM': [
       {'value': 'TPIN', 'label': 'Taxpayer PIN (TPIN)', 'requiresNumber': true, 'smileIdType': 'TPIN'},

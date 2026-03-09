@@ -2708,12 +2708,113 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
     kycVerified: true,
   });
 
+  // Create wallet if it doesn't exist yet
+  const walletDoc = await db.collection('wallets').doc(userId).get();
+  if (!walletDoc.exists) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+
+    await db.collection('wallets').doc(userId).set({
+      userId: userId,
+      walletId: walletId,
+      currency: userData.currency || 'GHS',
+      balance: 0,
+      isActive: true,
+      dailySpent: 0,
+      monthlySpent: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await userRef.update({
+      walletId: walletId,
+      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    logInfo('Wallet created during KYC completion', { userId, walletId });
+  }
+
   logInfo('KYC verification completed successfully', { userId });
 
   return {
     success: true,
     kycStatus: 'verified',
   };
+});
+
+/**
+ * Create wallet for a user after verification is complete.
+ * Idempotent — if wallet already exists, returns existing walletId.
+ * Called automatically after KYC or phone verification.
+ */
+exports.createWalletForUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+
+  try {
+    // Check if wallet already exists
+    const walletDoc = await db.collection('wallets').doc(userId).get();
+    if (walletDoc.exists) {
+      const existingWalletId = walletDoc.data().walletId;
+      logInfo('Wallet already exists for user', { userId, walletId: existingWalletId });
+      return { success: true, walletId: existingWalletId, message: 'Wallet already exists.' };
+    }
+
+    // Get user document for currency
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throwAppError(ERROR_CODES.USER_NOT_FOUND, 'User document not found.');
+    }
+
+    const userData = userDoc.data();
+
+    // Generate unique wallet ID
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+
+    // Create wallet document
+    const walletData = {
+      userId: userId,
+      walletId: walletId,
+      currency: userData.currency || 'GHS',
+      balance: 0,
+      isActive: true,
+      dailySpent: 0,
+      monthlySpent: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.runTransaction(async (transaction) => {
+      // Double-check wallet doesn't exist (race condition protection)
+      const freshWalletDoc = await transaction.get(db.collection('wallets').doc(userId));
+      if (freshWalletDoc.exists) {
+        return; // Already created by another call
+      }
+
+      // Create wallet
+      transaction.set(db.collection('wallets').doc(userId), walletData);
+
+      // Update user document with walletId
+      transaction.update(db.collection('users').doc(userId), {
+        walletId: walletId,
+        walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    logInfo('Wallet created for user', { userId, walletId });
+
+    return { success: true, walletId: walletId };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('Failed to create wallet', { userId, error: error.message });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Failed to create wallet. Please try again.');
+  }
 });
 
 /**
@@ -2764,6 +2865,36 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     kycCompleted: true,
     kycVerified: true,
   });
+
+  // Create wallet if it doesn't exist yet
+  const walletDoc = await db.collection('wallets').doc(userId).get();
+  if (!walletDoc.exists) {
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userData = userDoc.exists ? userDoc.data() : {};
+
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+
+    await db.collection('wallets').doc(userId).set({
+      userId: userId,
+      walletId: walletId,
+      currency: userData.currency || 'GHS',
+      balance: 0,
+      isActive: true,
+      dailySpent: 0,
+      monthlySpent: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection('users').doc(userId).update({
+      walletId: walletId,
+      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    logInfo('Wallet created during markUserAlreadyEnrolled', { userId, walletId });
+  }
 
   logInfo('User marked as KYC verified (SmileID already enrolled)', { userId });
 

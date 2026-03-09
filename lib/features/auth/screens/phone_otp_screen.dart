@@ -6,7 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pinput/pinput.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -189,10 +192,18 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(firebaseUser.uid)
-                .update({'phoneVerified': true});
+                .update({
+                  'phoneVerified': true,
+                  'kycCompleted': true,
+                  'kycStatus': 'verified',
+                });
+
+            // Create wallet for non-Smile-ID country user
+            final createWallet = FirebaseFunctions.instance.httpsCallable('createWalletForUser');
+            await createWallet.call();
           }
         } catch (e) {
-          debugPrint('Failed to update phoneVerified: $e');
+          debugPrint('Failed to complete phone verification: $e');
         }
 
         if (!mounted) return;
@@ -203,7 +214,9 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
             backgroundColor: AppColors.success,
           ),
         );
+
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+
         context.go(AppRoutes.main);
       } else {
         setState(() {

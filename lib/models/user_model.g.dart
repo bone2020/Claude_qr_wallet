@@ -22,7 +22,7 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
       email: fields[2] as String,
       phoneNumber: fields[3] as String,
       profilePhotoUrl: fields[4] as String?,
-      walletId: fields[5] as String,
+      walletId: fields[5] as String?,
       isVerified: fields[6] as bool,
       kycCompleted: fields[7] as bool,
       createdAt: fields[8] as DateTime,

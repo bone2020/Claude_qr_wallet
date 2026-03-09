@@ -55,16 +55,12 @@ class AuthService {
       // Update display name
       await user.updateDisplayName(fullName);
 
-      // Generate unique wallet ID
-      final walletId = _generateUniqueWalletId();
-
-      // Create user document in Firestore
+      // Create user document in Firestore (NO wallet yet — created after verification)
       final userModel = UserModel(
         id: user.uid,
         fullName: fullName,
         email: email,
         phoneNumber: phoneNumber,
-        walletId: walletId,
         country: countryCode ?? 'GH',
         currency: currencyCode ?? 'GHS',
         createdAt: DateTime.now(),
@@ -72,17 +68,8 @@ class AuthService {
 
       await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
 
-      // Create wallet document with user's currency
-      final walletModel = WalletModel(
-        id: user.uid,
-        walletId: walletId,
-        userId: user.uid,
-        currency: currencyCode ?? 'GHS',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+      // Wallet is NOT created here — it will be created by the Cloud Function
+      // after KYC verification (Smile countries) or phone verification (non-Smile countries)
 
       return AuthResult.success(userModel);
     } on FirebaseAuthException catch (e) {
@@ -163,30 +150,20 @@ class AuthService {
         final userModel = UserModel.fromJson(userDoc.data()!);
         return AuthResult.success(userModel);
       } else {
-        // New user - create documents
-        final walletId = _generateUniqueWalletId();
-
+        // New user - create document (NO wallet yet — created after verification)
         final userModel = UserModel(
           id: user.uid,
           fullName: user.displayName ?? 'User',
           email: user.email ?? '',
           phoneNumber: user.phoneNumber ?? '',
           profilePhotoUrl: user.photoURL,
-          walletId: walletId,
           createdAt: DateTime.now(),
         );
 
         await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
 
-        final walletModel = WalletModel(
-          id: user.uid,
-          walletId: walletId,
-          userId: user.uid,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-
-        await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+        // Wallet is NOT created here — it will be created by the Cloud Function
+        // after KYC verification (Smile countries) or phone verification (non-Smile countries)
 
         return AuthResult.success(userModel, isNewUser: true);
       }
@@ -253,9 +230,7 @@ class AuthService {
         final userModel = UserModel.fromJson(userDoc.data()!);
         return AuthResult.success(userModel);
       } else {
-        // New user - create documents
-        final walletId = _generateUniqueWalletId();
-
+        // New user - create document (NO wallet yet — created after verification)
         // Apple may not return name on subsequent sign-ins, so we use what we have
         final fullName = appleCredential.givenName != null && appleCredential.familyName != null
             ? '${appleCredential.givenName} ${appleCredential.familyName}'
@@ -266,21 +241,13 @@ class AuthService {
           fullName: fullName,
           email: user.email ?? appleCredential.email ?? '',
           phoneNumber: user.phoneNumber ?? '',
-          walletId: walletId,
           createdAt: DateTime.now(),
         );
 
         await _firestore.collection('users').doc(user.uid).set(userModel.toJson());
 
-        final walletModel = WalletModel(
-          id: user.uid,
-          walletId: walletId,
-          userId: user.uid,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-
-        await _firestore.collection('wallets').doc(user.uid).set(walletModel.toJson());
+        // Wallet is NOT created here — it will be created by the Cloud Function
+        // after KYC verification (Smile countries) or phone verification (non-Smile countries)
 
         return AuthResult.success(userModel, isNewUser: true);
       }
