@@ -14,6 +14,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import RevenuePage from './pages/RevenuePage';
 import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
+import FraudAlertsPage from './pages/FraudAlertsPage';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="users/:uid" element={<UserDetailsPage />} />
             <Route path="recovery" element={<RecoveryPage />} />
             <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="fraud" element={<FraudAlertsPage />} />
             <Route path="activity" element={<ActivityLogPage />} />
             <Route path="revenue" element={<RevenuePage />} />
             <Route path="reports" element={<ReportsPage />} />

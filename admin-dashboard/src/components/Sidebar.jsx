@@ -29,6 +29,7 @@ function Sidebar() {
         <NavLink to="/" end className={linkClass}>Dashboard</NavLink>
         <NavLink to="/users" className={linkClass}>User Search</NavLink>
         {isAdmin && <NavLink to="/transactions" className={linkClass}>Transactions</NavLink>}
+        <NavLink to="/fraud" className={linkClass}>Fraud Alerts</NavLink>
         <NavLink to="/recovery" className={linkClass}>Account Recovery</NavLink>
         <NavLink to="/activity" className={linkClass}>Activity Log</NavLink>
 

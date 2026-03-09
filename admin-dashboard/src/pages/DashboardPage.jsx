@@ -18,6 +18,14 @@ function DashboardPage() {
       const adminGetStats = httpsCallable(functions, 'adminGetStats');
       const result = await adminGetStats();
       setStats(result.data.stats);
+
+      // Also load fraud stats
+      try {
+        const fraudResult = await httpsCallable(functions, 'adminGetFraudStats')();
+        setStats(prev => ({ ...prev, ...fraudResult.data.stats }));
+      } catch (e) {
+        // Fraud stats optional
+      }
     } catch (err) {
       setError(err.message || 'Failed to load stats.');
     } finally {
@@ -81,6 +89,12 @@ function DashboardPage() {
           value={stats?.flaggedTransactions || 0}
           icon="⚠️"
           color="yellow"
+        />
+        <StatsCard
+          title="Open Fraud Alerts"
+          value={stats?.open || 0}
+          icon="🚨"
+          color="red"
         />
       </div>
 

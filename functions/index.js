@@ -1115,6 +1115,9 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       data: { action: 'deposit', amount: amount.toString(), reference },
     });
 
+    // Run fraud detection
+    await checkForFraud(userId, { type: 'deposit', amount, currency });
+
     return {
       success: true,
       amount: amount,
@@ -1629,6 +1632,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
       type: 'transaction',
       data: { action: 'withdrawal_initiated', amount: amount.toString(), reference },
     });
+
+    // Run fraud detection
+    await checkForFraud(userId, { type: 'withdrawal', amount, currency: validated.currency });
 
     return {
       success: true,
@@ -2344,6 +2350,137 @@ async function sendPushNotification(userId, { title, body, type = 'system', data
       } catch (e) { /* ignore cleanup errors */ }
     }
     logError('Failed to send push notification', { userId, title, error: error.message });
+  }
+}
+
+// ============================================================
+// FRAUD DETECTION
+// ============================================================
+
+/**
+ * Check a transaction for suspicious patterns and auto-flag if needed.
+ * Called internally after successful transactions.
+ * @param {string} userId - User who initiated the transaction
+ * @param {Object} txData - Transaction data
+ */
+async function checkForFraud(userId, txData) {
+  try {
+    const alerts = [];
+    const amount = txData.amount || 0;
+    const currency = txData.currency || 'Unknown';
+    const type = txData.type || 'unknown';
+
+    // 1. Large transaction threshold (varies by currency)
+    const largeThresholds = {
+      NGN: 500000, GHS: 10000, KES: 200000, UGX: 5000000, ZAR: 20000,
+      USD: 1000, GBP: 800, EUR: 900,
+    };
+    const threshold = largeThresholds[currency] || 10000;
+    if (amount >= threshold) {
+      alerts.push({
+        rule: 'large_transaction',
+        severity: 'medium',
+        message: `Large ${type}: ${currency} ${amount.toFixed(2)} exceeds threshold of ${currency} ${threshold}`,
+      });
+    }
+
+    // 2. Rapid transactions (3+ in last 5 minutes)
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentTxSnapshot = await db.collection('users').doc(userId)
+      .collection('transactions')
+      .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(fiveMinAgo))
+      .get();
+
+    if (recentTxSnapshot.size >= 3) {
+      alerts.push({
+        rule: 'rapid_transactions',
+        severity: 'high',
+        message: `Rapid activity: ${recentTxSnapshot.size} transactions in last 5 minutes`,
+      });
+    }
+
+    // 3. New account activity (account less than 24 hours old)
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      let accountAge = Infinity;
+
+      if (userData.createdAt) {
+        const createdDate = typeof userData.createdAt === 'string'
+          ? new Date(userData.createdAt)
+          : userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt);
+        accountAge = (Date.now() - createdDate.getTime()) / (1000 * 60 * 60); // hours
+      }
+
+      if (accountAge < 24 && amount > (threshold * 0.5)) {
+        alerts.push({
+          rule: 'new_account_large_tx',
+          severity: 'high',
+          message: `New account (${Math.round(accountAge)}h old) with significant transaction: ${currency} ${amount.toFixed(2)}`,
+        });
+      }
+    }
+
+    // 4. Multiple failed transactions recently
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const failedTxSnapshot = await db.collection('users').doc(userId)
+      .collection('transactions')
+      .where('status', '==', 'failed')
+      .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneHourAgo))
+      .get();
+
+    if (failedTxSnapshot.size >= 3) {
+      alerts.push({
+        rule: 'multiple_failures',
+        severity: 'medium',
+        message: `${failedTxSnapshot.size} failed transactions in the last hour`,
+      });
+    }
+
+    // If alerts found, create fraud alert records
+    if (alerts.length > 0) {
+      const highestSeverity = alerts.some(a => a.severity === 'high') ? 'high'
+        : alerts.some(a => a.severity === 'medium') ? 'medium' : 'low';
+
+      const alertId = `FRAUD-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+
+      await db.collection('fraud_alerts').doc(alertId).set({
+        id: alertId,
+        userId,
+        userEmail: userDoc.exists ? userDoc.data().email : 'unknown',
+        userName: userDoc.exists ? userDoc.data().fullName : 'unknown',
+        transactionId: txData.id || null,
+        transactionType: type,
+        amount,
+        currency,
+        severity: highestSeverity,
+        alerts,
+        status: 'open',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Notify admin via push notification if high severity
+      if (highestSeverity === 'high') {
+        // Get all admin users to notify
+        const adminSnapshot = await db.collection('admin_users').get();
+        const notifyPromises = adminSnapshot.docs.map(doc =>
+          sendPushNotification(doc.id, {
+            title: 'Fraud Alert',
+            body: `High severity alert for ${userDoc.exists ? userDoc.data().fullName : userId}: ${alerts[0].message}`,
+            type: 'security',
+            data: { action: 'fraud_alert', alertId, severity: highestSeverity },
+          }).catch(() => {}) // Don't fail if notification fails
+        );
+        await Promise.all(notifyPromises);
+      }
+
+      logStructured(LOG_LEVELS.WARNING, 'Fraud alert triggered', {
+        alertId, userId, severity: highestSeverity, rules: alerts.map(a => a.rule),
+      });
+    }
+  } catch (error) {
+    // Fraud detection must never block the main operation
+    logStructured(LOG_LEVELS.ERROR, 'Fraud detection error', { error: error.message, userId });
   }
 }
 
@@ -5339,6 +5476,136 @@ exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, con
   }
 });
 
+/**
+ * Admin: Get fraud alerts.
+ */
+exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'support');
+
+  const { limit: queryLimit, status: filterStatus, severity: filterSeverity } = data || {};
+  const fetchLimit = Math.min(queryLimit || 50, 200);
+
+  try {
+    let query = db.collection('fraud_alerts').orderBy('createdAt', 'desc');
+
+    if (filterStatus) {
+      query = query.where('status', '==', filterStatus);
+    }
+
+    query = query.limit(fetchLimit);
+
+    const snapshot = await query.get();
+    const alerts = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || null,
+    }));
+
+    // Filter by severity client-side since Firestore can't do 2 where + orderBy without index
+    const filtered = filterSeverity
+      ? alerts.filter(a => a.severity === filterSeverity)
+      : alerts;
+
+    return { success: true, alerts: filtered };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get fraud alerts: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Resolve a fraud alert.
+ */
+exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+
+  const { alertId, resolution, action } = data;
+  if (!alertId || !resolution) {
+    throw new functions.https.HttpsError('invalid-argument', 'alertId and resolution are required.');
+  }
+
+  try {
+    const alertRef = db.collection('fraud_alerts').doc(alertId);
+    const alertDoc = await alertRef.get();
+    if (!alertDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Fraud alert not found.');
+    }
+
+    const alertData = alertDoc.data();
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    await alertRef.update({
+      status: 'resolved',
+      resolution,
+      resolvedAction: action || 'none',
+      resolvedBy: caller.uid,
+      resolvedByEmail: callerEmail,
+      resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // If action is 'block', block the user account
+    if (action === 'block' && alertData.userId) {
+      await db.collection('users').doc(alertData.userId).update({
+        accountBlocked: true,
+        accountBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        accountBlockedBy: 'admin',
+        accountBlockReason: `Fraud alert: ${resolution}`,
+      });
+
+      await sendPushNotification(alertData.userId, {
+        title: 'Account Blocked',
+        body: 'Your account has been blocked for security review. Please contact support.',
+        type: 'security',
+        data: { action: 'account_blocked', blockedBy: 'admin' },
+      });
+    }
+
+    // Log activity
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'resolve_fraud_alert',
+      targetUserId: alertData.userId,
+      details: `Resolved fraud alert ${alertId}: ${resolution} (action: ${action || 'none'})`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: 'Fraud alert resolved.' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to resolve alert: ${error.message}`);
+  }
+});
+
+/**
+ * Admin: Get fraud alert statistics.
+ */
+exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'support');
+
+  try {
+    const openSnapshot = await db.collection('fraud_alerts').where('status', '==', 'open').count().get();
+    const highSnapshot = await db.collection('fraud_alerts').where('status', '==', 'open').where('severity', '==', 'high').count().get();
+    const totalSnapshot = await db.collection('fraud_alerts').count().get();
+    const resolvedSnapshot = await db.collection('fraud_alerts').where('status', '==', 'resolved').count().get();
+
+    return {
+      success: true,
+      stats: {
+        open: openSnapshot.data().count,
+        high: highSnapshot.data().count,
+        total: totalSnapshot.data().count,
+        resolved: resolvedSnapshot.data().count,
+      },
+    };
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', `Failed to get fraud stats: ${error.message}`);
+  }
+});
+
 // ============================================================
 // SMILE ID PHONE VERIFICATION
 // ============================================================
@@ -5843,6 +6110,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
       }),
     ]);
+
+    // Run fraud detection
+    await checkForFraud(senderUid, { id: result.transactionId, type: 'send', amount, currency: result.senderCurrency });
 
     return { success: true, ...result, _correlationId: correlation.correlationId };
 
