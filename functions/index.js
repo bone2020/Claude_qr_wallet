@@ -2716,6 +2716,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     await db.collection('wallets').doc(userId).set({
+      id: userId,
       userId: userId,
       walletId: walletId,
       currency: userData.currency || 'GHS',
@@ -2779,6 +2780,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
 
     // Create wallet document
     const walletData = {
+      id: userId,
       userId: userId,
       walletId: walletId,
       currency: userData.currency || 'GHS',
@@ -2877,6 +2879,7 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     await db.collection('wallets').doc(userId).set({
+      id: userId,
       userId: userId,
       walletId: walletId,
       currency: userData.currency || 'GHS',
