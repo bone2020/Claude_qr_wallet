@@ -15,6 +15,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../providers/wallet_provider.dart';
+import '../../../../core/services/push_notification_service.dart';
 
 /// Dedicated verification screen for Uganda National ID (NIN).
 /// Uganda requires 3 fields: NIN (id_number), Card Number (secondary_id_number), and DOB.
@@ -174,6 +175,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
         // Refresh wallet and currency after verification
         await ref.read(walletNotifierProvider.notifier).refreshWallet();
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+        await PushNotificationService().saveTokenToFirestore();
         if (!mounted) return;
         context.go(AppRoutes.main);
       } else {

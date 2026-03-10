@@ -17,6 +17,7 @@ import '../../../providers/currency_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
+import '../../../../core/services/push_notification_service.dart';
 
 /// Phone OTP verification screen
 class PhoneOtpScreen extends ConsumerStatefulWidget {
@@ -220,6 +221,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
         // Refresh wallet and currency after verification
         await ref.read(walletNotifierProvider.notifier).refreshWallet();
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+        await PushNotificationService().saveTokenToFirestore();
         if (!mounted) return;
         context.go(AppRoutes.main);
       } else {

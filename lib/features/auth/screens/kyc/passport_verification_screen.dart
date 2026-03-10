@@ -15,7 +15,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../providers/wallet_provider.dart';
-import '../../../../providers/currency_provider.dart';
+import '../../../../core/services/push_notification_service.dart'; 
 
 class PassportVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
@@ -133,6 +133,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
        // Refresh wallet and currency after verification
         await ref.read(walletNotifierProvider.notifier).refreshWallet();
         await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+        await PushNotificationService().saveTokenToFirestore();
         if (!mounted) return;
         context.go(AppRoutes.main);
       } else {
