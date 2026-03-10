@@ -1726,6 +1726,10 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 
 // Get list of banks
 exports.getBanks = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
   try {
     const country = data.country || 'nigeria';
     const response = await paystackRequest('GET', `/bank?country=${country}`);
