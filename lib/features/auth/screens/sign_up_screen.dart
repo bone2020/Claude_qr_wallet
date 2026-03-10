@@ -402,15 +402,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 const SizedBox(height: AppDimensions.spaceLG),
 
-                // Social Login
-                SocialLoginRow(
-                  onGooglePressed: _handleGoogleSignUp,
-                  onApplePressed: _handleAppleSignUp,
-                  isGoogleLoading: _isLoading,
-                )
-                    .animate()
-                    .fadeIn(duration: 400.ms, delay: 1100.ms)
-                    .slideY(begin: 0.2, end: 0, duration: 400.ms),
+               
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 

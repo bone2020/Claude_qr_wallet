@@ -228,10 +228,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 const SizedBox(height: AppDimensions.spaceXL),
 
-                // Social Login
-                _buildSocialLogin()
-                    .animate()
-                    .fadeIn(delay: 500.ms, duration: 400.ms),
+
 
                 const SizedBox(height: AppDimensions.spaceXXL),
 
