@@ -59,7 +59,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
 
   void _generateUserId() {
     final user = ref.read(currentUserProvider);
-    _userId = user?.id ?? _smileIdService.generateUserId();
+    _userId = _smileIdService.generateUserId();
   }
 
   Future<void> _startVerification() async {

@@ -65,6 +65,9 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
       } else {
         // User is signed out
         state = AuthStateData.unauthenticated();
+        try {
+          await SecureStorageService.clearAll();
+        } catch (_) {}
         await _localStorage.clearAll();
       }
     });
@@ -201,6 +204,13 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     // Remove FCM token before signing out
     await PushNotificationService().removeToken();
     await _authService.signOut();
+    // Clear secure storage (PIN hash, tokens, biometric settings)
+    try {
+      await SecureStorageService.clearAll();
+    } catch (e) {
+      // ignore: avoid_print
+      debugPrint('Failed to clear secure storage: $e');
+    }
     await _localStorage.clearAll();
     state = AuthStateData.unauthenticated();
   }

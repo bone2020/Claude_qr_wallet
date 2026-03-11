@@ -54,7 +54,7 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
 
   void _generateUserId() {
     final user = ref.read(currentUserProvider);
-    _userId = user?.id ?? _smileIdService.generateUserId();
+    _userId = _smileIdService.generateUserId();
   }
 
   Future<void> _startVerification() async {

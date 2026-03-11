@@ -1670,6 +1670,12 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const blockCheckDoc = await db.collection('users').doc(context.auth.uid).get();
+  if (blockCheckDoc.exists && blockCheckDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended. Withdrawal cannot be completed.');
+  }
+
   if (!transferCode || !otp) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Transfer code and OTP are required.');
   }
@@ -1800,6 +1806,14 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const userBlockDoc = await db.collection('users').doc(userId).get();
+  if (userBlockDoc.exists && userBlockDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended. All transactions are disabled. Contact support.');
+  }
+
+  await enforceRateLimit(userId, 'chargeMobileMoney');
+
   if (!amount || amount <= 0) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
   }
@@ -1846,7 +1860,11 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
         validateWalletDocument(walletData, 'chargeMobileMoney wallet');
 
         await db.runTransaction(async (transaction) => {
-          const creditBalance = safeAdd(walletData.balance, amount, 'chargeMobileMoney credit');
+          // Read fresh wallet data inside transaction to prevent stale balance
+          const freshWallet = await transaction.get(walletDoc.ref);
+          const freshData = freshWallet.data();
+          validateWalletDocument(freshData, 'chargeMobileMoney fresh wallet');
+          const creditBalance = safeAdd(freshData.balance, amount, 'chargeMobileMoney credit');
           transaction.update(walletDoc.ref, {
             balance: creditBalance,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -2020,6 +2038,14 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
+
+  // Check if account is blocked
+  const userBlockDoc = await db.collection('users').doc(userId).get();
+  if (userBlockDoc.exists && userBlockDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended. All transactions are disabled. Contact support.');
+  }
+
+  await enforceRateLimit(userId, 'initializeTransaction');
 
   try {
     const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2615,11 +2641,10 @@ async function enforceKyc(userId) {
 // NOTE: The client now sets kycStatus directly in Firestore for reliability.
 // This function is retained for backward compatibility and admin use cases.
 exports.updateKycStatus = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
+  // SECURITY: Restricted to admin only. Client KYC uses completeKycVerification.
+  const caller = await verifyAdmin(context, 'admin');
 
-  const userId = context.auth.uid;
+  const userId = data.targetUserId || context.auth.uid;
   const { status } = data;
 
   // Only allow setting to specific valid statuses
@@ -3529,6 +3554,12 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const userBlockDoc = await db.collection('users').doc(userId).get();
+  if (userBlockDoc.exists && userBlockDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended.');
+  }
+
   const { walletId, amount, note } = data;
 
   if (!walletId || typeof walletId !== 'string') {
@@ -3790,7 +3821,7 @@ exports.blockAccount = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
   }
   const userData = userDoc.data();
-  if (userData.pinHash && userData.pinHash !== pinHash) {
+  if (userData.pinHash && !timingSafeCompare(userData.pinHash || '', pinHash || '')) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Check if already blocked
@@ -3850,7 +3881,7 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
       'Your account was blocked by support. Please contact customer support to unblock your account.');
   }
   // Verify PIN
-  if (userData.pinHash && userData.pinHash !== pinHash) {
+  if (userData.pinHash && !timingSafeCompare(userData.pinHash || '', pinHash || '')) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Unblock account
@@ -4695,6 +4726,13 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
   }
 
+  // Verify caller is admin staff
+  const callerRecord = await admin.auth().getUser(context.auth.uid);
+  const callerRole = callerRecord.customClaims?.role;
+  if (!callerRole || !['support', 'admin', 'super_admin'].includes(callerRole)) {
+    throw new functions.https.HttpsError('permission-denied', 'Admin access required.');
+  }
+
   const uid = context.auth.uid;
   const { action, metadata } = data;
 
@@ -5158,26 +5196,10 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
 
     const recipientCode = recipientResponse.data.recipient_code;
 
-    // Step 2: Initiate transfer on Paystack (amount in kobo/pesewas)
+    // Step 2: Deduct balance FIRST (atomic)
     const amountInSmallestUnit = Math.round(amount * 100);
     const reference = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
-    const transferResponse = await paystackRequest('POST', '/transfer', {
-      source: 'balance',
-      amount: amountInSmallestUnit,
-      recipient: recipientCode,
-      reason: `Platform withdrawal: ${purpose}`,
-      reference: reference,
-    });
-
-    if (!transferResponse.status) {
-      throw new functions.https.HttpsError('internal', 'Failed to initiate transfer on Paystack.');
-    }
-
-    const transferCode = transferResponse.data.transfer_code;
-    const transferStatus = transferResponse.data.status;
-
-    // Step 3: Deduct from platform wallet
     const withdrawalRef = db.collection('wallets').doc('platform')
       .collection('withdrawals').doc(reference);
 
@@ -5191,7 +5213,6 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
         throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
       }
 
-      // Deduct from currency balance
       transaction.update(
         db.collection('wallets').doc('platform').collection('balances').doc(currency),
         {
@@ -5201,13 +5222,11 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
         }
       );
 
-      // Deduct from total USD balance
       transaction.update(db.collection('wallets').doc('platform'), {
         totalBalanceUSD: admin.firestore.FieldValue.increment(-amountInUSD),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Record withdrawal
       transaction.set(withdrawalRef, {
         id: reference,
         type: 'bank_transfer',
@@ -5221,15 +5240,64 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
         accountNumber,
         accountName,
         recipientCode,
-        transferCode,
         paystackReference: reference,
-        paystackStatus: transferStatus,
-        status: transferStatus === 'success' ? 'completed' : 'pending',
+        status: 'pending',
         withdrawnBy: caller.uid,
         withdrawnByEmail: callerEmail,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
+
+    // Step 3: NOW initiate Paystack transfer (balance already deducted)
+    let transferCode = null;
+    let transferStatus = 'pending';
+    try {
+      const transferResponse = await paystackRequest('POST', '/transfer', {
+        source: 'balance',
+        amount: amountInSmallestUnit,
+        recipient: recipientCode,
+        reason: `Platform withdrawal: ${purpose}`,
+        reference: reference,
+      });
+
+      if (transferResponse.status) {
+        transferCode = transferResponse.data.transfer_code;
+        transferStatus = transferResponse.data.status;
+      }
+
+      await withdrawalRef.update({
+        transferCode: transferCode,
+        paystackStatus: transferStatus,
+        status: transferStatus === 'success' ? 'completed' : 'pending',
+      });
+    } catch (transferError) {
+      // Paystack failed — refund the platform balance
+      logError('Paystack transfer failed, refunding platform balance', { error: transferError.message, reference });
+
+      await db.runTransaction(async (transaction) => {
+        transaction.update(
+          db.collection('wallets').doc('platform').collection('balances').doc(currency),
+          {
+            amount: admin.firestore.FieldValue.increment(amount),
+            usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }
+        );
+        transaction.update(db.collection('wallets').doc('platform'), {
+          totalBalanceUSD: admin.firestore.FieldValue.increment(amountInUSD),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      await withdrawalRef.update({
+        status: 'failed',
+        failureReason: transferError.message,
+        refunded: true,
+        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new functions.https.HttpsError('internal', `Paystack transfer failed: ${transferError.message}. Balance has been refunded.`);
+    }
 
     // Audit log
     await auditLog({
@@ -6449,6 +6517,12 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const userBlockDoc = await db.collection('users').doc(userId).get();
+  if (userBlockDoc.exists && userBlockDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended. All transactions are disabled. Contact support.');
+  }
+
   // Enforce persistent rate limiting (10 MoMo payments per hour)
   await enforceRateLimit(userId, 'momoRequestToPay');
 
@@ -6721,6 +6795,12 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Check if account is blocked
+  const userBlockDoc = await db.collection('users').doc(userId).get();
+  if (userBlockDoc.exists && userBlockDoc.data().accountBlocked === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended. All transactions are disabled. Contact support.');
+  }
+
   // Enforce persistent rate limiting (5 MoMo transfers per hour)
   await enforceRateLimit(userId, 'momoTransfer');
 
@@ -6881,9 +6961,8 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 // ============================================================
 
 exports.momoGetBalance = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
+  // Restricted to admin — exposes platform MoMo balance
+  await verifyAdmin(context, 'admin');
 
   const { product } = data; // 'collection' or 'disbursement'
 

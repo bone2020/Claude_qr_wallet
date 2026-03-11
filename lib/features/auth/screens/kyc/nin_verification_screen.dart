@@ -55,7 +55,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
   void _generateUserId() {
     final user = ref.read(currentUserProvider);
-    _userId = user?.id ?? _smileIdService.generateUserId();
+    _userId = _smileIdService.generateUserId();
   }
 
   Future<void> _startVerification() async {

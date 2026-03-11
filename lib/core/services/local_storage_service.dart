@@ -181,22 +181,19 @@ class LocalStorageService {
   // AUTHENTICATION TOKENS
   // ============================================================
 
-  /// Save auth token (for biometric re-auth)
+  /// Save auth token — stored only in SecureStorage for security
   Future<void> saveAuthToken(String token) async {
-    final box = await Hive.openBox(_settingsBoxName);
-    await box.put('auth_token', token);
+    // No longer stored in Hive (unencrypted). Use SecureStorageService instead.
   }
 
-  /// Get auth token
+  /// Get auth token — use SecureStorageService.getAuthToken() instead
   Future<String?> getAuthToken() async {
-    final box = await Hive.openBox(_settingsBoxName);
-    return box.get('auth_token') as String?;
+    return null;
   }
 
   /// Clear auth token
   Future<void> clearAuthToken() async {
-    final box = await Hive.openBox(_settingsBoxName);
-    await box.delete('auth_token');
+    // No-op: token no longer stored in Hive
   }
 
   // ============================================================

@@ -35,7 +35,7 @@ service cloud.firestore {
       allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus']);
       // Allow update but kycStatus and accountBlocked must not be modified (server-only fields)
       allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged();
-      allow delete: if isOwner(userId);
+      allow delete: if false;
 
       // Transactions - read only (writes via Cloud Functions)
       match /transactions/{txId} {
