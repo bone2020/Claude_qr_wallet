@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/models.dart';
@@ -11,8 +13,20 @@ class LocalStorageService {
   static const String _pendingTransactionsBoxName = 'pending_transactions_box';
 
   /// Initialize Hive and register adapters
+  static HiveAesCipher? _cipher;
+
   static Future<void> initialize() async {
     await Hive.initFlutter();
+
+    // Generate or retrieve encryption key
+    const secureStorage = FlutterSecureStorage();
+    String? encKeyString = await secureStorage.read(key: 'hive_encryption_key');
+    if (encKeyString == null) {
+      final key = Hive.generateSecureKey();
+      encKeyString = base64Encode(key);
+      await secureStorage.write(key: 'hive_encryption_key', value: encKeyString);
+    }
+    _cipher = HiveAesCipher(base64Decode(encKeyString));
 
     // Register adapters
     Hive.registerAdapter(UserModelAdapter());
@@ -28,13 +42,13 @@ class LocalStorageService {
 
   /// Save user data locally
   Future<void> saveUser(UserModel user) async {
-    final box = await Hive.openBox<Map>(_userBoxName);
+    final box = await Hive.openBox<Map>(_userBoxName, encryptionCipher: _cipher);
     await box.put('current_user', user.toJson());
   }
 
   /// Get cached user data
   Future<UserModel?> getUser() async {
-    final box = await Hive.openBox<Map>(_userBoxName);
+    final box = await Hive.openBox<Map>(_userBoxName, encryptionCipher: _cipher);
     final data = box.get('current_user');
     if (data == null) return null;
     return UserModel.fromJson(Map<String, dynamic>.from(data));
@@ -42,7 +56,7 @@ class LocalStorageService {
 
   /// Clear user data
   Future<void> clearUser() async {
-    final box = await Hive.openBox<Map>(_userBoxName);
+    final box = await Hive.openBox<Map>(_userBoxName, encryptionCipher: _cipher);
     await box.delete('current_user');
   }
 
@@ -52,13 +66,13 @@ class LocalStorageService {
 
   /// Save wallet data locally
   Future<void> saveWallet(WalletModel wallet) async {
-    final box = await Hive.openBox<Map>(_walletBoxName);
+    final box = await Hive.openBox<Map>(_walletBoxName, encryptionCipher: _cipher);
     await box.put('current_wallet', wallet.toJson());
   }
 
   /// Get cached wallet data
   Future<WalletModel?> getWallet() async {
-    final box = await Hive.openBox<Map>(_walletBoxName);
+    final box = await Hive.openBox<Map>(_walletBoxName, encryptionCipher: _cipher);
     final data = box.get('current_wallet');
     if (data == null) return null;
     return WalletModel.fromJson(Map<String, dynamic>.from(data));
@@ -66,7 +80,7 @@ class LocalStorageService {
 
   /// Clear wallet data
   Future<void> clearWallet() async {
-    final box = await Hive.openBox<Map>(_walletBoxName);
+    final box = await Hive.openBox<Map>(_walletBoxName, encryptionCipher: _cipher);
     await box.delete('current_wallet');
   }
 
@@ -76,14 +90,14 @@ class LocalStorageService {
 
   /// Save transactions locally (for offline viewing)
   Future<void> saveTransactions(List<TransactionModel> transactions) async {
-    final box = await Hive.openBox<List>(_transactionsBoxName);
+    final box = await Hive.openBox<List>(_transactionsBoxName, encryptionCipher: _cipher);
     final jsonList = transactions.map((t) => t.toJson()).toList();
     await box.put('transactions', jsonList);
   }
 
   /// Get cached transactions
   Future<List<TransactionModel>> getTransactions() async {
-    final box = await Hive.openBox<List>(_transactionsBoxName);
+    final box = await Hive.openBox<List>(_transactionsBoxName, encryptionCipher: _cipher);
     final data = box.get('transactions');
     if (data == null) return [];
     
@@ -107,7 +121,7 @@ class LocalStorageService {
 
   /// Clear transactions cache
   Future<void> clearTransactions() async {
-    final box = await Hive.openBox<List>(_transactionsBoxName);
+    final box = await Hive.openBox<List>(_transactionsBoxName, encryptionCipher: _cipher);
     await box.delete('transactions');
   }
 
@@ -117,7 +131,7 @@ class LocalStorageService {
 
   /// Save pending transaction for later sync
   Future<void> savePendingTransaction(Map<String, dynamic> transaction) async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName);
+    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
     final pending = box.get('pending', defaultValue: [])!;
     pending.add({
       ...transaction,
@@ -128,14 +142,14 @@ class LocalStorageService {
 
   /// Get all pending transactions
   Future<List<Map<String, dynamic>>> getPendingTransactions() async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName);
+    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
     final pending = box.get('pending', defaultValue: [])!;
     return pending.map((item) => Map<String, dynamic>.from(item)).toList();
   }
 
   /// Remove pending transaction after sync
   Future<void> removePendingTransaction(String id) async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName);
+    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
     final pending = box.get('pending', defaultValue: [])!;
     pending.removeWhere((item) => item['id'] == id);
     await box.put('pending', pending);
@@ -143,7 +157,7 @@ class LocalStorageService {
 
   /// Clear all pending transactions
   Future<void> clearPendingTransactions() async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName);
+    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
     await box.put('pending', []);
   }
 
@@ -153,19 +167,19 @@ class LocalStorageService {
 
   /// Save setting
   Future<void> saveSetting(String key, dynamic value) async {
-    final box = await Hive.openBox(_settingsBoxName);
+    final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher);
     await box.put(key, value);
   }
 
   /// Get setting
   Future<T?> getSetting<T>(String key, {T? defaultValue}) async {
-    final box = await Hive.openBox(_settingsBoxName);
+    final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher);
     return box.get(key, defaultValue: defaultValue) as T?;
   }
 
   /// Get all settings
   Future<Map<String, dynamic>> getAllSettings() async {
-    final box = await Hive.openBox(_settingsBoxName);
+    final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher);
     return Map<String, dynamic>.from(box.toMap());
   }
 
@@ -209,7 +223,7 @@ class LocalStorageService {
     await clearAuthToken();
     
     // Keep settings like dark mode preference
-    final box = await Hive.openBox(_settingsBoxName);
+    final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher);
     final darkMode = box.get(keyDarkMode);
     await box.clear();
     if (darkMode != null) {
