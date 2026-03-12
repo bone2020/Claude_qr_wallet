@@ -473,7 +473,7 @@ function validateWalletDocument(walletData, context = 'wallet') {
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid balance. Contact support.`);
   }
 
-  const currency = walletData.currency || 'GHS';
+  const currency = walletData.currency || 'NGN';
   if (typeof currency !== 'string') {
     logError('Wallet document validation failed: invalid currency', { context, currency });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid currency. Contact support.`);
@@ -538,7 +538,7 @@ const VALID_CURRENCIES = new Set([
  * @param {string} defaultCurrency - Default if not provided
  * @returns {string} Validated currency code (uppercase)
  */
-function validateCurrency(currency, defaultCurrency = 'GHS') {
+function validateCurrency(currency, defaultCurrency = 'NGN') {
   const code = (currency || defaultCurrency).toUpperCase().trim();
   if (!VALID_CURRENCIES.has(code)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
@@ -1670,6 +1670,9 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Rate limit OTP attempts to prevent brute-force
+  await enforceRateLimit(userId, 'finalizeTransfer');
+
   // Check if account is blocked
   const blockCheckDoc = await db.collection('users').doc(context.auth.uid).get();
   if (blockCheckDoc.exists && blockCheckDoc.data().accountBlocked === true) {
@@ -2214,6 +2217,7 @@ const RATE_LIMITS = {
   lookupWallet:       { windowMs: 5 * 60 * 1000,  maxRequests: 30, message: 'Too many wallet lookups. Please wait a few minutes.' },
   exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
+  finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
 };
 
 /**
@@ -2494,7 +2498,9 @@ async function checkForFraud(userId, txData) {
       // Notify admin via push notification if high severity
       if (highestSeverity === 'high') {
         // Get all admin users to notify
-        const adminSnapshot = await db.collection('admin_users').get();
+        const adminSnapshot = await db.collection('users')
+          .where('role', 'in', ['super_admin', 'admin'])
+          .get();
         const notifyPromises = adminSnapshot.docs.map(doc =>
           sendPushNotification(doc.id, {
             title: 'Fraud Alert',
@@ -2702,6 +2708,11 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
 
   const userData = userDoc.data();
 
+  // Check if account is blocked
+  if (userData.accountBlocked === true) {
+    throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. KYC verification cannot be completed.');
+  }
+
   // If already verified, return success (idempotent)
   if (userData.kycStatus === 'verified') {
     logInfo('User already KYC verified, no action needed', { userId });
@@ -2739,29 +2750,37 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
     kycVerified: true,
   });
 
-  // Create wallet if it doesn't exist yet
+  // Create wallet if it doesn't exist yet (using transaction to prevent race conditions)
   const walletDoc = await db.collection('wallets').doc(userId).get();
   if (!walletDoc.exists) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
-    await db.collection('wallets').doc(userId).set({
-      id: userId,
-      userId: userId,
-      walletId: walletId,
-      currency: userData.currency || 'GHS',
-      balance: 0,
-      isActive: true,
-      dailySpent: 0,
-      monthlySpent: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await db.runTransaction(async (transaction) => {
+      // Double-check wallet doesn't exist inside transaction (race condition protection)
+      const freshWalletDoc = await transaction.get(db.collection('wallets').doc(userId));
+      if (freshWalletDoc.exists) {
+        return; // Already created by another concurrent call
+      }
 
-    await userRef.update({
-      walletId: walletId,
-      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      transaction.set(db.collection('wallets').doc(userId), {
+        id: userId,
+        userId: userId,
+        walletId: walletId,
+        currency: userData.currency || 'GHS',
+        balance: 0,
+        isActive: true,
+        dailySpent: 0,
+        monthlySpent: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.update(userRef, {
+        walletId: walletId,
+        walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     });
 
     logInfo('Wallet created during KYC completion', { userId, walletId });
@@ -2803,6 +2822,11 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
     }
 
     const userData = userDoc.data();
+
+    // Check if account is blocked
+    if (userData.accountBlocked === true) {
+      throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Wallet cannot be created.');
+    }
 
     // Generate unique wallet ID
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -6660,7 +6684,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         type: 'collection',
         userId: userId,
         amount: amount,
-        currency: currency || 'EUR',
+        currency: validatedCurrency,
         phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
@@ -6670,7 +6694,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
       await auditLog({
         userId, operation: 'momoRequestToPay', result: 'success',
-        amount, currency: currency || 'EUR',
+        amount, currency: validatedCurrency,
         metadata: { referenceId, phoneNumber: validatedPhone, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
@@ -6742,6 +6766,12 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
         // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
         if (status === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
           await db.runTransaction(async (transaction) => {
+            // Re-read txDoc INSIDE the transaction to prevent double-credit
+            const freshTxDoc = await transaction.get(txRef);
+            if (!freshTxDoc.exists || normalizeStatus(freshTxDoc.data().status) === 'completed') {
+              return; // Already processed by another concurrent call
+            }
+
             // Get user's wallet
             const walletSnapshot = await db.collection('wallets')
               .where('userId', '==', txData.userId)
@@ -6952,7 +6982,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         type: 'disbursement',
         userId: userId,
         amount: amount,
-        currency: currency || 'EUR',
+        currency: validatedCurrency,
         phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
@@ -6965,7 +6995,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         type: 'disbursement',
         userId: userId,
         amount: amount,
-        currency: currency || 'EUR',
+        currency: validatedCurrency,
         phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
@@ -6978,7 +7008,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         id: referenceId,
         type: 'withdraw',
         amount: amount,
-        currency: currency || 'EUR',
+        currency: validatedCurrency,
         method: 'MTN MoMo',
         phoneNumber: validatedPhone,
         status: 'pending',

@@ -171,8 +171,8 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
         // Get sender's wallet for currency info
         final walletDoc = await _firestore.collection('wallets').doc(_userId).get();
         final senderCurrency = walletDoc.exists
-            ? (walletDoc.data()?['currency'] as String? ?? 'GHS')
-            : 'GHS';
+            ? (walletDoc.data()?['currency'] as String? ?? 'NGN')
+            : 'NGN';
 
         // Create a local transaction model for the UI
         final transaction = TransactionModel(
@@ -265,7 +265,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
           receiverName: userName,
           amount: (data['amount'] as num?)?.toDouble() ?? amount,
           fee: 0,
-          currency: (data['currency'] as String?) ?? wallet?.currency ?? 'GHS',
+          currency: (data['currency'] as String?) ?? wallet?.currency ?? 'NGN',
           type: TransactionType.deposit,
           status: TransactionStatus.completed,
           note: 'Deposit via ${bankName ?? "Bank"}',

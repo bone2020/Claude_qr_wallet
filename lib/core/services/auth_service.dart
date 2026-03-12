@@ -62,7 +62,7 @@ class AuthService {
         email: email,
         phoneNumber: phoneNumber,
         country: countryCode ?? 'GH',
-        currency: currencyCode ?? 'GHS',
+        currency: currencyCode ?? 'NGN',
         createdAt: DateTime.now(),
       );
 
