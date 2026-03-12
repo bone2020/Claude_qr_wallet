@@ -78,11 +78,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // Parse user data
         final userData = UserModel.fromJson(userDoc.data()!);
 
-        // Sync PIN hash to secure storage for app lock
-        final firestorePinHash = userDoc.data()?['pinHash'] as String?;
-        if (firestorePinHash != null && firestorePinHash.isNotEmpty) {
-          await SecureStorageService.savePinHash(firestorePinHash);
-        }
+        // Note: Firestore pinHash is HMAC'd (server-side security).
+        // Local SecureStorage pinHash is plain SHA-256 (set during PIN creation).
+        // They use different formats, so we do NOT sync Firestore → SecureStorage.
+        // Local PIN hash is set when user creates/changes PIN via change_pin_screen.
 
         // Check if KYC is completed (defense in depth - server also enforces)
         // Accept both canonical kycStatus and legacy kycCompleted

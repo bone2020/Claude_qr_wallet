@@ -2104,6 +2104,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
 // REQUIRED: Must be configured. QR signing will fail if missing.
 const QR_SECRET_KEY = functions.config().qr?.secret || '';
+const PIN_SECRET = functions.config().pin?.secret || '';
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // Helper: Generate HMAC signature
@@ -3808,6 +3809,27 @@ return {
  * Sets blockedBy to 'user' so the user can unblock themselves.
  */
 /**
+ * Server-side PIN hashing: HMAC-SHA256 with per-user salt + server secret.
+ * Client sends SHA-256(pin) — this function applies another layer.
+ * Even if Firestore data is exposed, PINs cannot be cracked without PIN_SECRET.
+ */
+function hashPinServer(clientHash, salt) {
+  requireConfig(PIN_SECRET, 'pin.secret');
+  return crypto.createHmac('sha256', salt + PIN_SECRET)
+    .update(clientHash)
+    .digest('hex');
+}
+
+/**
+ * Verify a PIN against the stored HMAC hash.
+ * Returns true if the PIN matches.
+ */
+function verifyPinServer(clientHash, storedHash, salt) {
+  const expectedHash = hashPinServer(clientHash, salt);
+  return timingSafeCompare(storedHash, expectedHash);
+}
+
+/**
  * Change or set user PIN. PIN hash can only be written server-side.
  * If user has no PIN set, currentPinHash is not required.
  * If user has a PIN set, currentPinHash must match before allowing change.
@@ -3820,7 +3842,7 @@ exports.changePin = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
   const { currentPinHash, newPinHash } = data;
 
-  // Validate new PIN hash
+  // Validate new PIN hash (SHA-256 hex = 64 chars)
   if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
   }
@@ -3841,19 +3863,27 @@ exports.changePin = functions.https.onCall(async (data, context) => {
     if (!currentPinHash || typeof currentPinHash !== 'string') {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Current PIN is required.');
     }
-    if (!timingSafeCompare(userData.pinHash, currentPinHash)) {
+    // Verify against HMAC hash using stored salt
+    if (!verifyPinServer(currentPinHash, userData.pinHash, userData.pinSalt || '')) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect current PIN.');
     }
   }
 
-  // Prevent setting the same PIN
-  if (userData.pinHash && timingSafeCompare(userData.pinHash, newPinHash)) {
+  // Generate new per-user salt
+  const newSalt = crypto.randomBytes(32).toString('hex');
+
+  // Compute HMAC hash: HMAC-SHA256(clientHash, salt + serverSecret)
+  const serverHash = hashPinServer(newPinHash, newSalt);
+
+  // Prevent setting the same PIN (compare at HMAC level)
+  if (userData.pinHash && timingSafeCompare(userData.pinHash, serverHash)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'New PIN must be different from current PIN.');
   }
 
-  // Update PIN hash (Admin SDK bypasses Firestore rules)
+  // Update PIN hash and salt (Admin SDK bypasses Firestore rules)
   await db.collection('users').doc(userId).update({
-    pinHash: newPinHash,
+    pinHash: serverHash,
+    pinSalt: newSalt,
     pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -3887,7 +3917,7 @@ exports.blockAccount = functions.https.onCall(async (data, context) => {
   if (!userData.pinHash) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'You must set a PIN before you can block your account.');
   }
-  if (!timingSafeCompare(userData.pinHash, pinHash)) {
+  if (!verifyPinServer(pinHash, userData.pinHash, userData.pinSalt || '')) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Check if already blocked
@@ -3950,7 +3980,7 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
   if (!userData.pinHash) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'You must set a PIN before you can unblock your account.');
   }
-  if (!timingSafeCompare(userData.pinHash, pinHash)) {
+  if (!verifyPinServer(pinHash, userData.pinHash, userData.pinSalt || '')) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Unblock account

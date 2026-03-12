@@ -310,7 +310,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                 Center(
                   child: Pinput(
                     controller: _pinController,
-                    length: 4,
+                    length: 6,
                     obscureText: true,
                     obscuringCharacter: '\u25CF',
                     defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,

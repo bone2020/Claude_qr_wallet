@@ -226,9 +226,9 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
   String get _stepSubtitle {
     switch (_currentStep) {
       case 0:
-        return 'Enter your current 4-digit transaction PIN';
+        return 'Enter your current 6-digit transaction PIN';
       case 1:
-        return 'Create a new 4-digit PIN';
+        return 'Create a new 6-digit PIN';
       case 2:
         return 'Re-enter your new PIN to confirm';
       default:
@@ -313,7 +313,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
               else
                 Pinput(
                   controller: _currentController,
-                  length: 4,
+                  length: 6,
                   obscureText: true,
                   obscuringCharacter: '●',
                   defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,

@@ -182,7 +182,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Enter your 4-digit PIN to confirm this transfer',
+                    'Enter your 6-digit PIN to confirm this transfer',
                     style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                   ),
                   const SizedBox(height: 20),
@@ -193,13 +193,13 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                       controller: pinController,
                       obscureText: true,
                       textAlign: TextAlign.center,
-                      maxLength: 4,
+                      maxLength: 6,
                       keyboardType: TextInputType.number,
                       style: AppTextStyles.headlineMedium(),
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: InputDecoration(
                         counterText: '',
-                        hintText: '●  ●  ●  ●',
+                        hintText: '●  ●  ●  ●  ●  ●',
                         hintStyle: AppTextStyles.headlineMedium(color: AppColors.textTertiaryDark),
                         filled: true,
                         fillColor: AppColors.inputBackgroundDark,
@@ -218,7 +218,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                       ),
                       autofocus: true,
                       onChanged: (value) {
-                        if (value.length == 4) {
+                        if (value.length == 6) {
                           final enteredHash = _hashPin(value);
                           if (enteredHash == storedPinHash) {
                             Navigator.of(dialogContext).pop(true);

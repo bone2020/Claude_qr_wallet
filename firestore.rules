@@ -28,19 +28,22 @@ service cloud.firestore {
         : request.resource.data.accountBlocked == resource.data.accountBlocked;
     }
 
-    // Helper: Ensure pinHash field is not modified by client
-    // pinHash can only be set by Cloud Functions (Admin SDK)
+    // Helper: Ensure pinHash and pinSalt fields are not modified by client
+    // pinHash and pinSalt can only be set by Cloud Functions (Admin SDK)
     function pinHashUnchanged() {
-      return !('pinHash' in resource.data)
-        ? !request.resource.data.keys().hasAny(['pinHash'])
-        : request.resource.data.pinHash == resource.data.pinHash;
+      return (!('pinHash' in resource.data)
+        ? !request.resource.data.keys().hasAny(['pinHash', 'pinSalt'])
+        : request.resource.data.pinHash == resource.data.pinHash)
+        && (!('pinSalt' in resource.data)
+        ? !request.resource.data.keys().hasAny(['pinSalt'])
+        : request.resource.data.pinSalt == resource.data.pinSalt);
     }
 
     // Users collection - own data only
     match /users/{userId} {
       allow read: if isOwner(userId);
       // Allow create without kycStatus (new user signup)
-      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus', 'pinHash']);
+      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus', 'pinHash', 'pinSalt']);
       // Allow update but kycStatus and accountBlocked must not be modified (server-only fields)
       allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged() && pinHashUnchanged();
       allow delete: if false;

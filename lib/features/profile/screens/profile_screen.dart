@@ -86,13 +86,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     controller: pinController,
                     obscureText: true,
                     textAlign: TextAlign.center,
-                    maxLength: 4,
+                    maxLength: 6,
                     keyboardType: TextInputType.number,
                     style: AppTextStyles.headlineMedium(),
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       counterText: '',
-                      hintText: '\u25CF  \u25CF  \u25CF  \u25CF',
+                      hintText: '\u25CF  \u25CF  \u25CF  \u25CF  \u25CF  \u25CF',
                       hintStyle: AppTextStyles.headlineMedium(color: AppColors.textTertiaryDark),
                       filled: true,
                       fillColor: AppColors.inputBackgroundDark,
@@ -111,7 +111,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     autofocus: true,
                     onChanged: (value) {
-                      if (value.length == 4) {
+                      if (value.length == 6) {
                         resultHash = _hashPin(value);
                         Navigator.of(dialogContext).pop();
                       } else if (error != null) {
