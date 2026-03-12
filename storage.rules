@@ -27,7 +27,7 @@ service firebase.storage {
     
     // Profile photos
     match /profile_photos/{userId}/{fileName} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && isOwner(userId);
       allow write: if isAuthenticated() 
         && isOwner(userId)
         && isImage()
@@ -48,7 +48,7 @@ service firebase.storage {
     
     // QR codes
     match /qr_codes/{userId}/{fileName} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && isOwner(userId);
       allow write: if isAuthenticated() 
         && isOwner(userId)
         && isImage()

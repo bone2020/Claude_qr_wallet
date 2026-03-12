@@ -2212,6 +2212,7 @@ const RATE_LIMITS = {
   momoTransfer:       { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many MoMo transfers. Please try again later.' },
   lookupWallet:       { windowMs: 5 * 60 * 1000,  maxRequests: 30, message: 'Too many wallet lookups. Please wait a few minutes.' },
   exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
+  changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
 };
 
 /**
@@ -3806,6 +3807,68 @@ return {
  * Requires PIN verification for security.
  * Sets blockedBy to 'user' so the user can unblock themselves.
  */
+/**
+ * Change or set user PIN. PIN hash can only be written server-side.
+ * If user has no PIN set, currentPinHash is not required.
+ * If user has a PIN set, currentPinHash must match before allowing change.
+ */
+exports.changePin = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { currentPinHash, newPinHash } = data;
+
+  // Validate new PIN hash
+  if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
+  }
+
+  // Rate limit PIN changes
+  await enforceRateLimit(userId, 'changePin');
+
+  // Get user document
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
+  }
+
+  const userData = userDoc.data();
+
+  // If PIN is already set, verify current PIN first
+  if (userData.pinHash) {
+    if (!currentPinHash || typeof currentPinHash !== 'string') {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Current PIN is required.');
+    }
+    if (!timingSafeCompare(userData.pinHash, currentPinHash)) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect current PIN.');
+    }
+  }
+
+  // Prevent setting the same PIN
+  if (userData.pinHash && timingSafeCompare(userData.pinHash, newPinHash)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'New PIN must be different from current PIN.');
+  }
+
+  // Update PIN hash (Admin SDK bypasses Firestore rules)
+  await db.collection('users').doc(userId).update({
+    pinHash: newPinHash,
+    pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  // Audit log
+  await auditLog({
+    userId,
+    operation: 'changePin',
+    result: 'success',
+    metadata: { hadExistingPin: !!userData.pinHash },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, message: 'PIN updated successfully.' };
+});
+
 exports.blockAccount = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -3821,7 +3884,10 @@ exports.blockAccount = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
   }
   const userData = userDoc.data();
-  if (userData.pinHash && !timingSafeCompare(userData.pinHash || '', pinHash || '')) {
+  if (!userData.pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'You must set a PIN before you can block your account.');
+  }
+  if (!timingSafeCompare(userData.pinHash, pinHash)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Check if already blocked
@@ -3880,8 +3946,11 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
       'Your account was blocked by support. Please contact customer support to unblock your account.');
   }
-  // Verify PIN
-  if (userData.pinHash && !timingSafeCompare(userData.pinHash || '', pinHash || '')) {
+  // Verify PIN - PIN must be set
+  if (!userData.pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'You must set a PIN before you can unblock your account.');
+  }
+  if (!timingSafeCompare(userData.pinHash, pinHash)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect PIN.');
   }
   // Unblock account
@@ -4920,7 +4989,7 @@ exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
 exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
-  const { amount, currency, purpose, bankDetails, notes } = data;
+  const { amount, currency, purpose, bankDetails, notes, idempotencyKey } = data;
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
@@ -4932,6 +5001,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
   }
 
+  return withIdempotency(idempotencyKey, 'adminPlatformWithdraw', caller.uid, async () => {
   try {
     // Verify sufficient balance in that currency
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -5043,6 +5113,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', `Withdrawal failed: ${error.message}`);
   }
+  }); // end withIdempotency
 });
 
 /**
@@ -5142,7 +5213,7 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
 exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
-  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes } = data;
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
@@ -5157,6 +5228,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
   }
 
+  return withIdempotency(idempotencyKey, 'adminInitiateTransfer', caller.uid, async () => {
   try {
     // Verify sufficient platform balance
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -5338,6 +5410,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', `Transfer failed: ${error.message}`);
   }
+  }); // end withIdempotency
 });
 
 // ============================================================
@@ -6181,6 +6254,11 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
       const senderName = senderUserDoc.exists ? senderUserDoc.data().fullName : 'Unknown';
       const recipientName = recipientUserDoc.exists ? recipientUserDoc.data().fullName : 'Unknown';
+
+      // Check if recipient account is blocked
+      if (recipientUserDoc.exists && recipientUserDoc.data().accountBlocked === true) {
+        throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Recipient account is suspended. Transfer cannot be completed.');
+      }
 
       // Generate transaction ID
       const txId = generateSecureTransactionId();

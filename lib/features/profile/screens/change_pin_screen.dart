@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:crypto/crypto.dart';
 import 'package:iconsax/iconsax.dart';
@@ -125,13 +126,18 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
       }
 
       final newPinHash = _hashPin(pin);
+      final currentPinHash = _currentPinController.text.isNotEmpty
+          ? _hashPin(_currentPinController.text)
+          : null;
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .update({'pinHash': newPinHash});
+      // Change PIN via Cloud Function (server-side write only)
+      final callable = FirebaseFunctions.instance.httpsCallable('changePin');
+      await callable.call({
+        if (currentPinHash != null) 'currentPinHash': currentPinHash,
+        'newPinHash': newPinHash,
+      });
 
-      // Also save to secure storage for offline app lock
+      // Save to secure storage for offline app lock
       await SecureStorageService.savePinHash(newPinHash);
 
       if (!mounted) return;
