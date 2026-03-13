@@ -19,7 +19,12 @@ class PaymentService {
   // ============================================================
 
   /// Paystack public key - safe to include in client
-  static const String _publicKey = 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b';
+  /// TODO: Before launch, replace with live key: pk_live_xxxxx
+  /// Consider using --dart-define or .env for environment-specific config
+  static const String _publicKey = String.fromEnvironment(
+    'PAYSTACK_PUBLIC_KEY',
+    defaultValue: 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b',
+  );
 
   // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 

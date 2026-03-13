@@ -616,7 +616,7 @@ function getCorrelationId(context) {
   }
 
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 10);
+  const random = crypto.randomBytes(4).toString('hex');
   return `corr_${timestamp}_${random}`;
 }
 
@@ -1143,7 +1143,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 // Handle Paystack webhook events
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
-    `webhook_paystack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    `webhook_paystack_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   logSecurityEvent('paystack_webhook_received', 'low', { correlationId: webhookCorrelationId, event: req.body?.event });
 
   // Fail fast if Paystack secret key is not configured
@@ -1488,7 +1488,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     }
 
     // Generate reference
-    const reference = `WD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reference = `WD_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     // Create transfer recipient first
     let recipientData;
@@ -1831,7 +1831,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
   try {
-    const reference = `MOMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reference = `MOMO_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const chargeResponse = await paystackRequest('POST', '/charge', {
       email: email,
@@ -2055,7 +2055,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   await enforceRateLimit(userId, 'initializeTransaction');
 
   try {
-    const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const reference = `TXN_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
@@ -2759,7 +2759,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
   const walletDoc = await db.collection('wallets').doc(userId).get();
   if (!walletDoc.exists) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     await db.runTransaction(async (transaction) => {
@@ -2835,7 +2835,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
 
     // Generate unique wallet ID
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     // Create wallet document
@@ -2935,7 +2935,7 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     const userData = userDoc.exists ? userDoc.data() : {};
 
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     await db.collection('wallets').doc(userId).set({
@@ -6266,6 +6266,10 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
 
 // Check if phone verification is supported for a country
 exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
   const { country } = data;
   
   const supportedCountries = {
@@ -6301,7 +6305,7 @@ exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, cont
 // Helper: Generate secure transaction ID
 function generateSecureTransactionId() {
   const timestamp = Date.now();
-  const random = Math.floor(Math.random() * 10000000);
+  const random = crypto.randomBytes(4).toString('hex');
   return `TXN${timestamp}${random}`;
 }
 
@@ -7238,7 +7242,7 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 
 exports.momoWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
-    `webhook_momo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    `webhook_momo_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   logSecurityEvent('momo_webhook_received', 'low', { correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status });
 
   // ── LAYER 1: HTTP Method Restriction ──
