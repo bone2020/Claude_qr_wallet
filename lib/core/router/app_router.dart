@@ -160,6 +160,14 @@ final routerProvider = Provider<GoRouter>((ref) {
 
               // Phone + email verified for non-Smile-ID country
               // Backend will auto-set kycStatus on first financial operation
+              // Check wallet exists before allowing main screen
+              final walletCheck = await FirebaseFirestore.instance
+                  .collection('wallets')
+                  .doc(currentUser.uid)
+                  .get();
+              if (!walletCheck.exists) {
+                return AppRoutes.kyc; // Send back to KYC to trigger wallet creation
+              }
               return AppRoutes.main;
             }
           }
@@ -235,7 +243,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
 
           // Phone + email verified — backend auto-verifies on first financial op
+          // But verify wallet exists
+          final walletExists = await FirebaseFirestore.instance
+              .collection('wallets')
+              .doc(currentUser.uid)
+              .get();
+          if (!walletExists.exists) {
+            return AppRoutes.kyc;
+          }
           return null;
+        }
+
+        // Final check: if going to main screen, verify wallet exists
+        if (location == AppRoutes.main) {
+          final walletFinal = await FirebaseFirestore.instance
+              .collection('wallets')
+              .doc(currentUser.uid)
+              .get();
+          if (!walletFinal.exists) {
+            return AppRoutes.kyc;
+          }
         }
       } catch (e) {
         // On error, allow navigation — server-side enforcement (Issue 1)

@@ -6,7 +6,11 @@ class ExchangeRateService {
 
   static Map<String, double>? _cachedRates;
   static DateTime? _cacheTime;
-  static const Duration _cacheDuration = Duration(minutes: 30);
+  static bool _usingFallbackRates = false;
+  static const Duration _cacheDuration = Duration(minutes: 10);
+
+  /// Returns true if the service is currently using hardcoded fallback rates
+  static bool get isUsingFallbackRates => _usingFallbackRates;
 
   // Fallback rates (used if Firestore fails)
   static const Map<String, double> _fallbackRates = {
@@ -80,11 +84,13 @@ class ExchangeRateService {
         );
         _cachedRates = rates;
         _cacheTime = DateTime.now();
+        _usingFallbackRates = false;
         return rates;
       }
     } catch (e) {
       print('Error fetching rates from Firestore: $e');
     }
+    _usingFallbackRates = true;
     return _fallbackRates;
   }
 

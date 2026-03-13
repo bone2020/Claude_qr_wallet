@@ -144,6 +144,21 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Admin activity - Cloud Functions only
+    match /admin_activity/{docId} {
+      allow read, write: if false;
+    }
+
+    // Fraud alerts - Cloud Functions only
+    match /fraud_alerts/{docId} {
+      allow read, write: if false;
+    }
+
+    // Recovery OTPs - Cloud Functions only
+    match /recovery_otps/{docId} {
+      allow read, write: if false;
+    }
+
     // Flagged transactions - Cloud Functions only (fraud review)
     match /flagged_transactions/{txId} {
       allow read, write: if false;

@@ -853,7 +853,7 @@ function fetchRates() {
 
 // Scheduled function - runs daily at midnight UTC
 exports.updateExchangeRatesDaily = functions.pubsub
-  .schedule('0 0 * * *')
+  .schedule('every 6 hours')
   .timeZone('UTC')
   .onRun(async (context) => {
     try {
@@ -1596,7 +1596,8 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         });
       });
 
-      throwServiceError('paystack', new Error('Failed to initiate transfer'));
+      throw new functions.https.HttpsError('unavailable',
+        'Withdrawal could not be completed. Your funds have been refunded to your wallet. Please try again.');
     }
 
     // Check if OTP is required
@@ -1932,6 +1933,9 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
 
+  // Rate limit virtual account creation
+  await enforceRateLimit(userId, 'getOrCreateVirtualAccount');
+
   try {
     // Check if user already has a virtual account
     const userDoc = await db.collection('users').doc(userId).get();
@@ -2218,6 +2222,7 @@ const RATE_LIMITS = {
   exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
+  getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
 };
 
 /**
@@ -3156,8 +3161,8 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
  * @returns {Promise<any>} - Cached result (if replay) or fresh result
  */
 async function withIdempotency(key, operation, userId, executeOperation) {
-  if (!key || typeof key !== 'string' || key.length < 16) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Idempotency key required (min 16 characters).');
+  if (!key || typeof key !== 'string' || key.length < 32) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Idempotency key required (min 32 characters).');
   }
 
   const idempotencyRef = db.collection('idempotency_keys').doc(key);
@@ -3429,6 +3434,96 @@ exports.cleanupExpiredData = functions.pubsub
     return null;
   });
 
+/**
+ * Auto-fail pending MoMo transactions older than 24 hours.
+ * Refunds wallet for disbursements that were debited but never completed.
+ * Runs every 6 hours.
+ */
+exports.cleanupPendingMomoTransactions = functions.pubsub
+  .schedule('every 6 hours')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
+
+      const pendingTx = await db.collection('momo_transactions')
+        .where('status', '==', 'pending')
+        .where('createdAt', '<', cutoff)
+        .limit(50)
+        .get();
+
+      if (pendingTx.empty) {
+        logInfo('No stale pending MoMo transactions found');
+        return null;
+      }
+
+      logInfo('Found stale pending MoMo transactions', { count: pendingTx.size });
+
+      for (const txDoc of pendingTx.docs) {
+        const txData = txDoc.data();
+
+        try {
+          // If this was a disbursement (money already debited), refund the wallet
+          if (txData.type === 'disbursement' && txData.userId) {
+            await db.runTransaction(async (transaction) => {
+              const walletDoc = await transaction.get(db.collection('wallets').doc(txData.userId));
+              if (walletDoc.exists) {
+                const walletData = walletDoc.data();
+                const newBalance = safeAdd(walletData.balance, txData.amount, 'momoCleanup refund');
+                transaction.update(walletDoc.ref, {
+                  balance: newBalance,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+
+              // Mark transaction as failed/refunded
+              transaction.update(txDoc.ref, {
+                status: 'failed',
+                failureReason: 'Transaction timed out after 24 hours',
+                refunded: txData.type === 'disbursement',
+                refundedAt: txData.type === 'disbursement' ? admin.firestore.FieldValue.serverTimestamp() : null,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            });
+
+            // Notify user
+            await sendPushNotification(txData.userId, {
+              title: 'MoMo Transaction Failed',
+              body: `Your MoMo ${txData.type === 'disbursement' ? 'withdrawal' : 'deposit'} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has timed out. ${txData.type === 'disbursement' ? 'The amount has been refunded to your wallet.' : 'Please try again.'}`,
+              type: 'transaction',
+              data: { action: 'momo_timeout', referenceId: txDoc.id },
+            }).catch(() => {});
+          } else {
+            // Collection (deposit) — just mark as failed, no refund needed
+            await txDoc.ref.update({
+              status: 'failed',
+              failureReason: 'Transaction timed out after 24 hours',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            if (txData.userId) {
+              await sendPushNotification(txData.userId, {
+                title: 'MoMo Deposit Failed',
+                body: `Your MoMo deposit of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has timed out. No charge was made. Please try again.`,
+                type: 'transaction',
+                data: { action: 'momo_timeout', referenceId: txDoc.id },
+              }).catch(() => {});
+            }
+          }
+
+          logInfo('Cleaned up stale MoMo transaction', { referenceId: txDoc.id, type: txData.type });
+        } catch (err) {
+          logError('Failed to cleanup MoMo transaction', { referenceId: txDoc.id, error: err.message });
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logError('MoMo cleanup job failed', { error: error.message });
+      throw error;
+    }
+  });
+
 // ============================================================
 // TRANSACTION STATE MACHINE
 // ============================================================
@@ -3470,7 +3565,14 @@ function normalizeStatus(status) {
     'PENDING': 'pending',
     'FAILED': 'failed',
   };
-  return map[status] || status.toLowerCase();
+  const normalized = map[status] || status.toLowerCase();
+  // Validate against known states — unknown statuses default to 'failed'
+  const validStates = Object.values(TRANSACTION_STATES);
+  if (!validStates.includes(normalized)) {
+    logError('Unknown transaction status received', { original: status, normalized });
+    return 'failed';
+  }
+  return normalized;
 }
 
 /**
@@ -6278,8 +6380,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
           `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
       }
 
-      // Check balance (safeSubtract validates the arithmetic)
-      safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
+      // Check balance and calculate new values
+      const newSenderBalance = safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
 
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
@@ -6318,9 +6420,11 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const txId = generateSecureTransactionId();
       const now = new Date();
 
-      // Deduct from sender
+      // Deduct from sender (use explicit balance, not increment, for financial safety)
+      const newRecipientBalance = safeAdd(recipientData.balance, amount, 'sendMoney recipient credit');
+
       transaction.update(senderWalletRef, {
-        balance: admin.firestore.FieldValue.increment(-totalDebit),
+        balance: newSenderBalance,
         dailySpent: admin.firestore.FieldValue.increment(totalDebit),
         monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
         updatedAt: timestamps.serverTimestamp()
@@ -6328,7 +6432,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
       // Add to recipient
       transaction.update(recipientRef, {
-        balance: admin.firestore.FieldValue.increment(amount),
+        balance: newRecipientBalance,
         updatedAt: timestamps.serverTimestamp()
       });
 
@@ -6336,9 +6440,21 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
       const senderCurrency = senderData.currency || 'NGN';
-      
+
       // Get exchange rates for USD conversion
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+
+      // Block cross-currency transactions if rates are stale (>25 hours old)
+      const recipientCurrency = recipientData.currency || 'NGN';
+      if (senderCurrency !== recipientCurrency) {
+        if (!ratesDoc.exists) {
+          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable. Cross-currency transfers are temporarily disabled.');
+        }
+        const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
+        if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
+          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated. Cross-currency transfers are temporarily disabled. Please try again later.');
+        }
+      }
       const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
       const exchangeRate = rates[senderCurrency] || 1;
       const feeInUSD = fee / exchangeRate;
