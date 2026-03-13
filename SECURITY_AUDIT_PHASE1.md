@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-13
 **Scope:** Cloud Functions (`functions/index.js`), Firestore/Storage Rules, Flutter App (`lib/`), Admin Dashboard
-**Total Findings:** 42 (5 Critical, 8 High, 17 Medium, 12 Low)
+**Total Findings:** 45 (5 Critical, 9 High, 18 Medium, 13 Low)
 
 ---
 
@@ -183,13 +183,19 @@ Fix: Add HMAC integrity check before storage. Validate all pending
 
 ### M-1: markUserAlreadyEnrolled Callable by Any Authenticated User — KYC Bypass
 ```
-[🟢 MEDIUM] File: functions/index.js (line ~2890)
-Issue: Any authenticated user can call markUserAlreadyEnrolled, which sets
-       kycStatus='verified' and creates a wallet. The function does not verify
-       the "already enrolled" claim with SmileID's API.
-Impact: A user can bypass KYC entirely without ever interacting with SmileID.
-Fix: Verify the claim by calling SmileID's API, or restrict to server-only.
+[🟡 HIGH] File: functions/index.js (line ~2890)
+Issue: Any authenticated user can call markUserAlreadyEnrolled, which
+       unconditionally sets kycStatus='verified', creates KYC documents, and
+       creates a wallet. The function never contacts SmileID to verify the
+       "already enrolled" claim — it trusts the client's assertion entirely.
+Impact: Complete KYC bypass for ANY authenticated user regardless of country
+       or prior verification. This is a direct path to full financial access
+       without identity verification.
+Fix: Either: (a) restrict to admin-only via verifyAdmin('admin'), (b) call
+     SmileID API to verify enrollment before setting kycStatus, or (c) remove
+     this function and handle via completeKycVerification.
 ```
+**NOTE: Elevated to HIGH severity — this is a direct, unconditional KYC bypass.**
 
 ### M-2: Cross-Currency Sends Not Converted Server-Side
 ```
@@ -350,9 +356,24 @@ Impact: Low practical impact but violates consistent-read principle within
 Fix: Use transaction.get() for exchange rates document.
 ```
 
+### M-18: chargeMobileMoney and initializeTransaction Have No Effective Rate Limiting
+```
+[🟢 MEDIUM] File: functions/index.js (lines ~1819, ~2055, ~2215-2226)
+Issue: Both functions call enforceRateLimit but their operation names
+       ('chargeMobileMoney', 'initializeTransaction') are missing from the
+       RATE_LIMITS config object. When checkRateLimitPersistent receives an
+       unknown operation, it logs a warning and returns true (allow).
+Impact: These two financial functions have zero effective persistent rate
+       limiting. An attacker can initiate unlimited mobile money charges or
+       create unlimited Paystack payment sessions.
+Fix: Add entries to the RATE_LIMITS object:
+     chargeMobileMoney: { windowMs: 60*60*1000, maxRequests: 10, ... },
+     initializeTransaction: { windowMs: 60*60*1000, maxRequests: 20, ... },
+```
+
 ---
 
-## 4. LOW Issues (12)
+## 4. LOW Issues (13)
 
 ### L-1: print() Statements Leak Financial Data to Device Logs
 ```
@@ -449,6 +470,17 @@ Issue: Fee minimum (10) and maximum (100) are in sender's local currency
 Fix: Define per-currency fee bounds or use percentage-only model.
 ```
 
+### L-13: momoCheckStatus Does Not Check accountBlocked Before Crediting
+```
+[⚪ LOW] File: functions/index.js (line ~6851)
+Issue: momoCheckStatus checks auth and KYC but does not check accountBlocked
+       before crediting the wallet when a MoMo collection succeeds.
+Impact: A user blocked after initiating a MoMo collection can still poll for
+       status and trigger a wallet credit. Window is narrow but allows a
+       blocked user to receive funds.
+Fix: Add accountBlocked check before the wallet credit path.
+```
+
 ---
 
 ## Summary
@@ -456,9 +488,9 @@ Fix: Define per-currency fee bounds or use percentage-only model.
 | Severity | Count | Key Themes |
 |----------|-------|------------|
 | 🔴 CRITICAL | 5 | Unauthenticated webhook, KYC bypass, broken admin RBAC, privilege escalation via Firestore, wallet balance minting |
-| 🟡 HIGH | 8 | Dead webhook code, OTP exposure, double-credit race conditions, stale exchange rates, floating-point finance, unsigned offline queue |
-| 🟢 MEDIUM | 17 | KYC bypass via markUserAlreadyEnrolled, cross-currency corruption, missing input validation, rate limit fail-open, PII exposure, Firestore rule gaps |
-| ⚪ LOW | 12 | Debug logging, unsalted PIN hash, hardcoded test keys, pagination limits, symbol inconsistencies |
+| 🟡 HIGH | 9 | Dead webhook code, OTP exposure, double-credit race conditions, stale exchange rates, floating-point finance, unsigned offline queue, markUserAlreadyEnrolled KYC bypass |
+| 🟢 MEDIUM | 18 | Cross-currency corruption, missing input validation, rate limit fail-open, zero rate limiting on 2 functions, PII exposure, Firestore rule gaps |
+| ⚪ LOW | 13 | Debug logging, unsalted PIN hash, hardcoded test keys, pagination limits, symbol inconsistencies, blocked user MoMo credit |
 
 ## Priority Remediation Order
 
@@ -467,11 +499,12 @@ Fix: Define per-currency fee bounds or use percentage-only model.
 3. **C-4**: Block role field in Firestore rules (lines 46, 48) — privilege escalation
 4. **C-5**: Add balance validation to wallet create rule (line 96) — money minting
 5. **C-3**: Fix admin claims key mismatch (line 4155) — admin system broken
-6. **H-3/H-4**: Fix non-transactional wallet reads in MoMo functions — double-credit
-7. **H-5**: Fix sendMoney recipient wallet read — lost credits
-8. **H-2**: Remove plaintext OTP from admin response — account takeover
-9. **M-1**: Add server verification to markUserAlreadyEnrolled — KYC bypass
+6. **M-1**: Restrict markUserAlreadyEnrolled to admin-only or add SmileID verification — KYC bypass (elevated to HIGH)
+7. **H-3/H-4**: Fix non-transactional wallet reads in MoMo functions — double-credit
+8. **H-5**: Fix sendMoney recipient wallet read — lost credits
+9. **H-2**: Remove plaintext OTP from admin response — account takeover
 10. **M-2**: Implement server-side currency conversion — balance corruption
+11. **M-18**: Add chargeMobileMoney and initializeTransaction to RATE_LIMITS config — zero rate limiting
 
 ## Positive Findings
 
