@@ -1825,7 +1825,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
   }
 
   // Validate currency and phone number format
-  const validatedCurrency = validateCurrency(currency, 'GHS');
+  const validatedCurrency = validateCurrency(currency, 'NGN');
   const validatedPhone = validatePhoneNumber(phoneNumber);
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
@@ -1835,7 +1835,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
     const chargeResponse = await paystackRequest('POST', '/charge', {
       email: email,
       amount: Math.round(amount * 100),
-      currency: currency || 'GHS',
+      currency: currency || 'NGN',
       mobile_money: {
         phone: validatedPhone,
         provider: provider,
@@ -1879,7 +1879,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
             id: txRef.id,
             type: 'deposit',
             amount: amount,
-            currency: currency || 'GHS',
+            currency: currency || 'NGN',
             status: 'completed',
             reference: reference,
             description: 'Mobile Money deposit',
@@ -2037,7 +2037,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
   }
 
   // Validate currency
-  const validatedCurrency = validateCurrency(currency, 'GHS');
+  const validatedCurrency = validateCurrency(currency, 'NGN');
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
@@ -2074,7 +2074,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
         email,
         expectedAmount: amount,
         expectedAmountKobo: Math.round(amount * 100),
-        currency: currency || 'GHS',
+        currency: currency || 'NGN',
         reference,
         paystackReference: response.data.reference,
         status: 'pending',
@@ -2768,7 +2768,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
         id: userId,
         userId: userId,
         walletId: walletId,
-        currency: userData.currency || 'GHS',
+        currency: userData.currency || 'NGN',
         balance: 0,
         isActive: true,
         dailySpent: 0,
@@ -2838,7 +2838,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
       id: userId,
       userId: userId,
       walletId: walletId,
-      currency: userData.currency || 'GHS',
+      currency: userData.currency || 'NGN',
       balance: 0,
       isActive: true,
       dailySpent: 0,
@@ -2937,7 +2937,7 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
       id: userId,
       userId: userId,
       walletId: walletId,
-      currency: userData.currency || 'GHS',
+      currency: userData.currency || 'NGN',
       balance: 0,
       isActive: true,
       dailySpent: 0,
@@ -4327,7 +4327,7 @@ exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
     wallet = {
       id: walletSnapshot.docs[0].id,
       balance: walletData.balance || 0,
-      currency: walletData.currency || 'GHS',
+      currency: walletData.currency || 'NGN',
     };
   }
 
@@ -6335,7 +6335,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // ============================================
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
-      const senderCurrency = senderData.currency || 'GHS';
+      const senderCurrency = senderData.currency || 'NGN';
       
       // Get exchange rates for USD conversion
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
@@ -6386,9 +6386,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         receiverName: recipientName,
         amount: amount,
         fee: fee,
-        currency: senderData.currency || 'GHS',
-        senderCurrency: senderData.currency || 'GHS',
-        receiverCurrency: recipientData.currency || 'GHS',
+        currency: senderData.currency || 'NGN',
+        senderCurrency: senderData.currency || 'NGN',
+        receiverCurrency: recipientData.currency || 'NGN',
         note: note || '',
         status: 'completed',
         createdAt: timestamps.serverTimestamp(),
@@ -6418,8 +6418,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         recipientName: recipientName,
         senderName: senderName,
         recipientUid: recipientUid,
-        senderCurrency: senderData.currency || 'GHS',
-        recipientCurrency: recipientData.currency || 'GHS',
+        senderCurrency: senderData.currency || 'NGN',
+        recipientCurrency: recipientData.currency || 'NGN',
         newBalance: senderBalance - totalDebit
       };
     });
@@ -6428,7 +6428,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'success',
-      amount, currency: result.currency || 'GHS',
+      amount, currency: result.currency || 'NGN',
       metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee, ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
@@ -6990,18 +6990,6 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
 
-      // Store pending withdrawal
-      transaction.set(db.collection('momo_transactions').doc(referenceId), {
-        type: 'disbursement',
-        userId: userId,
-        amount: amount,
-        currency: validatedCurrency,
-        phoneNumber: validatedPhone,
-        status: TRANSACTION_STATES.PENDING,
-        referenceId: referenceId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
-      });
 
       // Record in user's transactions subcollection for UI display
       transaction.set(db.collection('users').doc(userId).collection('transactions').doc(referenceId), {
