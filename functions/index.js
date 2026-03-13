@@ -2621,7 +2621,7 @@ async function enforceKyc(userId) {
   const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
 
   const userCountry = (userData.country || '').toUpperCase().trim();
-  const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');
+  const userPhoneVerified = userData.phoneVerified === true;
 
   // If user is NOT in a Smile ID country and has verified email + phone,
   // auto-verify their KYC status so they can use financial services.
@@ -4152,7 +4152,7 @@ async function verifyAdmin(context, requiredRole = 'support') {
 
   const uid = context.auth.uid;
   const claims = context.auth.token;
-  const role = claims.adminRole;
+  const role = claims.role;
 
   if (!role) {
     throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
@@ -7436,7 +7436,34 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
 
   try {
     const data = req.body;
-    logInfo('Smile ID webhook received', {
+
+    // Verify webhook signature to confirm request is from SmileID
+    const receivedSignature = data.signature;
+    const receivedTimestamp = data.timestamp;
+
+    if (!receivedSignature || !receivedTimestamp) {
+      logSecurityEvent('smileid_webhook_no_signature', 'high', { ip: req.ip });
+      res.status(401).send('Missing signature');
+      return;
+    }
+
+    // SmileID signature: HMAC-SHA256(apiKey, timestamp + partnerID + "sid_request")
+    const expectedData = receivedTimestamp + SMILE_ID_PARTNER_ID + 'sid_request';
+    const expectedSignature = crypto
+      .createHmac('sha256', SMILE_ID_API_KEY)
+      .update(expectedData)
+      .digest('base64');
+
+    if (!timingSafeCompare(receivedSignature, expectedSignature, 'base64')) {
+      logSecurityEvent('smileid_webhook_invalid_signature', 'critical', {
+        ip: req.ip,
+        receivedTimestamp,
+      });
+      res.status(401).send('Invalid signature');
+      return;
+    }
+
+    logInfo('Smile ID webhook received (signature verified)', {
       jobId: data.job_id,
       jobType: data.job_type,
       resultCode: data.result_code,

@@ -39,13 +39,21 @@ service cloud.firestore {
         : request.resource.data.pinSalt == resource.data.pinSalt);
     }
 
+    // Helper: Ensure role field is not modified by client
+    // role can only be set by Cloud Functions (Admin SDK) via admin promote/demote
+    function roleUnchanged() {
+      return !('role' in resource.data)
+        ? !request.resource.data.keys().hasAny(['role'])
+        : request.resource.data.role == resource.data.role;
+    }
+
     // Users collection - own data only
     match /users/{userId} {
       allow read: if isOwner(userId);
       // Allow create without kycStatus (new user signup)
-      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus', 'pinHash', 'pinSalt']);
+      allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus', 'pinHash', 'pinSalt', 'role']);
       // Allow update but kycStatus and accountBlocked must not be modified (server-only fields)
-      allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged() && pinHashUnchanged();
+      allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged() && pinHashUnchanged() && roleUnchanged();
       allow delete: if false;
 
       // Transactions - read only (writes via Cloud Functions)
@@ -93,7 +101,13 @@ service cloud.firestore {
     // Wallets - read own only, create during signup, updates via Cloud Functions
     match /wallets/{walletId} {
       allow read: if isAuthenticated() && request.auth.uid == walletId;
-      allow create: if isAuthenticated() && request.auth.uid == walletId;
+      // Create requires: balance must be 0, userId must match auth, and walletId must be present
+      allow create: if isAuthenticated()
+        && request.auth.uid == walletId
+        && request.resource.data.balance == 0
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['walletId', 'currency', 'balance'])
+        && !request.resource.data.keys().hasAny(['isAdmin', 'role']);
       allow update, delete: if false;
     }
 
