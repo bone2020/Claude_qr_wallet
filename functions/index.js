@@ -2223,6 +2223,8 @@ const RATE_LIMITS = {
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
+  chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
+  initializeTransaction: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many payment initializations. Please try again later.' },
 };
 
 /**
@@ -2892,7 +2894,10 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const userId = context.auth.uid;
+  // Restrict to admin only — prevents any user from self-verifying KYC
+  const caller = await verifyAdmin(context, 'admin');
+
+  const userId = data.targetUserId || context.auth.uid;
   const { idType } = data || {};
 
   logInfo('Processing SmileID already enrolled user', { userId, idType });
@@ -4727,11 +4732,10 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Return OTP to admin for manual delivery (secure internal process)
- return {
+  // Return result — OTP is delivered via SMS only
+  return {
     success: true,
-    message: 'Recovery OTP sent via SMS.',
-    otp, // Keep as fallback in case SMS fails — remove this line when going fully live
+    message: 'Recovery OTP sent via SMS. The user should receive it within 1-2 minutes.',
     phoneNumber: maskedPhone,
     expiresInMinutes: 10,
   };
@@ -6402,9 +6406,15 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND);
       }
 
-      const recipientDoc = recipientQuery.docs[0];
-      const recipientUid = recipientDoc.id;
-      const recipientRef = recipientDoc.ref;
+      const recipientUid = recipientQuery.docs[0].id;
+      const recipientRef = db.collection('wallets').doc(recipientUid);
+      // Re-read transactionally to get consistent balance
+      const recipientDoc = await transaction.get(recipientRef);
+
+      if (!recipientDoc.exists) {
+        throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND);
+      }
+
       const recipientData = recipientDoc.data();
       validateWalletDocument(recipientData, 'sendMoney recipient wallet');
 
@@ -6892,21 +6902,18 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
               return; // Already processed by another concurrent call
             }
 
-            // Get user's wallet
-            const walletSnapshot = await db.collection('wallets')
-              .where('userId', '==', txData.userId)
-              .limit(1)
-              .get();
+            // Get user's wallet (transactional read for consistency)
+            const walletRef = db.collection('wallets').doc(txData.userId);
+            const walletDoc = await transaction.get(walletRef);
 
-            if (!walletSnapshot.empty) {
-              const walletDoc = walletSnapshot.docs[0];
+            if (walletDoc.exists) {
               const walletData = walletDoc.data();
               validateWalletDocument(walletData, 'momoCheckStatus wallet');
 
               if (txData.type === 'collection') {
                 // Add money - credit wallet
                 const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus credit');
-                transaction.update(walletDoc.ref, {
+                transaction.update(walletRef, {
                   balance: creditBalance,
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
@@ -6974,26 +6981,23 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
 
           // Refund wallet for failed disbursements (money was already debited)
           if (txData.type === 'disbursement') {
-            const walletSnapshot = await db.collection('wallets')
-              .where('userId', '==', txData.userId)
-              .limit(1)
-              .get();
-
-            if (!walletSnapshot.empty) {
-              const walletDoc = walletSnapshot.docs[0];
+            const walletRef = db.collection('wallets').doc(txData.userId);
+            await db.runTransaction(async (refundTx) => {
+              const walletDoc = await refundTx.get(walletRef);
+              if (!walletDoc.exists) return;
               const walletData = walletDoc.data();
               const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus refund');
-              await walletDoc.ref.update({
+              refundTx.update(walletRef, {
                 balance: refundBalance,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
+            });
 
-              logInfo('Refunded wallet for failed MoMo disbursement', {
-                userId: txData.userId,
-                amount: txData.amount,
-                referenceId,
-              });
-            }
+            logInfo('Refunded wallet for failed MoMo disbursement', {
+              userId: txData.userId,
+              amount: txData.amount,
+              referenceId,
+            });
           }
         } else {
           // Other statuses (PENDING etc) - just update momo transaction
@@ -7333,19 +7337,16 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
     if (effectiveStatus === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
       await db.runTransaction(async (transaction) => {
-        const walletSnapshot = await db.collection('wallets')
-          .where('userId', '==', txData.userId)
-          .limit(1)
-          .get();
+        const walletRef = db.collection('wallets').doc(txData.userId);
+        const walletDoc = await transaction.get(walletRef);
 
-        if (!walletSnapshot.empty) {
-          const walletDoc = walletSnapshot.docs[0];
+        if (walletDoc.exists) {
           const walletData = walletDoc.data();
           validateWalletDocument(walletData, 'momoWebhook SUCCESSFUL wallet');
 
           if (txData.type === 'collection') {
             const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook collection credit');
-            transaction.update(walletDoc.ref, {
+            transaction.update(walletRef, {
               balance: creditBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -7378,18 +7379,15 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
       // Refund if disbursement failed
       if (txData.type === 'disbursement') {
         await db.runTransaction(async (transaction) => {
-          const walletSnapshot = await db.collection('wallets')
-            .where('userId', '==', txData.userId)
-            .limit(1)
-            .get();
+          const walletRef = db.collection('wallets').doc(txData.userId);
+          const walletDoc = await transaction.get(walletRef);
 
-          if (!walletSnapshot.empty) {
-            const walletDoc = walletSnapshot.docs[0];
+          if (walletDoc.exists) {
             const walletData = walletDoc.data();
             validateWalletDocument(walletData, 'momoWebhook FAILED refund wallet');
             const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook disbursement refund');
 
-            transaction.update(walletDoc.ref, {
+            transaction.update(walletRef, {
               balance: refundBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -7515,6 +7513,9 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
         .collection('users')
         .doc(userId)
         .update({
+          kycStatus: 'verified',
+          kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          kycCompleted: true,
           kycVerified: true,
           isVerified: true,
           'kycDetails.smileIdConfirmed': true,
@@ -7522,7 +7523,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
           'kycDetails.smileIdJobId': smileJobId,
           'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
         });
-      logInfo('Smile ID webhook: user verified', { userId, resultCode });
+      logInfo('Smile ID webhook: user verified (kycStatus set)', { userId, resultCode });
     } else {
       logInfo('Smile ID webhook: verification not passed', { userId, resultCode, resultText });
     }
