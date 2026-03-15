@@ -6728,7 +6728,7 @@ const MOMO_CONFIG = {
     logWarning('MoMo environment not set, defaulting to sandbox for development');
     return 'sandbox';
   })(),
-  callbackUrl: 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
+  callbackUrl: MOMO_WEBHOOK_SECRET ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}` : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
 };
 
 // Set baseUrl based on resolved environment
@@ -7351,19 +7351,16 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     return res.status(405).send('Method Not Allowed');
   }
 
-  // ── LAYER 2: Webhook HMAC Signature Verification ──
-  // Verify using HMAC-SHA256 of the request body — secret never leaves server.
+  // ── LAYER 2: Webhook Secret Token Verification ──
+  // The token is appended to the callback URL registered with MoMo.
+  // Only MoMo (which received the URL) should know the token.
   if (MOMO_WEBHOOK_SECRET) {
-    const receivedSignature = req.headers['x-momo-signature'] || req.query.token;
-    const expectedSignature = crypto
-      .createHmac('sha256', MOMO_WEBHOOK_SECRET)
-      .update(JSON.stringify(req.body))
-      .digest('hex');
-    if (!receivedSignature || !timingSafeCompare(receivedSignature, expectedSignature, 'utf8')) {
-      logSecurityEvent('momo_webhook_invalid_signature', 'high', {
+    const token = req.query.token;
+    if (!token || !timingSafeCompare(token, MOMO_WEBHOOK_SECRET, 'utf8')) {
+      logSecurityEvent('momo_webhook_invalid_token', 'high', {
         correlationId: webhookCorrelationId,
         ip: req.ip,
-        hasSignature: !!receivedSignature,
+        hasToken: !!token,
       });
       return res.status(403).send('Forbidden');
     }

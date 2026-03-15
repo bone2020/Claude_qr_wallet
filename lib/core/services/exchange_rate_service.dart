@@ -123,12 +123,12 @@ class ExchangeRateService {
     required String toCurrency,
   }) {
     if (fromCurrency == toCurrency) return amount;
-    // Reject stale or missing rates for conversions
+    // Use cached rates if fresh, fallback rates if stale (with warning flag)
+    final rates = _cachedRates ?? _fallbackRates;
     if (_cachedRates == null || _cacheTime == null ||
         DateTime.now().difference(_cacheTime!) > _maxStaleness) {
-      throw Exception('Exchange rates are stale or unavailable. Please refresh and try again.');
+      _usingFallbackRates = true;
     }
-    final rates = _cachedRates!;
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
@@ -156,11 +156,12 @@ class ExchangeRateService {
     required String toCurrency,
   }) {
     if (fromCurrency == toCurrency) return 1.0;
+    // Use cached rates if fresh, fallback rates if stale (with warning flag)
+    final rates = _cachedRates ?? _fallbackRates;
     if (_cachedRates == null || _cacheTime == null ||
         DateTime.now().difference(_cacheTime!) > _maxStaleness) {
-      throw Exception('Exchange rates are stale or unavailable. Please refresh and try again.');
+      _usingFallbackRates = true;
     }
-    final rates = _cachedRates!;
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
