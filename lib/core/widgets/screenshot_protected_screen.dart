@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// A wrapper widget that provides screenshot protection for sensitive screens
-class ScreenshotProtectedScreen extends StatelessWidget {
+import '../services/screenshot_prevention_service.dart';
+
+class ScreenshotProtectedScreen extends StatefulWidget {
   final Widget child;
 
   const ScreenshotProtectedScreen({
@@ -10,9 +11,26 @@ class ScreenshotProtectedScreen extends StatelessWidget {
   });
 
   @override
+  State<ScreenshotProtectedScreen> createState() => _ScreenshotProtectedScreenState();
+}
+
+class _ScreenshotProtectedScreenState extends State<ScreenshotProtectedScreen> {
+  final _screenshotService = ScreenshotPreventionService();
+
+  @override
+  void initState() {
+    super.initState();
+    _screenshotService.enableProtection();
+  }
+
+  @override
+  void dispose() {
+    _screenshotService.disableProtection();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // The actual screenshot prevention is handled by the service
-    // This widget just wraps the child
-    return child;
+    return widget.child;
   }
 }

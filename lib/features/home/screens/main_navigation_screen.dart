@@ -4,7 +4,6 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
-import '../../../core/services/screenshot_prevention_service.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'home_screen.dart';
 import '../../transactions/screens/transactions_screen.dart';
@@ -21,7 +20,6 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
-  final _screenshotService = ScreenshotPreventionService();
   DateTime? _backgroundTime;
   static const _lockGracePeriod = Duration(seconds: 60);
 
@@ -35,13 +33,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _screenshotService.enableProtection();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _screenshotService.disableProtection();
     super.dispose();
   }
 
@@ -50,7 +46,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (state == AppLifecycleState.paused) {
       _backgroundTime = DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
-      _screenshotService.enableProtection();
       _checkAppLock();
     }
   }
