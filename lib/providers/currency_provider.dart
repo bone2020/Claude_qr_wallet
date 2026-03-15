@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -92,19 +93,11 @@ class CurrencyNotifier extends StateNotifier<CurrencyState> {
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-        // Also update wallet currency
-        final walletDoc = await _firestore
-            .collection('wallets')
-            .where('userId', isEqualTo: user.uid)
-            .limit(1)
-            .get();
-
-        if (walletDoc.docs.isNotEmpty) {
-          await walletDoc.docs.first.reference.update({
-            'currency': newCurrency.code,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
+        // Update wallet currency via Cloud Function (wallet updates blocked at rules level)
+        final callable = FirebaseFunctions.instance.httpsCallable('updateWalletCurrency');
+        await callable.call<Map<String, dynamic>>({
+          'currency': newCurrency.code,
+        });
 
         state = state.copyWith(currency: newCurrency, isLoading: false);
         return true;

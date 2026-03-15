@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Exchange rate service with Firestore + fallback
@@ -88,7 +89,7 @@ class ExchangeRateService {
         return rates;
       }
     } catch (e) {
-      print('Error fetching rates from Firestore: $e');
+      debugPrint('Error fetching rates from Firestore: $e');
     }
     _usingFallbackRates = true;
     return _fallbackRates;
@@ -113,13 +114,21 @@ class ExchangeRateService {
     return (amount / fromRate) * toRate;
   }
 
+  /// Maximum age before cached rates are considered stale
+  static const Duration _maxStaleness = Duration(hours: 1);
+
   static double convert({
     required double amount,
     required String fromCurrency,
     required String toCurrency,
   }) {
     if (fromCurrency == toCurrency) return amount;
-    final rates = _cachedRates ?? _fallbackRates;
+    // Reject stale or missing rates for conversions
+    if (_cachedRates == null || _cacheTime == null ||
+        DateTime.now().difference(_cacheTime!) > _maxStaleness) {
+      throw Exception('Exchange rates are stale or unavailable. Please refresh and try again.');
+    }
+    final rates = _cachedRates!;
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
@@ -147,7 +156,11 @@ class ExchangeRateService {
     required String toCurrency,
   }) {
     if (fromCurrency == toCurrency) return 1.0;
-    final rates = _cachedRates ?? _fallbackRates;
+    if (_cachedRates == null || _cacheTime == null ||
+        DateTime.now().difference(_cacheTime!) > _maxStaleness) {
+      throw Exception('Exchange rates are stale or unavailable. Please refresh and try again.');
+    }
+    final rates = _cachedRates!;
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
@@ -177,7 +190,7 @@ class ExchangeRateService {
         return timestamp?.toDate();
       }
     } catch (e) {
-      print('Error getting update time: $e');
+      debugPrint('Error getting update time: $e');
     }
     return null;
   }

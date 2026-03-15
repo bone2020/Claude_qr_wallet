@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -62,7 +63,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
-      print('LOOKUP RESPONSE: $data');
+      debugPrint('LOOKUP RESPONSE: $data');
 
       if (data['found'] != true) {
         return WalletLookupResult.notFound();
@@ -165,7 +166,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
-      print('LOOKUP RESPONSE: $data');
+      debugPrint('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get sender's wallet for currency info
@@ -244,7 +245,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       });
 
       final data = result.data;
-      print('LOOKUP RESPONSE: $data');
+      debugPrint('LOOKUP RESPONSE: $data');
 
       if (data['success'] == true) {
         // Get wallet info for transaction model

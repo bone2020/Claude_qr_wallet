@@ -20,12 +20,15 @@ service cloud.firestore {
         : request.resource.data.kycStatus == resource.data.kycStatus;
     }
 
-    // Helper: Ensure accountBlocked field is not modified by client
+    // Helper: Ensure accountBlocked field and metadata are not modified by client
     // accountBlocked can only be set by Cloud Functions (Admin SDK)
     function accountBlockedUnchanged() {
-      return !('accountBlocked' in resource.data)
+      return (!('accountBlocked' in resource.data)
         ? !request.resource.data.keys().hasAny(['accountBlocked', 'accountBlockedAt', 'accountBlockedBy', 'accountUnblockedAt'])
-        : request.resource.data.accountBlocked == resource.data.accountBlocked;
+        : request.resource.data.accountBlocked == resource.data.accountBlocked
+          && request.resource.data.get('accountBlockedAt', null) == resource.data.get('accountBlockedAt', null)
+          && request.resource.data.get('accountBlockedBy', null) == resource.data.get('accountBlockedBy', null)
+          && request.resource.data.get('accountUnblockedAt', null) == resource.data.get('accountUnblockedAt', null));
     }
 
     // Helper: Ensure pinHash and pinSalt fields are not modified by client
@@ -89,12 +92,11 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // KYC documents — user can read and write their own KYC data
-      // Note: kycStatus on user doc is still server-only (handled by kycStatusUnchanged)
+      // KYC documents — read only from client
+      // KYC writes handled by Cloud Functions only for integrity
       match /kyc/{docId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId);
-        allow delete: if false;
+        allow write: if false;
       }
     }
 
@@ -109,6 +111,17 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['walletId', 'currency', 'balance'])
         && !request.resource.data.keys().hasAny(['isAdmin', 'role']);
       allow update, delete: if false;
+
+      // Platform wallet subcollections — Cloud Functions only
+      match /balances/{docId} {
+        allow read, write: if false;
+      }
+      match /fees/{docId} {
+        allow read, write: if false;
+      }
+      match /withdrawals/{docId} {
+        allow read, write: if false;
+      }
     }
 
     // Exchange rates - read only
