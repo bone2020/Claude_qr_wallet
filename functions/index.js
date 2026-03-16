@@ -1183,6 +1183,12 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
         await handleFailedTransfer(event.data);
         break;
 
+      case 'transfer.reversed':
+        // Bank reversed the transfer — refund wallet (same logic as failed)
+        logInfo('Transfer reversed by bank', { reference: event.data.reference, correlationId: webhookCorrelationId });
+        await handleFailedTransfer(event.data);
+        break;
+
       default:
         logInfo('Unhandled webhook event type', { event: event.event, correlationId: webhookCorrelationId });
     }
@@ -2029,7 +2035,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const { email, amount, currency } = data;
+  const { email, amount, currency, idempotencyKey } = data;
   const userId = context.auth.uid;
 
   requirePositiveNumber(amount, 'amount');
@@ -2052,6 +2058,10 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
   await enforceRateLimit(userId, 'initializeTransaction');
 
+  // Generate default idempotency key if none provided (same pattern as verifyPayment)
+  const effectiveIdempotencyKey = idempotencyKey || `initTxn_${userId}_${amount}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+
+  return withIdempotency(effectiveIdempotencyKey, 'initializeTransaction', userId, async () => {
   try {
     const reference = `TXN_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
 
@@ -2076,7 +2086,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
         email,
         expectedAmount: amount,
         expectedAmountKobo: Math.round(amount * 100),
-        currency: currency || 'NGN',
+        currency: validatedCurrency,
         reference,
         paystackReference: response.data.reference,
         status: 'pending',
@@ -2100,6 +2110,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     logError('Initialize transaction error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Transaction initialization failed. Please try again.');
   }
+  });
 });
 
 // ============================================================
@@ -6456,28 +6467,6 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to make transfers.');
       }
 
-      // Calculate fee (1% with min 10, max 100)
-      const fee = Math.min(Math.max(amount * 0.01, 10), 100);
-      const totalDebit = amount + fee;
-
-      // Enforce daily/monthly spending limits
-      const DAILY_LIMIT = 50000;   // Local currency units
-      const MONTHLY_LIMIT = 500000;
-      const currentDailySpent = Number(senderData.dailySpent) || 0;
-      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
-
-      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
-      }
-      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
-      }
-
-      // Check balance and calculate new values
-      const newSenderBalance = safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
-
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
         throwAppError(ERROR_CODES.TXN_SELF_TRANSFER);
@@ -6517,12 +6506,75 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Recipient account is suspended. Transfer cannot be completed.');
       }
 
+      // Determine if this is a cross-currency transfer
+      const senderCurrency = senderData.currency || 'NGN';
+      const recipientCurrency = recipientData.currency || 'NGN';
+      const isCrossCurrency = senderCurrency !== recipientCurrency;
+
+      // Fee structure: 2.5% same-currency, 5% cross-currency
+      const feeRate = isCrossCurrency ? 0.05 : 0.025;
+      const feeMin = isCrossCurrency ? 50 : 10;
+      const feeMax = isCrossCurrency ? 1000 : 500;
+      const fee = Math.min(Math.max(amount * feeRate, feeMin), feeMax);
+      const totalDebit = amount + fee;
+
+      // Enforce daily/monthly spending limits
+      const DAILY_LIMIT = 50000;   // Local currency units
+      const MONTHLY_LIMIT = 500000;
+      const currentDailySpent = Number(senderData.dailySpent) || 0;
+      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
+
+      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+
+      // Check balance and calculate new values
+      const newSenderBalance = safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
+
       // Generate transaction ID
       const txId = generateSecureTransactionId();
       const now = new Date();
 
-      // Deduct from sender (use explicit balance, not increment, for financial safety)
-      const newRecipientBalance = safeAdd(recipientData.balance, amount, 'sendMoney recipient credit');
+      // For cross-currency: convert amount using exchange rates
+      let creditAmount = amount; // Same currency — no conversion needed
+      let appliedExchangeRate = null;
+
+      // Get exchange rates (transactional read for consistency)
+      const ratesRef = db.collection('app_config').doc('exchange_rates');
+      const ratesDoc = await transaction.get(ratesRef);
+
+      if (isCrossCurrency) {
+        if (!ratesDoc.exists) {
+          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable. Cross-currency transfers are temporarily disabled.');
+        }
+        const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
+        if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
+          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated. Cross-currency transfers are temporarily disabled. Please try again later.');
+        }
+
+        const rates = ratesDoc.data().rates || {};
+        const senderRate = rates[senderCurrency];
+        const recipientRate = rates[recipientCurrency];
+
+        if (!senderRate || !recipientRate) {
+          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Exchange rate not available for ${senderCurrency} or ${recipientCurrency}.`);
+        }
+
+        // Convert: amount in sender currency → USD → recipient currency
+        // rate is currency-per-USD, so: amountInUSD = amount / senderRate
+        // amountInRecipient = amountInUSD * recipientRate
+        appliedExchangeRate = recipientRate / senderRate;
+        creditAmount = amount * appliedExchangeRate;
+        // Round to 2 decimal places for financial accuracy
+        creditAmount = Math.round(creditAmount * 100) / 100;
+      }
+
+      const newRecipientBalance = safeAdd(recipientData.balance, creditAmount, 'sendMoney recipient credit');
 
       transaction.update(senderWalletRef, {
         balance: newSenderBalance,
@@ -6540,27 +6592,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // ============================================
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
-      const senderCurrency = senderData.currency || 'NGN';
-
-      // Get exchange rates for USD conversion (transactional read for consistency)
-      const ratesRef = db.collection('app_config').doc('exchange_rates');
-      const ratesDoc = await transaction.get(ratesRef);
-
-      // Block cross-currency transactions if rates are stale (>25 hours old)
-      const recipientCurrency = recipientData.currency || 'NGN';
-      if (senderCurrency !== recipientCurrency) {
-        if (!ratesDoc.exists) {
-          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable. Cross-currency transfers are temporarily disabled.');
-        }
-        const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
-        if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
-          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated. Cross-currency transfers are temporarily disabled. Please try again later.');
-        }
-      }
       const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
-      const exchangeRate = rates[senderCurrency] || 1;
-      const feeInUSD = fee / exchangeRate;
-      
+      const feeExchangeRate = rates[senderCurrency] || 1;
+      const feeInUSD = fee / feeExchangeRate;
+
       // Update platform wallet USD balance
       const platformWalletRef = db.collection('wallets').doc('platform');
       transaction.update(platformWalletRef, {
@@ -6569,7 +6604,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         totalFeesCollected: admin.firestore.FieldValue.increment(1),
         updatedAt: timestamps.serverTimestamp()
       });
-      
+
       // Update currency-specific balance
       const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
       transaction.set(currencyBalanceRef, {
@@ -6580,7 +6615,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         lastTransactionAt: timestamps.serverTimestamp(),
         updatedAt: timestamps.serverTimestamp()
       }, { merge: true });
-      
+
       // Record fee in history
       const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
       transaction.set(feeRecordRef, {
@@ -6588,7 +6623,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         originalAmount: fee,
         currency: senderCurrency,
         usdAmount: feeInUSD,
-        exchangeRate: exchangeRate,
+        exchangeRate: feeExchangeRate,
         senderUid: senderUid,
         senderName: senderName,
         transferAmount: amount,
@@ -6604,16 +6639,16 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         receiverName: recipientName,
         amount: amount,
         fee: fee,
-        currency: senderData.currency || 'NGN',
-        senderCurrency: senderData.currency || 'NGN',
-        receiverCurrency: recipientData.currency || 'NGN',
+        currency: senderCurrency,
+        senderCurrency: senderCurrency,
+        receiverCurrency: recipientCurrency,
         note: note || '',
         status: 'completed',
         createdAt: timestamps.serverTimestamp(),
         completedAt: timestamps.serverTimestamp(),
         reference: `TXN-${now.getTime()}`,
-        exchangeRate: null,
-        convertedAmount: null,
+        exchangeRate: appliedExchangeRate,
+        convertedAmount: isCrossCurrency ? creditAmount : null,
         failureReason: null,
       };
 
@@ -6636,8 +6671,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         recipientName: recipientName,
         senderName: senderName,
         recipientUid: recipientUid,
-        senderCurrency: senderData.currency || 'NGN',
-        recipientCurrency: recipientData.currency || 'NGN',
+        senderCurrency: senderCurrency,
+        recipientCurrency: recipientCurrency,
+        exchangeRate: appliedExchangeRate,
+        convertedAmount: isCrossCurrency ? creditAmount : null,
         newBalance: newSenderBalance
       };
     });
@@ -7433,6 +7470,12 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
     if (effectiveStatus === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
       await db.runTransaction(async (transaction) => {
+        // Re-read txDoc inside transaction to prevent double-credit race
+        const freshTxDoc = await transaction.get(txRef);
+        if (!freshTxDoc.exists || normalizeStatus(freshTxDoc.data().status) === 'completed') {
+          return; // Already processed by another concurrent call
+        }
+
         const walletRef = db.collection('wallets').doc(txData.userId);
         const walletDoc = await transaction.get(walletRef);
 
@@ -7462,14 +7505,22 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           });
         }
 
-      // Send push notification for completed MoMo transaction
+        // Mark momo transaction as completed (inside transaction for atomicity)
+        transaction.update(txRef, {
+          ...buildStateTransitionFields(freshTxDoc.data().status, 'completed', externalId),
+          providerStatus: effectiveStatus,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      // Send push notification for completed MoMo transaction (outside transaction)
       const momoNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
       await sendPushNotification(txData.userId, {
         title: `${momoNotifType} Successful`,
         body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
         type: 'transaction',
         data: { action: momoNotifType === 'Deposit' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId: externalId },
-      });
       });
     } else if (effectiveStatus === 'FAILED') {
       // Refund if disbursement failed
