@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -182,7 +183,7 @@ class UserService {
       return UserResult.success(updatedUser);
     } catch (e) {
       // ignore: avoid_print
-      print('Error in markKycVerifiedForAlreadyEnrolledUser: $e');
+      debugPrint('Error in markKycVerifiedForAlreadyEnrolledUser: $e');
       return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
   }
@@ -487,7 +488,7 @@ class UserService {
         if (e.code != 'object-not-found') {
           // Log unexpected storage errors but continue with account deletion
           // ignore: avoid_print
-          print('Warning: Failed to delete profile photo during account deletion: ${e.code} - ${e.message}');
+          debugPrint('Warning: Failed to delete profile photo during account deletion: ${e.code} - ${e.message}');
         }
       }
 
@@ -498,7 +499,7 @@ class UserService {
         if (e.code != 'object-not-found') {
           // Log unexpected storage errors but continue with account deletion
           // ignore: avoid_print
-          print('Warning: Failed to delete KYC documents during account deletion: ${e.code} - ${e.message}');
+          debugPrint('Warning: Failed to delete KYC documents during account deletion: ${e.code} - ${e.message}');
         }
       }
 

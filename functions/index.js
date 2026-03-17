@@ -764,9 +764,10 @@ const PAYSTACK_BASE_URL = 'api.paystack.co';
 // Helper function for Paystack API calls
 const HTTP_TIMEOUT_MS = 15000; // 15 seconds for all external API calls
 
-function paystackRequest(method, path, data = null) {
+function paystackRequest(method, path, data = null, retries = 2) {
   requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
-  return new Promise((resolve, reject) => {
+
+  const makeRequest = (attemptsLeft) => new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
       port: 443,
@@ -794,12 +795,18 @@ function paystackRequest(method, path, data = null) {
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error(`Paystack request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
+      if (attemptsLeft > 0) {
+        logInfo('Paystack request timeout, retrying', { method, path, attemptsLeft });
+        setTimeout(() => makeRequest(attemptsLeft - 1).then(resolve, reject), 1000);
+      } else {
+        reject(new Error(`Paystack request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
+      }
     });
 
     req.on('error', (error) => {
-      if (error.code === 'ECONNRESET') {
-        reject(new Error(`Paystack connection reset: ${method} ${path}`));
+      if ((error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') && attemptsLeft > 0) {
+        logInfo('Paystack request error, retrying', { method, path, error: error.code, attemptsLeft });
+        setTimeout(() => makeRequest(attemptsLeft - 1).then(resolve, reject), 1000);
       } else {
         reject(error);
       }
@@ -810,6 +817,8 @@ function paystackRequest(method, path, data = null) {
     }
     req.end();
   });
+
+  return makeRequest(retries);
 }
 
 // ============================================================
@@ -3337,6 +3346,7 @@ async function withIdempotency(key, operation, userId, executeOperation) {
 exports.cleanupIdempotencyKeys = functions.pubsub
   .schedule('every 6 hours')
   .onRun(async () => {
+    try {
     const now = new Date();
     const expired = await db.collection('idempotency_keys')
       .where('expiresAt', '<', now)
@@ -3354,12 +3364,17 @@ exports.cleanupIdempotencyKeys = functions.pubsub
 
     logInfo('Cleaned expired idempotency keys', { count: expired.size });
     return null;
+    } catch (error) {
+      logError('Failed to cleanup idempotency keys', { error: error.message });
+      throw error;
+    }
   });
 
 // Cleanup expired QR nonces (runs hourly)
 exports.cleanupExpiredQrNonces = functions.pubsub
   .schedule('every 1 hours')
   .onRun(async () => {
+    try {
     const now = admin.firestore.Timestamp.now();
 
     const expiredNonces = await db.collection('qr_nonces')
@@ -3378,6 +3393,10 @@ exports.cleanupExpiredQrNonces = functions.pubsub
 
     logInfo('Cleaned expired QR nonces', { count: expiredNonces.size });
     return null;
+    } catch (error) {
+      logError('Failed to cleanup expired QR nonces', { error: error.message });
+      throw error;
+    }
   });
 
 // Reset daily spending counters at midnight UTC
@@ -3385,6 +3404,7 @@ exports.resetDailySpendingLimits = functions.pubsub
   .schedule('0 0 * * *')
   .timeZone('UTC')
   .onRun(async () => {
+    try {
     let totalReset = 0;
     let hasMore = true;
     while (hasMore) {
@@ -3409,6 +3429,10 @@ exports.resetDailySpendingLimits = functions.pubsub
 
     logInfo('Reset daily spending counters', { count: totalReset });
     return null;
+    } catch (error) {
+      logError('Failed to reset daily spending limits', { error: error.message });
+      throw error;
+    }
   });
 
 // Reset monthly spending counters on 1st of each month
@@ -3416,6 +3440,7 @@ exports.resetMonthlySpendingLimits = functions.pubsub
   .schedule('0 0 1 * *')
   .timeZone('UTC')
   .onRun(async () => {
+    try {
     let totalReset = 0;
     let hasMore = true;
     while (hasMore) {
@@ -3440,6 +3465,10 @@ exports.resetMonthlySpendingLimits = functions.pubsub
 
     logInfo('Reset monthly spending counters', { count: totalReset });
     return null;
+    } catch (error) {
+      logError('Failed to reset monthly spending limits', { error: error.message });
+      throw error;
+    }
   });
 
 /**
@@ -4986,6 +5015,7 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
 
   const snapshot = await db.collection('users')
     .where('role', 'in', ['super_admin', 'admin', 'support'])
+    .limit(100)
     .get();
 
   const admins = snapshot.docs.map(doc => {
