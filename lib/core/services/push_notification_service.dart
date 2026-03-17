@@ -132,13 +132,15 @@ class PushNotificationService {
     );
   }
 
-  /// Handle notification tap
+  /// Handle notification tap — navigate to relevant screen
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('Notification tapped: ${message.data}');
-    // Navigation can be handled here if needed
+    // Deep navigation requires a global navigator key.
+    // For now, the app opens to whatever screen was last active.
+    // TODO: Add deep link navigation when global navigator key is available.
   }
 
-  /// Save FCM token to Firestore for the current user
+  /// Save FCM token to Firestore subcollection (supports multiple devices)
   Future<void> saveTokenToFirestore() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -149,6 +151,21 @@ class PushNotificationService {
 
       debugPrint('FCM Token: $token');
 
+      // Store token in subcollection — each device gets its own document
+      // Use token hash as doc ID to avoid duplicates from same device
+      final tokenDocId = token.hashCode.toRadixString(16);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('fcm_tokens')
+          .doc(tokenDocId)
+          .set({
+        'token': token,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Also keep the legacy fcmToken field for backward compatibility
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
@@ -158,10 +175,36 @@ class PushNotificationService {
       _messaging.onTokenRefresh.listen((newToken) async {
         final currentUser = FirebaseAuth.instance.currentUser;
         if (currentUser != null) {
-          await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).update({
-            'fcmToken': newToken,
-            'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-          });
+          // Remove old token doc, add new one
+          final oldDocId = token.hashCode.toRadixString(16);
+          final newDocId = newToken.hashCode.toRadixString(16);
+
+          final batch = FirebaseFirestore.instance.batch();
+          batch.delete(FirebaseFirestore.instance
+              .collection('users')
+              .doc(currentUser.uid)
+              .collection('fcm_tokens')
+              .doc(oldDocId));
+          batch.set(
+              FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUser.uid)
+                  .collection('fcm_tokens')
+                  .doc(newDocId),
+              {
+                'token': newToken,
+                'platform': Platform.isIOS ? 'ios' : 'android',
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+          // Update legacy field too
+          batch.update(
+              FirebaseFirestore.instance.collection('users').doc(currentUser.uid),
+              {
+                'fcmToken': newToken,
+                'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+              });
+          await batch.commit();
+
           debugPrint('FCM Token refreshed and saved');
         }
       });
@@ -170,14 +213,37 @@ class PushNotificationService {
     }
   }
 
-  /// Remove FCM token on logout
+  /// Remove THIS device's FCM token on logout (other devices keep theirs)
   Future<void> removeToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-          'fcmToken': FieldValue.delete(),
-        });
+        final token = await _messaging.getToken();
+        if (token != null) {
+          final tokenDocId = token.hashCode.toRadixString(16);
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('fcm_tokens')
+              .doc(tokenDocId)
+              .delete();
+        }
+        // Update legacy field to another active token if any, or delete
+        final remainingTokens = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('fcm_tokens')
+            .limit(1)
+            .get();
+        if (remainingTokens.docs.isEmpty) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'fcmToken': FieldValue.delete(),
+          });
+        } else {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'fcmToken': remainingTokens.docs.first.data()['token'],
+          });
+        }
       }
       await _messaging.deleteToken();
     } catch (e) {

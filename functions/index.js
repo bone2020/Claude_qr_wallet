@@ -2350,19 +2350,25 @@ async function sendPushNotification(userId, { title, body, type = 'system', data
     // 1. Create in-app notification in Firestore
     await createNotification(userId, { title, body, type, data });
 
-    // 2. Get user's FCM token
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) return;
+    // 2. Get all FCM tokens for user (multi-device support)
+    const tokensSnapshot = await db.collection('users').doc(userId)
+        .collection('fcm_tokens').get();
 
-    const fcmToken = userDoc.data().fcmToken;
-    if (!fcmToken) {
-      logInfo('No FCM token for user, skipping push', { userId });
-      return;
+    // Fallback to legacy single token if subcollection is empty
+    let tokens = tokensSnapshot.docs.map(doc => doc.data().token).filter(Boolean);
+    if (tokens.length === 0) {
+      const userDoc = await db.collection('users').doc(userId).get();
+      if (!userDoc.exists) return;
+      const legacyToken = userDoc.data().fcmToken;
+      if (!legacyToken) {
+        logInfo('No FCM tokens for user, skipping push', { userId });
+        return;
+      }
+      tokens = [legacyToken];
     }
 
-    // 3. Send push notification via FCM
-    const message = {
-      token: fcmToken,
+    // 3. Send push notification to all devices
+    const baseMessage = {
       notification: {
         title: title,
         body: body,
@@ -2389,19 +2395,36 @@ async function sendPushNotification(userId, { title, body, type = 'system', data
       },
     };
 
-    await admin.messaging().send(message);
-    logInfo('Push notification sent', { userId, title });
+    // Send to all device tokens
+    const messages = tokens.map(token => ({ ...baseMessage, token }));
+    const results = await Promise.allSettled(
+      messages.map(msg => admin.messaging().send(msg))
+    );
+
+    // Clean up invalid tokens
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].status === 'rejected') {
+        const error = results[i].reason;
+        if (error.code === 'messaging/registration-token-not-registered' ||
+            error.code === 'messaging/invalid-registration-token') {
+          try {
+            // Find and delete the invalid token doc
+            const invalidToken = tokens[i];
+            const tokenDocs = await db.collection('users').doc(userId)
+                .collection('fcm_tokens')
+                .where('token', '==', invalidToken).get();
+            const deleteBatch = db.batch();
+            tokenDocs.docs.forEach(doc => deleteBatch.delete(doc.ref));
+            await deleteBatch.commit();
+          } catch (e) { /* ignore cleanup errors */ }
+        }
+      }
+    }
+
+    const successCount = results.filter(r => r.status === 'fulfilled').length;
+    logInfo('Push notification sent', { userId, title, devices: successCount, total: tokens.length });
   } catch (error) {
     // Push notification must never block the main operation
-    if (error.code === 'messaging/registration-token-not-registered' ||
-        error.code === 'messaging/invalid-registration-token') {
-      // Token is invalid, remove it
-      try {
-        await db.collection('users').doc(userId).update({
-          fcmToken: admin.firestore.FieldValue.delete(),
-        });
-      } catch (e) { /* ignore cleanup errors */ }
-    }
     logError('Failed to send push notification', { userId, title, error: error.message });
   }
 }
@@ -2528,6 +2551,14 @@ async function checkForFraud(userId, txData) {
         );
         await Promise.all(notifyPromises);
       }
+
+      // Notify the affected user about suspicious activity
+      await sendPushNotification(userId, {
+        title: 'Security Alert',
+        body: 'Unusual activity detected on your account. If this was not you, block your account immediately from your profile.',
+        type: 'security',
+        data: { action: 'suspicious_activity', alertId },
+      }).catch(() => {}); // Don't fail if notification fails
 
       logStructured(LOG_LEVELS.WARNING, 'Fraud alert triggered', {
         alertId, userId, severity: highestSeverity, rules: alerts.map(a => a.rule),
@@ -3147,7 +3178,7 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
     }
 
     // Delete user sub-collections (paginate to handle >500 docs)
-    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc'];
+    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc', 'fcm_tokens'];
     for (const subCol of subCollections) {
       let hasMore = true;
       while (hasMore) {
@@ -4093,6 +4124,14 @@ exports.changePin = functions.https.onCall(async (data, context) => {
     metadata: { hadExistingPin: !!userData.pinHash },
     ipHash: hashIp(context),
   });
+
+  // Security notification — alert user their PIN was changed
+  await sendPushNotification(userId, {
+    title: 'PIN Changed',
+    body: 'Your transaction PIN has been changed. If you did not make this change, block your account immediately from your profile.',
+    type: 'security',
+    data: { action: 'pin_changed' },
+  }).catch(() => {}); // Don't block the response if notification fails
 
   return { success: true, message: 'PIN updated successfully.' };
 });

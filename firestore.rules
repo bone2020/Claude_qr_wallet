@@ -65,10 +65,15 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Notifications
+      // Notifications — user can read, mark as read (update), and delete
       match /notifications/{notifId} {
-        allow read, update: if isOwner(userId);
-        allow create, delete: if false;
+        allow read, update, delete: if isOwner(userId);
+        allow create: if false;
+      }
+
+      // FCM tokens — user can manage their own device tokens
+      match /fcm_tokens/{tokenId} {
+        allow read, write: if isOwner(userId);
       }
 
       // Linked accounts — read only from client
