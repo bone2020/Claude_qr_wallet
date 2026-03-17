@@ -10,7 +10,7 @@ class LocalStorageService {
   static const String _walletBoxName = 'wallet_box';
   static const String _transactionsBoxName = 'transactions_box';
   static const String _settingsBoxName = 'settings_box';
-  static const String _pendingTransactionsBoxName = 'pending_transactions_box';
+
 
   /// Initialize Hive and register adapters
   static HiveAesCipher? _cipher;
@@ -126,42 +126,6 @@ class LocalStorageService {
   }
 
   // ============================================================
-  // PENDING TRANSACTIONS (Offline Queue)
-  // ============================================================
-
-  /// Save pending transaction for later sync
-  Future<void> savePendingTransaction(Map<String, dynamic> transaction) async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
-    final pending = box.get('pending', defaultValue: [])!;
-    pending.add({
-      ...transaction,
-      'queuedAt': DateTime.now().toIso8601String(),
-    });
-    await box.put('pending', pending);
-  }
-
-  /// Get all pending transactions
-  Future<List<Map<String, dynamic>>> getPendingTransactions() async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
-    final pending = box.get('pending', defaultValue: [])!;
-    return pending.map((item) => Map<String, dynamic>.from(item)).toList();
-  }
-
-  /// Remove pending transaction after sync
-  Future<void> removePendingTransaction(String id) async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
-    final pending = box.get('pending', defaultValue: [])!;
-    pending.removeWhere((item) => item['id'] == id);
-    await box.put('pending', pending);
-  }
-
-  /// Clear all pending transactions
-  Future<void> clearPendingTransactions() async {
-    final box = await Hive.openBox<List>(_pendingTransactionsBoxName, encryptionCipher: _cipher);
-    await box.put('pending', []);
-  }
-
-  // ============================================================
   // SETTINGS
   // ============================================================
 
@@ -219,7 +183,6 @@ class LocalStorageService {
     await clearUser();
     await clearWallet();
     await clearTransactions();
-    await clearPendingTransactions();
     await clearAuthToken();
     
     // Keep settings like dark mode preference

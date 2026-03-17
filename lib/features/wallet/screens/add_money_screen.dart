@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/services/payment_service.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../core/services/momo_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
@@ -140,10 +141,15 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Please enter phone number';
+      return 'Phone number is required';
     }
-    if (value.length < 7) {
-      return 'Please enter a valid phone number';
+    // Remove any non-digit characters for validation
+    final digitsOnly = value.replaceAll(RegExp(r'[^\d+]'), '');
+    if (digitsOnly.length < 10) {
+      return 'Please enter a valid phone number (at least 10 digits)';
+    }
+    if (digitsOnly.length > 15) {
+      return 'Phone number is too long';
     }
     return null;
   }
@@ -173,6 +179,9 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         amount: amount,
         userId: user.id,
         currency: _currency,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
       );
 
       if (!mounted) return;
@@ -188,7 +197,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      _showError(ErrorHandler.getUserFriendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -224,7 +233,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      _showError(ErrorHandler.getUserFriendlyMessage(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -237,6 +246,9 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       phoneNumber: _phoneController.text.replaceAll(' ', ''),
       userId: user.id,
       currency: _currency,
+    ).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
     );
 
     if (!mounted) return;
@@ -301,7 +313,10 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     setState(() => _isLoading = true);
 
     try {
-      final result = await _paymentService.checkMtnMomoStatus(referenceId);
+      final result = await _paymentService.checkMtnMomoStatus(referenceId).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
+      );
 
       if (!mounted) return;
 
@@ -316,7 +331,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      _showError(ErrorHandler.getUserFriendlyMessage(e));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

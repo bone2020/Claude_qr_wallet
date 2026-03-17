@@ -12,6 +12,7 @@ import '../../../core/services/biometric_service.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
@@ -311,6 +312,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         recipientWalletId: widget.recipientWalletId,
         amount: _amount,
         note: widget.note,
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
       );
 
       if (!mounted) return;
@@ -334,7 +338,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(ErrorHandler.getUserFriendlyMessage(e)),
           backgroundColor: AppColors.error,
         ),
       );

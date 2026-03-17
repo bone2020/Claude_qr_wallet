@@ -11,6 +11,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/services/payment_service.dart';
 import '../../../core/services/momo_service.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// Screen for withdrawing money from wallet to bank or mobile money
@@ -149,10 +150,15 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
   String? _validatePhone(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Please enter phone number';
+      return 'Phone number is required';
     }
-    if (value.length < 6) {
-      return 'Please enter a valid phone number';
+    // Remove any non-digit characters for validation
+    final digitsOnly = value.replaceAll(RegExp(r'[^\d+]'), '');
+    if (digitsOnly.length < 10) {
+      return 'Please enter a valid phone number (at least 10 digits)';
+    }
+    if (digitsOnly.length > 15) {
+      return 'Phone number is too long';
     }
     return null;
   }
@@ -232,7 +238,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     } catch (e) {
       if (mounted) {
         setState(() => _isVerifyingAccount = false);
-        _showError(e.toString());
+        _showError(ErrorHandler.getUserFriendlyMessage(e));
       }
     }
   }
@@ -288,6 +294,9 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           bankCode: _selectedBank!.code,
           accountNumber: _accountNumberController.text.replaceAll(' ', ''),
           accountName: _verifiedAccountName!,
+        ).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
         );
       } else {
         // Check if MTN provider - use direct MTN API
@@ -355,7 +364,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      _showError(ErrorHandler.getUserFriendlyMessage(e));
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -462,7 +471,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                             }
                           } catch (e) {
                             setDialogState(() => isVerifying = false);
-                            _showError(e.toString());
+                            _showError(ErrorHandler.getUserFriendlyMessage(e));
                           }
                         },
                   child: isVerifying

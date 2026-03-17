@@ -48,8 +48,10 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     if (value == null || value.isEmpty) {
       return AppStrings.errorFieldRequired;
     }
-    if (value.length < 18) {
-      return 'Please enter a valid wallet ID';
+    // QRW-XXXX-XXXX-XXXX format (alphanumeric)
+    final walletIdRegex = RegExp(r'^QRW-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$');
+    if (!walletIdRegex.hasMatch(value.toUpperCase())) {
+      return 'Please enter a valid wallet ID (e.g., QRW-AB12-CD34-EF56)';
     }
     return null;
   }
@@ -61,6 +63,9 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     final amount = double.tryParse(value.replaceAll(',', ''));
     if (amount == null || amount <= 0) {
       return AppStrings.errorInvalidAmount;
+    }
+    if (amount > 10000000) {
+      return 'Maximum transfer amount is 10,000,000';
     }
     return null;
   }

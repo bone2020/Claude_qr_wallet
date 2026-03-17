@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/payment_service.dart';
+import '../../../core/utils/error_handler.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// Screen shown after returning from Paystack payment
@@ -39,7 +40,10 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
 
   Future<void> _verifyPayment() async {
     try {
-      final result = await _paymentService.verifyPayment(widget.reference);
+      final result = await _paymentService.verifyPayment(widget.reference).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
+      );
 
       if (mounted) {
         setState(() {
@@ -60,7 +64,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
         setState(() {
           _isLoading = false;
           _isSuccess = false;
-          _errorMessage = e.toString();
+          _errorMessage = ErrorHandler.getUserFriendlyMessage(e);
         });
       }
     }
