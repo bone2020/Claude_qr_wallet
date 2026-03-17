@@ -4338,14 +4338,22 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
   const requiredRole = newRole === 'admin' ? 'super_admin' : 'admin';
   const caller = await verifyAdmin(context, requiredRole);
 
+  // Cannot promote yourself
+  if (targetUid === caller.uid) {
+    throw new functions.https.HttpsError('invalid-argument', 'Cannot promote yourself.');
+  }
+
   // Verify target user exists
+  let targetUser;
   try {
-    await admin.auth().getUser(targetUid);
+    targetUser = await admin.auth().getUser(targetUid);
   } catch (e) {
     throw new functions.https.HttpsError('not-found', 'Target user not found.');
   }
 
-  await admin.auth().setCustomUserClaims(targetUid, { role: newRole });
+  // Merge with existing claims to avoid wiping non-role claims
+  const existingClaims = targetUser.customClaims || {};
+  await admin.auth().setCustomUserClaims(targetUid, { ...existingClaims, role: newRole });
 
   await db.collection('users').doc(targetUid).update({
     role: newRole,
@@ -4369,7 +4377,7 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
     action: 'promote_user',
     targetUid,
     details: `Promoted to ${newRole}`,
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4404,7 +4412,11 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Cannot demote super_admin.');
   }
 
-  await admin.auth().setCustomUserClaims(targetUid, {});
+  // Remove only the role claim, preserve other claims
+  const targetUserRecord = await admin.auth().getUser(targetUid);
+  const existingClaims = targetUserRecord.customClaims || {};
+  delete existingClaims.role;
+  await admin.auth().setCustomUserClaims(targetUid, existingClaims);
 
   await db.collection('users').doc(targetUid).update({
     role: admin.firestore.FieldValue.delete(),
@@ -4428,7 +4440,7 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
     action: 'demote_user',
     targetUid,
     details: `Removed ${targetRole} role`,
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4624,9 +4636,25 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
   }
 
+  // Cannot block yourself
+  if (targetUid === caller.uid) {
+    throw new functions.https.HttpsError('invalid-argument', 'Cannot block your own account.');
+  }
+
   const userDoc = await db.collection('users').doc(targetUid).get();
   if (!userDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+
+  // Cannot block users with equal or higher admin role
+  const targetRole = userDoc.data().role;
+  if (targetRole) {
+    const roleHierarchy = { support: 1, admin: 2, super_admin: 3 };
+    const callerLevel = roleHierarchy[caller.role] || 0;
+    const targetLevel = roleHierarchy[targetRole] || 0;
+    if (targetLevel >= callerLevel) {
+      throw new functions.https.HttpsError('permission-denied', 'Cannot block a user with equal or higher admin role.');
+    }
   }
 
   await db.collection('users').doc(targetUid).update({
@@ -4661,7 +4689,7 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
     targetUserId: targetUid,
     targetInfo: userDoc.data().fullName || 'Unknown',
     details: reason || 'No reason provided',
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4716,7 +4744,7 @@ exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
     targetUserId: targetUid,
     targetInfo: userDoc.data().fullName || 'Unknown',
     details: 'Account unblocked',
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4732,6 +4760,12 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
   const { targetUid, newEmail } = data;
   if (!targetUid || !newEmail) {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid and newEmail are required.');
+  }
+
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(newEmail)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid email format.');
   }
 
   // Update in Firebase Auth
@@ -4760,7 +4794,7 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
     action: 'update_email',
     targetUserId: targetUid,
     details: `Email changed to ${newEmail}`,
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4787,6 +4821,15 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
   const phoneNumber = userData.phoneNumber;
   if (!phoneNumber) {
     throw new functions.https.HttpsError('failed-precondition', 'User has no phone number on file.');
+  }
+
+  // Rate limit: max 1 OTP per 60 seconds per target user
+  const existingOtp = await db.collection('recovery_otps').doc(targetUid).get();
+  if (existingOtp.exists) {
+    const lastCreated = existingOtp.data().createdAt?.toDate?.();
+    if (lastCreated && (Date.now() - lastCreated.getTime()) < 60 * 1000) {
+      throw new functions.https.HttpsError('resource-exhausted', 'Please wait at least 60 seconds before sending another OTP.');
+    }
   }
 
   // Generate 6-digit OTP
@@ -4848,7 +4891,7 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     action: 'send_recovery_otp',
     targetUserId: targetUid,
     details: `OTP sent to ${maskedPhone}`,
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4928,7 +4971,7 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
     action: 'verify_recovery_otp',
     targetUserId: targetUid,
     details: 'OTP verified successfully',
-    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    ipHash: hashIp(context),
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -5022,15 +5065,20 @@ exports.adminExportUsers = functions.https.onCall(async (data, context) => {
 
   try {
     const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(5000).get();
-    const walletsSnapshot = await db.collection('wallets').get();
 
-    // Build wallet lookup
+    // Only fetch wallets for the exported users (bounded)
+    const userIds = usersSnapshot.docs.map(doc => doc.id);
     const walletMap = {};
-    walletsSnapshot.docs.forEach(doc => {
-      if (doc.id !== 'platform') {
+    // Fetch in batches of 30 (Firestore 'in' query limit)
+    for (let i = 0; i < userIds.length; i += 30) {
+      const batch = userIds.slice(i, i + 30);
+      const walletBatch = await db.collection('wallets')
+        .where(admin.firestore.FieldPath.documentId(), 'in', batch)
+        .get();
+      walletBatch.docs.forEach(doc => {
         walletMap[doc.id] = doc.data();
-      }
-    });
+      });
+    }
 
     // Mask PII for non-super-admin callers
     const isSuperAdmin = caller.role === 'super_admin';
@@ -5103,7 +5151,6 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
   }
 
   // Get IP address
-  const ip = context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
   const userAgent = context.rawRequest?.headers?.['user-agent'] || 'unknown';
 
   // Get admin info
@@ -5122,7 +5169,7 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
     email,
     role,
     action,
-    ip,
+    ipHash: hashIp(context),
     userAgent,
     metadata: metadata || {},
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -5150,6 +5197,10 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
     query = query.where('uid', '==', filterUid);
   }
 
+  if (filterAction) {
+    query = query.where('action', '==', filterAction);
+  }
+
   query = query.limit(fetchLimit);
 
   const snapshot = await query.get();
@@ -5168,13 +5219,25 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
 exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
-  const { limit: queryLimit, filterUserId, filterOperation } = data || {};
+  const { limit: queryLimit, filterUserId, filterOperation, startDate, endDate } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
 
   let query = db.collection('audit_logs').orderBy('timestamp', 'desc');
 
   if (filterUserId) {
     query = query.where('userId', '==', filterUserId);
+  }
+
+  if (filterOperation) {
+    query = query.where('operation', '==', filterOperation);
+  }
+
+  if (startDate) {
+    query = query.where('timestamp', '>=', admin.firestore.Timestamp.fromDate(new Date(startDate)));
+  }
+
+  if (endDate) {
+    query = query.where('timestamp', '<=', admin.firestore.Timestamp.fromDate(new Date(endDate)));
   }
 
   query = query.limit(fetchLimit);
@@ -5387,7 +5450,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
       role: caller.role,
       action: 'platform_withdrawal',
       details: `Withdrew ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
-      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -5686,7 +5749,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
       role: caller.role,
       action: 'bank_transfer',
       details: `Transferred ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
-      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -5749,6 +5812,10 @@ exports.adminGetAllTransactions = functions.https.onCall(async (data, context) =
 
     if (endDate) {
       query = query.where('createdAt', '<=', admin.firestore.Timestamp.fromDate(new Date(endDate)));
+    }
+
+    if (filterCurrency) {
+      query = query.where('currency', '==', filterCurrency);
     }
 
     query = query.limit(fetchLimit);
@@ -5953,7 +6020,7 @@ exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
       action: 'flag_transaction',
       targetUserId: userId,
       details: `Flagged transaction ${transactionId}: ${reason}`,
-      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -6041,8 +6108,16 @@ exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, con
       role: caller.role,
       action: 'resolve_flagged_transaction',
       details: `Resolved flagged transaction ${transactionId}: ${resolution}`,
-      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminResolveFlaggedTransaction',
+      result: 'success',
+      metadata: { transactionId, resolution, callerRole: caller.role },
+      ipHash: hashIp(context),
     });
 
     return { success: true, message: 'Flagged transaction resolved.' };
@@ -6126,7 +6201,8 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
         accountBlocked: true,
         accountBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
         accountBlockedBy: 'admin',
-        accountBlockReason: `Fraud alert: ${resolution}`,
+        accountBlockedByUid: caller.uid,
+        accountBlockedReason: `Fraud alert: ${resolution}`,
       });
 
       await sendPushNotification(alertData.userId, {
@@ -6145,8 +6221,16 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
       action: 'resolve_fraud_alert',
       targetUserId: alertData.userId,
       details: `Resolved fraud alert ${alertId}: ${resolution} (action: ${action || 'none'})`,
-      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminResolveFraudAlert',
+      result: 'success',
+      metadata: { alertId, resolution, action: action || 'none', targetUserId: alertData.userId, callerRole: caller.role },
+      ipHash: hashIp(context),
     });
 
     return { success: true, message: 'Fraud alert resolved.' };
