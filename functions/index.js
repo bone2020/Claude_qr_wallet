@@ -683,15 +683,15 @@ function requireConfig(value, name) {
  * Missing critical configs are tracked at cold-start for fast runtime checks.
  */
 const CRITICAL_CONFIGS = {
-  'paystack.secret_key': functions.config().paystack?.secret_key,
-  'qr.secret': functions.config().qr?.secret,
-  'momo.collections_subscription_key': functions.config().momo?.collections_subscription_key,
-  'momo.collections_api_user': functions.config().momo?.collections_api_user,
-  'momo.collections_api_key': functions.config().momo?.collections_api_key,
-  'momo.disbursements_subscription_key': functions.config().momo?.disbursements_subscription_key,
-  'momo.disbursements_api_user': functions.config().momo?.disbursements_api_user,
-  'momo.disbursements_api_key': functions.config().momo?.disbursements_api_key,
-  'momo.webhook_secret': functions.config().momo?.webhook_secret,
+  'paystack.secret_key': process.env.PAYSTACK_SECRET_KEY,
+  'qr.secret': process.env.QR_SECRET,
+  'momo.collections_subscription_key': process.env.MOMO_COLLECTIONS_SUBSCRIPTION_KEY,
+  'momo.collections_api_user': process.env.MOMO_COLLECTIONS_API_USER,
+  'momo.collections_api_key': process.env.MOMO_COLLECTIONS_API_KEY,
+  'momo.disbursements_subscription_key': process.env.MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY,
+  'momo.disbursements_api_user': process.env.MOMO_DISBURSEMENTS_API_USER,
+  'momo.disbursements_api_key': process.env.MOMO_DISBURSEMENTS_API_KEY,
+  'momo.webhook_secret': process.env.MOMO_WEBHOOK_SECRET,
 };
 
 /**
@@ -758,7 +758,7 @@ function requireServiceReady(serviceName) {
 
 // Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
 // REQUIRED: Must be configured. Functions will fail with clear errors if missing.
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
+const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // Helper function for Paystack API calls
@@ -900,7 +900,7 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
   }
 
   // Validate admin secret is configured
-  const adminSecret = functions.config().admin?.exchange_rate_secret;
+  const adminSecret = process.env.ADMIN_EXCHANGE_RATE_SECRET;
   if (!adminSecret) {
     logError('Exchange rate endpoint called but admin secret not configured');
     res.status(503).json({ error: 'Service not configured' });
@@ -2128,8 +2128,8 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
 // REQUIRED: Must be configured. QR signing will fail if missing.
-const QR_SECRET_KEY = functions.config().qr?.secret || '';
-const PIN_SECRET = functions.config().pin?.secret || '';
+const QR_SECRET_KEY = process.env.QR_SECRET || '';
+const PIN_SECRET = process.env.PIN_SECRET || '';
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // Helper: Generate HMAC signature
@@ -4886,8 +4886,8 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
   // Send SMS via Africa's Talking
   try {
     const atCredentials = {
-      apiKey: functions.config().africastalking?.api_key,
-      username: functions.config().africastalking?.username || 'sandbox',
+      apiKey: process.env.AFRICASTALKING_API_KEY,
+      username: process.env.AFRICASTALKING_USERNAME || 'sandbox',
     };
     const AfricasTalking = require('africastalking')(atCredentials);
     const sms = AfricasTalking.SMS;
@@ -6307,8 +6307,8 @@ exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
-const SMILE_ID_API_KEY = functions.config().smileid?.api_key || '';
-const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
+const SMILE_ID_API_KEY = process.env.SMILEID_API_KEY || '';
+const SMILE_ID_PARTNER_ID = process.env.SMILEID_PARTNER_ID || '8244';
 
 /**
  * Smile ID API base URL — environment-aware.
@@ -6316,8 +6316,8 @@ const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
  * Fails secure: production deployment requires explicit config.
  */
 const SMILE_ID_BASE_URL = (() => {
-  const smileEnv = functions.config().smileid?.environment;
-  const appEnv = functions.config().app?.environment;
+  const smileEnv = process.env.SMILEID_ENVIRONMENT;
+  const appEnv = process.env.APP_ENVIRONMENT;
 
   if (smileEnv === 'production') {
     return 'api.smileidentity.com';
@@ -6890,22 +6890,22 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
 // MTN MoMo configuration - set via: firebase functions:config:set momo.collections_subscription_key="xxx" etc.
 // IMPORTANT: webhook_secret MUST be configured for production to verify callback authenticity
-const MOMO_WEBHOOK_SECRET = functions.config().momo?.webhook_secret || '';
+const MOMO_WEBHOOK_SECRET = process.env.MOMO_WEBHOOK_SECRET || '';
 
 const MOMO_CONFIG = {
   collections: {
-    subscriptionKey: functions.config().momo?.collections_subscription_key || '',
-    apiUser: functions.config().momo?.collections_api_user || '',
-    apiKey: functions.config().momo?.collections_api_key || '',
+    subscriptionKey: process.env.MOMO_COLLECTIONS_SUBSCRIPTION_KEY || '',
+    apiUser: process.env.MOMO_COLLECTIONS_API_USER || '',
+    apiKey: process.env.MOMO_COLLECTIONS_API_KEY || '',
   },
   disbursements: {
-    subscriptionKey: functions.config().momo?.disbursements_subscription_key || '',
-    apiUser: functions.config().momo?.disbursements_api_user || '',
-    apiKey: functions.config().momo?.disbursements_api_key || '',
+    subscriptionKey: process.env.MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY || '',
+    apiUser: process.env.MOMO_DISBURSEMENTS_API_USER || '',
+    apiKey: process.env.MOMO_DISBURSEMENTS_API_KEY || '',
   },
   environment: (() => {
-    const momoEnv = functions.config().momo?.environment;
-    const appEnv = functions.config().app?.environment;
+    const momoEnv = process.env.MOMO_ENVIRONMENT;
+    const appEnv = process.env.APP_ENVIRONMENT;
 
     if (momoEnv) {
       // Prevent sandbox in production
