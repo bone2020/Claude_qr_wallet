@@ -3212,9 +3212,15 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
     }
 
     // Anonymize audit logs (retain for compliance but remove PII)
-    const auditLogs = await db.collection('audit_logs')
-      .where('userId', '==', userId).limit(500).get();
-    if (!auditLogs.empty) {
+    // Paginate to handle users with >500 audit log entries
+    let hasMoreAuditLogs = true;
+    while (hasMoreAuditLogs) {
+      const auditLogs = await db.collection('audit_logs')
+        .where('userId', '==', userId).limit(500).get();
+      if (auditLogs.empty) {
+        hasMoreAuditLogs = false;
+        break;
+      }
       const batch = db.batch();
       auditLogs.forEach(doc => {
         batch.update(doc.ref, {
@@ -3223,6 +3229,7 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
         });
       });
       await batch.commit();
+      if (auditLogs.size < 500) hasMoreAuditLogs = false;
     }
 
     // Delete Firebase Auth account

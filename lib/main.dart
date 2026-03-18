@@ -23,25 +23,24 @@ void main() async {
   );
 
   // Initialize Firebase App Check
-  // Use debug provider in debug mode
-  //if (kDebugMode) {
-   // await FirebaseAppCheck.instance.activate(
-  //    androidProvider: AndroidProvider.debug,
-    //  appleProvider: AppleProvider.debug,
-   // );
-  //} else {
-  //  await FirebaseAppCheck.instance.activate(
-   // androidProvider: AndroidProvider.playIntegrity,
-  //  appleProvider: AppleProvider.deviceCheck,
-  //  );
-  //}
+  if (kDebugMode) {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+  } else {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: AndroidProvider.playIntegrity,
+      appleProvider: AppleProvider.deviceCheck,
+    );
+  }
 
   // Initialize Push Notifications
   final pushService = PushNotificationService();
   await pushService.initialize();
 
   // Initialize Smile ID for KYC verification
-  SmileID.initialize(useSandbox: true, enableCrashReporting: false);
+  SmileID.initialize(useSandbox: kDebugMode, enableCrashReporting: !kDebugMode);
 
   // Initialize local storage (Hive)
   await LocalStorageService.initialize();

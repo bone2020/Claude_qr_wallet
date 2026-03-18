@@ -18,13 +18,23 @@ class PaymentService {
   // PAYSTACK CONFIGURATION
   // ============================================================
 
-  /// Paystack public key - safe to include in client
-  /// TODO: Before launch, replace with live key: pk_live_xxxxx
-  /// Consider using --dart-define or .env for environment-specific config
+  /// Paystack public key — passed via --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_xxx
+  /// In debug/test builds, pass pk_test_xxx. In release, pass pk_live_xxx.
+  /// The app will refuse to initialize payments if no key is provided.
   static const String _publicKey = String.fromEnvironment(
     'PAYSTACK_PUBLIC_KEY',
-    defaultValue: 'pk_test_a5d5b376b470ceabd388aea915744bed5bd0f36b',
+    defaultValue: '',
   );
+
+  /// Validates that a Paystack key has been provided via --dart-define
+  static void _validateKey() {
+    if (_publicKey.isEmpty) {
+      throw Exception(
+        'PAYSTACK_PUBLIC_KEY not configured. '
+        'Build with: flutter build --dart-define=PAYSTACK_PUBLIC_KEY=pk_live_xxx',
+      );
+    }
+  }
 
   // NOTE: Secret key removed - all sensitive operations now use Cloud Functions
 
@@ -75,6 +85,7 @@ class PaymentService {
     required String userId,
     String? currency,
   }) async {
+    _validateKey();
     try {
       // Call Cloud Function to initialize transaction
       final callable = _functions.httpsCallable('initializeTransaction');
