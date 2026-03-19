@@ -330,6 +330,46 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     }
   }
 
+  /// Load more transactions using cursor-based pagination
+  Future<List<TransactionModel>> loadMoreTransactions({
+    int limit = 20,
+    required DateTime lastCreatedAt,
+    TransactionType? type,
+    TransactionStatus? status,
+  }) async {
+    if (_userId == null) return [];
+
+    try {
+      Query query = _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('transactions')
+          .orderBy('createdAt', descending: true)
+          .startAfter([Timestamp.fromDate(lastCreatedAt)]);
+
+      if (type != null) {
+        query = query.where('type', isEqualTo: type.name);
+      }
+
+      if (status != null) {
+        query = query.where('status', isEqualTo: status.name);
+      }
+
+      query = query.limit(limit);
+
+      final snapshot = await NetworkRetry.execute(
+        () => query.get(),
+        config: RetryConfig.quick,
+      );
+
+      return snapshot.docs
+          .map((doc) => TransactionModel.fromJson(doc.data() as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
   /// Stream of transactions (real-time updates)
   Stream<List<TransactionModel>> watchTransactions({int limit = 20}) {
     if (_userId == null) return Stream.value([]);
