@@ -136,6 +136,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     final transactions = _getFilteredTransactions(allTransactions, filter);
     final currencySymbol = ref.watch(currencyNotifierProvider).currency.symbol;
     final walletId = ref.watch(walletNotifierProvider).walletId;
+    final transactionsState = ref.watch(transactionsNotifierProvider);
 
     if (transactions.isEmpty) {
       return RefreshIndicator(
@@ -153,6 +154,10 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       );
     }
 
+    // Add 1 for the "Load More" button if there are more transactions
+    final showLoadMore = filter == 'all' && transactionsState.hasMore;
+    final itemCount = transactions.length + (showLoadMore ? 1 : 0);
+
     return RefreshIndicator(
       onRefresh: () async {
         await ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
@@ -160,9 +165,29 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       color: AppColors.primary,
       child: ListView.separated(
         padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
-        itemCount: transactions.length,
+        itemCount: itemCount,
         separatorBuilder: (_, __) => const SizedBox(height: AppDimensions.spaceSM),
         itemBuilder: (context, index) {
+          // "Load More" button at the end
+          if (index == transactions.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: transactionsState.isLoadingMore
+                    ? const CircularProgressIndicator(color: AppColors.primary)
+                    : TextButton(
+                        onPressed: () {
+                          ref.read(transactionsNotifierProvider.notifier).loadMore();
+                        },
+                        child: Text(
+                          'Load More',
+                          style: AppTextStyles.bodyMedium(color: AppColors.primary),
+                        ),
+                      ),
+              ),
+            );
+          }
+
           final transaction = transactions[index];
           final counterpartyName = transaction.getCounterpartyName(walletId);
 

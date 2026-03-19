@@ -183,12 +183,16 @@ final balanceHiddenProvider = Provider<bool>((ref) {
 class TransactionsState {
   final List<TransactionModel> transactions;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool hasMore;
   final String? error;
   final TransactionFilter filter;
 
   TransactionsState({
     this.transactions = const [],
     this.isLoading = false,
+    this.isLoadingMore = false,
+    this.hasMore = true,
     this.error,
     this.filter = TransactionFilter.all,
   });
@@ -196,12 +200,16 @@ class TransactionsState {
   TransactionsState copyWith({
     List<TransactionModel>? transactions,
     bool? isLoading,
+    bool? isLoadingMore,
+    bool? hasMore,
     String? error,
     TransactionFilter? filter,
   }) {
     return TransactionsState(
       transactions: transactions ?? this.transactions,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
       error: error,
       filter: filter ?? this.filter,
     );
@@ -281,10 +289,44 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
       final transactions = await _walletService.getTransactions(limit: 50);
       if (!mounted) return;
       await _localStorage.saveTransactions(transactions);
-      state = state.copyWith(transactions: transactions, isLoading: false);
+      state = state.copyWith(
+        transactions: transactions,
+        isLoading: false,
+        hasMore: transactions.length >= 50,
+      );
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  /// Load more (older) transactions
+  Future<void> loadMore() async {
+    if (!mounted || state.isLoadingMore || !state.hasMore) return;
+    if (state.transactions.isEmpty) return;
+
+    state = state.copyWith(isLoadingMore: true);
+
+    try {
+      final lastTransaction = state.transactions.last;
+      final olderTransactions = await _walletService.loadMoreTransactions(
+        limit: 30,
+        lastCreatedAt: lastTransaction.createdAt,
+      );
+
+      if (!mounted) return;
+
+      final allTransactions = [...state.transactions, ...olderTransactions];
+      await _localStorage.saveTransactions(allTransactions);
+
+      state = state.copyWith(
+        transactions: allTransactions,
+        isLoadingMore: false,
+        hasMore: olderTransactions.length >= 30,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
 
