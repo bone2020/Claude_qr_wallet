@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:smile_id/smile_id.dart';
 import 'firebase_options.dart';
 
@@ -107,8 +108,62 @@ class QRWalletApp extends ConsumerWidget {
       themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
-        return DeepLinkWrapper(child: child ?? const SizedBox.shrink());
+        return DeepLinkWrapper(
+          child: Column(
+            children: [
+              Consumer(
+                builder: (context, ref, _) {
+                  final connectivity = ref.watch(connectivityProvider);
+                  return connectivity.when(
+                    data: (isOnline) => isOnline
+                        ? const SizedBox.shrink()
+                        : const _OfflineBanner(),
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                  );
+                },
+              ),
+              Expanded(child: child ?? const SizedBox.shrink()),
+            ],
+          ),
+        );
       },
+    );
+  }
+}
+
+/// Banner shown when the device is offline
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.only(
+          top: MediaQuery.of(context).padding.top + 4,
+          bottom: 8,
+          left: 16,
+          right: 16,
+        ),
+        color: const Color(0xFFFF9800),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.wifi_off, color: Colors.white, size: 16),
+            SizedBox(width: 8),
+            Text(
+              'You are offline',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
