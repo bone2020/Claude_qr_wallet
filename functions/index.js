@@ -2266,6 +2266,7 @@ const RATE_LIMITS = {
   exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
+  previewTransfer:    { windowMs: 60 * 1000, maxRequests: 30, message: 'Too many preview requests.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
   initializeTransaction: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many payment initializations. Please try again later.' },
@@ -6583,6 +6584,103 @@ exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, cont
     supported: false,
     country: countryUpper,
     message: 'Phone verification not available for this country',
+  };
+});
+
+// ============================================================
+// TRANSFER PREVIEW (fee + conversion calculation)
+// ============================================================
+
+/**
+ * Preview a transfer — returns exact fee, exchange rate, and converted amount
+ * that sendMoney will use. No side effects, no balance check.
+ */
+exports.previewTransfer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { amount, recipientWalletId } = data;
+  const userId = context.auth.uid;
+
+  // Rate limit: 30 per minute
+  await enforceRateLimit(userId, 'previewTransfer');
+
+  requirePositiveNumber(amount, 'amount');
+
+  if (!recipientWalletId) {
+    throw new functions.https.HttpsError('invalid-argument', 'recipientWalletId is required.');
+  }
+
+  // Get sender wallet
+  const senderWalletSnapshot = await db.collection('wallets')
+    .where('userId', '==', userId).limit(1).get();
+
+  if (senderWalletSnapshot.empty) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
+  }
+
+  const senderData = senderWalletSnapshot.docs[0].data();
+  const senderCurrency = senderData.currency || 'NGN';
+
+  // Get recipient wallet
+  const recipientWalletSnapshot = await db.collection('wallets')
+    .where('walletId', '==', recipientWalletId).limit(1).get();
+
+  if (recipientWalletSnapshot.empty) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Recipient wallet not found.');
+  }
+
+  const recipientData = recipientWalletSnapshot.docs[0].data();
+  const recipientCurrency = recipientData.currency || 'NGN';
+  const isCrossCurrency = senderCurrency !== recipientCurrency;
+
+  // Calculate fee (same logic as sendMoney)
+  const feeRate = isCrossCurrency ? 0.05 : 0.025;
+  const feeMin = isCrossCurrency ? 5000 : 1000;     // minor units
+  const feeMax = isCrossCurrency ? 100000 : 50000;   // minor units
+  const fee = Math.round(Math.min(Math.max(amount * feeRate, feeMin), feeMax));
+  const totalDebit = amount + fee;
+
+  // Calculate conversion if cross-currency
+  let creditAmount = amount;
+  let exchangeRate = null;
+
+  if (isCrossCurrency) {
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    if (!ratesDoc.exists) {
+      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable.');
+    }
+
+    const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
+    if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
+      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated.');
+    }
+
+    const rates = ratesDoc.data().rates || {};
+    const senderRate = rates[senderCurrency];
+    const recipientRate = rates[recipientCurrency];
+
+    if (!senderRate || !recipientRate) {
+      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Exchange rate not available for ${senderCurrency} or ${recipientCurrency}.`);
+    }
+
+    exchangeRate = recipientRate / senderRate;
+    creditAmount = Math.round(amount * exchangeRate);
+  }
+
+  return {
+    success: true,
+    senderCurrency,
+    recipientCurrency,
+    isCrossCurrency,
+    amount,          // What user sends (minor units)
+    fee,             // Exact fee (minor units)
+    totalDebit,      // amount + fee (minor units)
+    creditAmount,    // What recipient gets (minor units, after conversion)
+    exchangeRate,    // null if same currency
+    senderBalance: senderData.balance,  // Current balance (minor units)
+    sufficient: senderData.balance >= totalDebit,
   };
 });
 

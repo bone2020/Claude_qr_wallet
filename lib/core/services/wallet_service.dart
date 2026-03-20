@@ -145,6 +145,19 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
   // TRANSACTION OPERATIONS
   // ============================================================
 
+  /// Preview a transfer — returns exact fee, exchange rate, and converted amount
+  Future<Map<String, dynamic>> previewTransfer({
+    required int amount,
+    required String recipientWalletId,
+  }) async {
+    final callable = FirebaseFunctions.instance.httpsCallable('previewTransfer');
+    final result = await callable.call<Map<String, dynamic>>({
+      'amount': amount,
+      'recipientWalletId': recipientWalletId,
+    });
+    return Map<String, dynamic>.from(result.data);
+  }
+
   /// Send money to another wallet (via secure Cloud Function)
   Future<TransactionResult> sendMoney({
     required String recipientWalletId,

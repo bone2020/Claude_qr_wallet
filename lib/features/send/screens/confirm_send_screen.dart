@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
@@ -48,14 +49,22 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _isLoading = false;
   bool _hasConvertedMerchantAmount = false;
 
-  // Fee and amount in major units (from user input text controller)
+  // Amount from user input (major units)
   double get _amountMajor => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
-  double get _feeMajor => (_amountMajor * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
-  double get _totalMajor => _amountMajor + _feeMajor;
-
-  // Minor unit conversions for backend calls
   int get _amountMinor => (_amountMajor * 100).round();
-  int get _feeMinor => (_feeMajor * 100).round();
+
+  // Server preview results (null until loaded)
+  int? _serverFee;
+  int? _serverTotalDebit;
+  int? _serverCreditAmount;
+  double? _serverExchangeRate;
+  bool? _serverSufficient;
+  bool _previewLoading = false;
+  String? _previewError;
+
+  // Display values from server preview (fall back to estimate if not loaded)
+  double get _feeMajor => _serverFee != null ? _serverFee! / 100.0 : (_amountMajor * 0.025).clamp(10, 500);
+  double get _totalMajor => _serverTotalDebit != null ? _serverTotalDebit! / 100.0 : _amountMajor + _feeMajor;
 
   String get _currency => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
@@ -67,6 +76,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   double? get _convertedAmount {
+    if (_serverCreditAmount != null) return _serverCreditAmount! / 100.0;
     if (!_needsConversion || widget.recipientCurrency == null) return null;
     return ExchangeRateService.convert(
       amount: _amountMajor,
@@ -76,6 +86,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   double? get _exchangeRate {
+    if (_serverExchangeRate != null) return _serverExchangeRate;
     if (!_needsConversion || widget.recipientCurrency == null) return null;
     return ExchangeRateService.getExchangeRate(
       fromCurrency: _currencyCode,
@@ -108,6 +119,45 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     );
   }
 
+  /// Fetch exact fee and conversion from server
+  Future<void> _fetchPreview() async {
+    if (_amountMinor <= 0) return;
+
+    setState(() {
+      _previewLoading = true;
+      _previewError = null;
+    });
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('previewTransfer');
+      final result = await callable.call<Map<String, dynamic>>({
+        'amount': _amountMinor,
+        'recipientWalletId': widget.recipientWalletId,
+      }).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Preview timed out'),
+      );
+
+      if (!mounted) return;
+
+      final data = result.data;
+      setState(() {
+        _serverFee = data['fee'] as int?;
+        _serverTotalDebit = data['totalDebit'] as int?;
+        _serverCreditAmount = data['creditAmount'] as int?;
+        _serverExchangeRate = (data['exchangeRate'] as num?)?.toDouble();
+        _serverSufficient = data['sufficient'] as bool?;
+        _previewLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _previewLoading = false;
+        _previewError = ErrorHandler.getUserFriendlyMessage(e);
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -116,6 +166,18 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     if (widget.amount > 0 && !widget.amountLocked) {
       _amountController.text = (widget.amount / 100).toStringAsFixed(0);
     }
+
+    // Debounced preview calls when amount changes
+    _amountController.addListener(() {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) _fetchPreview();
+      });
+    });
+
+    // Fetch server preview for accurate fee display
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchPreview();
+    });
   }
 
   @override
@@ -644,16 +706,44 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         children: [
           _buildSummaryRow(AppStrings.amount, '$_currency${_formatAmount(_amountMajor)}'),
           const SizedBox(height: AppDimensions.spaceMD),
-          _buildSummaryRow(AppStrings.transactionFee, '$_currency${_formatAmount(_feeMajor)}'),
+          _buildSummaryRow(
+            AppStrings.transactionFee,
+            _previewLoading
+                ? '...'
+                : '${_serverFee == null ? "~" : ""}$_currency${_formatAmount(_feeMajor)}',
+            trailing: _previewLoading
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textSecondaryDark),
+                  )
+                : null,
+          ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
             child: Divider(color: AppColors.inputBorderDark),
           ),
           _buildSummaryRow(
             AppStrings.totalAmount,
-            '$_currency${_formatAmount(_totalMajor)}',
+            _previewLoading
+                ? '...'
+                : '${_serverTotalDebit == null ? "~" : ""}$_currency${_formatAmount(_totalMajor)}',
             isTotal: true,
           ),
+          if (_previewError != null) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Text(
+              'Fee is approximate — $_previewError',
+              style: AppTextStyles.caption(color: AppColors.warning),
+            ),
+          ],
+          if (_serverSufficient == false) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Text(
+              'Insufficient balance for this transfer',
+              style: AppTextStyles.caption(color: AppColors.error),
+            ),
+          ],
           // Show conversion info if currencies are different
           if (_needsConversion && (_isMerchantQR || _convertedAmount != null)) ...[
             const SizedBox(height: AppDimensions.spaceMD),
@@ -737,7 +827,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
+  Widget _buildSummaryRow(String label, String value, {bool isTotal = false, Widget? trailing}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -747,11 +837,20 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               ? AppTextStyles.bodyLarge()
               : AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
-        Text(
-          value,
-          style: isTotal
-              ? AppTextStyles.headlineSmall(color: AppColors.primary)
-              : AppTextStyles.bodyMedium(),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: isTotal
+                  ? AppTextStyles.headlineSmall(color: AppColors.primary)
+                  : AppTextStyles.bodyMedium(),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: 6),
+              trailing,
+            ],
+          ],
         ),
       ],
     );
