@@ -108,23 +108,33 @@ class QRWalletApp extends ConsumerWidget {
       themeMode: themeMode,
       routerConfig: router,
       builder: (context, child) {
-        return DeepLinkWrapper(
-          child: Column(
-            children: [
-              Consumer(
-                builder: (context, ref, _) {
-                  final connectivity = ref.watch(connectivityProvider);
-                  return connectivity.when(
-                    data: (isOnline) => isOnline
-                        ? const SizedBox.shrink()
-                        : const _OfflineBanner(),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
-                  );
-                },
-              ),
-              Expanded(child: child ?? const SizedBox.shrink()),
-            ],
+        // Cap text scale factor at 1.5x to prevent layout overflow at extreme sizes
+        final mediaQuery = MediaQuery.of(context);
+        final cappedTextScaler = mediaQuery.textScaler.clamp(
+          minScaleFactor: 0.8,
+          maxScaleFactor: 1.5,
+        );
+
+        return MediaQuery(
+          data: mediaQuery.copyWith(textScaler: cappedTextScaler),
+          child: DeepLinkWrapper(
+            child: Column(
+              children: [
+                Consumer(
+                  builder: (context, ref, _) {
+                    final connectivity = ref.watch(connectivityProvider);
+                    return connectivity.when(
+                      data: (isOnline) => isOnline
+                          ? const SizedBox.shrink()
+                          : const _OfflineBanner(),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    );
+                  },
+                ),
+                Expanded(child: child ?? const SizedBox.shrink()),
+              ],
+            ),
           ),
         );
       },

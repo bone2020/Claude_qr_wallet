@@ -138,10 +138,13 @@ class BalanceCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(
-                  _formattedBalance,
-                  style: AppTextStyles.balanceDisplay(),
-                  overflow: TextOverflow.ellipsis,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _formattedBalance,
+                    style: AppTextStyles.balanceDisplay(),
+                  ),
                 ),
               ),
             ],
