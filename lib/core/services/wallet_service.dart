@@ -148,7 +148,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
   /// Send money to another wallet (via secure Cloud Function)
   Future<TransactionResult> sendMoney({
     required String recipientWalletId,
-    required double amount,
+    required int amount,
     String? note,
   }) async {
     if (_userId == null) {
@@ -224,7 +224,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
   /// Add money to wallet (from bank/card via Paystack)
   /// Balance is credited server-side via verifyPayment Cloud Function
   Future<TransactionResult> addMoney({
-    required double amount,
+    required int amount,
     required String paymentReference,
     String? bankName,
   }) async {

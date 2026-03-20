@@ -73,7 +73,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   }
 
   String get _currencySymbol => ref.read(walletNotifierProvider).currencySymbol;
-  double get _balance => ref.read(walletNotifierProvider).balance;
+  int get _balanceMinor => ref.read(walletNotifierProvider).balance;
+  double get _balance => _balanceMinor / 100;
 
   Future<void> _loadBanks() async {
     setState(() => _isLoadingBanks = true);
@@ -255,7 +256,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   Future<void> _handleWithdraw() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.parse(_amountController.text.replaceAll(',', ''));
+    final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
+    final amount = (amountMajor * 100).round();
     final isBankWithdrawal = _tabController.index == 0;
 
     // Validate based on withdrawal type
@@ -373,7 +375,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   }
 
   /// Shows OTP dialog for bank transfer verification
-  Future<bool> _showOtpDialog(String transferCode, double amount) async {
+  Future<bool> _showOtpDialog(String transferCode, int amount) async {
     final otpController = TextEditingController();
     bool isVerifying = false;
 
@@ -495,7 +497,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         false;
   }
 
-  Future<bool> _showConfirmationDialog(double amount, bool isBankWithdrawal) async {
+  Future<bool> _showConfirmationDialog(int amount, bool isBankWithdrawal) async {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -588,7 +590,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     );
   }
 
-  void _showSuccessDialog(double amount, String reference) {
+  void _showSuccessDialog(int amount, String reference) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1275,8 +1277,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     );
   }
 
-  String _formatAmount(double amount) {
-    final parts = amount.toStringAsFixed(2).split('.');
+  String _formatAmount(int amount) {
+    final parts = (amount / 100).toStringAsFixed(2).split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',

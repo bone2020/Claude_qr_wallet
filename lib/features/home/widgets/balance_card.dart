@@ -6,7 +6,7 @@ import '../../../core/constants/constants.dart';
 
 /// Balance card widget displaying wallet balance
 class BalanceCard extends StatelessWidget {
-  final double balance;
+  final int balance;
   final String currency;
   final bool isHidden;
   final String walletId;
@@ -23,9 +23,9 @@ class BalanceCard extends StatelessWidget {
 
   String get _formattedBalance {
     if (isHidden) return '••••••';
-    
-    // Format with thousand separators
-    final parts = balance.toStringAsFixed(2).split('.');
+
+    // Convert minor units to major and format with thousand separators
+    final parts = (balance / 100).toStringAsFixed(2).split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',

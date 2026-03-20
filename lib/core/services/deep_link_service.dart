@@ -150,7 +150,7 @@ class DeepLinkService {
         _router?.push('/confirm-send', extra: {
           'recipientWalletId': walletId,
           'recipientName': sanitizedName,
-          'amount': parsedAmount ?? 0.0,
+          'amount': parsedAmount != null ? (parsedAmount * 100).round() : 0,
           'note': sanitizedNote,
           'fromScan': true,
           'amountLocked': parsedAmount != null && parsedAmount > 0,

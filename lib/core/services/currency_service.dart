@@ -60,14 +60,15 @@ class CurrencyService {
     );
   }
 
-  // Format amount with currency symbol
-  static String formatAmount(double amount, CurrencyModel currency) {
-    return '${currency.symbol}${amount.toStringAsFixed(2)}';
+  // Format minor-unit amount with currency symbol
+  static String formatAmount(int minorUnits, CurrencyModel currency) {
+    final major = (minorUnits / 100).toStringAsFixed(2);
+    return '${currency.symbol}$major';
   }
 
-  // Format amount with thousand separators
-  static String formatAmountWithSeparators(double amount, CurrencyModel currency) {
-    final parts = amount.toStringAsFixed(2).split('.');
+  // Format minor-unit amount with thousand separators
+  static String formatAmountWithSeparators(int minorUnits, CurrencyModel currency) {
+    final parts = (minorUnits / 100).toStringAsFixed(2).split('.');
     final intPart = parts[0];
     final decPart = parts[1];
 

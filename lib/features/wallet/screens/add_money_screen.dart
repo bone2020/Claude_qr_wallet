@@ -41,7 +41,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
   String? _virtualAccountName;
 
   // Quick amount options
-  final List<double> _quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
+  final List<int> _quickAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
   @override
   void initState() {
@@ -154,15 +154,16 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     return null;
   }
 
-  void _selectQuickAmount(double amount) {
-    _amountController.text = amount.toInt().toString();
+  void _selectQuickAmount(int amount) {
+    _amountController.text = amount.toString();
   }
 
   // Card Payment
   Future<void> _handleCardPayment() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.parse(_amountController.text.replaceAll(',', ''));
+    final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
+    final amountMinor = (amountMajor * 100).round();
     final user = ref.read(currentUserProvider);
 
     if (user == null) {
@@ -176,7 +177,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       final result = await _paymentService.initializePayment(
         context: context,
         email: user.email,
-        amount: amount,
+        amount: amountMinor,
         userId: user.id,
         currency: _currency,
       ).timeout(
@@ -188,7 +189,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
       if (result.success) {
         ref.read(walletNotifierProvider.notifier).refreshWallet();
-        _showSuccess('$_currencySymbol${amount.toStringAsFixed(2)} added to your wallet');
+        _showSuccess('$_currencySymbol${amountMajor.toStringAsFixed(2)} added to your wallet');
         context.pop();
       } else if (result.pending) {
         // Payment popup shown, waiting for completion
@@ -213,7 +214,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       return;
     }
 
-    final amount = double.parse(_amountController.text.replaceAll(',', ''));
+    final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
+    final amountMinor = (amountMajor * 100).round();
     final user = ref.read(currentUserProvider);
 
     if (user == null) {
@@ -226,10 +228,10 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     try {
       // Check if MTN provider - use direct MTN API
       if (MomoService.isMtnProvider(_selectedMomoProvider!.code)) {
-        await _handleMtnMomoPayment(amount, user);
+        await _handleMtnMomoPayment(amountMinor, user);
       } else {
         // Use Paystack for non-MTN providers
-        await _handlePaystackMomoPayment(amount, user);
+        await _handlePaystackMomoPayment(amountMinor, user);
       }
     } catch (e) {
       if (!mounted) return;
@@ -240,7 +242,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
   }
 
   // MTN MoMo Direct API Payment
-  Future<void> _handleMtnMomoPayment(double amount, dynamic user) async {
+  Future<void> _handleMtnMomoPayment(int amount, dynamic user) async {
     final result = await _paymentService.initializeMtnMomoPayment(
       amount: amount,
       phoneNumber: _phoneController.text.replaceAll(' ', ''),
@@ -262,7 +264,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
   }
 
   // Show MTN approval dialog with status polling
-  void _showMtnApprovalDialog(double amount, String referenceId) {
+  void _showMtnApprovalDialog(int amount, String referenceId) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -280,7 +282,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Please approve the payment of $_currencySymbol${amount.toStringAsFixed(2)} on your MTN MoMo phone.',
+              'Please approve the payment of $_currencySymbol${(amount / 100).toStringAsFixed(2)} on your MTN MoMo phone.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -309,7 +311,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
   }
 
   // Check MTN payment status
-  Future<void> _checkMtnPaymentStatus(String referenceId, double amount) async {
+  Future<void> _checkMtnPaymentStatus(String referenceId, int amount) async {
     setState(() => _isLoading = true);
 
     try {
@@ -338,7 +340,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
   }
 
   // Paystack MoMo Payment (for non-MTN providers)
-  Future<void> _handlePaystackMomoPayment(double amount, dynamic user) async {
+  Future<void> _handlePaystackMomoPayment(int amount, dynamic user) async {
     final result = await _paymentService.initializeMobileMoneyPayment(
       email: user.email,
       amount: amount,
@@ -410,7 +412,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     );
   }
 
-  void _showPaymentSuccessDialog(double amount, String reference) {
+  void _showPaymentSuccessDialog(int amount, String reference) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -431,7 +433,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Amount: $_currencySymbol${amount.toStringAsFixed(2)}',
+              'Amount: $_currencySymbol${(amount / 100).toStringAsFixed(2)}',
               style: AppTextStyles.bodyLarge(),
             ),
             const SizedBox(height: AppDimensions.spaceSM),
@@ -1131,11 +1133,11 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     );
   }
 
-  String _formatAmount(double amount) {
+  String _formatAmount(int amount) {
     if (amount >= 1000) {
       return '${(amount / 1000).toStringAsFixed(0)}K';
     }
-    return amount.toStringAsFixed(0);
+    return amount.toString();
   }
 }
 

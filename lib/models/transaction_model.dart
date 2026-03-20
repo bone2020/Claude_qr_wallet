@@ -30,6 +30,8 @@ enum TransactionStatus {
 }
 
 /// Transaction model representing a single transaction
+/// All monetary amounts (amount, fee, convertedAmount) are in minor units (kobo/pesewas/cents).
+/// exchangeRate remains a double (it is a ratio, not a monetary amount).
 @HiveType(typeId: 2)
 class TransactionModel {
   @HiveField(0)
@@ -48,10 +50,10 @@ class TransactionModel {
   final String? receiverName;
 
   @HiveField(5)
-  final double amount;
+  final int amount;
 
   @HiveField(6)
-  final double fee;
+  final int fee;
 
   @HiveField(7)
   final String currency;
@@ -84,7 +86,7 @@ class TransactionModel {
   final String? receiverCurrency;
 
   @HiveField(17)
-  final double? convertedAmount;
+  final int? convertedAmount;
 
   @HiveField(18)
   final double? exchangeRate;
@@ -99,7 +101,7 @@ class TransactionModel {
     this.senderName,
     this.receiverName,
     required this.amount,
-    this.fee = 0.0,
+    this.fee = 0,
     this.currency = 'NGN',
     required this.type,
     this.status = TransactionStatus.pending,
@@ -131,8 +133,8 @@ class TransactionModel {
       receiverWalletId: json['receiverWalletId'] as String? ?? '',
       senderName: json['senderName'] as String?,
       receiverName: json['receiverName'] as String?,
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      fee: (json['fee'] as num?)?.toDouble() ?? 0.0,
+      amount: (json['amount'] as num?)?.toInt() ?? 0,
+      fee: (json['fee'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'NGN',
       type: TransactionType.values.firstWhere(
         (e) => e.name == json['type'],
@@ -151,7 +153,7 @@ class TransactionModel {
       failureReason: json['failureReason'] as String?,
       senderCurrency: json['senderCurrency'] as String?,
       receiverCurrency: json['receiverCurrency'] as String?,
-      convertedAmount: (json['convertedAmount'] as num?)?.toDouble(),
+      convertedAmount: (json['convertedAmount'] as num?)?.toInt(),
       exchangeRate: (json['exchangeRate'] as num?)?.toDouble(),
       method: json['method'] as String?,
     );
@@ -190,8 +192,8 @@ class TransactionModel {
     String? receiverWalletId,
     String? senderName,
     String? receiverName,
-    double? amount,
-    double? fee,
+    int? amount,
+    int? fee,
     String? currency,
     TransactionType? type,
     TransactionStatus? status,
@@ -202,7 +204,7 @@ class TransactionModel {
     String? failureReason,
     String? senderCurrency,
     String? receiverCurrency,
-    double? convertedAmount,
+    int? convertedAmount,
     double? exchangeRate,
     String? method,
   }) {
@@ -230,19 +232,32 @@ class TransactionModel {
     );
   }
 
-  /// Get total amount including fee
-  double get totalAmount => amount + fee;
+  /// Get total amount including fee (minor units)
+  int get totalAmount => amount + fee;
+
+  /// Format minor units to display string (e.g. 150050 -> "1500.50")
+  String get displayAmount => (amount / 100).toStringAsFixed(2);
+
+  /// Format fee to display string
+  String get displayFee => (fee / 100).toStringAsFixed(2);
+
+  /// Format total amount to display string
+  String get displayTotalAmount => (totalAmount / 100).toStringAsFixed(2);
+
+  /// Format converted amount to display string
+  String get displayConvertedAmount =>
+      convertedAmount != null ? (convertedAmount! / 100).toStringAsFixed(2) : '0.00';
 
   /// Check if transaction is a credit (money received)
   bool isCredit(String currentWalletId) {
     return receiverWalletId == currentWalletId;
   }
 
-  /// Get display amount with sign
-  String displayAmount(String currentWalletId, String symbol) {
+  /// Get display amount with sign (formatted from minor units)
+  String formattedAmount(String currentWalletId, String symbol) {
     final isReceived = isCredit(currentWalletId);
     final sign = isReceived ? '+' : '-';
-    return '$sign$symbol${amount.toStringAsFixed(2)}';
+    return '$sign$symbol${displayAmount}';
   }
 
   /// Get counterparty name or method for deposits/withdrawals
@@ -276,7 +291,7 @@ class TransactionModel {
   }
 
   /// Get currency symbol
-String get currencySymbol {
+  String get currencySymbol {
     const symbols = {
       'NGN': '₦',
       'GHS': 'GH₵',

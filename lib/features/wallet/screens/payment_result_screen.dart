@@ -30,7 +30,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
   bool _isLoading = true;
   bool _isSuccess = false;
   String? _errorMessage;
-  double _amount = 0;
+  int _amount = 0;
 
   @override
   void initState() {
@@ -70,8 +70,8 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
     }
   }
 
-  String _formatAmount(double amount) {
-    final parts = amount.toStringAsFixed(2).split('.');
+  String _formatAmount(int amount) {
+    final parts = (amount / 100).toStringAsFixed(2).split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',

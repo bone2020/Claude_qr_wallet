@@ -53,7 +53,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
     try {
       String? walletId;
       String? name;
-      double? amount;
+      int? amount;
       String? currency;
       String? note;
       bool isVerifiedQr = false;
@@ -77,7 +77,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
 
         // Extract data from verified payload
         walletId = verification.walletId;
-        amount = verification.amount;
+        amount = verification.amount != null ? (verification.amount! * 100).round() : null;
         note = verification.note;
         isVerifiedQr = true;
       } else {
@@ -89,7 +89,8 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
 
           final amountStr = uri.queryParameters['amount'];
           if (amountStr != null) {
-            amount = double.tryParse(amountStr);
+            final parsed = double.tryParse(amountStr);
+            if (parsed != null) amount = (parsed * 100).round();
           }
 
           currency = uri.queryParameters['currency'];
@@ -142,7 +143,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
         extra: {
           'recipientWalletId': walletId,
           'recipientName': name ?? 'Unknown',
-          'amount': amount ?? 0.0,
+          'amount': amount ?? 0,
           'note': note,
           'fromScan': true,
           'amountLocked': amount != null && amount > 0,

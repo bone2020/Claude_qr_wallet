@@ -81,7 +81,7 @@ class PaymentService {
   Future<PaymentResult> initializePayment({
     required BuildContext context,
     required String email,
-    required double amount,
+    required int amount,
     required String userId,
     String? currency,
   }) async {
@@ -120,7 +120,7 @@ class PaymentService {
   /// Initialize mobile money payment via Cloud Function
   Future<MobileMoneyPaymentResult> initializeMobileMoneyPayment({
     required String email,
-    required double amount,
+    required int amount,
     required String currency,
     required String provider,
     required String phoneNumber,
@@ -267,7 +267,7 @@ class PaymentService {
 
   /// Initiate withdrawal to bank via Cloud Function
   Future<WithdrawalResult> initiateWithdrawal({
-    required double amount,
+    required int amount,
     required String bankCode,
     required String accountNumber,
     required String accountName,
@@ -348,7 +348,7 @@ class PaymentService {
 
   /// Initiate withdrawal to mobile money via Cloud Function
   Future<WithdrawalResult> initiateMobileMoneyWithdrawal({
-    required double amount,
+    required int amount,
     required String provider,
     required String phoneNumber,
     required String accountName,
@@ -416,7 +416,7 @@ class PaymentService {
   /// Initialize MTN MoMo payment via direct API
   /// Use this for MTN users instead of Paystack
   Future<MobileMoneyPaymentResult> initializeMtnMomoPayment({
-    required double amount,
+    required int amount,
     required String phoneNumber,
     required String userId,
     String? currency,
@@ -481,7 +481,7 @@ class PaymentService {
 
   /// Initiate MTN MoMo withdrawal via direct API
   Future<WithdrawalResult> initiateMtnMomoWithdrawal({
-    required double amount,
+    required int amount,
     required String phoneNumber,
     required String accountName,
     String? currency,
@@ -550,7 +550,7 @@ class PaymentResult {
 class PaymentVerificationResult {
   final bool success;
   final String reference;
-  final double amount;
+  final int amount;
   final String? error;
 
   PaymentVerificationResult({

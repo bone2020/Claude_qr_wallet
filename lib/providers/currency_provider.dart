@@ -121,14 +121,14 @@ class CurrencyNotifier extends StateNotifier<CurrencyState> {
     state = state.copyWith(currency: currency);
   }
 
-  /// Format amount with current currency
-  String formatAmount(double amount) {
-    return CurrencyService.formatAmount(amount, state.currency);
+  /// Format minor-unit amount with current currency
+  String formatAmount(int minorUnits) {
+    return CurrencyService.formatAmount(minorUnits, state.currency);
   }
 
-  /// Format amount with thousand separators
-  String formatAmountWithSeparators(double amount) {
-    return CurrencyService.formatAmountWithSeparators(amount, state.currency);
+  /// Format minor-unit amount with thousand separators
+  String formatAmountWithSeparators(int minorUnits) {
+    return CurrencyService.formatAmountWithSeparators(minorUnits, state.currency);
   }
 }
 

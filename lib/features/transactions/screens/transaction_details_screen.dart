@@ -20,8 +20,8 @@ class TransactionDetailsScreen extends ConsumerWidget {
     required this.transactionId,
   });
 
-  String _formatAmount(double amount) {
-    final parts = amount.toStringAsFixed(2).split('.');
+  String _formatAmount(int amount) {
+    final parts = (amount / 100).toStringAsFixed(2).split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',

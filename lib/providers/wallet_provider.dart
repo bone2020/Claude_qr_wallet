@@ -49,7 +49,7 @@ class WalletState {
     );
   }
 
-  double get balance => wallet?.balance ?? 0.0;
+  int get balance => wallet?.balance ?? 0;
   String get walletId => wallet?.walletId ?? '';
   String get currency => wallet?.currency ?? CurrencyService.defaultCurrency.code;
   String get currencySymbol => wallet?.currencySymbol ?? CurrencyService.defaultCurrency.symbol;
@@ -166,7 +166,7 @@ final walletStreamProvider = StreamProvider<WalletModel?>((ref) {
 });
 
 /// Current balance provider
-final currentBalanceProvider = Provider<double>((ref) {
+final currentBalanceProvider = Provider<int>((ref) {
   return ref.watch(walletNotifierProvider).balance;
 });
 
@@ -375,8 +375,8 @@ class SendMoneyState {
   final String? recipientName;
   final String? recipientCurrency;
   final String? recipientCurrencySymbol;
-  final double amount;
-  final double? convertedAmount;
+  final int amount;
+  final int? convertedAmount;
   final double? exchangeRate;
   final String? note;
   final bool isLoading;
@@ -404,8 +404,8 @@ class SendMoneyState {
     String? recipientName,
     String? recipientCurrency,
     String? recipientCurrencySymbol,
-    double? amount,
-    double? convertedAmount,
+    int? amount,
+    int? convertedAmount,
     double? exchangeRate,
     String? note,
     bool? isLoading,
@@ -429,8 +429,8 @@ class SendMoneyState {
     );
   }
 
-  double get fee => (amount * 0.01).clamp(10, 100);
-  double get total => amount + fee;
+  int get fee => (amount * 0.01).clamp(1000, 10000).round(); // 1% fee, min 10.00, max 100.00 in minor units
+  int get total => amount + fee;
 
   bool get needsConversion => recipientCurrency != null && exchangeRate != null && exchangeRate != 1.0;
 
@@ -503,7 +503,7 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
   }
 
   /// Set amount
-  void setAmount(double amount) {
+  void setAmount(int amount) {
     state = state.copyWith(amount: amount);
   }
 

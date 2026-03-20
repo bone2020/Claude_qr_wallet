@@ -154,14 +154,15 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     try {
       if (!mounted) return;
 
-      final amount = double.parse(_amountController.text.replaceAll(',', ''));
+      final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
+      final amountMinor = (amountMajor * 100).round();
 
       context.push(
         AppRoutes.confirmSend,
         extra: {
           'recipientWalletId': _recipientWalletId,
           'recipientName': _recipientName,
-          'amount': amount,
+          'amount': amountMinor,
           'note': _noteController.text.isNotEmpty ? _noteController.text : null,
           'recipientCurrency': _recipientCurrency,
           'recipientCurrencySymbol': _recipientCurrencySymbol,

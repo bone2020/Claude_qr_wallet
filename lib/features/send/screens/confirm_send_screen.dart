@@ -20,7 +20,7 @@ import '../../../providers/wallet_provider.dart';
 class ConfirmSendScreen extends ConsumerStatefulWidget {
   final String recipientWalletId;
   final String recipientName;
-  final double amount;
+  final int amount;
   final String? note;
   final bool fromScan;
   final bool amountLocked;
@@ -48,10 +48,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _isLoading = false;
   bool _hasConvertedMerchantAmount = false;
 
-  // Mock fee calculation
-  double get _fee => (_amount * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
-  double get _amount => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
-  double get _total => _amount + _fee;
+  // Fee and amount in major units (from user input text controller)
+  double get _amountMajor => double.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
+  double get _feeMajor => (_amountMajor * 0.01).clamp(10, 100); // 1% fee, min 10, max 100
+  double get _totalMajor => _amountMajor + _feeMajor;
+
+  // Minor unit conversions for backend calls
+  int get _amountMinor => (_amountMajor * 100).round();
+  int get _feeMinor => (_feeMajor * 100).round();
 
   String get _currency => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
@@ -65,7 +69,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   double? get _convertedAmount {
     if (!_needsConversion || widget.recipientCurrency == null) return null;
     return ExchangeRateService.convert(
-      amount: _amount,
+      amount: _amountMajor,
       fromCurrency: _currencyCode,
       toCurrency: widget.recipientCurrency!,
     );
@@ -82,8 +86,8 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   // Merchant QR specific getters
   bool get _isMerchantQR => widget.amountLocked && _needsConversion;
 
-  // Original amount seller requested in their currency
-  double get _sellerRequestedAmount => widget.amount;
+  // Original amount seller requested in their currency (major units)
+  double get _sellerRequestedAmount => widget.amount / 100;
 
   // Reverse rate: from seller's currency to buyer's currency
   double? get _reverseExchangeRate {
@@ -110,7 +114,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     // For non-merchant QR or same currency, set amount directly
     // Merchant QR with different currency needs conversion in didChangeDependencies
     if (widget.amount > 0 && !widget.amountLocked) {
-      _amountController.text = widget.amount.toStringAsFixed(0);
+      _amountController.text = (widget.amount / 100).toStringAsFixed(0);
     }
   }
 
@@ -125,7 +129,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         _amountController.text = _buyerPaysAmount!.toStringAsFixed(2);
       } else {
         // Same currency or no conversion needed
-        _amountController.text = widget.amount.toStringAsFixed(2);
+        _amountController.text = (widget.amount / 100).toStringAsFixed(2);
       }
     }
   }
@@ -262,7 +266,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   Future<void> _handleSend() async {
-    if (_amount <= 0) {
+    if (_amountMajor <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter an amount'),
@@ -285,7 +289,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       if (biometricEnabled) {
         final biometricService = BiometricService();
         final authResult = await biometricService.authenticateForTransaction(
-          amount: _total,
+          amount: _totalMajor,
           recipient: widget.recipientName,
           currencySymbol: _currency,
         );
@@ -310,7 +314,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       final walletService = ref.read(walletServiceProvider);
       final result = await walletService.sendMoney(
         recipientWalletId: widget.recipientWalletId,
-        amount: _amount,
+        amount: _amountMinor,
         note: widget.note,
       ).timeout(
         const Duration(seconds: 30),
@@ -384,7 +388,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               ),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                '$_currency${_formatAmount(_amount)} sent to ${widget.recipientName}',
+                '$_currency${_formatAmount(_amountMajor)} sent to ${widget.recipientName}',
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -638,16 +642,16 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow(AppStrings.amount, '$_currency${_formatAmount(_amount)}'),
+          _buildSummaryRow(AppStrings.amount, '$_currency${_formatAmount(_amountMajor)}'),
           const SizedBox(height: AppDimensions.spaceMD),
-          _buildSummaryRow(AppStrings.transactionFee, '$_currency${_formatAmount(_fee)}'),
+          _buildSummaryRow(AppStrings.transactionFee, '$_currency${_formatAmount(_feeMajor)}'),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
             child: Divider(color: AppColors.inputBorderDark),
           ),
           _buildSummaryRow(
             AppStrings.totalAmount,
-            '$_currency${_formatAmount(_total)}',
+            '$_currency${_formatAmount(_totalMajor)}',
             isTotal: true,
           ),
           // Show conversion info if currencies are different
@@ -767,7 +771,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           width: double.infinity,
           height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _isLoading || _amount <= 0 ? null : _handleSend,
+            onPressed: _isLoading || _amountMajor <= 0 ? null : _handleSend,
             child: _isLoading
                 ? const SizedBox(
                     width: 24,
@@ -778,7 +782,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                     ),
                   )
                 : Text(
-                    '${AppStrings.send} $_currency${_formatAmount(_total)}',
+                    '${AppStrings.send} $_currency${_formatAmount(_totalMajor)}',
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),

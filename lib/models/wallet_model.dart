@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 part 'wallet_model.g.dart';
 
 /// Wallet model representing user's wallet
+/// All monetary amounts are stored in minor units (e.g. kobo, pesewas, cents)
 @HiveType(typeId: 1)
 class WalletModel {
   @HiveField(0)
@@ -16,7 +17,7 @@ class WalletModel {
   final String userId;
 
   @HiveField(3)
-  final double balance;
+  final int balance;
 
   @HiveField(4)
   final String currency;
@@ -31,30 +32,30 @@ class WalletModel {
   final DateTime updatedAt;
 
   @HiveField(8)
-  final double dailyLimit;
+  final int dailyLimit;
 
   @HiveField(9)
-  final double monthlyLimit;
+  final int monthlyLimit;
 
   @HiveField(10)
-  final double dailySpent;
+  final int dailySpent;
 
   @HiveField(11)
-  final double monthlySpent;
+  final int monthlySpent;
 
   WalletModel({
     required this.id,
     required this.walletId,
     required this.userId,
-    this.balance = 0.0,
+    this.balance = 0,
     this.currency = 'NGN',
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
-    this.dailyLimit = 500000.0,
-    this.monthlyLimit = 5000000.0,
-    this.dailySpent = 0.0,
-    this.monthlySpent = 0.0,
+    this.dailyLimit = 50000000,
+    this.monthlyLimit = 500000000,
+    this.dailySpent = 0,
+    this.monthlySpent = 0,
   });
 
   /// Create wallet from Firestore document
@@ -63,15 +64,15 @@ class WalletModel {
       id: json['id'] as String,
       walletId: json['walletId'] as String,
       userId: json['userId'] as String,
-      balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
+      balance: (json['balance'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'NGN',
       isActive: json['isActive'] as bool? ?? true,
       createdAt: json['createdAt'] is Timestamp ? (json['createdAt'] as Timestamp).toDate() : DateTime.parse(json['createdAt'] as String),
       updatedAt: json['updatedAt'] is Timestamp ? (json['updatedAt'] as Timestamp).toDate() : DateTime.parse(json['updatedAt'] as String),
-      dailyLimit: (json['dailyLimit'] as num?)?.toDouble() ?? 500000.0,
-      monthlyLimit: (json['monthlyLimit'] as num?)?.toDouble() ?? 5000000.0,
-      dailySpent: (json['dailySpent'] as num?)?.toDouble() ?? 0.0,
-      monthlySpent: (json['monthlySpent'] as num?)?.toDouble() ?? 0.0,
+      dailyLimit: (json['dailyLimit'] as num?)?.toInt() ?? 50000000,
+      monthlyLimit: (json['monthlyLimit'] as num?)?.toInt() ?? 500000000,
+      dailySpent: (json['dailySpent'] as num?)?.toInt() ?? 0,
+      monthlySpent: (json['monthlySpent'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -98,15 +99,15 @@ class WalletModel {
     String? id,
     String? walletId,
     String? userId,
-    double? balance,
+    int? balance,
     String? currency,
     bool? isActive,
     DateTime? createdAt,
     DateTime? updatedAt,
-    double? dailyLimit,
-    double? monthlyLimit,
-    double? dailySpent,
-    double? monthlySpent,
+    int? dailyLimit,
+    int? monthlyLimit,
+    int? dailySpent,
+    int? monthlySpent,
   }) {
     return WalletModel(
       id: id ?? this.id,
@@ -124,8 +125,8 @@ class WalletModel {
     );
   }
 
-  /// Check if user can make transaction of given amount
-  bool canTransact(double amount) {
+  /// Check if user can make transaction of given amount (minor units)
+  bool canTransact(int amount) {
     if (!isActive) return false;
     if (amount > balance) return false;
     if (dailySpent + amount > dailyLimit) return false;
@@ -133,11 +134,14 @@ class WalletModel {
     return true;
   }
 
-  /// Get remaining daily limit
-  double get remainingDailyLimit => dailyLimit - dailySpent;
+  /// Get remaining daily limit (minor units)
+  int get remainingDailyLimit => dailyLimit - dailySpent;
 
-  /// Get remaining monthly limit
-  double get remainingMonthlyLimit => monthlyLimit - monthlySpent;
+  /// Get remaining monthly limit (minor units)
+  int get remainingMonthlyLimit => monthlyLimit - monthlySpent;
+
+  /// Format minor units to display string (e.g. 150050 -> "1500.50")
+  String get displayBalance => (balance / 100).toStringAsFixed(2);
 
   /// Get currency symbol for African and common currencies
   String get currencySymbol {

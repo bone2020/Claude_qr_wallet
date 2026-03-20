@@ -489,7 +489,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             child: ConfirmSendScreen(
               recipientWalletId: extras?['recipientWalletId'] ?? '',
               recipientName: extras?['recipientName'] ?? '',
-              amount: extras?['amount'] ?? 0.0,
+              amount: extras?['amount'] ?? 0,
               note: extras?['note'],
               fromScan: extras?['fromScan'] ?? false,
               amountLocked: extras?['amountLocked'] ?? false,

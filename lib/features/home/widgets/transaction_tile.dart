@@ -8,7 +8,7 @@ import '../../../core/constants/constants.dart';
 class TransactionTile extends StatelessWidget {
   final String name;
   final String type; // 'send', 'receive', 'deposit', 'withdraw'
-  final double amount;
+  final int amount;
   final String currency;
   final DateTime date;
   final String status; // 'completed', 'pending', 'failed'
@@ -68,7 +68,8 @@ class TransactionTile extends StatelessWidget {
   }
 
   String get _formattedAmount {
-    final parts = amount.toStringAsFixed(2).split('.');
+    // Convert minor units to major and format with thousand separators
+    final parts = (amount / 100).toStringAsFixed(2).split('.');
     final integerPart = parts[0].replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',

@@ -492,7 +492,7 @@ function validateWalletDocument(walletData, context = 'wallet') {
  * @returns {number} The result
  */
 function safeAdd(base, addend, context = 'balance credit') {
-  const result = Number(base) + Number(addend);
+  const result = Math.round(Number(base) + Number(addend));
   if (!Number.isFinite(result) || result < 0) {
     logError('safeAdd produced invalid result', { base, addend, result, context });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
@@ -510,7 +510,7 @@ function safeAdd(base, addend, context = 'balance credit') {
  * @returns {number} The result
  */
 function safeSubtract(base, subtrahend, context = 'balance debit') {
-  const result = Number(base) - Number(subtrahend);
+  const result = Math.round(Number(base) - Number(subtrahend));
   if (!Number.isFinite(result)) {
     logError('safeSubtract produced non-finite result', { base, subtrahend, result, context });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
@@ -519,6 +519,33 @@ function safeSubtract(base, subtrahend, context = 'balance debit') {
     throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Insufficient funds for ${context}.`);
   }
   return result;
+}
+
+/**
+ * Convert a major-unit amount (e.g. 15.50) to minor units (e.g. 1550).
+ * @param {number} major - Amount in major units
+ * @returns {number} Integer amount in minor units
+ */
+function toMinorUnits(major) {
+  return Math.round(Number(major) * 100);
+}
+
+/**
+ * Convert a minor-unit amount (e.g. 1550) to major units (e.g. 15.50).
+ * @param {number} minor - Integer amount in minor units
+ * @returns {number} Amount in major units
+ */
+function toMajorUnits(minor) {
+  return Number(minor) / 100;
+}
+
+/**
+ * Format a minor-unit integer for display (e.g. 150050 -> "1500.50").
+ * @param {number} minor - Integer amount in minor units
+ * @returns {string} Formatted string with 2 decimal places
+ */
+function formatMinorUnits(minor) {
+  return toMajorUnits(minor).toFixed(2);
 }
 
 /**
@@ -1040,8 +1067,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     }
 
     const paymentData = response.data;
-    const amountInKobo = paymentData.amount;
-    const amount = amountInKobo / 100; // Convert from kobo to naira
+    const amount = paymentData.amount; // Already in minor units (kobo/pesewas/cents)
     const currency = paymentData.currency;
 
     // Secondary idempotency check via payments collection (defense in depth)
@@ -1119,7 +1145,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     // Send push notification for deposit
     await sendPushNotification(userId, {
       title: 'Deposit Successful',
-      body: `${currency} ${amount.toFixed(2)} has been added to your wallet`,
+      body: `${currency} ${formatMinorUnits(amount)} has been added to your wallet`,
       type: 'transaction',
       data: { action: 'deposit', amount: amount.toString(), reference },
     });
@@ -1260,7 +1286,7 @@ async function handleSuccessfulCharge(data) {
     }
   }
 
-  const amount = receivedAmountKobo / 100;
+  const amount = receivedAmountKobo; // Keep in minor units (kobo/pesewas/cents)
 
   // Get user's wallet
   const walletSnapshot = await db.collection('wallets')
@@ -1318,7 +1344,7 @@ async function handleSuccessfulCharge(data) {
   // Send push notification for deposit via webhook
   await sendPushNotification(userId, {
     title: 'Deposit Successful',
-    body: `${currency} ${amount.toFixed(2)} has been added to your wallet via ${data.channel || 'card'}`,
+    body: `${currency} ${formatMinorUnits(amount)} has been added to your wallet via ${data.channel || 'card'}`,
     type: 'transaction',
     data: { action: 'deposit', amount: amount.toString(), reference },
   });
@@ -1362,7 +1388,7 @@ async function handleSuccessfulTransfer(data) {
     const wdData = withdrawalDoc.data();
     await sendPushNotification(wdData.userId, {
       title: 'Withdrawal Completed',
-      body: `Your withdrawal of ${wdData.currency || ''} ${wdData.amount?.toFixed(2) || '0.00'} has been completed`,
+      body: `Your withdrawal of ${wdData.currency || ''} ${wdData.amount != null ? formatMinorUnits(wdData.amount) : '0.00'} has been completed`,
       type: 'transaction',
       data: { action: 'withdrawal_completed', reference },
     });
@@ -1432,7 +1458,7 @@ async function handleFailedTransfer(data) {
   // Send push notification for withdrawal failed
   await sendPushNotification(userId, {
     title: 'Withdrawal Failed',
-    body: `Your withdrawal of ${withdrawalData.currency || ''} ${amount?.toFixed(2) || '0.00'} has failed. The amount has been refunded to your wallet.`,
+    body: `Your withdrawal of ${withdrawalData.currency || ''} ${amount != null ? formatMinorUnits(amount) : '0.00'} has failed. The amount has been refunded to your wallet.`,
     type: 'transaction',
     data: { action: 'withdrawal_failed', reference, reason: data.reason || 'Transfer failed' },
   });
@@ -1474,8 +1500,8 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
   // Validate amount
   requirePositiveNumber(amount, 'amount');
 
-  // Minimum withdrawal amount (e.g., 100)
-  if (amount < 100) {
+  // Minimum withdrawal amount: 100 major units = 10000 minor units
+  if (amount < 10000) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_SMALL, 'Minimum withdrawal is 100.');
   }
 
@@ -1582,7 +1608,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     // Initiate transfer
     const transferResponse = await paystackRequest('POST', '/transfer', {
       source: 'balance',
-      amount: amount * 100, // Convert to kobo
+      amount: amount, // Already in minor units (kobo/pesewas/cents)
       recipient: recipientCode,
       reference: reference,
       reason: `Wallet withdrawal - ${reference}`,
@@ -1642,7 +1668,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     // Send push notification for withdrawal initiated
     await sendPushNotification(userId, {
       title: 'Withdrawal Initiated',
-      body: `Your withdrawal of ${validated.currency || 'NGN'} ${amount.toFixed(2)} is being processed`,
+      body: `Your withdrawal of ${validated.currency || 'NGN'} ${formatMinorUnits(amount)} is being processed`,
       type: 'transaction',
       data: { action: 'withdrawal_initiated', amount: amount.toString(), reference },
     });
@@ -2076,7 +2102,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
-      amount: Math.round(amount * 100), // Convert to smallest unit
+      amount: amount, // Already in minor units (kobo/pesewas/cents)
       currency: validatedCurrency,
       reference: reference,
       callback_url: 'https://qr-wallet-1993.web.app/payment-callback',
@@ -2094,7 +2120,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
         userId,
         email,
         expectedAmount: amount,
-        expectedAmountKobo: Math.round(amount * 100),
+        expectedAmountKobo: amount,
         currency: validatedCurrency,
         reference,
         paystackReference: response.data.reference,
@@ -2457,15 +2483,15 @@ async function checkForFraud(userId, txData) {
 
     // 1. Large transaction threshold (varies by currency)
     const largeThresholds = {
-      NGN: 500000, GHS: 10000, KES: 200000, UGX: 5000000, ZAR: 20000,
-      USD: 1000, GBP: 800, EUR: 900,
+      NGN: 50000000, GHS: 1000000, KES: 20000000, UGX: 500000000, ZAR: 2000000,
+      USD: 100000, GBP: 80000, EUR: 90000,
     };
-    const threshold = largeThresholds[currency] || 10000;
+    const threshold = largeThresholds[currency] || 1000000;
     if (amount >= threshold) {
       alerts.push({
         rule: 'large_transaction',
         severity: 'medium',
-        message: `Large ${type}: ${currency} ${amount.toFixed(2)} exceeds threshold of ${currency} ${threshold}`,
+        message: `Large ${type}: ${currency} ${formatMinorUnits(amount)} exceeds threshold of ${currency} ${formatMinorUnits(threshold)}`,
       });
     }
 
@@ -2501,7 +2527,7 @@ async function checkForFraud(userId, txData) {
         alerts.push({
           rule: 'new_account_large_tx',
           severity: 'high',
-          message: `New account (${Math.round(accountAge)}h old) with significant transaction: ${currency} ${amount.toFixed(2)}`,
+          message: `New account (${Math.round(accountAge)}h old) with significant transaction: ${currency} ${formatMinorUnits(amount)}`,
         });
       }
     }
@@ -3628,7 +3654,7 @@ exports.cleanupPendingMomoTransactions = functions.pubsub
             // Notify user
             await sendPushNotification(txData.userId, {
               title: 'MoMo Transaction Failed',
-              body: `Your MoMo ${txData.type === 'disbursement' ? 'withdrawal' : 'deposit'} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has timed out. ${txData.type === 'disbursement' ? 'The amount has been refunded to your wallet.' : 'Please try again.'}`,
+              body: `Your MoMo ${txData.type === 'disbursement' ? 'withdrawal' : 'deposit'} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has timed out. ${txData.type === 'disbursement' ? 'The amount has been refunded to your wallet.' : 'Please try again.'}`,
               type: 'transaction',
               data: { action: 'momo_timeout', referenceId: txDoc.id },
             }).catch(() => {});
@@ -3643,7 +3669,7 @@ exports.cleanupPendingMomoTransactions = functions.pubsub
             if (txData.userId) {
               await sendPushNotification(txData.userId, {
                 title: 'MoMo Deposit Failed',
-                body: `Your MoMo deposit of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has timed out. No charge was made. Please try again.`,
+                body: `Your MoMo deposit of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has timed out. No charge was made. Please try again.`,
                 type: 'transaction',
                 data: { action: 'momo_timeout', referenceId: txDoc.id },
               }).catch(() => {});
@@ -5407,7 +5433,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     const currentBalance = balanceDoc.data().amount || 0;
     if (currentBalance < amount) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+        `Insufficient ${currency} balance. Available: ${formatMinorUnits(currentBalance)}, Requested: ${formatMinorUnits(amount)}`);
     }
 
     // Get exchange rate for USD equivalent
@@ -5486,7 +5512,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
       email: callerEmailForLog,
       role: caller.role,
       action: 'platform_withdrawal',
-      details: `Withdrew ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
+      details: `Withdrew ${currency} ${formatMinorUnits(amount)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
       ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -5638,7 +5664,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     const currentBalance = balanceDoc.data().amount || 0;
     if (currentBalance < amount) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+        `Insufficient ${currency} balance. Available: ${formatMinorUnits(currentBalance)}, Requested: ${formatMinorUnits(amount)}`);
     }
 
     // Get exchange rate for USD equivalent
@@ -5785,7 +5811,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
       email: callerEmail,
       role: caller.role,
       action: 'bank_transfer',
-      details: `Transferred ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
+      details: `Transferred ${currency} ${formatMinorUnits(amount)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
       ipHash: hashIp(context),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -6671,26 +6697,26 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const recipientCurrency = recipientData.currency || 'NGN';
       const isCrossCurrency = senderCurrency !== recipientCurrency;
 
-      // Fee structure: 2.5% same-currency, 5% cross-currency
+      // Fee structure: 2.5% same-currency, 5% cross-currency (all in minor units)
       const feeRate = isCrossCurrency ? 0.05 : 0.025;
-      const feeMin = isCrossCurrency ? 50 : 10;
-      const feeMax = isCrossCurrency ? 1000 : 500;
-      const fee = Math.min(Math.max(amount * feeRate, feeMin), feeMax);
+      const feeMin = isCrossCurrency ? 5000 : 1000;   // 50.00 / 10.00 in minor units
+      const feeMax = isCrossCurrency ? 100000 : 50000; // 1000.00 / 500.00 in minor units
+      const fee = Math.round(Math.min(Math.max(amount * feeRate, feeMin), feeMax));
       const totalDebit = amount + fee;
 
-      // Enforce daily/monthly spending limits
-      const DAILY_LIMIT = 50000;   // Local currency units
-      const MONTHLY_LIMIT = 500000;
+      // Enforce daily/monthly spending limits (in minor units)
+      const DAILY_LIMIT = 5000000;   // 50,000.00 in minor units
+      const MONTHLY_LIMIT = 50000000; // 500,000.00 in minor units
       const currentDailySpent = Number(senderData.dailySpent) || 0;
       const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
 
       if (currentDailySpent + totalDebit > DAILY_LIMIT) {
         throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+          `Daily spending limit of ${formatMinorUnits(DAILY_LIMIT)} exceeded. Current: ${formatMinorUnits(currentDailySpent)}, requested: ${formatMinorUnits(totalDebit)}`);
       }
       if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
         throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+          `Monthly spending limit of ${formatMinorUnits(MONTHLY_LIMIT)} exceeded. Current: ${formatMinorUnits(currentMonthlySpent)}, requested: ${formatMinorUnits(totalDebit)}`);
       }
 
       // Check balance and calculate new values
@@ -6729,9 +6755,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         // rate is currency-per-USD, so: amountInUSD = amount / senderRate
         // amountInRecipient = amountInUSD * recipientRate
         appliedExchangeRate = recipientRate / senderRate;
-        creditAmount = amount * appliedExchangeRate;
-        // Round to 2 decimal places for financial accuracy
-        creditAmount = Math.round(creditAmount * 100) / 100;
+        creditAmount = Math.round(amount * appliedExchangeRate); // Round to integer minor units
       }
 
       const newRecipientBalance = safeAdd(recipientData.balance, creditAmount, 'sendMoney recipient credit');
@@ -6754,7 +6778,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // ============================================
       const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
       const feeExchangeRate = rates[senderCurrency] || 1;
-      const feeInUSD = fee / feeExchangeRate;
+      const feeInUSD = toMajorUnits(fee) / feeExchangeRate;
 
       // Update platform wallet USD balance
       const platformWalletRef = db.collection('wallets').doc('platform');
@@ -6852,13 +6876,13 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     await Promise.all([
       sendPushNotification(senderUid, {
         title: 'Money Sent',
-        body: `You sent ${result.senderCurrency || ''}${amount.toFixed(2)} to ${result.recipientName || 'a wallet'}`,
+        body: `You sent ${result.senderCurrency || ''}${formatMinorUnits(amount)} to ${result.recipientName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_sent', amount: amount.toString(), transactionId: result.transactionId },
       }),
       sendPushNotification(result.recipientUid, {
         title: 'Money Received',
-        body: `You received ${result.recipientCurrency || ''}${amount.toFixed(2)} from ${result.senderName || 'a wallet'}`,
+        body: `You received ${result.recipientCurrency || ''}${formatMinorUnits(amount)} from ${result.senderName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
       }),
@@ -7076,7 +7100,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
     // Create request to pay
     const response = await momoRequest('collections', 'POST', '/v1_0/requesttopay', {
-      amount: amount.toString(),
+      amount: toMajorUnits(amount).toString(),
       currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payer: {
@@ -7252,7 +7276,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
           const checkNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
           await sendPushNotification(txData.userId, {
             title: `${checkNotifType} Successful`,
-            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has been completed`,
             type: 'transaction',
             data: { action: txData.type === 'collection' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId },
           });
@@ -7424,7 +7448,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
     // Create transfer request
     const response = await momoRequest('disbursements', 'POST', '/v1_0/transfer', {
-      amount: amount.toString(),
+      amount: toMajorUnits(amount).toString(),
       currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payee: {
@@ -7448,7 +7472,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
      // Send push notification for MoMo withdrawal
       await sendPushNotification(userId, {
         title: 'Withdrawal Initiated',
-        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${amount.toFixed(2)} is being processed`,
+        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${formatMinorUnits(amount)} is being processed`,
         type: 'transaction',
         data: { action: 'withdrawal_initiated', amount: amount.toString(), referenceId },
       });
@@ -7678,7 +7702,7 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
       const momoNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
       await sendPushNotification(txData.userId, {
         title: `${momoNotifType} Successful`,
-        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has been completed`,
         type: 'transaction',
         data: { action: momoNotifType === 'Deposit' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId: externalId },
       });

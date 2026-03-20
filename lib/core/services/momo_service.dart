@@ -23,7 +23,7 @@ class MomoService {
   /// Request payment from user's MoMo wallet
   /// Returns referenceId to check status
   Future<MomoPaymentResult> requestToPay({
-    required double amount,
+    required int amount,
     required String phoneNumber,
     String? currency,
     String? payerMessage,
@@ -69,7 +69,7 @@ class MomoService {
 
   /// Transfer money to user's MoMo wallet
   Future<MomoPaymentResult> transfer({
-    required double amount,
+    required int amount,
     required String phoneNumber,
     String? currency,
     String? payeeNote,
