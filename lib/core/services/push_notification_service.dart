@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
+import '../router/app_router.dart';
 
 /// Top-level background message handler (must be top-level function)
 @pragma('vm:entry-point')
@@ -135,9 +137,45 @@ class PushNotificationService {
   /// Handle notification tap — navigate to relevant screen
   void _handleNotificationTap(RemoteMessage message) {
     debugPrint('Notification tapped: ${message.data}');
-    // Deep navigation requires a global navigator key.
-    // For now, the app opens to whatever screen was last active.
-    // TODO: Add deep link navigation when global navigator key is available.
+
+    final action = message.data['action'] as String?;
+    if (action == null) return;
+
+    // Delay to ensure app is fully rendered after cold start
+    Future.delayed(const Duration(milliseconds: 500), () {
+      final context = rootNavigatorKey.currentContext;
+      if (context == null) {
+        debugPrint('Navigator context not available for notification tap');
+        return;
+      }
+
+      switch (action) {
+        // Transaction notifications → go to notifications screen
+        case 'deposit':
+        case 'money_sent':
+        case 'money_received':
+        case 'withdrawal_completed':
+        case 'withdrawal_initiated':
+        case 'withdrawal_failed':
+        case 'momo_timeout':
+          GoRouter.of(context).push(AppRoutes.notifications);
+          break;
+
+        // Security notifications → go to profile
+        case 'pin_changed':
+        case 'account_blocked':
+        case 'account_blocked_by_admin':
+        case 'account_unblocked':
+        case 'suspicious_activity':
+          GoRouter.of(context).push(AppRoutes.profile);
+          break;
+
+        // Default → notifications screen
+        default:
+          GoRouter.of(context).push(AppRoutes.notifications);
+          break;
+      }
+    });
   }
 
   /// Save FCM token to Firestore subcollection (supports multiple devices)

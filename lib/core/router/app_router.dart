@@ -90,9 +90,14 @@ class AppRoutes {
   static const String appLock = '/app-lock';
 }
 
+/// Global navigator key for accessing navigation outside of widget tree
+/// Used by PushNotificationService for notification tap navigation
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: AppRoutes.splash,
     debugLogDiagnostics: true,
     redirect: (context, state) async {
