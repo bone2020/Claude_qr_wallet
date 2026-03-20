@@ -318,7 +318,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                       color: isDark ? Colors.white : Colors.black,
                     ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: AppColors.inputBorderDark),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),

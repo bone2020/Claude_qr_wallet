@@ -271,7 +271,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.phone_android, color: Colors.amber),
+            Icon(Icons.phone_android, color: AppColors.warning),
             SizedBox(width: 12),
             Text('Approve Payment'),
           ],
@@ -288,7 +288,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             const SizedBox(height: 8),
             const Text(
               'Check your phone for the approval prompt.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
               textAlign: TextAlign.center,
             ),
           ],

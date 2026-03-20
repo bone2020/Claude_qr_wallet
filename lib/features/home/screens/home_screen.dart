@@ -204,7 +204,7 @@ class HomeScreen extends ConsumerWidget {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: const BoxDecoration(
-                          color: Colors.red,
+                          color: AppColors.error,
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(

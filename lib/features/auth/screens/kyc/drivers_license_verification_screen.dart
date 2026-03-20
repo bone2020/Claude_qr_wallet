@@ -298,7 +298,7 @@ class _SmileIdDocumentScreen extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Verification failed: $error'),
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
             );
             Navigator.pop(context);
