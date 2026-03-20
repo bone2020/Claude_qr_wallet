@@ -16,6 +16,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/services.dart';
 import 'core/services/deep_link_service.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/widgets/responsive_wrapper.dart';
 import 'providers/providers.dart';
 
 void main() async {
@@ -117,23 +118,25 @@ class QRWalletApp extends ConsumerWidget {
 
         return MediaQuery(
           data: mediaQuery.copyWith(textScaler: cappedTextScaler),
-          child: DeepLinkWrapper(
-            child: Column(
-              children: [
-                Consumer(
-                  builder: (context, ref, _) {
-                    final connectivity = ref.watch(connectivityProvider);
-                    return connectivity.when(
-                      data: (isOnline) => isOnline
-                          ? const SizedBox.shrink()
-                          : const _OfflineBanner(),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    );
-                  },
-                ),
-                Expanded(child: child ?? const SizedBox.shrink()),
-              ],
+          child: ResponsiveWrapper(
+            child: DeepLinkWrapper(
+              child: Column(
+                children: [
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final connectivity = ref.watch(connectivityProvider);
+                      return connectivity.when(
+                        data: (isOnline) => isOnline
+                            ? const SizedBox.shrink()
+                            : const _OfflineBanner(),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      );
+                    },
+                  ),
+                  Expanded(child: child ?? const SizedBox.shrink()),
+                ],
+              ),
             ),
           ),
         );
