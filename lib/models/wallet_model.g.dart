@@ -20,15 +20,15 @@ class WalletModelAdapter extends TypeAdapter<WalletModel> {
       id: fields[0] as String,
       walletId: fields[1] as String,
       userId: fields[2] as String,
-      balance: fields[3] as double,
+      balance: fields[3] as int,
       currency: fields[4] as String,
       isActive: fields[5] as bool,
       createdAt: fields[6] as DateTime,
       updatedAt: fields[7] as DateTime,
-      dailyLimit: fields[8] as double,
-      monthlyLimit: fields[9] as double,
-      dailySpent: fields[10] as double,
-      monthlySpent: fields[11] as double,
+      dailyLimit: fields[8] as int,
+      monthlyLimit: fields[9] as int,
+      dailySpent: fields[10] as int,
+      monthlySpent: fields[11] as int,
     );
   }
 
