@@ -62,7 +62,8 @@ service cloud.firestore {
       // Transactions - read only (writes via Cloud Functions)
       match /transactions/{txId} {
         allow read: if isOwner(userId);
-        allow write: if false;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
       }
 
       // Notifications — user can read, mark as read (update), and delete
@@ -80,28 +81,32 @@ service cloud.firestore {
       // Writes via Cloud Functions with verification
       match /linkedAccounts/{accountId} {
         allow read: if isOwner(userId);
-        allow write: if false;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
       }
 
       // Bank accounts — read only from client
       // Adding bank accounts requires verification via Cloud Function
       match /bankAccounts/{accountId} {
         allow read: if isOwner(userId);
-        allow write: if false;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
       }
 
       // Payment cards — read only from client
       // Card tokenization handled by Paystack, not stored directly
       match /cards/{cardId} {
         allow read: if isOwner(userId);
-        allow write: if false;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
       }
 
       // KYC documents — read only from client
       // KYC writes handled by Cloud Functions only for integrity
       match /kyc/{docId} {
         allow read: if isOwner(userId);
-        allow write: if false;
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
       }
     }
 

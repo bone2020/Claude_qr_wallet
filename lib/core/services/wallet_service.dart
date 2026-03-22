@@ -196,7 +196,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
           senderName: '',
           receiverName: data['recipientName'] as String? ?? 'Unknown',
           amount: amount,
-          fee: (data['fee'] as num?)?.toDouble() ?? 0,
+          fee: (data['fee'] as num?)?.toInt() ?? 0,
           currency: senderCurrency, // Use sender's actual currency
           type: TransactionType.send,
           status: TransactionStatus.completed,
@@ -277,7 +277,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
           receiverWalletId: wallet?.walletId ?? '',
           senderName: bankName ?? 'Bank Transfer',
           receiverName: userName,
-          amount: (data['amount'] as num?)?.toDouble() ?? amount,
+          amount: (data['amount'] as num?)?.toInt() ?? amount,
           fee: 0,
           currency: (data['currency'] as String?) ?? wallet?.currency ?? 'NGN',
           type: TransactionType.deposit,

@@ -459,6 +459,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             firstName: extras?['firstName'],
             lastName: extras?['lastName'],
             idNumber: extras?['idNumber'],
+            documentVerified: extras?['documentVerified'] ?? false,
           );
         },
       ),

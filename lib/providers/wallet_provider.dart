@@ -140,7 +140,7 @@ class WalletNotifier extends StateNotifier<WalletState> {
   }
 
   /// Update wallet balance locally (for optimistic UI)
-  void updateBalance(double newBalance) {
+  void updateBalance(int newBalance) {
     if (state.wallet != null) {
       final updatedWallet = state.wallet!.copyWith(balance: newBalance);
       state = state.copyWith(wallet: updatedWallet);

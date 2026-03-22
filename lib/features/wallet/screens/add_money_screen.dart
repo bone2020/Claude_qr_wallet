@@ -286,7 +286,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Check your phone for the approval prompt.',
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
               textAlign: TextAlign.center,

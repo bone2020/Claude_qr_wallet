@@ -148,6 +148,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
           'firstName': null,
           'lastName': null,
           'idNumber': _ninController.text.trim(),
+          'documentVerified': true,
         },
       );
 

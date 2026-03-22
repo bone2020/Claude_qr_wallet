@@ -203,6 +203,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
           'firstName': null,
           'lastName': null,
           'idNumber': _requiresIdNumber ? _idNumberController.text.trim() : null,
+          'documentVerified': true,
         },
       );
 

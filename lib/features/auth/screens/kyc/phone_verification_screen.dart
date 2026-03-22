@@ -12,6 +12,7 @@ class PhoneVerificationScreen extends ConsumerStatefulWidget {
   final String? firstName;
   final String? lastName;
   final String? idNumber;
+  final bool documentVerified;
 
   const PhoneVerificationScreen({
     super.key,
@@ -19,6 +20,7 @@ class PhoneVerificationScreen extends ConsumerStatefulWidget {
     this.firstName,
     this.lastName,
     this.idNumber,
+    this.documentVerified = false,
   });
 
   @override
@@ -32,6 +34,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
   bool _isLoading = false;
   bool _isVerified = false;
   bool _isSupported = true;
+  bool _checkFailed = false;
   String? _errorMessage;
   List<String>? _supportedOperators;
 
@@ -52,15 +55,26 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
   }
 
   Future<void> _checkSupport() async {
-    final support = await _smileIdService.checkPhoneVerificationSupport(widget.countryCode);
-    if (mounted) {
-      setState(() {
-        _isSupported = support.supported;
-        _supportedOperators = support.operators;
-        if (!support.supported) {
-          _errorMessage = support.message ?? 'Phone verification not available for this country';
-        }
-      });
+    try {
+      final support = await _smileIdService.checkPhoneVerificationSupport(widget.countryCode);
+      if (mounted) {
+        setState(() {
+          _checkFailed = false;
+          _isSupported = support.supported;
+          _supportedOperators = support.operators;
+          if (!support.supported) {
+            _errorMessage = support.message ?? 'Phone verification not available for this country';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _checkFailed = true;
+          _isSupported = false;
+          _errorMessage = 'Could not check phone verification support. Please try again.';
+        });
+      }
     }
   }
 
@@ -353,7 +367,8 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
                   child: const Text('Continue'),
                 ).animate().fadeIn(delay: 400.ms),
 
-              if (!_isVerified)
+              // Skip allowed: document already verified (SmileID) OR server says not supported
+              if (!_isVerified && !_checkFailed && (widget.documentVerified || !_isSupported))
                 TextButton(
                   onPressed: _handleSkip,
                   child: Text(
@@ -363,6 +378,39 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
                     ),
                   ),
                 ).animate().fadeIn(delay: 500.ms),
+
+              // Check failed: show Retry + skip only if document already verified
+              if (_checkFailed) ...[
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _checkFailed = false;
+                      _errorMessage = null;
+                    });
+                    _checkSupport();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Retry'),
+                ).animate().fadeIn(delay: 500.ms),
+                if (widget.documentVerified) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _handleSkip,
+                    child: Text(
+                      'Skip for now',
+                      style: TextStyle(
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ],
           ),
         ),

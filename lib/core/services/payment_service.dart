@@ -54,7 +54,7 @@ class PaymentService {
         return PaymentVerificationResult(
           success: true,
           reference: reference,
-          amount: (data['amount'] as num?)?.toDouble() ?? 0,
+          amount: (data['amount'] as num?)?.toInt() ?? 0,
         );
       } else {
         return PaymentVerificationResult(
