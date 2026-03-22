@@ -113,8 +113,19 @@ class _DriversLicenseVerificationScreenState extends ConsumerState<DriversLicens
     setState(() => _isLoading = true);
 
     try {
+      // Phone verification step (optional for SmileID countries)
+      final phoneVerified = await context.push<bool>(
+        AppRoutes.kycPhoneVerification,
+        extra: {
+          'countryCode': widget.countryCode,
+          'documentVerified': true, // SmileID already verified, skip is allowed
+        },
+      );
+
+      if (!mounted) return;
+
       final userService = UserService();
-    final result = await userService.uploadKycDocuments(
+      final result = await userService.uploadKycDocuments(
         idType: 'DRIVERS_LICENSE',
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,

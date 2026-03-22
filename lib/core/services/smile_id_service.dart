@@ -65,6 +65,12 @@ class SmileIDService {
     return countryIdTypes[countryCode.toUpperCase()] ?? countryIdTypes['GH']!;
   }
 
+  /// Check if a country is supported by SmileID document verification
+  bool isSmileIdCountry(String? countryCode) {
+    if (countryCode == null) return false;
+    return countryIdTypes.containsKey(countryCode.toUpperCase());
+  }
+
   /// Check if country supports phone verification
   bool supportsPhoneVerification(String? countryCode) {
     if (countryCode == null) return false;

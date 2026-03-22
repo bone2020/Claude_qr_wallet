@@ -22,6 +22,7 @@ import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
 import '../../features/auth/screens/kyc/uganda_nin_verification_screen.dart';
 import '../../features/auth/screens/app_lock_screen.dart';
 import '../../features/auth/screens/kyc/phone_verification_screen.dart';
+import '../../features/auth/screens/manual_kyc_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
 import '../../features/send/screens/send_money_screen.dart';
@@ -63,6 +64,7 @@ class AppRoutes {
   static const String kycNationalId = '/kyc-national-id';
   static const String kycSsnit = '/kyc-ssnit';
   static const String kycUgandaNin = '/kyc-uganda-nin';
+  static const String manualKyc = '/manual-kyc';
   static const String kycPhoneVerification = '/kyc-phone-verification';
   static const String main = '/main';
   static const String home = '/home';
@@ -444,6 +446,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extras = state.extra as Map<String, dynamic>?;
           return UgandaNinVerificationScreen(
             countryCode: extras?['countryCode'] ?? 'UG',
+          );
+        },
+      ),
+
+      // Manual KYC (non-SmileID countries)
+      GoRoute(
+        path: AppRoutes.manualKyc,
+        name: 'manualKyc',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return ManualKycScreen(
+            countryCode: extras?['countryCode'] ?? 'GH',
           );
         },
       ),

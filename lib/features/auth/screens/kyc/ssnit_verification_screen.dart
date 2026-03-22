@@ -128,6 +128,17 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
     setState(() => _isLoading = true);
 
     try {
+      // Phone verification step (optional for SmileID countries)
+      final phoneVerified = await context.push<bool>(
+        AppRoutes.kycPhoneVerification,
+        extra: {
+          'countryCode': widget.countryCode,
+          'documentVerified': true, // SmileID already verified, skip is allowed
+        },
+      );
+
+      if (!mounted) return;
+
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: 'SSNIT',
