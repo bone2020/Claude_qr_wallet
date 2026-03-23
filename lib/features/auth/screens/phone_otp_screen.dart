@@ -198,7 +198,6 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 .update({
                   'phoneVerified': true,
                   'kycCompleted': true,
-                  'kycStatus': 'verified',
                 });
 
             // Create wallet for non-Smile-ID country user

@@ -2852,6 +2852,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
         id: userId,
         userId: userId,
         walletId: walletId,
+        kycStatus: 'verified',
         currency: userData.currency || 'NGN',
         balance: 0,
         isActive: true,
@@ -2863,6 +2864,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
 
       transaction.update(userRef, {
         walletId: walletId,
+        kycStatus: 'verified',
         walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
@@ -2944,6 +2946,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
       // Update user document with walletId
       transaction.update(db.collection('users').doc(userId), {
         walletId: walletId,
+        kycStatus: 'verified',
         walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
