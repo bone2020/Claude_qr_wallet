@@ -130,6 +130,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.kycSsnit,
         AppRoutes.kycUgandaNin,
         AppRoutes.kycPhoneVerification,
+        AppRoutes.manualKyc,
         AppRoutes.appLock,
       };
 
