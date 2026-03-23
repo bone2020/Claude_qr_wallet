@@ -199,9 +199,6 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                   'phoneVerified': true,
                 });
 
-            // Create wallet for non-Smile-ID country user
-            final createWallet = FirebaseFunctions.instance.httpsCallable('createWalletForUser');
-            await createWallet.call();
           }
         } catch (e) {
           debugPrint('Failed to complete phone verification: $e');
