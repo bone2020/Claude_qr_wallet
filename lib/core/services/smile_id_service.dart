@@ -82,6 +82,7 @@ class SmileIDService {
     if (phoneNumber == null || phoneNumber.isEmpty) return null;
 
     const dialCodeMap = {
+      // SmileID countries
       '+234': 'NG',
       '+233': 'GH',
       '+254': 'KE',
@@ -90,6 +91,29 @@ class SmileIDService {
       '+256': 'UG',
       '+260': 'ZM',
       '+263': 'ZW',
+      // Non-SmileID MoMo countries
+      '+232': 'SL',  // Sierra Leone
+      '+231': 'LR',  // Liberia
+      '+237': 'CM',  // Cameroon
+      '+229': 'BJ',  // Benin
+      '+226': 'BF',  // Burkina Faso
+      '+243': 'CD',  // DR Congo
+      '+242': 'CG',  // Congo
+      '+240': 'GQ',  // Equatorial Guinea
+      '+241': 'GA',  // Gabon
+      '+224': 'GN',  // Guinea
+      '+245': 'GW',  // Guinea-Bissau
+      '+223': 'ML',  // Mali
+      '+227': 'NE',  // Niger
+      '+250': 'RW',  // Rwanda
+      '+239': 'ST',  // São Tomé
+      '+221': 'SN',  // Senegal
+      '+235': 'TD',  // Chad
+      '+228': 'TG',  // Togo
+      '+255': 'TZ',  // Tanzania
+      '+249': 'SD',  // Sudan
+      '+211': 'SS',  // South Sudan
+      '+268': 'SZ',  // Eswatini
     };
 
     for (final entry in dialCodeMap.entries) {
