@@ -197,7 +197,6 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 .doc(firebaseUser.uid)
                 .update({
                   'phoneVerified': true,
-                  'kycCompleted': true,
                 });
 
             // Create wallet for non-Smile-ID country user

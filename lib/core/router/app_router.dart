@@ -145,8 +145,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               .get();
           if (userDoc.exists) {
             final data = userDoc.data()!;
-            final kycVerified = data['kycStatus'] == 'verified' ||
-                data['kycCompleted'] == true;
+            final kycVerified = data['kycStatus'] == 'verified';
 
             if (!kycVerified) {
               // Countries with Smile ID KYC configured — must complete Smile ID
@@ -230,8 +229,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
 
         final data = userDoc.data()!;
-        final kycVerified = data['kycStatus'] == 'verified' ||
-            data['kycCompleted'] == true;
+        final kycVerified = data['kycStatus'] == 'verified';
 
         if (!kycVerified) {
           // Countries with Smile ID KYC configured — must complete Smile ID
@@ -248,16 +246,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             return AppRoutes.phoneOtp;
           }
 
-          // Phone + email verified — backend auto-verifies on first financial op
-          // But verify wallet exists
-          final walletExists = await FirebaseFirestore.instance
-              .collection('wallets')
-              .doc(currentUser.uid)
-              .get();
-          if (!walletExists.exists) {
-            return AppRoutes.kyc;
-          }
-          return null;
+          // Phone + email verified — send to manual KYC for document upload
+          // ManualKycScreen will handle phone verification + document upload + wallet creation
+          return AppRoutes.kyc;
         }
 
         // Final check: if going to main screen, verify wallet exists
