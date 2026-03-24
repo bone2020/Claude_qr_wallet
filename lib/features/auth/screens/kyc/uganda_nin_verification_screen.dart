@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -172,6 +173,10 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
         if (result.user != null) {
           ref.read(authNotifierProvider.notifier).updateUser(result.user!);
         }
+
+        // Create wallet (server sets kycStatus: 'verified')
+        final createWallet = FirebaseFunctions.instance.httpsCallable('createWalletForUser');
+        await createWallet.call();
 
         // Refresh wallet and currency after verification
         await ref.read(walletNotifierProvider.notifier).refreshWallet();

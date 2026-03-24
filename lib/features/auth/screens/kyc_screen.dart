@@ -40,19 +40,6 @@ class _KycScreenState extends ConsumerState<KycScreen> {
 
     _userCountryCode ??= 'GH';
 
-    // Check if this is a SmileID country
-    if (!_smileIdService.isSmileIdCountry(_userCountryCode)) {
-      // Non-SmileID country: go to manual KYC + mandatory phone verification
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.pushReplacement(
-          AppRoutes.manualKyc,
-          extra: {'countryCode': _userCountryCode},
-        );
-      });
-      return;
-    }
-
-    // SmileID country: show SmileID-specific ID types
     setState(() {
       _idTypes = _smileIdService.getIdTypesForCountry(_userCountryCode);
     });
