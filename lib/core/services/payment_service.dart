@@ -85,7 +85,6 @@ class PaymentService {
     required String userId,
     String? currency,
   }) async {
-    _validateKey();
     try {
       // Call Cloud Function to initialize transaction
       final callable = _functions.httpsCallable('initializeTransaction');
