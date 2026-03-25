@@ -11,6 +11,7 @@ import 'package:pinput/pinput.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../core/services/secure_storage_service.dart';
+import '../../../core/utils/error_handler.dart';
 
 class ResetPinScreen extends ConsumerStatefulWidget {
   const ResetPinScreen({super.key});
@@ -20,27 +21,26 @@ class ResetPinScreen extends ConsumerStatefulWidget {
 }
 
 class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
-  // Steps: 0 = choose method, 1 = verify identity, 2 = new PIN, 3 = confirm PIN
-  int _currentStep = 0;
-  String _selectedMethod = ''; // 'email' or 'phone'
-  bool _isLoading = false;
-  String? _errorMessage;
-
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _otpController = TextEditingController();
   final _newPinController = TextEditingController();
   final _confirmPinController = TextEditingController();
-  bool _obscurePassword = true;
 
-  // Phone OTP state
+  int _currentStep = 0;
+  String _selectedMethod = '';
+  bool _isLoading = false;
+  String? _errorMessage;
+  bool _obscurePassword = true;
   String? _verificationId;
-  final _otpController = TextEditingController();
 
   @override
   void dispose() {
+    _emailController.dispose();
     _passwordController.dispose();
+    _otpController.dispose();
     _newPinController.dispose();
     _confirmPinController.dispose();
-    _otpController.dispose();
     super.dispose();
   }
 
@@ -50,298 +50,169 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
     return digest.toString();
   }
 
-  void _selectMethod(String method) {
-    final user = FirebaseAuth.instance.currentUser;
+  Future<void> _verifyWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    if (method == 'phone' && (user?.phoneNumber == null || user!.phoneNumber!.isEmpty)) {
-      setState(() {
-        _errorMessage = 'No phone number linked to this account.';
-      });
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email and password');
       return;
     }
 
-    setState(() {
-      _selectedMethod = method;
-      _errorMessage = null;
-      _currentStep = 1;
-    });
-
-    if (method == 'phone') {
-      _sendPhoneOtp();
-    }
-  }
-
-  Future<void> _verifyEmailPassword() async {
-    final password = _passwordController.text.trim();
-    if (password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your password.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.email == null) {
-        throw Exception('User not logged in or no email found.');
-      }
+      if (user == null) throw Exception('User not logged in');
 
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-
+      final credential = EmailAuthProvider.credential(email: email, password: password);
       await user.reauthenticateWithCredential(credential);
 
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _currentStep = 2;
-      });
+      setState(() { _isLoading = false; _currentStep = 2; });
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      String message;
-      switch (e.code) {
-        case 'wrong-password':
-        case 'invalid-credential':
-          message = 'Incorrect password. Please try again.';
-          break;
-        case 'too-many-requests':
-          message = 'Too many attempts. Please try again later.';
-          break;
-        default:
-          message = 'Authentication failed. Please try again.';
-      }
       setState(() {
         _isLoading = false;
-        _errorMessage = message;
+        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          _errorMessage = 'Incorrect password. Please try again.';
+        } else if (e.code == 'too-many-requests') {
+          _errorMessage = 'Too many attempts. Please try again later.';
+        } else {
+          _errorMessage = 'Verification failed. Please try again.';
+        }
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Authentication failed. Please try again.';
-      });
+      setState(() { _isLoading = false; _errorMessage = ErrorHandler.getUserFriendlyMessage(e); });
     }
   }
 
   Future<void> _sendPhoneOtp() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final phoneNumber = user.phoneNumber;
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      setState(() => _errorMessage = 'No phone number linked to your account. Please use email verification.');
+      return;
+    }
+
+    setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null || user.phoneNumber == null) {
-        throw Exception('No phone number linked.');
-      }
-
       await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: user.phoneNumber!,
+        phoneNumber: phoneNumber,
         timeout: const Duration(seconds: 60),
         verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-verification on Android
           try {
             await user.reauthenticateWithCredential(credential);
-            if (!mounted) return;
-            setState(() {
-              _isLoading = false;
-              _currentStep = 2;
-            });
+            if (mounted) setState(() { _isLoading = false; _currentStep = 2; });
           } catch (e) {
-            if (!mounted) return;
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Auto-verification failed. Please enter the code manually.';
-            });
+            if (mounted) setState(() { _isLoading = false; _errorMessage = 'Auto-verification failed. Please enter the OTP manually.'; });
           }
         },
         verificationFailed: (FirebaseAuthException e) {
-          if (!mounted) return;
-          setState(() {
-            _isLoading = false;
-            _errorMessage = e.message ?? 'Failed to send OTP. Please try again.';
-          });
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _errorMessage = e.code == 'too-many-requests'
+                  ? 'Too many attempts. Please try again later.'
+                  : 'Failed to send OTP. Please try again.';
+            });
+          }
         },
         codeSent: (String verificationId, int? resendToken) {
-          if (!mounted) return;
-          setState(() {
-            _isLoading = false;
-            _verificationId = verificationId;
-          });
+          if (mounted) setState(() { _isLoading = false; _verificationId = verificationId; });
         },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          _verificationId = verificationId;
-        },
+        codeAutoRetrievalTimeout: (String verificationId) { _verificationId = verificationId; },
       );
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to send OTP. Please try again.';
-      });
+      setState(() { _isLoading = false; _errorMessage = ErrorHandler.getUserFriendlyMessage(e); });
     }
   }
 
   Future<void> _verifyPhoneOtp() async {
     final otp = _otpController.text.trim();
-    if (otp.length != 6) {
-      setState(() => _errorMessage = 'Please enter the 6-digit code.');
-      return;
-    }
+    if (otp.length != 6) { setState(() => _errorMessage = 'Please enter the 6-digit code'); return; }
+    if (_verificationId == null) { setState(() => _errorMessage = 'Verification expired. Please request a new code.'); return; }
 
-    if (_verificationId == null) {
-      setState(() => _errorMessage = 'Verification expired. Please resend OTP.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
-      );
-
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User not logged in.');
+      if (user == null) throw Exception('User not logged in');
 
+      final credential = PhoneAuthProvider.credential(verificationId: _verificationId!, smsCode: otp);
       await user.reauthenticateWithCredential(credential);
 
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _currentStep = 2;
-      });
+      setState(() { _isLoading = false; _currentStep = 2; });
     } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      String message;
-      switch (e.code) {
-        case 'invalid-verification-code':
-          message = 'Invalid code. Please try again.';
-          break;
-        case 'session-expired':
-          message = 'Code expired. Please resend OTP.';
-          break;
-        default:
-          message = 'Verification failed. Please try again.';
-      }
       setState(() {
         _isLoading = false;
-        _errorMessage = message;
+        _errorMessage = e.code == 'invalid-verification-code'
+            ? 'Incorrect code. Please try again.'
+            : 'Verification failed. Please try again.';
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Verification failed. Please try again.';
-      });
+      setState(() { _isLoading = false; _errorMessage = ErrorHandler.getUserFriendlyMessage(e); });
     }
   }
 
   void _setNewPin(String pin) {
-    setState(() {
-      _errorMessage = null;
-      _currentStep = 3;
-    });
+    setState(() { _errorMessage = null; _currentStep = 3; });
   }
 
   Future<void> _confirmNewPin(String pin) async {
     if (pin != _newPinController.text) {
-      setState(() {
-        _errorMessage = 'PINs do not match.';
-        _confirmPinController.clear();
-      });
+      setState(() { _errorMessage = 'PINs do not match'; _confirmPinController.clear(); });
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() { _isLoading = true; _errorMessage = null; });
 
     try {
       final newPinHash = _hashPin(pin);
-
-      // Force token refresh to get fresh auth_time
-      await FirebaseAuth.instance.currentUser?.getIdToken(true);
-
-      // Call resetPin Cloud Function
       final callable = FirebaseFunctions.instance.httpsCallable('resetPin');
-      await callable.call({
-        'newPinHash': newPinHash,
-        'method': _selectedMethod,
-      });
+      await callable.call({ 'newPinHash': newPinHash, 'method': _selectedMethod });
 
-      // Save to secure storage for offline app lock
       await SecureStorageService.savePinHash(newPinHash);
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      // Show success dialog
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
+        builder: (context) => AlertDialog(
           backgroundColor: AppColors.surfaceDark,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusLG)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), shape: BoxShape.circle),
                 child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 48),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
               Text('PIN Reset!', style: AppTextStyles.headlineSmall()),
               const SizedBox(height: AppDimensions.spaceXS),
-              Text(
-                'Your transaction PIN has been reset successfully.',
-                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-                textAlign: TextAlign.center,
-              ),
+              Text('Your transaction PIN has been reset successfully.',
+                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark), textAlign: TextAlign.center),
             ],
           ),
           actions: [
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  context.pop();
-                },
+                onPressed: () { Navigator.pop(context); context.pop(); },
                 child: Text('Done', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
               ),
             ),
           ],
         ),
       );
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = e.message ?? 'Failed to reset PIN. Please try again.';
-      });
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to reset PIN. Please try again.';
-      });
+      setState(() { _isLoading = false; _errorMessage = 'Failed to reset PIN. Please try again.'; });
     }
   }
 
@@ -355,10 +226,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () {
             if (_currentStep > 0) {
-              setState(() {
-                _currentStep = _currentStep == 1 ? 0 : _currentStep - 1;
-                _errorMessage = null;
-              });
+              setState(() { _currentStep = _currentStep == 1 ? 0 : _currentStep - 1; _errorMessage = null; });
             } else {
               context.pop();
             }
@@ -377,429 +245,218 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
 
   Widget _buildCurrentStep() {
     switch (_currentStep) {
-      case 0:
-        return _buildChooseMethod();
-      case 1:
-        return _buildVerifyIdentity();
-      case 2:
-        return _buildNewPin();
-      case 3:
-        return _buildConfirmPin();
-      default:
-        return const SizedBox.shrink();
+      case 0: return _buildMethodSelection();
+      case 1: return _selectedMethod == 'email' ? _buildEmailVerification() : _buildPhoneVerification();
+      case 2: return _buildPinStep(title: 'Enter New PIN', subtitle: 'Create a new 6-digit transaction PIN', controller: _newPinController, onCompleted: _setNewPin);
+      case 3: return _buildPinStep(title: 'Confirm New PIN', subtitle: 'Re-enter your new PIN to confirm', controller: _confirmPinController, onCompleted: _confirmNewPin);
+      default: return _buildMethodSelection();
     }
   }
 
-  Widget _buildChooseMethod() {
+  Widget _buildMethodSelection() {
     final user = FirebaseAuth.instance.currentUser;
     final hasPhone = user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: AppDimensions.spaceMD),
+        const SizedBox(height: AppDimensions.spaceXL),
         Text('Verify Your Identity', style: AppTextStyles.headlineSmall()),
         const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          'Choose how to verify your identity before resetting your PIN.',
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-        ),
+        Text('To reset your PIN, please verify your identity using one of the options below.',
+          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceXXL),
-
-        // Email/Password option
-        _buildMethodCard(
-          icon: Iconsax.sms,
-          title: 'Email & Password',
-          subtitle: user?.email ?? 'Email',
-          onTap: () => _selectMethod('email'),
-        ),
-
+        _buildMethodCard(icon: Iconsax.sms, title: 'Email & Password', subtitle: 'Verify using your login credentials',
+          onTap: () { setState(() { _selectedMethod = 'email'; _currentStep = 1; _errorMessage = null; }); }),
         const SizedBox(height: AppDimensions.spaceMD),
-
-        // Phone OTP option
-        _buildMethodCard(
-          icon: Iconsax.call,
-          title: 'Phone OTP',
-          subtitle: hasPhone ? user!.phoneNumber! : 'No phone number linked',
-          onTap: hasPhone ? () => _selectMethod('phone') : null,
+        _buildMethodCard(icon: Iconsax.call, title: 'Phone Number',
+          subtitle: hasPhone ? 'Verify via OTP sent to your phone' : 'No phone number linked to your account',
           enabled: hasPhone,
-        ),
-
-        if (_errorMessage != null) ...[
-          const SizedBox(height: AppDimensions.spaceMD),
-          Text(
-            _errorMessage!,
-            style: AppTextStyles.bodySmall(color: AppColors.error),
-            textAlign: TextAlign.center,
-          ),
-        ],
-
+          onTap: hasPhone ? () { setState(() { _selectedMethod = 'phone'; _currentStep = 1; _errorMessage = null; }); _sendPhoneOtp(); } : null),
         const Spacer(),
-
-        // Security note
         Container(
           padding: const EdgeInsets.all(AppDimensions.spaceMD),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceDark,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          ),
-          child: Row(
-            children: [
-              const Icon(Iconsax.shield_tick, color: AppColors.primary, size: 24),
-              const SizedBox(width: AppDimensions.spaceMD),
-              Expanded(
-                child: Text(
-                  'For your security, you must verify your identity before resetting your PIN.',
-                  style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
-                ),
-              ),
-            ],
-          ),
+          decoration: BoxDecoration(color: AppColors.surfaceDark, borderRadius: BorderRadius.circular(AppDimensions.radiusMD)),
+          child: Row(children: [
+            const Icon(Iconsax.shield_tick, color: AppColors.primary, size: 24),
+            const SizedBox(width: AppDimensions.spaceMD),
+            Expanded(child: Text('This verification ensures only you can reset your PIN.',
+              style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark))),
+          ]),
         ),
         const SizedBox(height: AppDimensions.spaceMD),
       ],
     );
   }
 
-  Widget _buildMethodCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback? onTap,
-    bool enabled = true,
-  }) {
+  Widget _buildMethodCard({required IconData icon, required String title, required String subtitle, bool enabled = true, VoidCallback? onTap}) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: Container(
-        padding: const EdgeInsets.all(AppDimensions.spaceMD),
+        padding: const EdgeInsets.all(AppDimensions.spaceLG),
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          border: Border.all(
-            color: enabled ? AppColors.inputBorderDark : AppColors.inputBorderDark.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+          border: Border.all(color: enabled ? AppColors.inputBorderDark : AppColors.inputBorderDark.withOpacity(0.5)),
+        ),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.primary.withOpacity(0.1) : AppColors.textTertiaryDark.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            ),
+            child: Icon(icon, color: enabled ? AppColors.primary : AppColors.textTertiaryDark, size: 24),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (enabled ? AppColors.primary : AppColors.textSecondaryDark).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: enabled ? AppColors.primary : AppColors.textSecondaryDark, size: 24),
-            ),
-            const SizedBox(width: AppDimensions.spaceMD),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.bodyLarge(
-                      color: enabled ? AppColors.textPrimaryDark : AppColors.textSecondaryDark,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Iconsax.arrow_right_3,
-              color: enabled ? AppColors.textSecondaryDark : AppColors.inputBorderDark,
-              size: 20,
-            ),
-          ],
-        ),
+          const SizedBox(width: AppDimensions.spaceMD),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: AppTextStyles.labelLarge(color: enabled ? AppColors.textPrimaryDark : AppColors.textTertiaryDark)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: AppTextStyles.bodySmall(color: enabled ? AppColors.textSecondaryDark : AppColors.textTertiaryDark)),
+          ])),
+          if (enabled) const Icon(Iconsax.arrow_right_3, color: AppColors.textSecondaryDark, size: 20),
+        ]),
       ),
     );
   }
 
-  Widget _buildVerifyIdentity() {
-    if (_selectedMethod == 'email') {
-      return _buildEmailVerification();
-    } else {
-      return _buildPhoneVerification();
-    }
-  }
-
   Widget _buildEmailVerification() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: AppDimensions.spaceMD),
+    final user = FirebaseAuth.instance.currentUser;
+    return SingleChildScrollView(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: AppDimensions.spaceXL),
         Text('Enter Your Password', style: AppTextStyles.headlineSmall()),
         const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          'Enter your account password to verify your identity.',
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-        ),
+        Text('Verify your identity by entering your login credentials.',
+          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceXXL),
-
-        TextField(
+        Text('Email', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+        const SizedBox(height: AppDimensions.spaceSM),
+        TextFormField(
+          controller: _emailController..text = user?.email ?? '',
+          readOnly: true,
+          style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
+          decoration: InputDecoration(
+            filled: true, fillColor: AppColors.surfaceDark,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.inputBorderDark)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.inputBorderDark)),
+            prefixIcon: const Icon(Iconsax.sms, color: AppColors.textSecondaryDark),
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spaceLG),
+        Text('Password', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+        const SizedBox(height: AppDimensions.spaceSM),
+        TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           style: AppTextStyles.bodyLarge(),
           decoration: InputDecoration(
-            labelText: 'Password',
-            labelStyle: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-            filled: true,
-            fillColor: AppColors.surfaceDark,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.inputBorderDark),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.inputBorderDark),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            ),
+            hintText: 'Enter your password',
+            hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
+            filled: true, fillColor: AppColors.surfaceDark,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.inputBorderDark)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.inputBorderDark)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.primary)),
             prefixIcon: const Icon(Iconsax.lock, color: AppColors.textSecondaryDark),
             suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword ? Iconsax.eye_slash : Iconsax.eye,
-                color: AppColors.textSecondaryDark,
-              ),
+              icon: Icon(_obscurePassword ? Iconsax.eye_slash : Iconsax.eye, color: AppColors.textSecondaryDark),
               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
             ),
           ),
         ),
-
         if (_errorMessage != null) ...[
           const SizedBox(height: AppDimensions.spaceMD),
-          Text(
-            _errorMessage!,
-            style: AppTextStyles.bodySmall(color: AppColors.error),
-          ),
+          Text(_errorMessage!, style: AppTextStyles.bodySmall(color: AppColors.error)),
         ],
-
         const SizedBox(height: AppDimensions.spaceXXL),
-
         SizedBox(
-          width: double.infinity,
-          height: 52,
+          width: double.infinity, height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _verifyEmailPassword,
+            onPressed: _isLoading ? null : _verifyWithEmail,
             child: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(color: AppColors.backgroundDark, strokeWidth: 2),
-                  )
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark))
                 : Text('Verify', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
           ),
         ),
-      ],
+      ]),
     );
   }
 
   Widget _buildPhoneVerification() {
-    final defaultPinTheme = PinTheme(
-      width: 48,
-      height: 48,
-      textStyle: AppTextStyles.headlineSmall(),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.inputBorderDark),
-      ),
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    final phone = user?.phoneNumber ?? '';
+    final maskedPhone = phone.length > 4 ? '${'*' * (phone.length - 4)}${phone.substring(phone.length - 4)}' : phone;
 
-    final focusedPinTheme = defaultPinTheme.copyWith(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.primary, width: 2),
-      ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: AppDimensions.spaceMD),
-        Text('Enter OTP Code', style: AppTextStyles.headlineSmall()),
-        const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          'Enter the 6-digit code sent to your phone number.',
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-        ),
-        const SizedBox(height: AppDimensions.spaceXXL),
-
-        if (_isLoading && _verificationId == null)
-          const Center(child: CircularProgressIndicator(color: AppColors.primary))
-        else ...[
-          Center(
-            child: Pinput(
-              controller: _otpController,
-              length: 6,
-              defaultPinTheme: defaultPinTheme,
-              focusedPinTheme: focusedPinTheme,
-              keyboardType: TextInputType.number,
-              onCompleted: (_) => _verifyPhoneOtp(),
-            ),
-          ),
-
-          if (_errorMessage != null) ...[
-            const SizedBox(height: AppDimensions.spaceMD),
-            Center(
-              child: Text(
-                _errorMessage!,
-                style: AppTextStyles.bodySmall(color: AppColors.error),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ],
-
-          const SizedBox(height: AppDimensions.spaceXXL),
-
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _verifyPhoneOtp,
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(color: AppColors.backgroundDark, strokeWidth: 2),
-                    )
-                  : Text('Verify', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
-            ),
-          ),
-
-          const SizedBox(height: AppDimensions.spaceMD),
-
-          Center(
-            child: TextButton(
-              onPressed: _isLoading ? null : _sendPhoneOtp,
-              child: Text(
-                'Resend Code',
-                style: AppTextStyles.bodyMedium(color: AppColors.primary),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildNewPin() {
-    final defaultPinTheme = PinTheme(
-      width: 56,
-      height: 56,
-      textStyle: AppTextStyles.headlineLarge(),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.inputBorderDark),
-      ),
-    );
-
-    final focusedPinTheme = defaultPinTheme.copyWith(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.primary, width: 2),
-      ),
-    );
-
-    return Column(
-      children: [
-        const SizedBox(height: AppDimensions.spaceMD),
-        Text('Enter New PIN', style: AppTextStyles.headlineSmall()),
-        const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          'Create a new 6-digit transaction PIN.',
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppDimensions.spaceXXL),
-
-        Pinput(
-          controller: _newPinController,
-          length: 6,
-          obscureText: true,
-          obscuringCharacter: '\u25CF',
-          defaultPinTheme: defaultPinTheme,
-          focusedPinTheme: focusedPinTheme,
-          onCompleted: _setNewPin,
-          keyboardType: TextInputType.number,
-        ),
-
-        if (_errorMessage != null) ...[
-          const SizedBox(height: AppDimensions.spaceMD),
-          Text(
-            _errorMessage!,
-            style: AppTextStyles.bodySmall(color: AppColors.error),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildConfirmPin() {
-    final defaultPinTheme = PinTheme(
-      width: 56,
-      height: 56,
-      textStyle: AppTextStyles.headlineLarge(),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: _errorMessage != null ? AppColors.error : AppColors.inputBorderDark),
-      ),
-    );
-
-    final focusedPinTheme = defaultPinTheme.copyWith(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.primary, width: 2),
-      ),
-    );
-
-    return Column(
-      children: [
-        const SizedBox(height: AppDimensions.spaceMD),
-        Text('Confirm New PIN', style: AppTextStyles.headlineSmall()),
-        const SizedBox(height: AppDimensions.spaceXS),
-        Text(
-          'Re-enter your new PIN to confirm.',
-          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: AppDimensions.spaceXXL),
-
-        if (_isLoading)
-          const CircularProgressIndicator(color: AppColors.primary)
-        else
-          Pinput(
-            controller: _confirmPinController,
-            length: 6,
-            obscureText: true,
-            obscuringCharacter: '\u25CF',
-            defaultPinTheme: defaultPinTheme,
-            focusedPinTheme: focusedPinTheme,
-            onCompleted: _confirmNewPin,
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: AppDimensions.spaceXL),
+      Text('Enter OTP', style: AppTextStyles.headlineSmall()),
+      const SizedBox(height: AppDimensions.spaceXS),
+      Text('Enter the 6-digit code sent to $maskedPhone',
+        style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
+      const SizedBox(height: AppDimensions.spaceXXL),
+      if (_isLoading && _verificationId == null)
+        const Center(child: CircularProgressIndicator(color: AppColors.primary))
+      else ...[
+        Center(
+          child: Pinput(
+            controller: _otpController, length: 6,
+            defaultPinTheme: PinTheme(width: 50, height: 50, textStyle: AppTextStyles.headlineSmall(),
+              decoration: BoxDecoration(color: AppColors.surfaceDark, borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                border: Border.all(color: AppColors.inputBorderDark))),
+            focusedPinTheme: PinTheme(width: 50, height: 50, textStyle: AppTextStyles.headlineSmall(),
+              decoration: BoxDecoration(color: AppColors.surfaceDark, borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+                border: Border.all(color: AppColors.primary, width: 2))),
             keyboardType: TextInputType.number,
+            onCompleted: (_) => _verifyPhoneOtp(),
           ),
-
+        ),
         if (_errorMessage != null) ...[
           const SizedBox(height: AppDimensions.spaceMD),
-          Text(
-            _errorMessage!,
-            style: AppTextStyles.bodySmall(color: AppColors.error),
-            textAlign: TextAlign.center,
-          ),
+          Center(child: Text(_errorMessage!, style: AppTextStyles.bodySmall(color: AppColors.error), textAlign: TextAlign.center)),
         ],
+        const SizedBox(height: AppDimensions.spaceXL),
+        Center(child: TextButton(
+          onPressed: _isLoading ? null : _sendPhoneOtp,
+          child: Text('Resend Code', style: AppTextStyles.labelMedium(color: AppColors.primary)),
+        )),
+        const SizedBox(height: AppDimensions.spaceXL),
+        SizedBox(
+          width: double.infinity, height: AppDimensions.buttonHeightLG,
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _verifyPhoneOtp,
+            child: _isLoading
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark))
+                : Text('Verify', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+          ),
+        ),
       ],
-    );
+    ]);
+  }
+
+  Widget _buildPinStep({required String title, required String subtitle, required TextEditingController controller, required Function(String) onCompleted}) {
+    final defaultPinTheme = PinTheme(width: 56, height: 56, textStyle: AppTextStyles.headlineLarge(),
+      decoration: BoxDecoration(color: AppColors.surfaceDark, borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        border: Border.all(color: _errorMessage != null ? AppColors.error : AppColors.inputBorderDark)));
+    final focusedPinTheme = defaultPinTheme.copyWith(
+      decoration: BoxDecoration(color: AppColors.surfaceDark, borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        border: Border.all(color: AppColors.primary, width: 2)));
+
+    return Column(children: [
+      const SizedBox(height: AppDimensions.spaceXXL),
+      Text(title, style: AppTextStyles.headlineSmall()),
+      const SizedBox(height: AppDimensions.spaceXS),
+      Text(subtitle, style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark), textAlign: TextAlign.center),
+      const SizedBox(height: AppDimensions.spaceXXL),
+      if (_isLoading)
+        const CircularProgressIndicator(color: AppColors.primary)
+      else
+        Pinput(controller: controller, length: 6, obscureText: true, obscuringCharacter: '\u25CF',
+          defaultPinTheme: defaultPinTheme, focusedPinTheme: focusedPinTheme,
+          onCompleted: onCompleted, keyboardType: TextInputType.number),
+      if (_errorMessage != null) ...[
+        const SizedBox(height: AppDimensions.spaceMD),
+        Text(_errorMessage!, style: AppTextStyles.bodySmall(color: AppColors.error), textAlign: TextAlign.center),
+      ],
+    ]);
   }
 }

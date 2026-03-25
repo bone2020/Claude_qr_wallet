@@ -337,16 +337,16 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
 
               // Forgot PIN link (only shown at step 0)
               if (_currentStep == 0)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
+                Center(
                   child: TextButton(
                     onPressed: () => context.push(AppRoutes.resetPin),
                     child: Text(
                       'Forgot your PIN?',
-                      style: AppTextStyles.bodyMedium(color: AppColors.primary),
+                      style: AppTextStyles.labelMedium(color: AppColors.primary),
                     ),
                   ),
                 ),
+              const SizedBox(height: AppDimensions.spaceSM),
 
               // Security note
               Container(
