@@ -35,6 +35,7 @@ import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/change_password_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
+import '../../features/profile/screens/reset_pin_screen.dart';
 import '../../features/profile/screens/help_support_screen.dart';
 import '../../features/profile/screens/about_screen.dart';
 import '../../features/profile/screens/notification_settings_screen.dart';
@@ -89,6 +90,7 @@ class AppRoutes {
   static const String themeSettings = '/theme-settings';
   static const String notifications = '/notifications';
   static const String appLock = '/app-lock';
+  static const String resetPin = '/reset-pin';
 }
 
 /// Global navigator key for accessing navigation outside of widget tree
@@ -580,6 +582,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.changePin,
         name: 'changePin',
         builder: (context, state) => const ChangePinScreen(),
+      ),
+
+      // Reset PIN Screen
+      GoRoute(
+        path: AppRoutes.resetPin,
+        name: 'resetPin',
+        builder: (context, state) => const ResetPinScreen(),
       ),
 
       // Help & Support Screen
