@@ -90,15 +90,15 @@ class BalanceCard extends StatelessWidget {
                     onTap: () => _copyWalletId(context),
                     child: Row(
                       children: [
-                        Text(
+                       Text(
                           walletId,
-                          style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
+                          style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         Icon(
                           Iconsax.copy,
-                          size: 12,
-                          color: AppColors.textTertiaryDark,
+                          size: 14,
+                          color: AppColors.textSecondaryDark,
                         ),
                       ],
                     ),
@@ -153,30 +153,33 @@ class BalanceCard extends StatelessWidget {
           const SizedBox(height: AppDimensions.spaceLG),
 
           // Wallet ID QR hint
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppDimensions.spaceSM,
-              vertical: AppDimensions.spaceXS,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Iconsax.scan_barcode,
-                  size: 14,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  AppStrings.tapToCopy,
-                  style: AppTextStyles.caption(color: AppColors.primary),
+          GestureDetector(
+            onTap: () => _copyWalletId(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.spaceSM,
+                vertical: AppDimensions.spaceXS,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Iconsax.copy,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    AppStrings.tapToCopy,
+                    style: AppTextStyles.caption(color: AppColors.primary),
                 ),
               ],
             ),
+          ),
           ),
         ],
       ),

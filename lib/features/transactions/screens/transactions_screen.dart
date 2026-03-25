@@ -41,7 +41,9 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
     switch (filter) {
       case 'sent':
         return allTransactions
-            .where((t) => t.type == TransactionType.send)
+            .where((t) =>
+                t.type == TransactionType.send ||
+                t.type == TransactionType.withdraw)
             .toList();
       case 'received':
         return allTransactions
