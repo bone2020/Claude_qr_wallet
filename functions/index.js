@@ -473,7 +473,7 @@ function validateWalletDocument(walletData, context = 'wallet') {
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid balance. Contact support.`);
   }
 
-  const currency = walletData.currency || 'NGN';
+  const currency = walletData.currency || 'GHS';
   if (typeof currency !== 'string') {
     logError('Wallet document validation failed: invalid currency', { context, currency });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `${context} has an invalid currency. Contact support.`);
@@ -492,7 +492,7 @@ function validateWalletDocument(walletData, context = 'wallet') {
  * @returns {number} The result
  */
 function safeAdd(base, addend, context = 'balance credit') {
-  const result = Math.round(Number(base) + Number(addend));
+  const result = Number(base) + Number(addend);
   if (!Number.isFinite(result) || result < 0) {
     logError('safeAdd produced invalid result', { base, addend, result, context });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
@@ -510,7 +510,7 @@ function safeAdd(base, addend, context = 'balance credit') {
  * @returns {number} The result
  */
 function safeSubtract(base, subtrahend, context = 'balance debit') {
-  const result = Math.round(Number(base) - Number(subtrahend));
+  const result = Number(base) - Number(subtrahend);
   if (!Number.isFinite(result)) {
     logError('safeSubtract produced non-finite result', { base, subtrahend, result, context });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Arithmetic error during ${context}. Contact support.`);
@@ -519,33 +519,6 @@ function safeSubtract(base, subtrahend, context = 'balance debit') {
     throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Insufficient funds for ${context}.`);
   }
   return result;
-}
-
-/**
- * Convert a major-unit amount (e.g. 15.50) to minor units (e.g. 1550).
- * @param {number} major - Amount in major units
- * @returns {number} Integer amount in minor units
- */
-function toMinorUnits(major) {
-  return Math.round(Number(major) * 100);
-}
-
-/**
- * Convert a minor-unit amount (e.g. 1550) to major units (e.g. 15.50).
- * @param {number} minor - Integer amount in minor units
- * @returns {number} Amount in major units
- */
-function toMajorUnits(minor) {
-  return Number(minor) / 100;
-}
-
-/**
- * Format a minor-unit integer for display (e.g. 150050 -> "1500.50").
- * @param {number} minor - Integer amount in minor units
- * @returns {string} Formatted string with 2 decimal places
- */
-function formatMinorUnits(minor) {
-  return toMajorUnits(minor).toFixed(2);
 }
 
 /**
@@ -565,7 +538,7 @@ const VALID_CURRENCIES = new Set([
  * @param {string} defaultCurrency - Default if not provided
  * @returns {string} Validated currency code (uppercase)
  */
-function validateCurrency(currency, defaultCurrency = 'NGN') {
+function validateCurrency(currency, defaultCurrency = 'GHS') {
   const code = (currency || defaultCurrency).toUpperCase().trim();
   if (!VALID_CURRENCIES.has(code)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
@@ -643,7 +616,7 @@ function getCorrelationId(context) {
   }
 
   const timestamp = Date.now();
-  const random = crypto.randomBytes(4).toString('hex');
+  const random = Math.random().toString(36).substring(2, 10);
   return `corr_${timestamp}_${random}`;
 }
 
@@ -710,15 +683,15 @@ function requireConfig(value, name) {
  * Missing critical configs are tracked at cold-start for fast runtime checks.
  */
 const CRITICAL_CONFIGS = {
-  'paystack.secret_key': process.env.PAYSTACK_SECRET_KEY,
-  'qr.secret': process.env.QR_SECRET,
-  'momo.collections_subscription_key': process.env.MOMO_COLLECTIONS_SUBSCRIPTION_KEY,
-  'momo.collections_api_user': process.env.MOMO_COLLECTIONS_API_USER,
-  'momo.collections_api_key': process.env.MOMO_COLLECTIONS_API_KEY,
-  'momo.disbursements_subscription_key': process.env.MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY,
-  'momo.disbursements_api_user': process.env.MOMO_DISBURSEMENTS_API_USER,
-  'momo.disbursements_api_key': process.env.MOMO_DISBURSEMENTS_API_KEY,
-  'momo.webhook_secret': process.env.MOMO_WEBHOOK_SECRET,
+  'paystack.secret_key': functions.config().paystack?.secret_key,
+  'qr.secret': functions.config().qr?.secret,
+  'momo.collections_subscription_key': functions.config().momo?.collections_subscription_key,
+  'momo.collections_api_user': functions.config().momo?.collections_api_user,
+  'momo.collections_api_key': functions.config().momo?.collections_api_key,
+  'momo.disbursements_subscription_key': functions.config().momo?.disbursements_subscription_key,
+  'momo.disbursements_api_user': functions.config().momo?.disbursements_api_user,
+  'momo.disbursements_api_key': functions.config().momo?.disbursements_api_key,
+  'momo.webhook_secret': functions.config().momo?.webhook_secret,
 };
 
 /**
@@ -785,16 +758,15 @@ function requireServiceReady(serviceName) {
 
 // Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
 // REQUIRED: Must be configured. Functions will fail with clear errors if missing.
-const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY || '';
+const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // Helper function for Paystack API calls
 const HTTP_TIMEOUT_MS = 15000; // 15 seconds for all external API calls
 
-function paystackRequest(method, path, data = null, retries = 2) {
+function paystackRequest(method, path, data = null) {
   requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
-
-  const makeRequest = (attemptsLeft) => new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
       port: 443,
@@ -822,18 +794,12 @@ function paystackRequest(method, path, data = null, retries = 2) {
 
     req.on('timeout', () => {
       req.destroy();
-      if (attemptsLeft > 0) {
-        logInfo('Paystack request timeout, retrying', { method, path, attemptsLeft });
-        setTimeout(() => makeRequest(attemptsLeft - 1).then(resolve, reject), 1000);
-      } else {
-        reject(new Error(`Paystack request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
-      }
+      reject(new Error(`Paystack request timed out after ${HTTP_TIMEOUT_MS}ms: ${method} ${path}`));
     });
 
     req.on('error', (error) => {
-      if ((error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') && attemptsLeft > 0) {
-        logInfo('Paystack request error, retrying', { method, path, error: error.code, attemptsLeft });
-        setTimeout(() => makeRequest(attemptsLeft - 1).then(resolve, reject), 1000);
+      if (error.code === 'ECONNRESET') {
+        reject(new Error(`Paystack connection reset: ${method} ${path}`));
       } else {
         reject(error);
       }
@@ -844,8 +810,6 @@ function paystackRequest(method, path, data = null, retries = 2) {
     }
     req.end();
   });
-
-  return makeRequest(retries);
 }
 
 // ============================================================
@@ -889,7 +853,7 @@ function fetchRates() {
 
 // Scheduled function - runs daily at midnight UTC
 exports.updateExchangeRatesDaily = functions.pubsub
-  .schedule('every 6 hours')
+  .schedule('0 0 * * *')
   .timeZone('UTC')
   .onRun(async (context) => {
     try {
@@ -927,7 +891,7 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
   }
 
   // Validate admin secret is configured
-  const adminSecret = process.env.ADMIN_EXCHANGE_RATE_SECRET;
+  const adminSecret = functions.config().admin?.exchange_rate_secret;
   if (!adminSecret) {
     logError('Exchange rate endpoint called but admin secret not configured');
     res.status(503).json({ error: 'Service not configured' });
@@ -1060,14 +1024,15 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
   return withIdempotency(effectiveIdempotencyKey, 'verifyPayment', userId, async () => {
   try {
     // Verify with Paystack
-    const response = await paystackRequest('GET', `/transaction/verify/${encodeURIComponent(reference)}`);
+    const response = await paystackRequest('GET', `/transaction/verify/${reference}`);
 
     if (!response.status || response.data.status !== 'success') {
       return { success: false, error: 'Payment verification failed' };
     }
 
     const paymentData = response.data;
-    const amount = paymentData.amount; // Already in minor units (kobo/pesewas/cents)
+    const amountInKobo = paymentData.amount;
+    const amount = amountInKobo / 100; // Convert from kobo to naira
     const currency = paymentData.currency;
 
     // Secondary idempotency check via payments collection (defense in depth)
@@ -1145,7 +1110,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     // Send push notification for deposit
     await sendPushNotification(userId, {
       title: 'Deposit Successful',
-      body: `${currency} ${formatMinorUnits(amount)} has been added to your wallet`,
+      body: `${currency} ${amount.toFixed(2)} has been added to your wallet`,
       type: 'transaction',
       data: { action: 'deposit', amount: amount.toString(), reference },
     });
@@ -1178,7 +1143,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 // Handle Paystack webhook events
 exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
-    `webhook_paystack_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    `webhook_paystack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   logSecurityEvent('paystack_webhook_received', 'low', { correlationId: webhookCorrelationId, event: req.body?.event });
 
   // Fail fast if Paystack secret key is not configured
@@ -1215,12 +1180,6 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
         break;
 
       case 'transfer.failed':
-        await handleFailedTransfer(event.data);
-        break;
-
-      case 'transfer.reversed':
-        // Bank reversed the transfer — refund wallet (same logic as failed)
-        logInfo('Transfer reversed by bank', { reference: event.data.reference, correlationId: webhookCorrelationId });
         await handleFailedTransfer(event.data);
         break;
 
@@ -1286,7 +1245,7 @@ async function handleSuccessfulCharge(data) {
     }
   }
 
-  const amount = receivedAmountKobo; // Keep in minor units (kobo/pesewas/cents)
+  const amount = receivedAmountKobo / 100;
 
   // Get user's wallet
   const walletSnapshot = await db.collection('wallets')
@@ -1344,7 +1303,7 @@ async function handleSuccessfulCharge(data) {
   // Send push notification for deposit via webhook
   await sendPushNotification(userId, {
     title: 'Deposit Successful',
-    body: `${currency} ${formatMinorUnits(amount)} has been added to your wallet via ${data.channel || 'card'}`,
+    body: `${currency} ${amount.toFixed(2)} has been added to your wallet via ${data.channel || 'card'}`,
     type: 'transaction',
     data: { action: 'deposit', amount: amount.toString(), reference },
   });
@@ -1388,7 +1347,7 @@ async function handleSuccessfulTransfer(data) {
     const wdData = withdrawalDoc.data();
     await sendPushNotification(wdData.userId, {
       title: 'Withdrawal Completed',
-      body: `Your withdrawal of ${wdData.currency || ''} ${wdData.amount != null ? formatMinorUnits(wdData.amount) : '0.00'} has been completed`,
+      body: `Your withdrawal of ${wdData.currency || ''} ${wdData.amount?.toFixed(2) || '0.00'} has been completed`,
       type: 'transaction',
       data: { action: 'withdrawal_completed', reference },
     });
@@ -1458,7 +1417,7 @@ async function handleFailedTransfer(data) {
   // Send push notification for withdrawal failed
   await sendPushNotification(userId, {
     title: 'Withdrawal Failed',
-    body: `Your withdrawal of ${withdrawalData.currency || ''} ${amount != null ? formatMinorUnits(amount) : '0.00'} has failed. The amount has been refunded to your wallet.`,
+    body: `Your withdrawal of ${withdrawalData.currency || ''} ${amount?.toFixed(2) || '0.00'} has failed. The amount has been refunded to your wallet.`,
     type: 'transaction',
     data: { action: 'withdrawal_failed', reference, reason: data.reason || 'Transfer failed' },
   });
@@ -1498,10 +1457,12 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
   logFinancialOperation('initiateWithdrawal', 'initiated', { amount, bankCode, accountNumber, accountName, type, mobileMoneyProvider, phoneNumber: validatedPhone });
   // Validate amount
-  requirePositiveNumber(amount, 'amount');
+  if (!amount || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
+  }
 
-  // Minimum withdrawal amount: 100 major units = 10000 minor units
-  if (amount < 10000) {
+  // Minimum withdrawal amount (e.g., 100)
+  if (amount < 100) {
     throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_SMALL, 'Minimum withdrawal is 100.');
   }
 
@@ -1527,7 +1488,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     }
 
     // Generate reference
-    const reference = `WD_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+    const reference = `WD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Create transfer recipient first
     let recipientData;
@@ -1608,7 +1569,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     // Initiate transfer
     const transferResponse = await paystackRequest('POST', '/transfer', {
       source: 'balance',
-      amount: amount, // Already in minor units (kobo/pesewas/cents)
+      amount: amount,// Convert to kobo
       recipient: recipientCode,
       reference: reference,
       reason: `Wallet withdrawal - ${reference}`,
@@ -1635,8 +1596,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
         });
       });
 
-      throw new functions.https.HttpsError('unavailable',
-        'Withdrawal could not be completed. Your funds have been refunded to your wallet. Please try again.');
+      throwServiceError('paystack', new Error('Failed to initiate transfer'));
     }
 
     // Check if OTP is required
@@ -1668,7 +1628,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
     // Send push notification for withdrawal initiated
     await sendPushNotification(userId, {
       title: 'Withdrawal Initiated',
-      body: `Your withdrawal of ${validated.currency || 'NGN'} ${formatMinorUnits(amount)} is being processed`,
+      body: `Your withdrawal of ${validated.currency || 'NGN'} ${amount.toFixed(2)} is being processed`,
       type: 'transaction',
       data: { action: 'withdrawal_initiated', amount: amount.toString(), reference },
     });
@@ -1709,9 +1669,6 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
-
-  // Rate limit OTP attempts to prevent brute-force
-  await enforceRateLimit(userId, 'finalizeTransfer');
 
   // Check if account is blocked
   const blockCheckDoc = await db.collection('users').doc(context.auth.uid).get();
@@ -1780,12 +1737,8 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
   }
 
   try {
-    const VALID_COUNTRIES = ['nigeria', 'ghana', 'kenya', 'south africa', 'uganda', 'sierra leone', 'cameroon', 'senegal', 'tanzania', 'rwanda'];
     const country = data.country || 'nigeria';
-    if (!VALID_COUNTRIES.includes(country.toLowerCase())) {
-      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Unsupported country.');
-    }
-    const response = await paystackRequest('GET', `/bank?country=${encodeURIComponent(country)}`);
+    const response = await paystackRequest('GET', `/bank?country=${country}`);
     logInfo('Paystack getBanks response', { status: response.status });
     if (!response.status) {
       throw new Error('Failed to fetch banks');
@@ -1820,7 +1773,7 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
 
   try {
     logInfo('Calling Paystack to verify account', { accountNumber: maskPii.account(accountNumber), bankCode });
-    const response = await paystackRequest('GET', `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
+    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
 
     logInfo('Paystack verifyAccount response', { status: response.status });
     if (!response.status) {
@@ -1861,22 +1814,24 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
 
   await enforceRateLimit(userId, 'chargeMobileMoney');
 
-  requirePositiveNumber(amount, 'amount');
+  if (!amount || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
+  }
   if (!provider || !phoneNumber) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Provider and phone number are required.');
   }
 
   // Validate currency and phone number format
-  const validatedCurrency = validateCurrency(currency, 'NGN');
+  const validatedCurrency = validateCurrency(currency, 'GHS');
   const validatedPhone = validatePhoneNumber(phoneNumber);
 
   return withIdempotency(idempotencyKey, 'chargeMobileMoney', userId, async () => {
   try {
-    const reference = `MOMO_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+    const reference = `MOMO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const chargeResponse = await paystackRequest('POST', '/charge', {
       email: email,
-      amount: Math.round(amount * 100),
+      amount: amount,
       currency: validatedCurrency,
       mobile_money: {
         phone: validatedPhone,
@@ -1921,7 +1876,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
             id: txRef.id,
             type: 'deposit',
             amount: amount,
-            currency: currency || 'NGN',
+            currency: validatedCurrency,
             status: 'completed',
             reference: reference,
             description: 'Mobile Money deposit',
@@ -1973,9 +1928,6 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
-
-  // Rate limit virtual account creation
-  await enforceRateLimit(userId, 'getOrCreateVirtualAccount');
 
   try {
     // Check if user already has a virtual account
@@ -2070,17 +2022,19 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  const { email, amount, currency, idempotencyKey } = data;
+  const { email, amount, currency } = data;
   const userId = context.auth.uid;
 
-  requirePositiveNumber(amount, 'amount');
+  if (!amount || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
+  }
 
   if (!email) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Email is required.');
   }
 
   // Validate currency
-  const validatedCurrency = validateCurrency(currency, 'NGN');
+  const validatedCurrency = validateCurrency(currency, 'GHS');
 
   // Enforce KYC verification before financial operation
   await enforceKyc(userId);
@@ -2093,16 +2047,12 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
   await enforceRateLimit(userId, 'initializeTransaction');
 
-  // Generate default idempotency key if none provided (same pattern as verifyPayment)
-  const effectiveIdempotencyKey = idempotencyKey || `initTxn_${userId}_${amount}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-
-  return withIdempotency(effectiveIdempotencyKey, 'initializeTransaction', userId, async () => {
   try {
-    const reference = `TXN_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+    const reference = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     const response = await paystackRequest('POST', '/transaction/initialize', {
       email: email,
-      amount: amount, // Already in minor units (kobo/pesewas/cents)
+      amount: amount, // Convert to smallest unit
       currency: validatedCurrency,
       reference: reference,
       callback_url: 'https://qr-wallet-1993.web.app/payment-callback',
@@ -2120,7 +2070,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
         userId,
         email,
         expectedAmount: amount,
-        expectedAmountKobo: amount,
+        expectedAmountKobo: amount, 
         currency: validatedCurrency,
         reference,
         paystackReference: response.data.reference,
@@ -2145,7 +2095,6 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
     logError('Initialize transaction error', { error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Transaction initialization failed. Please try again.');
   }
-  });
 });
 
 // ============================================================
@@ -2154,7 +2103,7 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
 // REQUIRED: Must be configured. QR signing will fail if missing.
-const QR_SECRET_KEY = process.env.QR_SECRET || '';
+const QR_SECRET_KEY = functions.config().qr?.secret || '';
 const PIN_SECRET = process.env.PIN_SECRET || '';
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -2326,8 +2275,7 @@ async function checkRateLimitPersistent(userId, operation) {
     return result;
   } catch (error) {
     logError('Rate limit check failed', { userId, operation, error: error.message });
-    // Fail closed for financial operations to prevent abuse during outages
-    return false;
+    return true; // Fail open to avoid blocking legitimate users
   }
 }
 
@@ -2387,25 +2335,19 @@ async function sendPushNotification(userId, { title, body, type = 'system', data
     // 1. Create in-app notification in Firestore
     await createNotification(userId, { title, body, type, data });
 
-    // 2. Get all FCM tokens for user (multi-device support)
-    const tokensSnapshot = await db.collection('users').doc(userId)
-        .collection('fcm_tokens').get();
+    // 2. Get user's FCM token
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) return;
 
-    // Fallback to legacy single token if subcollection is empty
-    let tokens = tokensSnapshot.docs.map(doc => doc.data().token).filter(Boolean);
-    if (tokens.length === 0) {
-      const userDoc = await db.collection('users').doc(userId).get();
-      if (!userDoc.exists) return;
-      const legacyToken = userDoc.data().fcmToken;
-      if (!legacyToken) {
-        logInfo('No FCM tokens for user, skipping push', { userId });
-        return;
-      }
-      tokens = [legacyToken];
+    const fcmToken = userDoc.data().fcmToken;
+    if (!fcmToken) {
+      logInfo('No FCM token for user, skipping push', { userId });
+      return;
     }
 
-    // 3. Send push notification to all devices
-    const baseMessage = {
+    // 3. Send push notification via FCM
+    const message = {
+      token: fcmToken,
       notification: {
         title: title,
         body: body,
@@ -2432,36 +2374,19 @@ async function sendPushNotification(userId, { title, body, type = 'system', data
       },
     };
 
-    // Send to all device tokens
-    const messages = tokens.map(token => ({ ...baseMessage, token }));
-    const results = await Promise.allSettled(
-      messages.map(msg => admin.messaging().send(msg))
-    );
-
-    // Clean up invalid tokens
-    for (let i = 0; i < results.length; i++) {
-      if (results[i].status === 'rejected') {
-        const error = results[i].reason;
-        if (error.code === 'messaging/registration-token-not-registered' ||
-            error.code === 'messaging/invalid-registration-token') {
-          try {
-            // Find and delete the invalid token doc
-            const invalidToken = tokens[i];
-            const tokenDocs = await db.collection('users').doc(userId)
-                .collection('fcm_tokens')
-                .where('token', '==', invalidToken).get();
-            const deleteBatch = db.batch();
-            tokenDocs.docs.forEach(doc => deleteBatch.delete(doc.ref));
-            await deleteBatch.commit();
-          } catch (e) { /* ignore cleanup errors */ }
-        }
-      }
-    }
-
-    const successCount = results.filter(r => r.status === 'fulfilled').length;
-    logInfo('Push notification sent', { userId, title, devices: successCount, total: tokens.length });
+    await admin.messaging().send(message);
+    logInfo('Push notification sent', { userId, title });
   } catch (error) {
     // Push notification must never block the main operation
+    if (error.code === 'messaging/registration-token-not-registered' ||
+        error.code === 'messaging/invalid-registration-token') {
+      // Token is invalid, remove it
+      try {
+        await db.collection('users').doc(userId).update({
+          fcmToken: admin.firestore.FieldValue.delete(),
+        });
+      } catch (e) { /* ignore cleanup errors */ }
+    }
     logError('Failed to send push notification', { userId, title, error: error.message });
   }
 }
@@ -2485,15 +2410,15 @@ async function checkForFraud(userId, txData) {
 
     // 1. Large transaction threshold (varies by currency)
     const largeThresholds = {
-      NGN: 50000000, GHS: 1000000, KES: 20000000, UGX: 500000000, ZAR: 2000000,
-      USD: 100000, GBP: 80000, EUR: 90000,
+      NGN: 500000, GHS: 10000, KES: 200000, UGX: 5000000, ZAR: 20000,
+      USD: 1000, GBP: 800, EUR: 900,
     };
-    const threshold = largeThresholds[currency] || 1000000;
+    const threshold = largeThresholds[currency] || 10000;
     if (amount >= threshold) {
       alerts.push({
         rule: 'large_transaction',
         severity: 'medium',
-        message: `Large ${type}: ${currency} ${formatMinorUnits(amount)} exceeds threshold of ${currency} ${formatMinorUnits(threshold)}`,
+        message: `Large ${type}: ${currency} ${amount.toFixed(2)} exceeds threshold of ${currency} ${threshold}`,
       });
     }
 
@@ -2529,7 +2454,7 @@ async function checkForFraud(userId, txData) {
         alerts.push({
           rule: 'new_account_large_tx',
           severity: 'high',
-          message: `New account (${Math.round(accountAge)}h old) with significant transaction: ${currency} ${formatMinorUnits(amount)}`,
+          message: `New account (${Math.round(accountAge)}h old) with significant transaction: ${currency} ${amount.toFixed(2)}`,
         });
       }
     }
@@ -2575,9 +2500,7 @@ async function checkForFraud(userId, txData) {
       // Notify admin via push notification if high severity
       if (highestSeverity === 'high') {
         // Get all admin users to notify
-        const adminSnapshot = await db.collection('users')
-          .where('role', 'in', ['super_admin', 'admin'])
-          .get();
+        const adminSnapshot = await db.collection('admin_users').get();
         const notifyPromises = adminSnapshot.docs.map(doc =>
           sendPushNotification(doc.id, {
             title: 'Fraud Alert',
@@ -2588,14 +2511,6 @@ async function checkForFraud(userId, txData) {
         );
         await Promise.all(notifyPromises);
       }
-
-      // Notify the affected user about suspicious activity
-      await sendPushNotification(userId, {
-        title: 'Security Alert',
-        body: 'Unusual activity detected on your account. If this was not you, block your account immediately from your profile.',
-        type: 'security',
-        data: { action: 'suspicious_activity', alertId },
-      }).catch(() => {}); // Don't fail if notification fails
 
       logStructured(LOG_LEVELS.WARNING, 'Fraud alert triggered', {
         alertId, userId, severity: highestSeverity, rules: alerts.map(a => a.rule),
@@ -2701,7 +2616,7 @@ async function enforceKyc(userId) {
   const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
 
   const userCountry = (userData.country || '').toUpperCase().trim();
-  const userPhoneVerified = userData.phoneVerified === true;
+  const userPhoneVerified = userData.phoneVerified === true || (userData.phoneNumber != null && userData.phoneNumber !== '');
 
   // If user is NOT in a Smile ID country and has verified email + phone,
   // auto-verify their KYC status so they can use financial services.
@@ -2793,11 +2708,6 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
 
   const userData = userDoc.data();
 
-  // Check if account is blocked
-  if (userData.accountBlocked === true) {
-    throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. KYC verification cannot be completed.');
-  }
-
   // If already verified, return success (idempotent)
   if (userData.kycStatus === 'verified') {
     logInfo('User already KYC verified, no action needed', { userId });
@@ -2835,39 +2745,29 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
     kycVerified: true,
   });
 
-  // Create wallet if it doesn't exist yet (using transaction to prevent race conditions)
+  // Create wallet if it doesn't exist yet
   const walletDoc = await db.collection('wallets').doc(userId).get();
   if (!walletDoc.exists) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
-    await db.runTransaction(async (transaction) => {
-      // Double-check wallet doesn't exist inside transaction (race condition protection)
-      const freshWalletDoc = await transaction.get(db.collection('wallets').doc(userId));
-      if (freshWalletDoc.exists) {
-        return; // Already created by another concurrent call
-      }
+    await db.collection('wallets').doc(userId).set({
+      id: userId,
+      userId: userId,
+      walletId: walletId,
+      currency: userData.currency || 'GHS',
+      balance: 0,
+      isActive: true,
+      dailySpent: 0,
+      monthlySpent: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-      transaction.set(db.collection('wallets').doc(userId), {
-        id: userId,
-        userId: userId,
-        walletId: walletId,
-        kycStatus: 'verified',
-        currency: userData.currency || 'NGN',
-        balance: 0,
-        isActive: true,
-        dailySpent: 0,
-        monthlySpent: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      transaction.update(userRef, {
-        walletId: walletId,
-        kycStatus: 'verified',
-        walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    await userRef.update({
+      walletId: walletId,
+      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     logInfo('Wallet created during KYC completion', { userId, walletId });
@@ -2910,14 +2810,9 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
 
     const userData = userDoc.data();
 
-    // Check if account is blocked
-    if (userData.accountBlocked === true) {
-      throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Wallet cannot be created.');
-    }
-
     // Generate unique wallet ID
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     // Create wallet document
@@ -2925,7 +2820,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
       id: userId,
       userId: userId,
       walletId: walletId,
-      currency: userData.currency || 'NGN',
+      currency: userData.currency || 'GHS',
       balance: 0,
       isActive: true,
       dailySpent: 0,
@@ -2947,7 +2842,6 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
       // Update user document with walletId
       transaction.update(db.collection('users').doc(userId), {
         walletId: walletId,
-        kycStatus: 'verified',
         walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     });
@@ -2963,9 +2857,17 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
 });
 
 /**
- * Update wallet currency. Wallet updates are blocked at Firestore rules level,
- * so currency changes must go through this Cloud Function.
+ * Mark user as KYC verified when SmileID returns "already enrolled" error.
+ * This indicates the user was previously verified by SmileID, so we can
+ * trust that verification and set kycStatus: 'verified' directly.
+ *
+ * Unlike updateKycStatus, this function doesn't require prior KYC document
+ * approval because SmileID has already verified the user's identity.
  */
+// ============================================================
+// UPDATE WALLET CURRENCY
+// ============================================================
+
 exports.updateWalletCurrency = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -2995,23 +2897,12 @@ exports.updateWalletCurrency = functions.https.onCall(async (data, context) => {
   return { success: true, currency: validatedCurrency };
 });
 
-/**
- * Mark user as KYC verified when SmileID returns "already enrolled" error.
- * This indicates the user was previously verified by SmileID, so we can
- * trust that verification and set kycStatus: 'verified' directly.
- *
- * Unlike updateKycStatus, this function doesn't require prior KYC document
- * approval because SmileID has already verified the user's identity.
- */
 exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
-  // Restrict to admin only — prevents any user from self-verifying KYC
-  const caller = await verifyAdmin(context, 'admin');
-
-  const userId = data.targetUserId || context.auth.uid;
+  const userId = context.auth.uid;
   const { idType } = data || {};
 
   logInfo('Processing SmileID already enrolled user', { userId, idType });
@@ -3047,25 +2938,21 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     kycVerified: true,
   });
 
-  // Create wallet if it doesn't exist yet (transactional to prevent race conditions)
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const segment = () => Array.from({ length: 4 }, () => chars[crypto.randomInt(chars.length)]).join('');
-  const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
-
-  await db.runTransaction(async (transaction) => {
-    const walletRef = db.collection('wallets').doc(userId);
-    const walletDoc = await transaction.get(walletRef);
-    if (walletDoc.exists) return; // Already exists, skip
-
-    const userRef = db.collection('users').doc(userId);
-    const userDoc = await transaction.get(userRef);
+  // Create wallet if it doesn't exist yet
+  const walletDoc = await db.collection('wallets').doc(userId).get();
+  if (!walletDoc.exists) {
+    const userDoc = await db.collection('users').doc(userId).get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    transaction.set(walletRef, {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+
+    await db.collection('wallets').doc(userId).set({
       id: userId,
       userId: userId,
       walletId: walletId,
-      currency: userData.currency || 'NGN',
+      currency: userData.currency || 'GHS',
       balance: 0,
       isActive: true,
       dailySpent: 0,
@@ -3074,13 +2961,13 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    transaction.update(userRef, {
+    await db.collection('users').doc(userId).update({
       walletId: walletId,
       walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     logInfo('Wallet created during markUserAlreadyEnrolled', { userId, walletId });
-  });
+  }
 
   logInfo('User marked as KYC verified (SmileID already enrolled)', { userId });
 
@@ -3217,21 +3104,13 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
         'Cannot delete account with remaining balance. Please withdraw all funds first.');
     }
 
-    // Delete user sub-collections (paginate to handle >500 docs)
-    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc', 'fcm_tokens'];
+    // Delete user sub-collections
+    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc'];
     for (const subCol of subCollections) {
-      let hasMore = true;
-      while (hasMore) {
-        const docs = await db.collection('users').doc(userId).collection(subCol).limit(500).get();
-        if (docs.empty) {
-          hasMore = false;
-          break;
-        }
-        const batch = db.batch();
-        docs.forEach(doc => batch.delete(doc.ref));
-        await batch.commit();
-        if (docs.size < 500) hasMore = false;
-      }
+      const docs = await db.collection('users').doc(userId).collection(subCol).limit(500).get();
+      const batch = db.batch();
+      docs.forEach(doc => batch.delete(doc.ref));
+      if (!docs.empty) await batch.commit();
     }
 
     // Delete user document
@@ -3243,15 +3122,9 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
     }
 
     // Anonymize audit logs (retain for compliance but remove PII)
-    // Paginate to handle users with >500 audit log entries
-    let hasMoreAuditLogs = true;
-    while (hasMoreAuditLogs) {
-      const auditLogs = await db.collection('audit_logs')
-        .where('userId', '==', userId).limit(500).get();
-      if (auditLogs.empty) {
-        hasMoreAuditLogs = false;
-        break;
-      }
+    const auditLogs = await db.collection('audit_logs')
+      .where('userId', '==', userId).limit(500).get();
+    if (!auditLogs.empty) {
       const batch = db.batch();
       auditLogs.forEach(doc => {
         batch.update(doc.ref, {
@@ -3260,7 +3133,6 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
         });
       });
       await batch.commit();
-      if (auditLogs.size < 500) hasMoreAuditLogs = false;
     }
 
     // Delete Firebase Auth account
@@ -3299,8 +3171,8 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
  * @returns {Promise<any>} - Cached result (if replay) or fresh result
  */
 async function withIdempotency(key, operation, userId, executeOperation) {
-  if (!key || typeof key !== 'string' || key.length < 32) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Idempotency key required (min 32 characters).');
+  if (!key || typeof key !== 'string' || key.length < 16) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Idempotency key required (min 16 characters).');
   }
 
   const idempotencyRef = db.collection('idempotency_keys').doc(key);
@@ -3384,7 +3256,6 @@ async function withIdempotency(key, operation, userId, executeOperation) {
 exports.cleanupIdempotencyKeys = functions.pubsub
   .schedule('every 6 hours')
   .onRun(async () => {
-    try {
     const now = new Date();
     const expired = await db.collection('idempotency_keys')
       .where('expiresAt', '<', now)
@@ -3402,17 +3273,12 @@ exports.cleanupIdempotencyKeys = functions.pubsub
 
     logInfo('Cleaned expired idempotency keys', { count: expired.size });
     return null;
-    } catch (error) {
-      logError('Failed to cleanup idempotency keys', { error: error.message });
-      throw error;
-    }
   });
 
 // Cleanup expired QR nonces (runs hourly)
 exports.cleanupExpiredQrNonces = functions.pubsub
   .schedule('every 1 hours')
   .onRun(async () => {
-    try {
     const now = admin.firestore.Timestamp.now();
 
     const expiredNonces = await db.collection('qr_nonces')
@@ -3431,10 +3297,6 @@ exports.cleanupExpiredQrNonces = functions.pubsub
 
     logInfo('Cleaned expired QR nonces', { count: expiredNonces.size });
     return null;
-    } catch (error) {
-      logError('Failed to cleanup expired QR nonces', { error: error.message });
-      throw error;
-    }
   });
 
 // Reset daily spending counters at midnight UTC
@@ -3442,35 +3304,24 @@ exports.resetDailySpendingLimits = functions.pubsub
   .schedule('0 0 * * *')
   .timeZone('UTC')
   .onRun(async () => {
-    try {
-    let totalReset = 0;
-    let hasMore = true;
-    while (hasMore) {
-      const walletsSnapshot = await db.collection('wallets')
-        .where('dailySpent', '>', 0)
-        .limit(500)
-        .get();
+    const walletsSnapshot = await db.collection('wallets')
+      .where('dailySpent', '>', 0)
+      .limit(500)
+      .get();
 
-      if (walletsSnapshot.empty) {
-        hasMore = false;
-        break;
-      }
-
-      const batch = db.batch();
-      walletsSnapshot.docs.forEach(doc => {
-        batch.update(doc.ref, { dailySpent: 0 });
-      });
-      await batch.commit();
-      totalReset += walletsSnapshot.size;
-      if (walletsSnapshot.size < 500) hasMore = false;
+    if (walletsSnapshot.empty) {
+      logInfo('No daily spending counters to reset');
+      return null;
     }
 
-    logInfo('Reset daily spending counters', { count: totalReset });
+    const batch = db.batch();
+    walletsSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, { dailySpent: 0 });
+    });
+    await batch.commit();
+
+    logInfo('Reset daily spending counters', { count: walletsSnapshot.size });
     return null;
-    } catch (error) {
-      logError('Failed to reset daily spending limits', { error: error.message });
-      throw error;
-    }
   });
 
 // Reset monthly spending counters on 1st of each month
@@ -3478,35 +3329,24 @@ exports.resetMonthlySpendingLimits = functions.pubsub
   .schedule('0 0 1 * *')
   .timeZone('UTC')
   .onRun(async () => {
-    try {
-    let totalReset = 0;
-    let hasMore = true;
-    while (hasMore) {
-      const walletsSnapshot = await db.collection('wallets')
-        .where('monthlySpent', '>', 0)
-        .limit(500)
-        .get();
+    const walletsSnapshot = await db.collection('wallets')
+      .where('monthlySpent', '>', 0)
+      .limit(500)
+      .get();
 
-      if (walletsSnapshot.empty) {
-        hasMore = false;
-        break;
-      }
-
-      const batch = db.batch();
-      walletsSnapshot.docs.forEach(doc => {
-        batch.update(doc.ref, { monthlySpent: 0 });
-      });
-      await batch.commit();
-      totalReset += walletsSnapshot.size;
-      if (walletsSnapshot.size < 500) hasMore = false;
+    if (walletsSnapshot.empty) {
+      logInfo('No monthly spending counters to reset');
+      return null;
     }
 
-    logInfo('Reset monthly spending counters', { count: totalReset });
+    const batch = db.batch();
+    walletsSnapshot.docs.forEach(doc => {
+      batch.update(doc.ref, { monthlySpent: 0 });
+    });
+    await batch.commit();
+
+    logInfo('Reset monthly spending counters', { count: walletsSnapshot.size });
     return null;
-    } catch (error) {
-      logError('Failed to reset monthly spending limits', { error: error.message });
-      throw error;
-    }
   });
 
 /**
@@ -3520,6 +3360,90 @@ exports.resetMonthlySpendingLimits = functions.pubsub
  *   - Flagged transactions (resolved): 180 days
  *   - Audit logs: 365 days (regulatory minimum)
  */
+// ============================================================
+// CLEANUP PENDING MOMO TRANSACTIONS
+// ============================================================
+
+exports.cleanupPendingMomoTransactions = functions.pubsub
+  .schedule('every 6 hours')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      const pendingTx = await db.collection('momo_transactions')
+        .where('status', '==', 'pending')
+        .where('createdAt', '<', cutoff)
+        .limit(50)
+        .get();
+
+      if (pendingTx.empty) {
+        logInfo('No stale pending MoMo transactions found');
+        return null;
+      }
+
+      logInfo('Found stale pending MoMo transactions', { count: pendingTx.size });
+
+      for (const txDoc of pendingTx.docs) {
+        const txData = txDoc.data();
+
+        try {
+          if (txData.type === 'disbursement' && txData.userId) {
+            await db.runTransaction(async (transaction) => {
+              const walletDoc = await transaction.get(db.collection('wallets').doc(txData.userId));
+              if (walletDoc.exists) {
+                const walletData = walletDoc.data();
+                const newBalance = safeAdd(walletData.balance, txData.amount, 'momoCleanup refund');
+                transaction.update(walletDoc.ref, {
+                  balance: newBalance,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+
+              transaction.update(txDoc.ref, {
+                status: 'failed',
+                failureReason: 'Transaction timed out after 24 hours',
+                refunded: true,
+                refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            });
+
+            await sendPushNotification(txData.userId, {
+              title: 'MoMo Transaction Failed',
+              body: 'Your MoMo withdrawal has timed out. The amount has been refunded to your wallet.',
+              type: 'transaction',
+              data: { action: 'momo_timeout', referenceId: txDoc.id },
+            }).catch(() => {});
+          } else {
+            await txDoc.ref.update({
+              status: 'failed',
+              failureReason: 'Transaction timed out after 24 hours',
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            if (txData.userId) {
+              await sendPushNotification(txData.userId, {
+                title: 'MoMo Deposit Failed',
+                body: 'Your MoMo deposit has timed out. No charge was made. Please try again.',
+                type: 'transaction',
+                data: { action: 'momo_timeout', referenceId: txDoc.id },
+              }).catch(() => {});
+            }
+          }
+        } catch (innerError) {
+          logError('Error processing stale MoMo transaction', { txId: txDoc.id, error: innerError.message });
+        }
+      }
+
+      logInfo('Cleaned up stale MoMo transactions', { processed: pendingTx.size });
+      return null;
+    } catch (error) {
+      logError('Error in cleanupPendingMomoTransactions', { error: error.message });
+      return null;
+    }
+  });
+
 exports.cleanupExpiredData = functions.pubsub
   .schedule('0 3 * * *')  // Daily at 3:00 AM UTC
   .timeZone('UTC')
@@ -3604,96 +3528,6 @@ exports.cleanupExpiredData = functions.pubsub
     return null;
   });
 
-/**
- * Auto-fail pending MoMo transactions older than 24 hours.
- * Refunds wallet for disbursements that were debited but never completed.
- * Runs every 6 hours.
- */
-exports.cleanupPendingMomoTransactions = functions.pubsub
-  .schedule('every 6 hours')
-  .timeZone('UTC')
-  .onRun(async (context) => {
-    try {
-      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
-
-      const pendingTx = await db.collection('momo_transactions')
-        .where('status', '==', 'pending')
-        .where('createdAt', '<', cutoff)
-        .limit(50)
-        .get();
-
-      if (pendingTx.empty) {
-        logInfo('No stale pending MoMo transactions found');
-        return null;
-      }
-
-      logInfo('Found stale pending MoMo transactions', { count: pendingTx.size });
-
-      for (const txDoc of pendingTx.docs) {
-        const txData = txDoc.data();
-
-        try {
-          // If this was a disbursement (money already debited), refund the wallet
-          if (txData.type === 'disbursement' && txData.userId) {
-            await db.runTransaction(async (transaction) => {
-              const walletDoc = await transaction.get(db.collection('wallets').doc(txData.userId));
-              if (walletDoc.exists) {
-                const walletData = walletDoc.data();
-                const newBalance = safeAdd(walletData.balance, txData.amount, 'momoCleanup refund');
-                transaction.update(walletDoc.ref, {
-                  balance: newBalance,
-                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-              }
-
-              // Mark transaction as failed/refunded
-              transaction.update(txDoc.ref, {
-                status: 'failed',
-                failureReason: 'Transaction timed out after 24 hours',
-                refunded: txData.type === 'disbursement',
-                refundedAt: txData.type === 'disbursement' ? admin.firestore.FieldValue.serverTimestamp() : null,
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              });
-            });
-
-            // Notify user
-            await sendPushNotification(txData.userId, {
-              title: 'MoMo Transaction Failed',
-              body: `Your MoMo ${txData.type === 'disbursement' ? 'withdrawal' : 'deposit'} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has timed out. ${txData.type === 'disbursement' ? 'The amount has been refunded to your wallet.' : 'Please try again.'}`,
-              type: 'transaction',
-              data: { action: 'momo_timeout', referenceId: txDoc.id },
-            }).catch(() => {});
-          } else {
-            // Collection (deposit) — just mark as failed, no refund needed
-            await txDoc.ref.update({
-              status: 'failed',
-              failureReason: 'Transaction timed out after 24 hours',
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            if (txData.userId) {
-              await sendPushNotification(txData.userId, {
-                title: 'MoMo Deposit Failed',
-                body: `Your MoMo deposit of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has timed out. No charge was made. Please try again.`,
-                type: 'transaction',
-                data: { action: 'momo_timeout', referenceId: txDoc.id },
-              }).catch(() => {});
-            }
-          }
-
-          logInfo('Cleaned up stale MoMo transaction', { referenceId: txDoc.id, type: txData.type });
-        } catch (err) {
-          logError('Failed to cleanup MoMo transaction', { referenceId: txDoc.id, error: err.message });
-        }
-      }
-
-      return null;
-    } catch (error) {
-      logError('MoMo cleanup job failed', { error: error.message });
-      throw error;
-    }
-  });
-
 // ============================================================
 // TRANSACTION STATE MACHINE
 // ============================================================
@@ -3735,14 +3569,7 @@ function normalizeStatus(status) {
     'PENDING': 'pending',
     'FAILED': 'failed',
   };
-  const normalized = map[status] || status.toLowerCase();
-  // Validate against known states — unknown statuses default to 'failed'
-  const validStates = Object.values(TRANSACTION_STATES);
-  if (!validStates.includes(normalized)) {
-    logError('Unknown transaction status received', { original: status, normalized });
-    return 'failed';
-  }
-  return normalized;
+  return map[status] || status.toLowerCase();
 }
 
 /**
@@ -4196,11 +4023,10 @@ exports.resetPin = functions.https.onCall(async (data, context) => {
  * Requires PIN verification for security.
  * Sets blockedBy to 'user' so the user can unblock themselves.
  */
-/**
- * Server-side PIN hashing: HMAC-SHA256 with per-user salt + server secret.
- * Client sends SHA-256(pin) — this function applies another layer.
- * Even if Firestore data is exposed, PINs cannot be cracked without PIN_SECRET.
- */
+// ============================================================
+// PIN HELPER FUNCTIONS
+// ============================================================
+
 function hashPinServer(clientHash, salt) {
   requireConfig(PIN_SECRET, 'pin.secret');
   return crypto.createHmac('sha256', salt + PIN_SECRET)
@@ -4208,20 +4034,15 @@ function hashPinServer(clientHash, salt) {
     .digest('hex');
 }
 
-/**
- * Verify a PIN against the stored HMAC hash.
- * Returns true if the PIN matches.
- */
 function verifyPinServer(clientHash, storedHash, salt) {
   const expectedHash = hashPinServer(clientHash, salt);
   return timingSafeCompare(storedHash, expectedHash);
 }
 
-/**
- * Change or set user PIN. PIN hash can only be written server-side.
- * If user has no PIN set, currentPinHash is not required.
- * If user has a PIN set, currentPinHash must match before allowing change.
- */
+// ============================================================
+// CHANGE PIN
+// ============================================================
+
 exports.changePin = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4230,15 +4051,12 @@ exports.changePin = functions.https.onCall(async (data, context) => {
   const userId = context.auth.uid;
   const { currentPinHash, newPinHash } = data;
 
-  // Validate new PIN hash (SHA-256 hex = 64 chars)
   if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
   }
 
-  // Rate limit PIN changes
   await enforceRateLimit(userId, 'changePin');
 
-  // Get user document
   const userDoc = await db.collection('users').doc(userId).get();
   if (!userDoc.exists) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
@@ -4246,36 +4064,28 @@ exports.changePin = functions.https.onCall(async (data, context) => {
 
   const userData = userDoc.data();
 
-  // If PIN is already set, verify current PIN first
   if (userData.pinHash) {
     if (!currentPinHash || typeof currentPinHash !== 'string') {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Current PIN is required.');
     }
-    // Verify against HMAC hash using stored salt
     if (!verifyPinServer(currentPinHash, userData.pinHash, userData.pinSalt || '')) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Incorrect current PIN.');
     }
   }
 
-  // Generate new per-user salt
   const newSalt = crypto.randomBytes(32).toString('hex');
-
-  // Compute HMAC hash: HMAC-SHA256(clientHash, salt + serverSecret)
   const serverHash = hashPinServer(newPinHash, newSalt);
 
-  // Prevent setting the same PIN (compare at HMAC level)
   if (userData.pinHash && timingSafeCompare(userData.pinHash, serverHash)) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'New PIN must be different from current PIN.');
   }
 
-  // Update PIN hash and salt (Admin SDK bypasses Firestore rules)
   await db.collection('users').doc(userId).update({
     pinHash: serverHash,
     pinSalt: newSalt,
     pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Audit log
   await auditLog({
     userId,
     operation: 'changePin',
@@ -4284,15 +4094,82 @@ exports.changePin = functions.https.onCall(async (data, context) => {
     ipHash: hashIp(context),
   });
 
-  // Security notification — alert user their PIN was changed
   await sendPushNotification(userId, {
     title: 'PIN Changed',
     body: 'Your transaction PIN has been changed. If you did not make this change, block your account immediately from your profile.',
     type: 'security',
     data: { action: 'pin_changed' },
-  }).catch(() => {}); // Don't block the response if notification fails
+  }).catch(() => {});
 
   return { success: true, message: 'PIN updated successfully.' };
+});
+
+// ============================================================
+// RESET PIN (Forgot PIN)
+// ============================================================
+
+exports.resetPin = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { newPinHash, method } = data;
+
+  if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
+  }
+
+  if (!method || !['email', 'phone'].includes(method)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Verification method is required.');
+  }
+
+  await enforceRateLimit(userId, 'resetPin');
+
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
+  }
+
+  const userData = userDoc.data();
+
+  if (!userData.pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'No PIN is set. Use Change PIN instead.');
+  }
+
+  const authTime = context.auth.token.auth_time;
+  const now = Math.floor(Date.now() / 1000);
+  if (now - authTime > 5 * 60) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED, 'Your session has expired. Please verify your identity again.');
+  }
+
+  const newSalt = crypto.randomBytes(32).toString('hex');
+  const serverHash = hashPinServer(newPinHash, newSalt);
+
+  await db.collection('users').doc(userId).update({
+    pinHash: serverHash,
+    pinSalt: newSalt,
+    pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+    pinResetAt: admin.firestore.FieldValue.serverTimestamp(),
+    pinResetMethod: method,
+  });
+
+  await auditLog({
+    userId,
+    operation: 'resetPin',
+    result: 'success',
+    metadata: { method },
+    ipHash: hashIp(context),
+  });
+
+  await sendPushNotification(userId, {
+    title: 'PIN Reset',
+    body: 'Your transaction PIN has been reset. If you did not make this change, block your account immediately.',
+    type: 'security',
+    data: { action: 'pin_changed' },
+  }).catch(() => {});
+
+  return { success: true, message: 'PIN reset successfully.' };
 });
 
 exports.blockAccount = functions.https.onCall(async (data, context) => {
@@ -4309,7 +4186,7 @@ exports.blockAccount = functions.https.onCall(async (data, context) => {
   if (!userDoc.exists) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
   }
-  const userData = userDoc.data();
+const userData = userDoc.data();
   if (!userData.pinHash) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'You must set a PIN before you can block your account.');
   }
@@ -4362,7 +4239,7 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
   if (!userDoc.exists) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
   }
-  const userData = userDoc.data();
+ const userData = userDoc.data();
   // Check if account is actually blocked
   if (userData.accountBlocked !== true) {
     return { success: true, message: 'Account is not blocked.' };
@@ -4422,7 +4299,7 @@ async function verifyAdmin(context, requiredRole = 'support') {
 
   const uid = context.auth.uid;
   const claims = context.auth.token;
-  const role = claims.role;
+  const role = claims.adminRole;
 
   if (!role) {
     throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
@@ -4497,22 +4374,14 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
   const requiredRole = newRole === 'admin' ? 'super_admin' : 'admin';
   const caller = await verifyAdmin(context, requiredRole);
 
-  // Cannot promote yourself
-  if (targetUid === caller.uid) {
-    throw new functions.https.HttpsError('invalid-argument', 'Cannot promote yourself.');
-  }
-
   // Verify target user exists
-  let targetUser;
   try {
-    targetUser = await admin.auth().getUser(targetUid);
+    await admin.auth().getUser(targetUid);
   } catch (e) {
     throw new functions.https.HttpsError('not-found', 'Target user not found.');
   }
 
-  // Merge with existing claims to avoid wiping non-role claims
-  const existingClaims = targetUser.customClaims || {};
-  await admin.auth().setCustomUserClaims(targetUid, { ...existingClaims, role: newRole });
+  await admin.auth().setCustomUserClaims(targetUid, { role: newRole });
 
   await db.collection('users').doc(targetUid).update({
     role: newRole,
@@ -4536,7 +4405,7 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
     action: 'promote_user',
     targetUid,
     details: `Promoted to ${newRole}`,
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4571,11 +4440,7 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Cannot demote super_admin.');
   }
 
-  // Remove only the role claim, preserve other claims
-  const targetUserRecord = await admin.auth().getUser(targetUid);
-  const existingClaims = targetUserRecord.customClaims || {};
-  delete existingClaims.role;
-  await admin.auth().setCustomUserClaims(targetUid, existingClaims);
+  await admin.auth().setCustomUserClaims(targetUid, {});
 
   await db.collection('users').doc(targetUid).update({
     role: admin.firestore.FieldValue.delete(),
@@ -4599,7 +4464,7 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
     action: 'demote_user',
     targetUid,
     details: `Removed ${targetRole} role`,
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4685,7 +4550,7 @@ exports.adminSearchUser = functions.https.onCall(async (data, context) => {
  * Get detailed user information including wallet and recent transactions.
  */
 exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  await verifyAdmin(context, 'support');
 
   const { targetUid } = data;
   if (!targetUid) {
@@ -4711,7 +4576,7 @@ exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
     wallet = {
       id: walletSnapshot.docs[0].id,
       balance: walletData.balance || 0,
-      currency: walletData.currency || 'NGN',
+      currency: walletData.currency || 'GHS',
     };
   }
 
@@ -4745,39 +4610,25 @@ exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
     ...doc.data(),
   }));
 
-  // Role-based field redaction: support tier gets masked PII
-  const isPrivileged = caller.role === 'super_admin' || caller.role === 'admin';
-  const maskPiiField = (val) => {
-    if (!val) return '';
-    if (val.includes('@')) {
-      const [local, domain] = val.split('@');
-      return local.substring(0, 2) + '***@' + (domain || '');
-    }
-    return val.substring(0, 4) + '****' + val.substring(val.length - 2);
-  };
-
-  // Exclude pinHash/pinSalt from response
-  const userResponse = {
-    uid: targetUid,
-    email: isPrivileged ? (userData.email || '') : maskPiiField(userData.email || ''),
-    fullName: isPrivileged ? (userData.fullName || '') : '***',
-    phoneNumber: isPrivileged ? (userData.phoneNumber || '') : maskPiiField(userData.phoneNumber || ''),
-    kycStatus: userData.kycStatus || 'none',
-    accountBlocked: userData.accountBlocked || false,
-    accountBlockedBy: userData.accountBlockedBy || null,
-    role: userData.role || null,
-    createdAt: userData.createdAt,
-    lastLoginAt: userData.lastLoginAt || null,
-    countryCode: userData.countryCode || '',
-    currencyCode: userData.currencyCode || '',
-    profileImageUrl: userData.profileImageUrl || null,
-    emailVerified: userData.emailVerified || false,
-    phoneVerified: userData.phoneVerified || false,
-  };
-
   return {
     success: true,
-    user: userResponse,
+    user: {
+      uid: targetUid,
+      email: userData.email || '',
+      fullName: userData.fullName || '',
+      phoneNumber: userData.phoneNumber || '',
+      kycStatus: userData.kycStatus || 'none',
+      accountBlocked: userData.accountBlocked || false,
+      accountBlockedBy: userData.accountBlockedBy || null,
+      role: userData.role || null,
+      createdAt: userData.createdAt,
+      lastLoginAt: userData.lastLoginAt || null,
+      countryCode: userData.countryCode || '',
+      currencyCode: userData.currencyCode || '',
+      profileImageUrl: userData.profileImageUrl || null,
+      emailVerified: userData.emailVerified || false,
+      phoneVerified: userData.phoneVerified || false,
+    },
     wallet,
     transactions,
     kycDocuments,
@@ -4795,25 +4646,9 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
   }
 
-  // Cannot block yourself
-  if (targetUid === caller.uid) {
-    throw new functions.https.HttpsError('invalid-argument', 'Cannot block your own account.');
-  }
-
   const userDoc = await db.collection('users').doc(targetUid).get();
   if (!userDoc.exists) {
     throw new functions.https.HttpsError('not-found', 'User not found.');
-  }
-
-  // Cannot block users with equal or higher admin role
-  const targetRole = userDoc.data().role;
-  if (targetRole) {
-    const roleHierarchy = { support: 1, admin: 2, super_admin: 3 };
-    const callerLevel = roleHierarchy[caller.role] || 0;
-    const targetLevel = roleHierarchy[targetRole] || 0;
-    if (targetLevel >= callerLevel) {
-      throw new functions.https.HttpsError('permission-denied', 'Cannot block a user with equal or higher admin role.');
-    }
   }
 
   await db.collection('users').doc(targetUid).update({
@@ -4848,7 +4683,7 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
     targetUserId: targetUid,
     targetInfo: userDoc.data().fullName || 'Unknown',
     details: reason || 'No reason provided',
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4903,7 +4738,7 @@ exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
     targetUserId: targetUid,
     targetInfo: userDoc.data().fullName || 'Unknown',
     details: 'Account unblocked',
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4919,12 +4754,6 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
   const { targetUid, newEmail } = data;
   if (!targetUid || !newEmail) {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid and newEmail are required.');
-  }
-
-  // Basic email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(newEmail)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid email format.');
   }
 
   // Update in Firebase Auth
@@ -4953,7 +4782,7 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
     action: 'update_email',
     targetUserId: targetUid,
     details: `Email changed to ${newEmail}`,
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -4982,15 +4811,6 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('failed-precondition', 'User has no phone number on file.');
   }
 
-  // Rate limit: max 1 OTP per 60 seconds per target user
-  const existingOtp = await db.collection('recovery_otps').doc(targetUid).get();
-  if (existingOtp.exists) {
-    const lastCreated = existingOtp.data().createdAt?.toDate?.();
-    if (lastCreated && (Date.now() - lastCreated.getTime()) < 60 * 1000) {
-      throw new functions.https.HttpsError('resource-exhausted', 'Please wait at least 60 seconds before sending another OTP.');
-    }
-  }
-
   // Generate 6-digit OTP
   const otp = crypto.randomInt(100000, 999999).toString();
   const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
@@ -5009,8 +4829,8 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
   // Send SMS via Africa's Talking
   try {
     const atCredentials = {
-      apiKey: process.env.AFRICASTALKING_API_KEY,
-      username: process.env.AFRICASTALKING_USERNAME || 'sandbox',
+      apiKey: functions.config().africastalking?.api_key,
+      username: functions.config().africastalking?.username || 'sandbox',
     };
     const AfricasTalking = require('africastalking')(atCredentials);
     const sms = AfricasTalking.SMS;
@@ -5050,14 +4870,15 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     action: 'send_recovery_otp',
     targetUserId: targetUid,
     details: `OTP sent to ${maskedPhone}`,
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Return result — OTP is delivered via SMS only
-  return {
+  // Return OTP to admin for manual delivery (secure internal process)
+ return {
     success: true,
-    message: 'Recovery OTP sent via SMS. The user should receive it within 1-2 minutes.',
+    message: 'Recovery OTP sent via SMS.',
+    otp, // Keep as fallback in case SMS fails — remove this line when going fully live
     phoneNumber: maskedPhone,
     expiresInMinutes: 10,
   };
@@ -5130,7 +4951,7 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
     action: 'verify_recovery_otp',
     targetUserId: targetUid,
     details: 'OTP verified successfully',
-    ipHash: hashIp(context),
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
@@ -5145,7 +4966,6 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
 
   const snapshot = await db.collection('users')
     .where('role', 'in', ['super_admin', 'admin', 'support'])
-    .limit(100)
     .get();
 
   const admins = snapshot.docs.map(doc => {
@@ -5225,42 +5045,24 @@ exports.adminExportUsers = functions.https.onCall(async (data, context) => {
 
   try {
     const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(5000).get();
+    const walletsSnapshot = await db.collection('wallets').get();
 
-    // Only fetch wallets for the exported users (bounded)
-    const userIds = usersSnapshot.docs.map(doc => doc.id);
+    // Build wallet lookup
     const walletMap = {};
-    // Fetch in batches of 30 (Firestore 'in' query limit)
-    for (let i = 0; i < userIds.length; i += 30) {
-      const batch = userIds.slice(i, i + 30);
-      const walletBatch = await db.collection('wallets')
-        .where(admin.firestore.FieldPath.documentId(), 'in', batch)
-        .get();
-      walletBatch.docs.forEach(doc => {
+    walletsSnapshot.docs.forEach(doc => {
+      if (doc.id !== 'platform') {
         walletMap[doc.id] = doc.data();
-      });
-    }
-
-    // Mask PII for non-super-admin callers
-    const isSuperAdmin = caller.role === 'super_admin';
-    const maskEmail = (email) => {
-      if (!email) return '';
-      const [local, domain] = email.split('@');
-      if (!domain) return '***';
-      return local.substring(0, 2) + '***@' + domain;
-    };
-    const maskPhone = (phone) => {
-      if (!phone) return '';
-      return phone.substring(0, 4) + '****' + phone.substring(phone.length - 2);
-    };
+      }
+    });
 
     const users = usersSnapshot.docs.map(doc => {
       const u = doc.data();
       const w = walletMap[doc.id] || {};
       return {
         uid: doc.id,
-        fullName: isSuperAdmin ? (u.fullName || '') : '***',
-        email: isSuperAdmin ? (u.email || '') : maskEmail(u.email),
-        phoneNumber: isSuperAdmin ? (u.phoneNumber || '') : maskPhone(u.phoneNumber),
+        fullName: u.fullName || '',
+        email: u.email || '',
+        phoneNumber: u.phoneNumber || '',
         country: u.country || '',
         currency: u.currency || '',
         walletId: w.walletId || '',
@@ -5283,7 +5085,7 @@ exports.adminExportUsers = functions.https.onCall(async (data, context) => {
     return { success: true, users };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Export failed. Please try again.');
+    throw new functions.https.HttpsError('internal', `Export failed: ${error.message}`);
   }
 });
 
@@ -5311,6 +5113,7 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
   }
 
   // Get IP address
+  const ip = context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown';
   const userAgent = context.rawRequest?.headers?.['user-agent'] || 'unknown';
 
   // Get admin info
@@ -5329,7 +5132,7 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
     email,
     role,
     action,
-    ipHash: hashIp(context),
+    ip,
     userAgent,
     metadata: metadata || {},
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -5357,10 +5160,6 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
     query = query.where('uid', '==', filterUid);
   }
 
-  if (filterAction) {
-    query = query.where('action', '==', filterAction);
-  }
-
   query = query.limit(fetchLimit);
 
   const snapshot = await query.get();
@@ -5379,25 +5178,13 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
 exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
-  const { limit: queryLimit, filterUserId, filterOperation, startDate, endDate } = data || {};
+  const { limit: queryLimit, filterUserId, filterOperation } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
 
   let query = db.collection('audit_logs').orderBy('timestamp', 'desc');
 
   if (filterUserId) {
     query = query.where('userId', '==', filterUserId);
-  }
-
-  if (filterOperation) {
-    query = query.where('operation', '==', filterOperation);
-  }
-
-  if (startDate) {
-    query = query.where('timestamp', '>=', admin.firestore.Timestamp.fromDate(new Date(startDate)));
-  }
-
-  if (endDate) {
-    query = query.where('timestamp', '<=', admin.firestore.Timestamp.fromDate(new Date(endDate)));
   }
 
   query = query.limit(fetchLimit);
@@ -5459,7 +5246,7 @@ exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) =>
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get platform wallet. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get platform wallet: ${error.message}`);
   }
 });
 
@@ -5493,7 +5280,7 @@ exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
     return { success: true, fees };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get fee history. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get fee history: ${error.message}`);
   }
 });
 
@@ -5517,7 +5304,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
   }
 
-  return withIdempotency(idempotencyKey, 'adminPlatformWithdraw', caller.uid, async () => {
+  
   try {
     // Verify sufficient balance in that currency
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -5530,7 +5317,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     const currentBalance = balanceDoc.data().amount || 0;
     if (currentBalance < amount) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${formatMinorUnits(currentBalance)}, Requested: ${formatMinorUnits(amount)}`);
+        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
     }
 
     // Get exchange rate for USD equivalent
@@ -5609,8 +5396,8 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
       email: callerEmailForLog,
       role: caller.role,
       action: 'platform_withdrawal',
-      details: `Withdrew ${currency} ${formatMinorUnits(amount)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
-      ipHash: hashIp(context),
+      details: `Withdrew ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)} USD) for: ${purpose}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -5627,9 +5414,8 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Withdrawal failed. Please try again.');
+    throw new functions.https.HttpsError('internal', `Withdrawal failed: ${error.message}`);
   }
-  }); // end withIdempotency
 });
 
 /**
@@ -5657,7 +5443,7 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
     return { success: true, withdrawals };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get withdrawals. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get withdrawals: ${error.message}`);
   }
 });
 
@@ -5671,14 +5457,10 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
 exports.adminGetBanks = functions.https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
-  const VALID_COUNTRIES = ['nigeria', 'ghana', 'kenya', 'south africa', 'uganda', 'sierra leone', 'cameroon', 'senegal', 'tanzania', 'rwanda'];
   const country = data.country || 'nigeria';
-  if (!VALID_COUNTRIES.includes(country.toLowerCase())) {
-    throw new functions.https.HttpsError('invalid-argument', 'Unsupported country.');
-  }
 
   try {
-    const response = await paystackRequest('GET', `/bank?country=${encodeURIComponent(country)}`);
+    const response = await paystackRequest('GET', `/bank?country=${country}`);
     if (!response.status) {
       throw new functions.https.HttpsError('internal', 'Failed to fetch banks.');
     }
@@ -5694,7 +5476,7 @@ exports.adminGetBanks = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get banks. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get banks: ${error.message}`);
   }
 });
 
@@ -5710,7 +5492,7 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
   }
 
   try {
-    const response = await paystackRequest('GET', `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`);
+    const response = await paystackRequest('GET', `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
     if (!response.status) {
       return { success: false, error: 'Could not verify account.' };
     }
@@ -5722,7 +5504,7 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Verification failed. Please try again.');
+    throw new functions.https.HttpsError('internal', `Verification failed: ${error.message}`);
   }
 });
 
@@ -5733,7 +5515,7 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
 exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
-  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes } = data;
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
@@ -5748,7 +5530,6 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
   }
 
-  return withIdempotency(idempotencyKey, 'adminInitiateTransfer', caller.uid, async () => {
   try {
     // Verify sufficient platform balance
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -5761,7 +5542,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     const currentBalance = balanceDoc.data().amount || 0;
     if (currentBalance < amount) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${formatMinorUnits(currentBalance)}, Requested: ${formatMinorUnits(amount)}`);
+        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
     }
 
     // Get exchange rate for USD equivalent
@@ -5908,8 +5689,8 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
       email: callerEmail,
       role: caller.role,
       action: 'bank_transfer',
-      details: `Transferred ${currency} ${formatMinorUnits(amount)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
-      ipHash: hashIp(context),
+      details: `Transferred ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -5928,9 +5709,8 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Transfer failed. Please try again.');
+    throw new functions.https.HttpsError('internal', `Transfer failed: ${error.message}`);
   }
-  }); // end withIdempotency
 });
 
 // ============================================================
@@ -5974,10 +5754,6 @@ exports.adminGetAllTransactions = functions.https.onCall(async (data, context) =
       query = query.where('createdAt', '<=', admin.firestore.Timestamp.fromDate(new Date(endDate)));
     }
 
-    if (filterCurrency) {
-      query = query.where('currency', '==', filterCurrency);
-    }
-
     query = query.limit(fetchLimit);
 
     const snapshot = await query.get();
@@ -6019,7 +5795,7 @@ exports.adminGetAllTransactions = functions.https.onCall(async (data, context) =
         'A Firestore index is required. Check the Firebase Console logs for a link to create it.');
     }
 
-    throw new functions.https.HttpsError('internal', 'Failed to get transactions. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get transactions: ${error.message}`);
   }
 });
 
@@ -6114,7 +5890,7 @@ exports.adminGetTransactionStats = functions.https.onCall(async (data, context) 
         'A Firestore index is required. Check the Firebase Console logs for a link to create it.');
     }
 
-    throw new functions.https.HttpsError('internal', 'Failed to get transaction stats. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get transaction stats: ${error.message}`);
   }
 });
 
@@ -6180,7 +5956,7 @@ exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
       action: 'flag_transaction',
       targetUserId: userId,
       details: `Flagged transaction ${transactionId}: ${reason}`,
-      ipHash: hashIp(context),
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -6195,7 +5971,7 @@ exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
     return { success: true, message: 'Transaction flagged for review.' };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to flag transaction. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to flag transaction: ${error.message}`);
   }
 });
 
@@ -6227,7 +6003,7 @@ exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, contex
     return { success: true, flagged };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get flagged transactions. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get flagged transactions: ${error.message}`);
   }
 });
 
@@ -6268,22 +6044,14 @@ exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, con
       role: caller.role,
       action: 'resolve_flagged_transaction',
       details: `Resolved flagged transaction ${transactionId}: ${resolution}`,
-      ipHash: hashIp(context),
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await auditLog({
-      userId: caller.uid,
-      operation: 'adminResolveFlaggedTransaction',
-      result: 'success',
-      metadata: { transactionId, resolution, callerRole: caller.role },
-      ipHash: hashIp(context),
     });
 
     return { success: true, message: 'Flagged transaction resolved.' };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to resolve. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to resolve: ${error.message}`);
   }
 });
 
@@ -6320,7 +6088,7 @@ exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
     return { success: true, alerts: filtered };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to get fraud alerts. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get fraud alerts: ${error.message}`);
   }
 });
 
@@ -6361,8 +6129,7 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
         accountBlocked: true,
         accountBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
         accountBlockedBy: 'admin',
-        accountBlockedByUid: caller.uid,
-        accountBlockedReason: `Fraud alert: ${resolution}`,
+        accountBlockReason: `Fraud alert: ${resolution}`,
       });
 
       await sendPushNotification(alertData.userId, {
@@ -6381,22 +6148,14 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
       action: 'resolve_fraud_alert',
       targetUserId: alertData.userId,
       details: `Resolved fraud alert ${alertId}: ${resolution} (action: ${action || 'none'})`,
-      ipHash: hashIp(context),
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await auditLog({
-      userId: caller.uid,
-      operation: 'adminResolveFraudAlert',
-      result: 'success',
-      metadata: { alertId, resolution, action: action || 'none', targetUserId: alertData.userId, callerRole: caller.role },
-      ipHash: hashIp(context),
     });
 
     return { success: true, message: 'Fraud alert resolved.' };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    throw new functions.https.HttpsError('internal', 'Failed to resolve alert. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to resolve alert: ${error.message}`);
   }
 });
 
@@ -6422,7 +6181,7 @@ exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
       },
     };
   } catch (error) {
-    throw new functions.https.HttpsError('internal', 'Failed to get fraud stats. Please try again.');
+    throw new functions.https.HttpsError('internal', `Failed to get fraud stats: ${error.message}`);
   }
 });
 
@@ -6430,8 +6189,8 @@ exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
-const SMILE_ID_API_KEY = process.env.SMILEID_API_KEY || '';
-const SMILE_ID_PARTNER_ID = process.env.SMILEID_PARTNER_ID || '8244';
+const SMILE_ID_API_KEY = functions.config().smileid?.api_key || '';
+const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
 
 /**
  * Smile ID API base URL — environment-aware.
@@ -6439,8 +6198,8 @@ const SMILE_ID_PARTNER_ID = process.env.SMILEID_PARTNER_ID || '8244';
  * Fails secure: production deployment requires explicit config.
  */
 const SMILE_ID_BASE_URL = (() => {
-  const smileEnv = process.env.SMILEID_ENVIRONMENT;
-  const appEnv = process.env.APP_ENVIRONMENT;
+  const smileEnv = functions.config().smileid?.environment;
+  const appEnv = functions.config().app?.environment;
 
   if (smileEnv === 'production') {
     return 'api.smileidentity.com';
@@ -6651,10 +6410,6 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
 
 // Check if phone verification is supported for a country
 exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
-
   const { country } = data;
   
   const supportedCountries = {
@@ -6684,110 +6439,13 @@ exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, cont
 });
 
 // ============================================================
-// TRANSFER PREVIEW (fee + conversion calculation)
-// ============================================================
-
-/**
- * Preview a transfer — returns exact fee, exchange rate, and converted amount
- * that sendMoney will use. No side effects, no balance check.
- */
-exports.previewTransfer = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
-
-  const { amount, recipientWalletId } = data;
-  const userId = context.auth.uid;
-
-  // Rate limit: 30 per minute
-  await enforceRateLimit(userId, 'previewTransfer');
-
-  requirePositiveNumber(amount, 'amount');
-
-  if (!recipientWalletId) {
-    throw new functions.https.HttpsError('invalid-argument', 'recipientWalletId is required.');
-  }
-
-  // Get sender wallet
-  const senderWalletSnapshot = await db.collection('wallets')
-    .where('userId', '==', userId).limit(1).get();
-
-  if (senderWalletSnapshot.empty) {
-    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
-  }
-
-  const senderData = senderWalletSnapshot.docs[0].data();
-  const senderCurrency = senderData.currency || 'NGN';
-
-  // Get recipient wallet
-  const recipientWalletSnapshot = await db.collection('wallets')
-    .where('walletId', '==', recipientWalletId).limit(1).get();
-
-  if (recipientWalletSnapshot.empty) {
-    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Recipient wallet not found.');
-  }
-
-  const recipientData = recipientWalletSnapshot.docs[0].data();
-  const recipientCurrency = recipientData.currency || 'NGN';
-  const isCrossCurrency = senderCurrency !== recipientCurrency;
-
-  // Calculate fee (same logic as sendMoney)
-  const feeRate = isCrossCurrency ? 0.05 : 0.025;
-  const feeMin = isCrossCurrency ? 5000 : 1000;     // minor units
-  const feeMax = isCrossCurrency ? 100000 : 50000;   // minor units
-  const fee = Math.round(Math.min(Math.max(amount * feeRate, feeMin), feeMax));
-  const totalDebit = amount + fee;
-
-  // Calculate conversion if cross-currency
-  let creditAmount = amount;
-  let exchangeRate = null;
-
-  if (isCrossCurrency) {
-    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    if (!ratesDoc.exists) {
-      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable.');
-    }
-
-    const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
-    if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
-      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated.');
-    }
-
-    const rates = ratesDoc.data().rates || {};
-    const senderRate = rates[senderCurrency];
-    const recipientRate = rates[recipientCurrency];
-
-    if (!senderRate || !recipientRate) {
-      throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Exchange rate not available for ${senderCurrency} or ${recipientCurrency}.`);
-    }
-
-    exchangeRate = recipientRate / senderRate;
-    creditAmount = Math.round(amount * exchangeRate);
-  }
-
-  return {
-    success: true,
-    senderCurrency,
-    recipientCurrency,
-    isCrossCurrency,
-    amount,          // What user sends (minor units)
-    fee,             // Exact fee (minor units)
-    totalDebit,      // amount + fee (minor units)
-    creditAmount,    // What recipient gets (minor units, after conversion)
-    exchangeRate,    // null if same currency
-    senderBalance: senderData.balance,  // Current balance (minor units)
-    sufficient: senderData.balance >= totalDebit,
-  };
-});
-
-// ============================================================
 // SEND MONEY (Wallet to Wallet Transfer)
 // ============================================================
 
 // Helper: Generate secure transaction ID
 function generateSecureTransactionId() {
   const timestamp = Date.now();
-  const random = crypto.randomBytes(4).toString('hex');
+  const random = Math.floor(Math.random() * 10000000);
   return `TXN${timestamp}${random}`;
 }
 
@@ -6847,6 +6505,28 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to make transfers.');
       }
 
+      // Calculate fee (1% with min 10, max 100)
+      const fee = Math.min(Math.max(amount * 0.01, 10), 100);
+      const totalDebit = amount + fee;
+
+      // Enforce daily/monthly spending limits
+      const DAILY_LIMIT = 50000;   // Local currency units
+      const MONTHLY_LIMIT = 500000;
+      const currentDailySpent = Number(senderData.dailySpent) || 0;
+      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
+
+      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+
+      // Check balance (safeSubtract validates the arithmetic)
+      safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
+
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
         throwAppError(ERROR_CODES.TXN_SELF_TRANSFER);
@@ -6862,15 +6542,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND);
       }
 
-      const recipientUid = recipientQuery.docs[0].id;
-      const recipientRef = db.collection('wallets').doc(recipientUid);
-      // Re-read transactionally to get consistent balance
-      const recipientDoc = await transaction.get(recipientRef);
-
-      if (!recipientDoc.exists) {
-        throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND);
-      }
-
+      const recipientDoc = recipientQuery.docs[0];
+      const recipientUid = recipientDoc.id;
+      const recipientRef = recipientDoc.ref;
       const recipientData = recipientDoc.data();
       validateWalletDocument(recipientData, 'sendMoney recipient wallet');
 
@@ -6886,76 +6560,13 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Recipient account is suspended. Transfer cannot be completed.');
       }
 
-      // Determine if this is a cross-currency transfer
-      const senderCurrency = senderData.currency || 'NGN';
-      const recipientCurrency = recipientData.currency || 'NGN';
-      const isCrossCurrency = senderCurrency !== recipientCurrency;
-
-      // Fee structure: 2.5% same-currency, 5% cross-currency (all in minor units)
-      const feeRate = isCrossCurrency ? 0.05 : 0.025;
-      const feeMin = isCrossCurrency ? 5000 : 1000;   // 50.00 / 10.00 in minor units
-      const feeMax = isCrossCurrency ? 100000 : 50000; // 1000.00 / 500.00 in minor units
-      const fee = Math.round(Math.min(Math.max(amount * feeRate, feeMin), feeMax));
-      const totalDebit = amount + fee;
-
-      // Enforce daily/monthly spending limits (in minor units)
-      const DAILY_LIMIT = 5000000;   // 50,000.00 in minor units
-      const MONTHLY_LIMIT = 50000000; // 500,000.00 in minor units
-      const currentDailySpent = Number(senderData.dailySpent) || 0;
-      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
-
-      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Daily spending limit of ${formatMinorUnits(DAILY_LIMIT)} exceeded. Current: ${formatMinorUnits(currentDailySpent)}, requested: ${formatMinorUnits(totalDebit)}`);
-      }
-      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Monthly spending limit of ${formatMinorUnits(MONTHLY_LIMIT)} exceeded. Current: ${formatMinorUnits(currentMonthlySpent)}, requested: ${formatMinorUnits(totalDebit)}`);
-      }
-
-      // Check balance and calculate new values
-      const newSenderBalance = safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
-
       // Generate transaction ID
       const txId = generateSecureTransactionId();
       const now = new Date();
 
-      // For cross-currency: convert amount using exchange rates
-      let creditAmount = amount; // Same currency — no conversion needed
-      let appliedExchangeRate = null;
-
-      // Get exchange rates (transactional read for consistency)
-      const ratesRef = db.collection('app_config').doc('exchange_rates');
-      const ratesDoc = await transaction.get(ratesRef);
-
-      if (isCrossCurrency) {
-        if (!ratesDoc.exists) {
-          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates unavailable. Cross-currency transfers are temporarily disabled.');
-        }
-        const ratesUpdatedAt = ratesDoc.data().updatedAt?.toDate?.();
-        if (!ratesUpdatedAt || (Date.now() - ratesUpdatedAt.getTime()) > 25 * 60 * 60 * 1000) {
-          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Exchange rates are outdated. Cross-currency transfers are temporarily disabled. Please try again later.');
-        }
-
-        const rates = ratesDoc.data().rates || {};
-        const senderRate = rates[senderCurrency];
-        const recipientRate = rates[recipientCurrency];
-
-        if (!senderRate || !recipientRate) {
-          throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, `Exchange rate not available for ${senderCurrency} or ${recipientCurrency}.`);
-        }
-
-        // Convert: amount in sender currency → USD → recipient currency
-        // rate is currency-per-USD, so: amountInUSD = amount / senderRate
-        // amountInRecipient = amountInUSD * recipientRate
-        appliedExchangeRate = recipientRate / senderRate;
-        creditAmount = Math.round(amount * appliedExchangeRate); // Round to integer minor units
-      }
-
-      const newRecipientBalance = safeAdd(recipientData.balance, creditAmount, 'sendMoney recipient credit');
-
+      // Deduct from sender
       transaction.update(senderWalletRef, {
-        balance: newSenderBalance,
+        balance: admin.firestore.FieldValue.increment(-totalDebit),
         dailySpent: admin.firestore.FieldValue.increment(totalDebit),
         monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
         updatedAt: timestamps.serverTimestamp()
@@ -6963,17 +6574,21 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
       // Add to recipient
       transaction.update(recipientRef, {
-        balance: newRecipientBalance,
+        balance: admin.firestore.FieldValue.increment(amount),
         updatedAt: timestamps.serverTimestamp()
       });
 
       // ============================================
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
+      const senderCurrency = senderData.currency || 'GHS';
+      
+      // Get exchange rates for USD conversion
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
       const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
-      const feeExchangeRate = rates[senderCurrency] || 1;
-      const feeInUSD = toMajorUnits(fee) / feeExchangeRate;
-
+      const exchangeRate = rates[senderCurrency] || 1;
+      const feeInUSD = fee / exchangeRate;
+      
       // Update platform wallet USD balance
       const platformWalletRef = db.collection('wallets').doc('platform');
       transaction.update(platformWalletRef, {
@@ -6982,7 +6597,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         totalFeesCollected: admin.firestore.FieldValue.increment(1),
         updatedAt: timestamps.serverTimestamp()
       });
-
+      
       // Update currency-specific balance
       const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
       transaction.set(currencyBalanceRef, {
@@ -6993,7 +6608,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         lastTransactionAt: timestamps.serverTimestamp(),
         updatedAt: timestamps.serverTimestamp()
       }, { merge: true });
-
+      
       // Record fee in history
       const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
       transaction.set(feeRecordRef, {
@@ -7001,7 +6616,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         originalAmount: fee,
         currency: senderCurrency,
         usdAmount: feeInUSD,
-        exchangeRate: feeExchangeRate,
+        exchangeRate: exchangeRate,
         senderUid: senderUid,
         senderName: senderName,
         transferAmount: amount,
@@ -7017,16 +6632,16 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         receiverName: recipientName,
         amount: amount,
         fee: fee,
-        currency: senderCurrency,
-        senderCurrency: senderCurrency,
-        receiverCurrency: recipientCurrency,
+        currency: senderData.currency || 'GHS',
+        senderCurrency: senderData.currency || 'GHS',
+        receiverCurrency: recipientData.currency || 'GHS',
         note: note || '',
         status: 'completed',
         createdAt: timestamps.serverTimestamp(),
         completedAt: timestamps.serverTimestamp(),
         reference: `TXN-${now.getTime()}`,
-        exchangeRate: appliedExchangeRate,
-        convertedAmount: isCrossCurrency ? creditAmount : null,
+        exchangeRate: null,
+        convertedAmount: null,
         failureReason: null,
       };
 
@@ -7049,11 +6664,9 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         recipientName: recipientName,
         senderName: senderName,
         recipientUid: recipientUid,
-        senderCurrency: senderCurrency,
-        recipientCurrency: recipientCurrency,
-        exchangeRate: appliedExchangeRate,
-        convertedAmount: isCrossCurrency ? creditAmount : null,
-        newBalance: newSenderBalance
+        senderCurrency: senderData.currency || 'GHS',
+        recipientCurrency: recipientData.currency || 'GHS',
+        newBalance: senderBalance - totalDebit
       };
     });
 
@@ -7061,7 +6674,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
     await auditLog({
       userId: senderUid, operation: 'sendMoney', result: 'success',
-      amount, currency: result.currency || 'NGN',
+      amount, currency: result.currency || 'GHS',
       metadata: { transactionId: result.transactionId, recipientWalletId, fee: result.fee, ...correlation.toAuditContext() },
       ipHash: hashIp(context),
     });
@@ -7070,13 +6683,13 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
     await Promise.all([
       sendPushNotification(senderUid, {
         title: 'Money Sent',
-        body: `You sent ${result.senderCurrency || ''}${formatMinorUnits(amount)} to ${result.recipientName || 'a wallet'}`,
+        body: `You sent ${result.senderCurrency || ''}${amount.toFixed(2)} to ${result.recipientName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_sent', amount: amount.toString(), transactionId: result.transactionId },
       }),
       sendPushNotification(result.recipientUid, {
         title: 'Money Received',
-        body: `You received ${result.recipientCurrency || ''}${formatMinorUnits(amount)} from ${result.senderName || 'a wallet'}`,
+        body: `You received ${result.recipientCurrency || ''}${amount.toFixed(2)} from ${result.senderName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
       }),
@@ -7108,22 +6721,22 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
 // MTN MoMo configuration - set via: firebase functions:config:set momo.collections_subscription_key="xxx" etc.
 // IMPORTANT: webhook_secret MUST be configured for production to verify callback authenticity
-const MOMO_WEBHOOK_SECRET = process.env.MOMO_WEBHOOK_SECRET || '';
+const MOMO_WEBHOOK_SECRET = functions.config().momo?.webhook_secret || '';
 
 const MOMO_CONFIG = {
   collections: {
-    subscriptionKey: process.env.MOMO_COLLECTIONS_SUBSCRIPTION_KEY || '',
-    apiUser: process.env.MOMO_COLLECTIONS_API_USER || '',
-    apiKey: process.env.MOMO_COLLECTIONS_API_KEY || '',
+    subscriptionKey: functions.config().momo?.collections_subscription_key || '',
+    apiUser: functions.config().momo?.collections_api_user || '',
+    apiKey: functions.config().momo?.collections_api_key || '',
   },
   disbursements: {
-    subscriptionKey: process.env.MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY || '',
-    apiUser: process.env.MOMO_DISBURSEMENTS_API_USER || '',
-    apiKey: process.env.MOMO_DISBURSEMENTS_API_KEY || '',
+    subscriptionKey: functions.config().momo?.disbursements_subscription_key || '',
+    apiUser: functions.config().momo?.disbursements_api_user || '',
+    apiKey: functions.config().momo?.disbursements_api_key || '',
   },
   environment: (() => {
-    const momoEnv = process.env.MOMO_ENVIRONMENT;
-    const appEnv = process.env.APP_ENVIRONMENT;
+    const momoEnv = functions.config().momo?.environment;
+    const appEnv = functions.config().app?.environment;
 
     if (momoEnv) {
       // Prevent sandbox in production
@@ -7143,7 +6756,9 @@ const MOMO_CONFIG = {
     logWarning('MoMo environment not set, defaulting to sandbox for development');
     return 'sandbox';
   })(),
-  callbackUrl: MOMO_WEBHOOK_SECRET ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}` : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
+  callbackUrl: MOMO_WEBHOOK_SECRET
+    ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}`
+    : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
 };
 
 // Set baseUrl based on resolved environment
@@ -7266,7 +6881,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
   // Fail fast if MoMo collections API is not configured
   requireServiceReady('momo_collections');
 
-  requirePositiveNumber(amount, 'amount');
+  if (!amount || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
+  }
   if (!phoneNumber) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
@@ -7294,7 +6911,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
     // Create request to pay
     const response = await momoRequest('collections', 'POST', '/v1_0/requesttopay', {
-      amount: toMajorUnits(amount).toString(),
+      amount: amount.toString(),
       currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payer: {
@@ -7313,7 +6930,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
         type: 'collection',
         userId: userId,
         amount: amount,
-        currency: validatedCurrency,
+        currency: currency || 'EUR',
         phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
@@ -7323,7 +6940,7 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 
       await auditLog({
         userId, operation: 'momoRequestToPay', result: 'success',
-        amount, currency: validatedCurrency,
+        amount, currency: currency || 'EUR',
         metadata: { referenceId, phoneNumber: validatedPhone, ...correlation.toAuditContext() },
         ipHash: hashIp(context),
       });
@@ -7395,38 +7012,21 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
         // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
         if (status === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
           await db.runTransaction(async (transaction) => {
-            // Re-read txDoc INSIDE the transaction to prevent double-credit
-            const freshTxDoc = await transaction.get(txRef);
-            if (!freshTxDoc.exists || normalizeStatus(freshTxDoc.data().status) === 'completed') {
-              return; // Already processed by another concurrent call
-            }
+            // Get user's wallet
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
 
-            // Check if user account is blocked before crediting
-            const userRef = db.collection('users').doc(txData.userId);
-            const userDoc = await transaction.get(userRef);
-            if (userDoc.exists && userDoc.data().accountBlocked === true) {
-              logSecurityEvent('momo_credit_blocked_user', 'high', { userId: txData.userId, referenceId });
-              transaction.update(txRef, {
-                ...buildStateTransitionFields(txData.status, 'blocked', referenceId),
-                providerStatus: status,
-                blockedReason: 'User account blocked',
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              });
-              return;
-            }
-
-            // Get user's wallet (transactional read for consistency)
-            const walletRef = db.collection('wallets').doc(txData.userId);
-            const walletDoc = await transaction.get(walletRef);
-
-            if (walletDoc.exists) {
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
               const walletData = walletDoc.data();
               validateWalletDocument(walletData, 'momoCheckStatus wallet');
 
               if (txData.type === 'collection') {
                 // Add money - credit wallet
                 const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus credit');
-                transaction.update(walletRef, {
+                transaction.update(walletDoc.ref, {
                   balance: creditBalance,
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
@@ -7470,7 +7070,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
           const checkNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
           await sendPushNotification(txData.userId, {
             title: `${checkNotifType} Successful`,
-            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has been completed`,
+            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
             type: 'transaction',
             data: { action: txData.type === 'collection' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId },
           });
@@ -7494,23 +7094,26 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
 
           // Refund wallet for failed disbursements (money was already debited)
           if (txData.type === 'disbursement') {
-            const walletRef = db.collection('wallets').doc(txData.userId);
-            await db.runTransaction(async (refundTx) => {
-              const walletDoc = await refundTx.get(walletRef);
-              if (!walletDoc.exists) return;
+            const walletSnapshot = await db.collection('wallets')
+              .where('userId', '==', txData.userId)
+              .limit(1)
+              .get();
+
+            if (!walletSnapshot.empty) {
+              const walletDoc = walletSnapshot.docs[0];
               const walletData = walletDoc.data();
               const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus refund');
-              refundTx.update(walletRef, {
+              await walletDoc.ref.update({
                 balance: refundBalance,
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
-            });
 
-            logInfo('Refunded wallet for failed MoMo disbursement', {
-              userId: txData.userId,
-              amount: txData.amount,
-              referenceId,
-            });
+              logInfo('Refunded wallet for failed MoMo disbursement', {
+                userId: txData.userId,
+                amount: txData.amount,
+                referenceId,
+              });
+            }
           }
         } else {
           // Other statuses (PENDING etc) - just update momo transaction
@@ -7556,7 +7159,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
   // Fail fast if MoMo disbursements API is not configured
   requireServiceReady('momo_disbursements');
 
-  requirePositiveNumber(amount, 'amount');
+  if (!amount || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID);
+  }
   if (!phoneNumber) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Phone number is required.');
   }
@@ -7617,7 +7222,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         type: 'disbursement',
         userId: userId,
         amount: amount,
-        currency: validatedCurrency,
+        currency: currency || 'EUR',
         phoneNumber: validatedPhone,
         status: TRANSACTION_STATES.PENDING,
         referenceId: referenceId,
@@ -7625,13 +7230,25 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
 
+      // Store pending withdrawal
+      transaction.set(db.collection('momo_transactions').doc(referenceId), {
+        type: 'disbursement',
+        userId: userId,
+        amount: amount,
+        currency: currency || 'EUR',
+        phoneNumber: validatedPhone,
+        status: TRANSACTION_STATES.PENDING,
+        referenceId: referenceId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
+      });
 
       // Record in user's transactions subcollection for UI display
       transaction.set(db.collection('users').doc(userId).collection('transactions').doc(referenceId), {
         id: referenceId,
         type: 'withdraw',
         amount: amount,
-        currency: validatedCurrency,
+        currency: currency || 'EUR',
         method: 'MTN MoMo',
         phoneNumber: validatedPhone,
         status: 'pending',
@@ -7642,7 +7259,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
     // Create transfer request
     const response = await momoRequest('disbursements', 'POST', '/v1_0/transfer', {
-      amount: toMajorUnits(amount).toString(),
+      amount: amount.toString(),
       currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payee: {
@@ -7666,7 +7283,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
      // Send push notification for MoMo withdrawal
       await sendPushNotification(userId, {
         title: 'Withdrawal Initiated',
-        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${formatMinorUnits(amount)} is being processed`,
+        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${amount.toFixed(2)} is being processed`,
         type: 'transaction',
         data: { action: 'withdrawal_initiated', amount: amount.toString(), referenceId },
       });
@@ -7757,7 +7374,7 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 
 exports.momoWebhook = functions.https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
-    `webhook_momo_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    `webhook_momo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   logSecurityEvent('momo_webhook_received', 'low', { correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status });
 
   // ── LAYER 1: HTTP Method Restriction ──
@@ -7848,22 +7465,19 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
     // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
     if (effectiveStatus === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
       await db.runTransaction(async (transaction) => {
-        // Re-read txDoc inside transaction to prevent double-credit race
-        const freshTxDoc = await transaction.get(txRef);
-        if (!freshTxDoc.exists || normalizeStatus(freshTxDoc.data().status) === 'completed') {
-          return; // Already processed by another concurrent call
-        }
+        const walletSnapshot = await db.collection('wallets')
+          .where('userId', '==', txData.userId)
+          .limit(1)
+          .get();
 
-        const walletRef = db.collection('wallets').doc(txData.userId);
-        const walletDoc = await transaction.get(walletRef);
-
-        if (walletDoc.exists) {
+        if (!walletSnapshot.empty) {
+          const walletDoc = walletSnapshot.docs[0];
           const walletData = walletDoc.data();
           validateWalletDocument(walletData, 'momoWebhook SUCCESSFUL wallet');
 
           if (txData.type === 'collection') {
             const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook collection credit');
-            transaction.update(walletRef, {
+            transaction.update(walletDoc.ref, {
               balance: creditBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -7883,36 +7497,31 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
           });
         }
 
-        // Mark momo transaction as completed (inside transaction for atomicity)
-        transaction.update(txRef, {
-          ...buildStateTransitionFields(freshTxDoc.data().status, 'completed', externalId),
-          providerStatus: effectiveStatus,
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-
-      // Send push notification for completed MoMo transaction (outside transaction)
+      // Send push notification for completed MoMo transaction
       const momoNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
       await sendPushNotification(txData.userId, {
         title: `${momoNotifType} Successful`,
-        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount != null ? formatMinorUnits(txData.amount) : '0.00'} has been completed`,
+        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
         type: 'transaction',
         data: { action: momoNotifType === 'Deposit' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId: externalId },
+      });
       });
     } else if (effectiveStatus === 'FAILED') {
       // Refund if disbursement failed
       if (txData.type === 'disbursement') {
         await db.runTransaction(async (transaction) => {
-          const walletRef = db.collection('wallets').doc(txData.userId);
-          const walletDoc = await transaction.get(walletRef);
+          const walletSnapshot = await db.collection('wallets')
+            .where('userId', '==', txData.userId)
+            .limit(1)
+            .get();
 
-          if (walletDoc.exists) {
+          if (!walletSnapshot.empty) {
+            const walletDoc = walletSnapshot.docs[0];
             const walletData = walletDoc.data();
             validateWalletDocument(walletData, 'momoWebhook FAILED refund wallet');
             const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook disbursement refund');
 
-            transaction.update(walletRef, {
+            transaction.update(walletDoc.ref, {
               balance: refundBalance,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
@@ -7959,34 +7568,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
 
   try {
     const data = req.body;
-
-    // Verify webhook signature to confirm request is from SmileID
-    const receivedSignature = data.signature;
-    const receivedTimestamp = data.timestamp;
-
-    if (!receivedSignature || !receivedTimestamp) {
-      logSecurityEvent('smileid_webhook_no_signature', 'high', { ip: req.ip });
-      res.status(401).send('Missing signature');
-      return;
-    }
-
-    // SmileID signature: HMAC-SHA256(apiKey, timestamp + partnerID + "sid_request")
-    const expectedData = receivedTimestamp + SMILE_ID_PARTNER_ID + 'sid_request';
-    const expectedSignature = crypto
-      .createHmac('sha256', SMILE_ID_API_KEY)
-      .update(expectedData)
-      .digest('base64');
-
-    if (!timingSafeCompare(receivedSignature, expectedSignature, 'base64')) {
-      logSecurityEvent('smileid_webhook_invalid_signature', 'critical', {
-        ip: req.ip,
-        receivedTimestamp,
-      });
-      res.status(401).send('Invalid signature');
-      return;
-    }
-
-    logInfo('Smile ID webhook received (signature verified)', {
+    logInfo('Smile ID webhook received', {
       jobId: data.job_id,
       jobType: data.job_type,
       resultCode: data.result_code,
@@ -8038,9 +7620,6 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
         .collection('users')
         .doc(userId)
         .update({
-          kycStatus: 'verified',
-          kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          kycCompleted: true,
           kycVerified: true,
           isVerified: true,
           'kycDetails.smileIdConfirmed': true,
@@ -8048,7 +7627,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
           'kycDetails.smileIdJobId': smileJobId,
           'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
         });
-      logInfo('Smile ID webhook: user verified (kycStatus set)', { userId, resultCode });
+      logInfo('Smile ID webhook: user verified', { userId, resultCode });
     } else {
       logInfo('Smile ID webhook: verification not passed', { userId, resultCode, resultText });
     }

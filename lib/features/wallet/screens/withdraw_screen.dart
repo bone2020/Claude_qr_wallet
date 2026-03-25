@@ -85,11 +85,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
       final banks = await _paymentService.getBanks(country: country);
       if (mounted) {
-        setState(() {
-          _banks = [
-            Bank(name: 'Test Bank (Development)', code: '001', type: 'nuban'),
-            ...banks,
-          ];
+ setState(() {
+          _banks = banks;
           _isLoadingBanks = false;
         });
       }
