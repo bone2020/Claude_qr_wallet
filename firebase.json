@@ -40,8 +40,9 @@
       }
     }
   },
-  "hosting": {
+    "hosting": {
     "public": "admin-dashboard/dist",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",
