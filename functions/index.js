@@ -2265,6 +2265,7 @@ const RATE_LIMITS = {
   lookupWallet:       { windowMs: 5 * 60 * 1000,  maxRequests: 30, message: 'Too many wallet lookups. Please wait a few minutes.' },
   exportUserData:     { windowMs: 24 * 60 * 60 * 1000, maxRequests: 2, message: 'Data export limit reached. You may export your data twice per day.' },
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
+  resetPin:           { windowMs: 60 * 60 * 1000, maxRequests: 3,  message: 'Too many PIN reset attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 1000, maxRequests: 30, message: 'Too many preview requests.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
@@ -4097,6 +4098,98 @@ return {
 
 // ============================================================
 // ACCOUNT BLOCKING
+/**
+ * Reset PIN (forgot PIN flow).
+ * Requires recent re-authentication (auth_time within 5 minutes).
+ * User must re-authenticate via email/password or phone OTP on the client,
+ * then call this function with the new PIN hash.
+ */
+exports.resetPin = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { newPinHash, method } = data;
+
+  // Validate new PIN hash (SHA-256 hex = 64 chars)
+  if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
+  }
+
+  // Validate method
+  if (!method || !['email', 'phone'].includes(method)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid reset method.');
+  }
+
+  // Rate limit PIN resets (stricter than changes)
+  await enforceRateLimit(userId, 'resetPin');
+
+  // Verify recent re-authentication: auth_time must be within 5 minutes
+  const authTime = context.auth.token.auth_time;
+  const now = Math.floor(Date.now() / 1000);
+  const fiveMinutes = 5 * 60;
+
+  if (!authTime || (now - authTime) > fiveMinutes) {
+    throwAppError(
+      ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      'Session expired. Please re-authenticate and try again.'
+    );
+  }
+
+  // Get user document
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
+  }
+
+  const userData = userDoc.data();
+
+  // User must have a PIN set to reset it
+  if (!userData.pinHash) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'No PIN is set on this account.');
+  }
+
+  // Generate new per-user salt
+  const newSalt = crypto.randomBytes(32).toString('hex');
+
+  // Compute HMAC hash
+  const serverHash = hashPinServer(newPinHash, newSalt);
+
+  // Prevent setting the same PIN
+  if (timingSafeCompare(userData.pinHash, serverHash)) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'New PIN must be different from your previous PIN.');
+  }
+
+  // Update PIN hash and salt
+  await db.collection('users').doc(userId).update({
+    pinHash: serverHash,
+    pinSalt: newSalt,
+    pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
+    pinResetAt: admin.firestore.FieldValue.serverTimestamp(),
+    pinResetMethod: method,
+  });
+
+  // Audit log
+  await auditLog({
+    userId,
+    operation: 'resetPin',
+    result: 'success',
+    metadata: { method },
+    ipHash: hashIp(context),
+  });
+
+  // Security notification
+  await sendPushNotification(userId, {
+    title: 'PIN Reset',
+    body: 'Your transaction PIN has been reset. If you did not make this change, block your account immediately from your profile.',
+    type: 'security',
+    data: { action: 'pin_reset', method },
+  }).catch(() => {});
+
+  return { success: true, message: 'PIN reset successfully.' };
+});
+
 // ============================================================
 /**
  * Block user's account - prevents all financial operations.

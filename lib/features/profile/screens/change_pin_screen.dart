@@ -11,6 +11,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:pinput/pinput.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/services/secure_storage_service.dart';
 
 class ChangePinScreen extends ConsumerStatefulWidget {
@@ -333,6 +334,19 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
               ],
 
               const Spacer(),
+
+              // Forgot PIN link (only shown at step 0)
+              if (_currentStep == 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
+                  child: TextButton(
+                    onPressed: () => context.push(AppRoutes.resetPin),
+                    child: Text(
+                      'Forgot your PIN?',
+                      style: AppTextStyles.bodyMedium(color: AppColors.primary),
+                    ),
+                  ),
+                ),
 
               // Security note
               Container(
