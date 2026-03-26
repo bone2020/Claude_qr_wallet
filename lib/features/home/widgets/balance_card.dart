@@ -91,13 +91,13 @@ class BalanceCard extends StatelessWidget {
                     child: Row(
                       children: [
                        Text(
-                          walletId,
-                          style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
+                        walletId,
+                          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                         ),
                         const SizedBox(width: 6),
                         Icon(
                           Iconsax.copy,
-                          size: 14,
+                          size: 16,
                           color: AppColors.textSecondaryDark,
                         ),
                       ],
