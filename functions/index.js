@@ -6408,6 +6408,10 @@ exports.previewTransfer = functions.https.onCall(async (data, context) => {
   }
 
   const senderUid = context.auth.uid;
+
+  // Rate limit preview requests
+  await enforceRateLimit(senderUid, 'previewTransfer');
+
   const { amount, recipientWalletId } = data;
 
   if (!amount || typeof amount !== 'number' || amount <= 0) {
@@ -6420,17 +6424,17 @@ exports.previewTransfer = functions.https.onCall(async (data, context) => {
 
   try {
     // Get sender wallet
-    const senderWallet = await db.collection('wallets').doc(senderUid).get();
+    const senderWalletDoc = await db.collection('wallets').doc(senderUid).get();
 
-    if (!senderWallet.exists) {
+    if (!senderWalletDoc.exists) {
       throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
     }
 
-    const senderData = senderWallet.data();
-    const senderBalance = senderData.balance || 0;
+    const senderData = senderWalletDoc.data();
+    const senderBalance = Number(senderData.balance) || 0;
     const senderCurrency = senderData.currency || 'GHS';
 
-    // Find recipient
+    // Find recipient by walletId field
     const recipientQuery = await db.collection('wallets')
       .where('walletId', '==', recipientWalletId)
       .limit(1)
@@ -6460,7 +6464,7 @@ exports.previewTransfer = functions.https.onCall(async (data, context) => {
       const senderRate = rates[senderCurrency] || 1;
       const recipientRate = rates[recipientCurrency] || 1;
 
-      // Convert: sender currency → USD → recipient currency
+      // Convert: sender currency -> USD -> recipient currency
       exchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
       creditAmount = Math.round(amount * exchangeRate);
     }
@@ -6477,7 +6481,7 @@ exports.previewTransfer = functions.https.onCall(async (data, context) => {
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
-    logError('Preview transfer error', { error: error.message });
+    logError('Preview transfer error', { error: error.message, senderUid });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Could not preview transfer. Please try again.');
   }
 });
