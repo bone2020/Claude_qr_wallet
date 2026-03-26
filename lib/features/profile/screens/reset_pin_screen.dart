@@ -12,6 +12,7 @@ import 'package:pinput/pinput.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/services/secure_storage_service.dart';
 import '../../../core/utils/error_handler.dart';
+import '../../../providers/auth_provider.dart'; 
 
 class ResetPinScreen extends ConsumerStatefulWidget {
   const ResetPinScreen({super.key});
@@ -86,11 +87,15 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Future<void> _sendPhoneOtp() async {
-    final user = FirebaseAuth.instance.currentUser;
+  final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final phoneNumber = user.phoneNumber;
-    if (phoneNumber == null || phoneNumber.isEmpty) {
+    // Check Firebase Auth phone first, fall back to Firestore phone from sign-up
+    final authPhone = user.phoneNumber;
+    final firestorePhone = ref.read(currentUserProvider)?.phoneNumber;
+    final phoneNumber = (authPhone != null && authPhone.isNotEmpty) ? authPhone : firestorePhone;
+    if (phoneNumber == null || phoneNumber.isEmpty) { 
+
       setState(() => _errorMessage = 'No phone number linked to your account. Please use email verification.');
       return;
     }
@@ -255,7 +260,9 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
 
   Widget _buildMethodSelection() {
     final user = FirebaseAuth.instance.currentUser;
-    final hasPhone = user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty;
+    final firestorePhone = ref.read(currentUserProvider)?.phoneNumber;
+    final hasPhone = (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) ||
+        (firestorePhone != null && firestorePhone.isNotEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,8 +390,9 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Widget _buildPhoneVerification() {
-    final user = FirebaseAuth.instance.currentUser;
-    final phone = user?.phoneNumber ?? '';
+final user = FirebaseAuth.instance.currentUser;
+    final firestorePhone = ref.read(currentUserProvider)?.phoneNumber ?? '';
+    final phone = (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) ? user.phoneNumber! : firestorePhone;
     final maskedPhone = phone.length > 4 ? '${'*' * (phone.length - 4)}${phone.substring(phone.length - 4)}' : phone;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
