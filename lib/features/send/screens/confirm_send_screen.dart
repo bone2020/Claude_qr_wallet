@@ -62,6 +62,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _previewLoading = false;
   String? _previewError;
 
+   /// Format exchange rate with enough decimal places to be meaningful
+  String _formatRate(double rate) {
+    if (rate == 0) return '0.00';
+    if (rate >= 1) return rate.toStringAsFixed(2);
+    if (rate >= 0.01) return rate.toStringAsFixed(4);
+    return rate.toStringAsFixed(6);
+  }
+
   // Display values from server preview (fall back to estimate if not loaded)
   double get _feeMajor => _serverFee != null ? _serverFee! / 100.0 : (_amountMajor * 0.025).clamp(10, 500);
   double get _totalMajor => _serverTotalDebit != null ? _serverTotalDebit! / 100.0 : _amountMajor + _feeMajor;
@@ -785,7 +793,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             ),
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-              '1 ${widget.recipientCurrency} = ${reverseRate.toStringAsFixed(2)} $_currencyCode',
+               '1 ${widget.recipientCurrency} = ${_formatRate(reverseRate)} $_currencyCode',
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
             ),
           ],
@@ -819,7 +827,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            '1 $_currencyCode = ${rate.toStringAsFixed(2)} ${widget.recipientCurrency}',
+           '1 $_currencyCode = ${_formatRate(rate)} ${widget.recipientCurrency}',
             style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
           ),
         ],
