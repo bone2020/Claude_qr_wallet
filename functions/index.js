@@ -6581,8 +6581,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       }
 
       // Enforce daily/monthly spending limits
-      const DAILY_LIMIT = 50000;
-      const MONTHLY_LIMIT = 500000;
+      const DAILY_LIMIT = 5000000;   // 50,000 major units in minor units
+      const MONTHLY_LIMIT = 50000000; 
       const currentDailySpent = Number(senderData.dailySpent) || 0;
       const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
 
