@@ -6595,6 +6595,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
           `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
       }
 
+      // Fetch exchange rates (needed for currency conversion and fee collection)
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+
       // Get user names
       // senderUserDoc already fetched above for block check
       const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
@@ -6619,9 +6623,20 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         updatedAt: timestamps.serverTimestamp()
       });
 
-      // Add to recipient
+      // Convert amount if cross-country transfer
+      let creditAmount = amount; // Default: same currency, no conversion
+      let txExchangeRate = null;
+
+      if (isCrossCountry) {
+        const senderRate = rates[senderCurrency] || 1;
+        const recipientRate = rates[recipientCurrency] || 1;
+        txExchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+        creditAmount = Math.round(amount * txExchangeRate);
+      }
+
+      // Add converted amount to recipient
       transaction.update(recipientRef, {
-        balance: admin.firestore.FieldValue.increment(amount),
+        balance: admin.firestore.FieldValue.increment(creditAmount),
         updatedAt: timestamps.serverTimestamp()
       });
 
@@ -6629,10 +6644,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
       // senderCurrency already declared above
-
-      // Get exchange rates for USD conversion
-      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+      // rates already fetched above for currency conversion
       const exchangeRate = rates[senderCurrency] || 1;
       const feeInUSD = fee / exchangeRate;
       
@@ -6687,8 +6699,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         createdAt: timestamps.serverTimestamp(),
         completedAt: timestamps.serverTimestamp(),
         reference: `TXN-${now.getTime()}`,
-        exchangeRate: null,
-        convertedAmount: null,
+        exchangeRate: txExchangeRate,
+        convertedAmount: isCrossCountry ? creditAmount : null,
         failureReason: null,
       };
 
@@ -6698,21 +6710,29 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         { ...baseTxData, type: 'send' }
       );
 
-      // Recipient transaction record
+      // Recipient transaction record (amount in recipient's currency)
       transaction.set(
         db.collection('users').doc(recipientUid).collection('transactions').doc(txId),
-        { ...baseTxData, type: 'receive', fee: 0 }
+        {
+          ...baseTxData,
+          type: 'receive',
+          fee: 0,
+          amount: creditAmount,
+          currency: recipientCurrency,
+        }
       );
 
       return {
         transactionId: txId,
         amount: amount,
         fee: fee,
+        creditAmount: creditAmount,
+        exchangeRate: txExchangeRate,
         recipientName: recipientName,
         senderName: senderName,
         recipientUid: recipientUid,
-        senderCurrency: senderData.currency || 'GHS',
-        recipientCurrency: recipientData.currency || 'GHS',
+        senderCurrency: senderCurrency,
+        recipientCurrency: recipientCurrency,
         newBalance: senderBalance - totalDebit
       };
     });
