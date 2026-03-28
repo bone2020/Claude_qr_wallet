@@ -2718,6 +2718,16 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
     };
   }
 
+  // If already pending_review, return current status (idempotent)
+  if (userData.kycStatus === 'pending_review') {
+    logInfo('User KYC already pending review', { userId });
+    return {
+      success: true,
+      kycStatus: 'pending_review',
+      message: 'Verification pending review',
+    };
+  }
+
   // Check if KYC documents exist
   const kycDocRef = userRef.collection('kyc').doc('documents');
   const kycDoc = await kycDocRef.get();
@@ -2728,56 +2738,29 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
 
   const kycData = kycDoc.data();
 
-  // Validate KYC document status - accept verified, approved, or smileIdVerified
-  const validStatuses = ['verified', 'approved'];
-  const isValidStatus = validStatuses.includes(kycData.status) || kycData.smileIdVerified === true;
+  // SmileID verified documents go to pending_review (webhook will finalize)
+  // Non-SmileID documents also go to pending_review for manual review
+  const isSmileIdVerified = kycData.smileIdVerified === true;
+  const validStatuses = ['verified', 'approved', 'pending_review'];
+  const isValidStatus = validStatuses.includes(kycData.status) || isSmileIdVerified;
 
   if (!isValidStatus) {
     logInfo('KYC documents not yet verified', { userId, status: kycData.status, smileIdVerified: kycData.smileIdVerified });
     throwAppError(ERROR_CODES.KYC_INCOMPLETE, 'KYC documents have not been verified yet.');
   }
 
-  // Set kycStatus using Admin SDK (bypasses Firestore rules)
+  // Set kycStatus to pending_review — webhook or admin will promote to 'verified'
   await userRef.update({
-    kycStatus: 'verified',
+    kycStatus: 'pending_review',
     kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
     kycCompleted: true,
-    kycVerified: true,
   });
 
-  // Create wallet if it doesn't exist yet
-  const walletDoc = await db.collection('wallets').doc(userId).get();
-  if (!walletDoc.exists) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
-
-    await db.collection('wallets').doc(userId).set({
-      id: userId,
-      userId: userId,
-      walletId: walletId,
-      currency: userData.currency || 'GHS',
-      balance: 0,
-      isActive: true,
-      dailySpent: 0,
-      monthlySpent: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await userRef.update({
-      walletId: walletId,
-      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    logInfo('Wallet created during KYC completion', { userId, walletId });
-  }
-
-  logInfo('KYC verification completed successfully', { userId });
+  logInfo('KYC set to pending_review, awaiting webhook/admin verification', { userId });
 
   return {
     success: true,
-    kycStatus: 'verified',
+    kycStatus: 'pending_review',
   };
 });
 
@@ -7743,6 +7726,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
     const resultCode = data.result_code;
     const resultText = data.result_text;
     const smileJobId = data.smile_job_id;
+    const actions = data.actions || {};
 
     if (!userId || !jobId) {
       logError('Smile ID webhook: missing userId or jobId', { data });
@@ -7750,7 +7734,36 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    // Store full result in Firestore
+    // Extract face-matching and liveness results
+    const livenessResult = actions.Liveness || 'Not Available';
+    const selfieCheck = actions.Selfie_Check || 'Not Available';
+    const documentCheck = actions.Document_Verification || 'Not Available';
+    const humanReview = actions.Human_Review_Compare || 'Not Available';
+    const antiSpoofing = actions.Anti_Spoofing || 'Not Available';
+    const confidenceValue = data.confidence_value || null;
+
+    // Determine if face matching passed
+    // Must have liveness pass AND (selfie match OR human review pass)
+    const livenessPass = livenessResult === 'Pass' || livenessResult === 'Passed';
+    const selfiePass = selfieCheck === 'Pass' || selfieCheck === 'Passed';
+    const humanReviewPass = humanReview === 'Pass' || humanReview === 'Passed';
+    const documentPass = documentCheck === 'Pass' || documentCheck === 'Passed' || documentCheck === 'Not Applicable';
+    const faceMatchPassed = livenessPass && (selfiePass || humanReviewPass);
+
+    // Extract legal name from ID document results if available
+    let legalName = null;
+    const idInfo = data.id_info || data.result || {};
+    const fullName = idInfo.FullName || idInfo.full_name;
+    const firstName = idInfo.FirstName || idInfo.first_name || idInfo.given_names;
+    const lastName = idInfo.LastName || idInfo.last_name || idInfo.surname;
+
+    if (fullName) {
+      legalName = fullName;
+    } else if (firstName || lastName) {
+      legalName = [firstName, lastName].filter(Boolean).join(' ');
+    }
+
+    // Store full result in Firestore (always, regardless of pass/fail)
     await admin.firestore()
       .collection('users')
       .doc(userId)
@@ -7765,34 +7778,107 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
           resultCode,
           resultText,
           jobType: data.job_type,
-          actions: data.actions || {},
-          confidence: data.confidence_value || null,
-          livenessScore: data.actions?.Liveness || null,
-          documentCheck: data.actions?.Document_Verification || null,
-          humanReview: data.actions?.Human_Review_Compare || null,
-          selfieMatch: data.actions?.Selfie_Check || null,
-          antifraud: data.actions?.Anti_Spoofing || null,
+          actions,
+          confidence: confidenceValue,
+          livenessScore: livenessResult,
+          documentCheck,
+          humanReview,
+          selfieMatch: selfieCheck,
+          antifraud: antiSpoofing,
+          faceMatchPassed,
+          legalName,
           fullResult: data,
           receivedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
       }, { merge: true });
 
-    // If verification passed, update user's KYC status
-    if (resultCode === '0220' || resultCode === '0120') {
+    // Verification passed: face match + valid result code
+    const validResultCode = resultCode === '0220' || resultCode === '0120';
+
+    if (validResultCode && faceMatchPassed) {
+      // Full pass — set kycStatus to 'verified', create wallet
+      const userRef = admin.firestore().collection('users').doc(userId);
+      const userDoc = await userRef.get();
+      const userData = userDoc.exists ? userDoc.data() : {};
+
+      const updateData = {
+        kycStatus: 'verified',
+        kycVerified: true,
+        isVerified: true,
+        kycCompleted: true,
+        kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        'kycDetails.smileIdConfirmed': true,
+        'kycDetails.smileIdResultCode': resultCode,
+        'kycDetails.smileIdJobId': smileJobId,
+        'kycDetails.faceMatchPassed': true,
+        'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      // Store legal name if extracted
+      if (legalName) {
+        updateData.legalName = legalName;
+      }
+
+      await userRef.update(updateData);
+
+      // Create wallet if it doesn't exist
+      const walletDoc = await admin.firestore().collection('wallets').doc(userId).get();
+      if (!walletDoc.exists) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+
+        await admin.firestore().collection('wallets').doc(userId).set({
+          id: userId,
+          userId: userId,
+          walletId: walletId,
+          currency: userData.currency || 'GHS',
+          balance: 0,
+          isActive: true,
+          dailySpent: 0,
+          monthlySpent: 0,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await userRef.update({
+          walletId: walletId,
+          walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        logInfo('Wallet created via SmileID webhook', { userId, walletId });
+      }
+
+      logInfo('Smile ID webhook: user VERIFIED (face match passed)', { userId, resultCode, faceMatchPassed });
+    } else if (validResultCode && !faceMatchPassed) {
+      // Document verified but face match failed — mark as failed
       await admin.firestore()
         .collection('users')
         .doc(userId)
         .update({
-          kycVerified: true,
-          isVerified: true,
-          'kycDetails.smileIdConfirmed': true,
+          kycStatus: 'failed',
+          kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
           'kycDetails.smileIdResultCode': resultCode,
           'kycDetails.smileIdJobId': smileJobId,
-          'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
+          'kycDetails.faceMatchPassed': false,
+          'kycDetails.failureReason': 'Face matching failed',
+          'kycDetails.failedAt': admin.firestore.FieldValue.serverTimestamp(),
         });
-      logInfo('Smile ID webhook: user verified', { userId, resultCode });
+      logInfo('Smile ID webhook: FAILED (face match failed)', { userId, resultCode, actions });
     } else {
-      logInfo('Smile ID webhook: verification not passed', { userId, resultCode, resultText });
+      // Non-passing result code
+      await admin.firestore()
+        .collection('users')
+        .doc(userId)
+        .update({
+          kycStatus: 'failed',
+          kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          'kycDetails.smileIdResultCode': resultCode,
+          'kycDetails.smileIdJobId': smileJobId,
+          'kycDetails.failureReason': resultText || 'Verification not passed',
+          'kycDetails.failedAt': admin.firestore.FieldValue.serverTimestamp(),
+        });
+      logInfo('Smile ID webhook: FAILED (result code not passing)', { userId, resultCode, resultText });
     }
 
     res.status(200).send('OK');

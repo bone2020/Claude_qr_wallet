@@ -22,6 +22,7 @@ import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
 import '../../features/auth/screens/kyc/uganda_nin_verification_screen.dart';
 import '../../features/auth/screens/app_lock_screen.dart';
 import '../../features/auth/screens/kyc/phone_verification_screen.dart';
+import '../../features/auth/screens/kyc/verification_pending_screen.dart';
 
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/home/screens/main_navigation_screen.dart';
@@ -91,6 +92,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String appLock = '/app-lock';
   static const String resetPin = '/reset-pin';
+  static const String verificationPending = '/verification-pending';
 }
 
 /// Global navigator key for accessing navigation outside of widget tree
@@ -131,6 +133,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.kycSsnit,
         AppRoutes.kycUgandaNin,
         AppRoutes.kycPhoneVerification,
+        AppRoutes.verificationPending,
         AppRoutes.appLock,
       };
 
@@ -146,9 +149,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               .get();
           if (userDoc.exists) {
             final data = userDoc.data()!;
-            final kycVerified = data['kycStatus'] == 'verified';
+            final kycStatus = data['kycStatus'] as String?;
 
-            if (!kycVerified) {
+            if (kycStatus == 'pending_review') {
+              return AppRoutes.verificationPending;
+            }
+
+            if (kycStatus != 'verified') {
               return AppRoutes.kyc;
             }
           }
@@ -205,9 +212,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
 
         final data = userDoc.data()!;
-        final kycVerified = data['kycStatus'] == 'verified';
+        final kycStatus = data['kycStatus'] as String?;
 
-        if (!kycVerified) {
+        // If pending_review, send to waiting screen
+        if (kycStatus == 'pending_review') {
+          return AppRoutes.verificationPending;
+        }
+
+        if (kycStatus != 'verified') {
           // Countries with Smile ID KYC configured — must complete Smile ID
           const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
           final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
@@ -431,6 +443,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             documentVerified: extras?['documentVerified'] ?? false,
           );
         },
+      ),
+
+      // Verification Pending Screen
+      GoRoute(
+        path: AppRoutes.verificationPending,
+        name: 'verificationPending',
+        builder: (context, state) => const VerificationPendingScreen(),
       ),
 
       // Main Navigation (contains bottom nav) - Protected: shows balance

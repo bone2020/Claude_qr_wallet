@@ -213,7 +213,7 @@ class UserService {
         'idType': idType,
         'dateOfBirth': dateOfBirth.toIso8601String(),
         'submittedAt': DateTime.now().toIso8601String(),
-        'status': smileIdVerified ? 'verified' : 'pending',
+        'status': 'pending_review',
         'smileIdVerified': smileIdVerified,
         if (idNumber != null) 'idNumber': idNumber,
         if (smileIdResult != null) 'smileIdResult': smileIdResult,
@@ -305,6 +305,7 @@ class UserService {
       final status = kycDoc.data()?['status'] as String?;
       switch (status) {
         case 'pending':
+        case 'pending_review':
           return KycStatus.pending;
         case 'approved':
           return KycStatus.approved;

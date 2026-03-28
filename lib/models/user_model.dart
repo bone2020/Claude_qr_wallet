@@ -53,6 +53,9 @@ class UserModel {
   @HiveField(15)
   final String? accountBlockedBy;
 
+  @HiveField(16)
+  final String? legalName;
+
   UserModel({
     required this.id,
     required this.fullName,
@@ -70,6 +73,7 @@ class UserModel {
     this.kycStatus,
     this.accountBlocked = false,
     this.accountBlockedBy,
+    this.legalName,
   });
 
   /// Create user from Firestore document
@@ -93,6 +97,7 @@ class UserModel {
       kycStatus: json['kycStatus'] as String?,
       accountBlocked: json['accountBlocked'] as bool? ?? false,
       accountBlockedBy: json['accountBlockedBy'] as String?,
+      legalName: json['legalName'] as String?,
     );
   }
 
@@ -114,6 +119,7 @@ class UserModel {
       'businessLogoUrl': businessLogoUrl,
       'accountBlocked': accountBlocked,
       'accountBlockedBy': accountBlockedBy,
+      if (legalName != null) 'legalName': legalName,
     };
     // Only include kycStatus when non-null — Firestore security rules block
     // user document creation if the kycStatus key is present (server-only field)
@@ -141,6 +147,7 @@ class UserModel {
     String? kycStatus,
     bool? accountBlocked,
     String? accountBlockedBy,
+    String? legalName,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -159,8 +166,12 @@ class UserModel {
       kycStatus: kycStatus ?? this.kycStatus,
       accountBlocked: accountBlocked ?? this.accountBlocked,
       accountBlockedBy: accountBlockedBy ?? this.accountBlockedBy,
+      legalName: legalName ?? this.legalName,
     );
   }
+
+  /// Get display name — prefers legalName over fullName
+  String get displayName => legalName ?? fullName;
 
   /// Get display name (first name)
   String get firstName {

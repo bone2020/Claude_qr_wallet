@@ -13,10 +13,7 @@ import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/currency_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
-import '../../../../providers/wallet_provider.dart';
-import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
 
 class NinVerificationScreen extends ConsumerStatefulWidget {
@@ -160,16 +157,13 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           ref.read(authNotifierProvider.notifier).updateUser(result.user!);
         }
 
-        // Create wallet (server sets kycStatus: 'verified')
-        final createWallet = FirebaseFunctions.instance.httpsCallable('createWalletForUser');
-        await createWallet.call();
+        // Set kycStatus to pending_review (webhook will finalize to verified)
+        final completeKyc = FirebaseFunctions.instance.httpsCallable('completeKycVerification');
+        await completeKyc.call();
 
-       // Refresh wallet and currency after verification
-        await ref.read(walletNotifierProvider.notifier).refreshWallet();
-        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
         await PushNotificationService().saveTokenToFirestore();
         if (!mounted) return;
-        context.go(AppRoutes.main); 
+        context.go(AppRoutes.verificationPending);
       } else {
         _showError(result.error ?? 'Failed to complete verification');
       }
