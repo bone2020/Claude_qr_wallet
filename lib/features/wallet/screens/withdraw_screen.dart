@@ -152,8 +152,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     }
     // Remove any non-digit characters for validation
     final digitsOnly = value.replaceAll(RegExp(r'[^\d+]'), '');
-    if (digitsOnly.length < 10) {
-      return 'Please enter a valid phone number (at least 10 digits)';
+    if (digitsOnly.length < 7) {
+      return 'Please enter a valid phone number';
     }
     if (digitsOnly.length > 15) {
       return 'Phone number is too long';

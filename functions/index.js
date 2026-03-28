@@ -2216,7 +2216,7 @@ const RATE_LIMITS = {
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
   resetPin:           { windowMs: 60 * 60 * 1000, maxRequests: 3,  message: 'Too many PIN reset attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
-  previewTransfer:    { windowMs: 60 * 1000, maxRequests: 30, message: 'Too many preview requests.' },
+  previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
   initializeTransaction: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many payment initializations. Please try again later.' },
@@ -6449,6 +6449,139 @@ function generateSecureTransactionId() {
   return `TXN${timestamp}${random}`;
 }
 
+// ============================================================
+// FEE CALCULATION (Tiered structure)
+// ============================================================
+
+/**
+ * Calculate transaction fee using a tiered sliding scale.
+ * Smaller amounts pay a higher percentage, larger amounts pay less.
+ * This keeps daily small transactions affordable while generating
+ * fair revenue on larger transfers.
+ *
+ * Same Country Tiers:
+ *   0 - 500 major units:     1.5%   (min fee: 50 minor units / 0.50 major)
+ *   501 - 5,000:             1.0%
+ *   5,001 - 50,000:          0.75%
+ *   50,001+:                 0.5%
+ *
+ * Cross Country Tiers:
+ *   0 - 500 major units:     3.0%   (min fee: 100 minor units / 1.00 major)
+ *   501 - 5,000:             2.0%
+ *   5,001 - 50,000:          1.5%
+ *   50,001+:                 1.0%
+ *
+ * @param {number} amount - Amount in minor units (e.g. 150000 = 1500.00 major)
+ * @param {boolean} isCrossCountry - true if sender and recipient have different currencies
+ * @returns {number} Fee in minor units (integer)
+ */
+function calculateFee(amount, isCrossCountry) {
+  const majorAmount = amount / 100;
+  let rate;
+
+  if (isCrossCountry) {
+    if (majorAmount <= 500) rate = 0.03;
+    else if (majorAmount <= 5000) rate = 0.02;
+    else if (majorAmount <= 50000) rate = 0.015;
+    else rate = 0.01;
+    return Math.round(Math.max(amount * rate, 100)); // min 100 minor units (1.00 major)
+  } else {
+    if (majorAmount <= 500) rate = 0.015;
+    else if (majorAmount <= 5000) rate = 0.01;
+    else if (majorAmount <= 50000) rate = 0.0075;
+    else rate = 0.005;
+    return Math.round(Math.max(amount * rate, 50)); // min 50 minor units (0.50 major)
+  }
+}
+
+// ============================================================
+// PREVIEW TRANSFER (Get exact fee before sending)
+// ============================================================
+
+exports.previewTransfer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const senderUid = context.auth.uid;
+
+  // Rate limit preview requests
+  await enforceRateLimit(senderUid, 'previewTransfer');
+
+  const { amount, recipientWalletId } = data;
+
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'Amount must be positive.');
+  }
+
+  if (!recipientWalletId || typeof recipientWalletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Recipient wallet ID is required.');
+  }
+
+  try {
+    // Get sender wallet
+    const senderWalletDoc = await db.collection('wallets').doc(senderUid).get();
+
+    if (!senderWalletDoc.exists) {
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
+    }
+
+    const senderData = senderWalletDoc.data();
+    const senderBalance = Number(senderData.balance) || 0;
+    const senderCurrency = senderData.currency || 'GHS';
+
+    // Find recipient by walletId field
+    const recipientQuery = await db.collection('wallets')
+      .where('walletId', '==', recipientWalletId)
+      .limit(1)
+      .get();
+
+    if (recipientQuery.empty) {
+      throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND, 'Recipient not found.');
+    }
+
+    const recipientData = recipientQuery.docs[0].data();
+    const recipientCurrency = recipientData.currency || 'GHS';
+
+    // Calculate fee using tiered structure
+    const isCrossCountry = senderCurrency !== recipientCurrency;
+    const fee = calculateFee(amount, isCrossCountry);
+    const totalDebit = amount + fee;
+    const sufficient = senderBalance >= totalDebit;
+
+    // Cross-currency conversion if needed
+    let creditAmount = amount;
+    let exchangeRate = null;
+
+    if (isCrossCountry) {
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+
+      const senderRate = rates[senderCurrency] || 1;
+      const recipientRate = rates[recipientCurrency] || 1;
+
+      // Convert: sender currency -> USD -> recipient currency
+      exchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+      creditAmount = Math.round(amount * exchangeRate);
+    }
+
+    return {
+      fee: fee,
+      totalDebit: totalDebit,
+      creditAmount: creditAmount,
+      exchangeRate: exchangeRate,
+      sufficient: sufficient,
+      senderCurrency: senderCurrency,
+      recipientCurrency: recipientCurrency,
+      isCrossCountry: isCrossCountry,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('Preview transfer error', { error: error.message, senderUid });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Could not preview transfer. Please try again.');
+  }
+});
+
 exports.sendMoney = functions.https.onCall(async (data, context) => {
   // 1. Check authentication
   if (!context.auth) {
@@ -6505,27 +6638,10 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Your account is blocked. Please unblock it from your profile to make transfers.');
       }
 
-      // Calculate fee (1% with min 10, max 100)
-      const fee = Math.min(Math.max(amount * 0.01, 10), 100);
-      const totalDebit = amount + fee;
+      // Fee is calculated after recipient lookup (needs recipient currency)
+      let fee, totalDebit;
 
-      // Enforce daily/monthly spending limits
-      const DAILY_LIMIT = 50000;   // Local currency units
-      const MONTHLY_LIMIT = 500000;
-      const currentDailySpent = Number(senderData.dailySpent) || 0;
-      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
-
-      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
-      }
-      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
-        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
-          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
-      }
-
-      // Check balance (safeSubtract validates the arithmetic)
-      safeSubtract(senderBalance, totalDebit, 'sendMoney debit check');
+      // Balance check moved below after fee calculation
 
       // Prevent self-transfer
       if (senderData.walletId === recipientWalletId) {
@@ -6547,6 +6663,37 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       const recipientRef = recipientDoc.ref;
       const recipientData = recipientDoc.data();
       validateWalletDocument(recipientData, 'sendMoney recipient wallet');
+
+      // Calculate fee using tiered structure (needs recipient currency)
+      const senderCurrency = senderData.currency || 'GHS';
+      const recipientCurrency = recipientData.currency || 'GHS';
+      const isCrossCountry = senderCurrency !== recipientCurrency;
+      fee = calculateFee(amount, isCrossCountry);
+      totalDebit = amount + fee;
+
+      // Check balance with actual fee
+      if (senderBalance < totalDebit) {
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
+      }
+
+      // Enforce daily/monthly spending limits
+      const DAILY_LIMIT = 5000000;   // 50,000 major units in minor units
+      const MONTHLY_LIMIT = 50000000; 
+      const currentDailySpent = Number(senderData.dailySpent) || 0;
+      const currentMonthlySpent = Number(senderData.monthlySpent) || 0;
+
+      if (currentDailySpent + totalDebit > DAILY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Daily spending limit of ${DAILY_LIMIT} exceeded. Current: ${currentDailySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+      if (currentMonthlySpent + totalDebit > MONTHLY_LIMIT) {
+        throwAppError(ERROR_CODES.TXN_AMOUNT_TOO_LARGE,
+          `Monthly spending limit of ${MONTHLY_LIMIT} exceeded. Current: ${currentMonthlySpent.toFixed(2)}, requested: ${totalDebit.toFixed(2)}`);
+      }
+
+      // Fetch exchange rates (needed for currency conversion and fee collection)
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
 
       // Get user names
       // senderUserDoc already fetched above for block check
@@ -6572,20 +6719,28 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         updatedAt: timestamps.serverTimestamp()
       });
 
-      // Add to recipient
+      // Convert amount if cross-country transfer
+      let creditAmount = amount; // Default: same currency, no conversion
+      let txExchangeRate = null;
+
+      if (isCrossCountry) {
+        const senderRate = rates[senderCurrency] || 1;
+        const recipientRate = rates[recipientCurrency] || 1;
+        txExchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+        creditAmount = Math.round(amount * txExchangeRate);
+      }
+
+      // Add converted amount to recipient
       transaction.update(recipientRef, {
-        balance: admin.firestore.FieldValue.increment(amount),
+        balance: admin.firestore.FieldValue.increment(creditAmount),
         updatedAt: timestamps.serverTimestamp()
       });
 
       // ============================================
       // COLLECT FEE TO PLATFORM WALLET
       // ============================================
-      const senderCurrency = senderData.currency || 'GHS';
-      
-      // Get exchange rates for USD conversion
-      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+      // senderCurrency already declared above
+      // rates already fetched above for currency conversion
       const exchangeRate = rates[senderCurrency] || 1;
       const feeInUSD = fee / exchangeRate;
       
@@ -6640,8 +6795,8 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         createdAt: timestamps.serverTimestamp(),
         completedAt: timestamps.serverTimestamp(),
         reference: `TXN-${now.getTime()}`,
-        exchangeRate: null,
-        convertedAmount: null,
+        exchangeRate: txExchangeRate,
+        convertedAmount: isCrossCountry ? creditAmount : null,
         failureReason: null,
       };
 
@@ -6651,21 +6806,29 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         { ...baseTxData, type: 'send' }
       );
 
-      // Recipient transaction record
+      // Recipient transaction record (amount in recipient's currency)
       transaction.set(
         db.collection('users').doc(recipientUid).collection('transactions').doc(txId),
-        { ...baseTxData, type: 'receive', fee: 0 }
+        {
+          ...baseTxData,
+          type: 'receive',
+          fee: 0,
+          amount: creditAmount,
+          currency: recipientCurrency,
+        }
       );
 
       return {
         transactionId: txId,
         amount: amount,
         fee: fee,
+        creditAmount: creditAmount,
+        exchangeRate: txExchangeRate,
         recipientName: recipientName,
         senderName: senderName,
         recipientUid: recipientUid,
-        senderCurrency: senderData.currency || 'GHS',
-        recipientCurrency: recipientData.currency || 'GHS',
+        senderCurrency: senderCurrency,
+        recipientCurrency: recipientCurrency,
         newBalance: senderBalance - totalDebit
       };
     });
