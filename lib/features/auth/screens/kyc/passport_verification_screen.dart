@@ -129,7 +129,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
         selfie: _smileIdFiles?.selfie,
         idFront: _smileIdFiles?.documentFront,
         idBack: _smileIdFiles?.documentBack,
-        smileIdVerified: true,
+        smileIdVerified: false,
         smileIdResult: _verificationResult,
       );
 

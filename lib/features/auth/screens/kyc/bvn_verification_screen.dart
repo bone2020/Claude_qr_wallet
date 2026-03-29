@@ -145,7 +145,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
         selfie: _smileIdFiles?.selfie,
         idFront: _smileIdFiles?.documentFront,
         idBack: _smileIdFiles?.documentBack,
-        smileIdVerified: true,
+        smileIdVerified: false,
         smileIdResult: _verificationResult,
       );
 
