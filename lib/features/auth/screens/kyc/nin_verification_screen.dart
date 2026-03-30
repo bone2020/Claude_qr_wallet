@@ -314,7 +314,7 @@ class _SmileIdBiometricScreen extends StatelessWidget {
         idType: idType,
         idNumber: idNumber,
         userId: userId,
-        callbackUrl: _smileIdCallbackUrl,
+        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,

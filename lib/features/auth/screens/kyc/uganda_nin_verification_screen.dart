@@ -341,7 +341,7 @@ class _UgandaSmileIdBiometricScreen extends StatelessWidget {
         idType: 'NATIONAL_ID_NO_PHOTO',
         idNumber: idNumber,
         userId: userId,
-        callbackUrl: _smileIdCallbackUrl,
+        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,

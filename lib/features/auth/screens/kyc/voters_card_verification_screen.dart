@@ -288,7 +288,7 @@ class _SmileIdDocumentScreen extends StatelessWidget {
         documentType: documentType,
         userId: userId,
         captureBothSides: captureBothSides,
-        callbackUrl: _smileIdCallbackUrl,
+        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
