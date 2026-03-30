@@ -17,6 +17,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
 
+const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+
 class NationalIdVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
 
@@ -35,7 +37,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
-  bool _isVerified = false;
+  bool _isCaptured = false;
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles;
   String? _userId;
@@ -123,11 +125,11 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
       if (result != null) {
         setState(() {
-          _isVerified = true;
+          _isCaptured = true;
           _verificationResult = result;
           _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
         });
-        _showSuccess(AppStrings.verificationSuccessful);
+        _showSuccess('Document captured successfully');
       }
     } else {
       // Use Document Verification for other countries
@@ -145,11 +147,11 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
       if (result != null) {
         setState(() {
-          _isVerified = true;
+          _isCaptured = true;
           _verificationResult = result;
           _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
         });
-        _showSuccess(AppStrings.verificationSuccessful);
+        _showSuccess('Document captured successfully');
       }
     }
   }
@@ -180,7 +182,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   }
 
   Future<void> _handleContinue() async {
-    if (!_isVerified) {
+    if (!_isCaptured) {
       _showError('Please complete verification with Smile ID');
       return;
     }
@@ -307,13 +309,13 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
                     ],
 
                     KycVerificationCard(
-                      title: _isVerified ? 'Verified with Smile ID' : 'Verify Your $_countryName',
-                      description: _isVerified
-                          ? 'Your $_countryName has been verified successfully'
+                      title: _isCaptured ? 'Document Captured' : 'Verify Your $_countryName',
+                      description: _isCaptured
+                          ? 'Your $_countryName has been captured. Verification will begin when you continue.'
                           : _requiresIdNumber
                               ? 'We will verify your ID number and take a selfie for confirmation'
                               : 'We will capture both sides of your ID and take a selfie',
-                      isVerified: _isVerified,
+                      isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
@@ -388,6 +390,7 @@ class _SmileIdDocumentScreen extends StatelessWidget {
         documentType: documentType,
         userId: userId,
         captureBothSides: captureBothSides,
+        callbackUrl: _smileIdCallbackUrl,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
@@ -395,14 +398,11 @@ class _SmileIdDocumentScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
+          // "Already enrolled" means SmileID has seen this user before
+          // Still require webhook verification — don't bypass
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: documentType,
-            );
             if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
+              Navigator.pop(context, 'already_enrolled_pending');
             }
             return;
           }
@@ -443,6 +443,7 @@ class _SmileIdBiometricScreen extends StatelessWidget {
         idType: idType,
         idNumber: idNumber,
         userId: userId,
+        callbackUrl: _smileIdCallbackUrl,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
@@ -450,14 +451,11 @@ class _SmileIdBiometricScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
+          // "Already enrolled" means SmileID has seen this user before
+          // Still require webhook verification — don't bypass
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: idType,
-            );
             if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
+              Navigator.pop(context, 'already_enrolled_pending');
             }
             return;
           }

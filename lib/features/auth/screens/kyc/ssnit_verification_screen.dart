@@ -16,6 +16,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart'; 
 
+const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+
 class SsnitVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
 
@@ -34,7 +36,7 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
-  bool _isVerified = false;
+  bool _isCaptured = false;
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles;
   String? _userId;
@@ -80,11 +82,11 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
 
     if (result != null) {
       setState(() {
-        _isVerified = true;
+        _isCaptured = true;
         _verificationResult = result;
         _smileIdFiles = SmileIDService.instance.parseResultFiles(result); 
       });
-      _showSuccess(AppStrings.verificationSuccessful);
+      _showSuccess('Document captured successfully');
     }
   }
 
@@ -114,7 +116,7 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
   }
 
   Future<void> _handleContinue() async {
-    if (!_isVerified) {
+    if (!_isCaptured) {
       _showError('Please complete verification with Smile ID');
       return;
     }
@@ -233,11 +235,11 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
                     const SizedBox(height: AppDimensions.spaceXL),
 
                     KycVerificationCard(
-                      title: _isVerified ? 'Verified with Smile ID' : 'Verify Your Identity',
-                      description: _isVerified
-                          ? 'Your SSNIT has been verified successfully'
+                      title: _isCaptured ? 'Document Captured' : 'Verify Your Identity',
+                      description: _isCaptured
+                          ? 'Your SSNIT has been captured. Verification will begin when you continue.'
                           : 'We will verify your SSNIT and take a selfie for confirmation',
-                      isVerified: _isVerified,
+                      isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
@@ -312,6 +314,7 @@ class _SmileIdBiometricScreen extends StatelessWidget {
         idType: idType,
         idNumber: idNumber,
         userId: userId,
+        callbackUrl: _smileIdCallbackUrl,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
@@ -319,14 +322,11 @@ class _SmileIdBiometricScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
+          // "Already enrolled" means SmileID has seen this user before
+          // Still require webhook verification — don't bypass
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: idType,
-            );
             if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
+              Navigator.pop(context, 'already_enrolled_pending');
             }
             return;
           }

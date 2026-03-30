@@ -16,6 +16,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
 
+const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+
 class VotersCardVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
 
@@ -33,7 +35,7 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
-  bool _isVerified = false;
+  bool _isCaptured = false;
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles; 
   String? _userId;
@@ -64,11 +66,11 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
 
     if (result != null) {
       setState(() {
-        _isVerified = true;
+        _isCaptured = true;
         _verificationResult = result;
         _smileIdFiles = SmileIDService.instance.parseResultFiles(result); 
       });
-      _showSuccess(AppStrings.verificationSuccessful);
+      _showSuccess('Document captured successfully');
     }
   }
 
@@ -98,7 +100,7 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
   }
 
   Future<void> _handleContinue() async {
-    if (!_isVerified) {
+    if (!_isCaptured) {
       _showError('Please complete verification with Smile ID');
       return;
     }
@@ -207,11 +209,11 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
                     const SizedBox(height: AppDimensions.spaceXXL),
 
                     KycVerificationCard(
-                      title: _isVerified ? 'Verified with Smile ID' : "Verify Your Voter's Card",
-                      description: _isVerified
-                          ? "Your voter's card has been verified successfully"
+                      title: _isCaptured ? 'Document Captured' : "Verify Your Voter's Card",
+                      description: _isCaptured
+                          ? "Your voter's card has been captured. Verification will begin when you continue."
                           : 'We will capture both sides of your card and take a selfie',
-                      isVerified: _isVerified,
+                      isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
@@ -286,6 +288,7 @@ class _SmileIdDocumentScreen extends StatelessWidget {
         documentType: documentType,
         userId: userId,
         captureBothSides: captureBothSides,
+        callbackUrl: _smileIdCallbackUrl,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
@@ -293,14 +296,11 @@ class _SmileIdDocumentScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
-          // Check if this is an "already enrolled" error - treat as success
+          // "Already enrolled" means SmileID has seen this user before
+          // Still require webhook verification — don't bypass
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            // User was previously verified - update their KYC status immediately
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: documentType,
-            );
             if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
+              Navigator.pop(context, 'already_enrolled_pending');
             }
             return;
           }

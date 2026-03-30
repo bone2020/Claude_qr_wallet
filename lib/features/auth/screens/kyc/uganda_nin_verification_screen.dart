@@ -16,6 +16,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
 
+const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+
 /// Dedicated verification screen for Uganda National ID (NIN).
 /// Uganda requires 3 fields: NIN (id_number), Card Number (secondary_id_number), and DOB.
 /// This is separate from NationalIdVerificationScreen to avoid complicating the shared screen.
@@ -38,7 +40,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
-  bool _isVerified = false;
+  bool _isCaptured = false;
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles;
   String? _userId;
@@ -92,11 +94,11 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
 
     if (result != null) {
       setState(() {
-        _isVerified = true;
+        _isCaptured = true;
         _verificationResult = result;
         _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
       });
-      _showSuccess(AppStrings.verificationSuccessful);
+      _showSuccess('Document captured successfully');
     }
   }
 
@@ -126,7 +128,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   }
 
   Future<void> _handleContinue() async {
-    if (!_isVerified) {
+    if (!_isCaptured) {
       _showError('Please complete verification with Smile ID');
       return;
     }
@@ -260,11 +262,11 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
 
                     // Smile ID Verification
                     KycVerificationCard(
-                      title: _isVerified ? 'Verified with Smile ID' : 'Verify Your National ID',
-                      description: _isVerified
-                          ? 'Your National ID has been verified successfully'
+                      title: _isCaptured ? 'Document Captured' : 'Verify Your National ID',
+                      description: _isCaptured
+                          ? 'Your National ID has been captured. Verification will begin when you continue.'
                           : 'We will verify your NIN against the national database and take a selfie for confirmation',
-                      isVerified: _isVerified,
+                      isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 250.ms, duration: 400.ms),
 
@@ -339,6 +341,7 @@ class _UgandaSmileIdBiometricScreen extends StatelessWidget {
         idType: 'NATIONAL_ID_NO_PHOTO',
         idNumber: idNumber,
         userId: userId,
+        callbackUrl: _smileIdCallbackUrl,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
@@ -346,12 +349,11 @@ class _UgandaSmileIdBiometricScreen extends StatelessWidget {
           Navigator.pop(context, result);
         },
         onError: (error) async {
+          // "Already enrolled" means SmileID has seen this user before
+          // Still require webhook verification — don't bypass
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            await UserService().markKycVerifiedForAlreadyEnrolledUser(
-              idType: 'NATIONAL_ID_NO_PHOTO',
-            );
             if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled');
+              Navigator.pop(context, 'already_enrolled_pending');
             }
             return;
           }
