@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,18 +24,92 @@ class VerificationPendingScreen extends ConsumerStatefulWidget {
 class _VerificationPendingScreenState
     extends ConsumerState<VerificationPendingScreen> {
   StreamSubscription<DocumentSnapshot>? _kycSubscription;
+  Timer? _pollTimer;
   bool _isTransitioning = false;
+  bool _isPolling = false;
+  String? _smileUserId;
+  String? _smileJobId;
 
   @override
   void initState() {
     super.initState();
+    _loadSmileJobInfo();
+    _startPolling();
     _listenForKycStatusChange();
   }
 
   @override
   void dispose() {
     _kycSubscription?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadSmileJobInfo() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Try KYC documents subcollection first
+    final kycDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('kyc')
+        .doc('documents')
+        .get();
+
+    if (kycDoc.exists) {
+      setState(() {
+        _smileUserId = kycDoc.data()?['smileUserId'] as String?;
+        _smileJobId = kycDoc.data()?['smileJobId'] as String?;
+      });
+    }
+
+    // If no job info in KYC docs, try user doc
+    if (_smileUserId == null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        setState(() {
+          _smileUserId = userDoc.data()?['smileUserId'] as String?;
+          _smileJobId = userDoc.data()?['smileJobId'] as String?;
+        });
+      }
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      if (_isPolling || _isTransitioning) return;
+      if (_smileUserId == null || _smileJobId == null) {
+        await _loadSmileJobInfo();
+        if (_smileUserId == null || _smileJobId == null) return;
+      }
+
+      _isPolling = true;
+      try {
+        final callable = FirebaseFunctions.instance
+            .httpsCallable('checkSmileIdJobStatus');
+        final result = await callable.call({
+          'smileUserId': _smileUserId,
+          'smileJobId': _smileJobId,
+        });
+
+        final data = result.data as Map<String, dynamic>;
+        final status = data['status'] as String?;
+
+        if (status == 'verified' || status == 'failed') {
+          // Job is done — the Firestore listener will handle navigation
+          timer.cancel();
+        }
+      } catch (e) {
+        debugPrint('Poll error: $e');
+      } finally {
+        _isPolling = false;
+      }
+    });
   }
 
   void _listenForKycStatusChange() {
@@ -53,6 +128,7 @@ class _VerificationPendingScreenState
 
       if (kycStatus == 'verified') {
         setState(() => _isTransitioning = true);
+        _pollTimer?.cancel();
 
         // Refresh wallet and currency now that verification is complete
         await ref.read(walletNotifierProvider.notifier).refreshWallet();
@@ -63,6 +139,7 @@ class _VerificationPendingScreenState
         context.go(AppRoutes.main);
       } else if (kycStatus == 'failed') {
         setState(() => _isTransitioning = true);
+        _pollTimer?.cancel();
 
         if (!mounted) return;
         _showFailedDialog();

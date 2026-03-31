@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -318,8 +321,26 @@ class _SmileIdBiometricScreen extends StatelessWidget {
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
-        onSuccess: (result) {
-          Navigator.pop(context, result);
+        onSuccess: (result) async {
+          try {
+            final jsonResult = json.decode(result);
+            final smileJobId = jsonResult['smile_job_id'] ?? jsonResult['smileJobId'];
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({
+                'smileUserId': userId,
+                'smileJobId': smileJobId,
+              });
+            }
+          } catch (e) {
+            debugPrint('Error parsing SmileID result: $e');
+          }
+          if (context.mounted) {
+            Navigator.pop(context, result);
+          }
         },
         onError: (error) async {
           // "Already enrolled" means SmileID has seen this user before
