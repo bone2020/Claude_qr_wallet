@@ -158,6 +158,12 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
               try {
                 final jsonResult = json.decode(_verificationResult!);
                 smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
+                // Extract job ID from file paths if not found
+                if (smileJobId == null) {
+                  final selfieFile = jsonResult['selfieFile']?.toString() ?? '';
+                  final jobMatch = RegExp(r'job-[a-f0-9\-]+').firstMatch(selfieFile);
+                  if (jobMatch != null) smileJobId = jobMatch.group(0);
+                }
               } catch (_) {}
             }
             await FirebaseFirestore.instance

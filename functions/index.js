@@ -8041,7 +8041,7 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
       // Create wallet if not exists
       const walletDoc = await db.collection('wallets').doc(userId).get();
       if (!walletDoc.exists) {
-        const walletId = 'W' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
         await db.collection('wallets').doc(userId).set({
           id: userId,
           userId: userId,
