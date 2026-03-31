@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -145,6 +148,29 @@ class _DriversLicenseVerificationScreenState extends ConsumerState<DriversLicens
         // Set kycStatus to pending_review (webhook will finalize to verified)
         final completeKyc = FirebaseFunctions.instance.httpsCallable('completeKycVerification');
         await completeKyc.call();
+
+        // Save SmileID userId and jobId for polling
+        try {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user != null && _userId != null) {
+            String? smileJobId;
+            if (_verificationResult != null && _verificationResult != 'already_enrolled_pending') {
+              try {
+                final jsonResult = json.decode(_verificationResult!);
+                smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
+              } catch (_) {}
+            }
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .update({
+              'smileUserId': _userId,
+              if (smileJobId != null) 'smileJobId': smileJobId,
+            });
+          }
+        } catch (e) {
+          debugPrint('Error saving SmileID job info: $e');
+        }
 
         await PushNotificationService().saveTokenToFirestore();
         if (!mounted) return;

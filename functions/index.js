@@ -2220,6 +2220,7 @@ const RATE_LIMITS = {
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
   initializeTransaction: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many payment initializations. Please try again later.' },
+  checkSmileIdJobStatus: { windowMs: 60 * 1000, maxRequests: 30, message: 'Too many status check requests.' },
 };
 
 /**
@@ -7885,5 +7886,211 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
   } catch (error) {
     logError('Smile ID webhook error', { error: error.message });
     res.status(500).send('Error');
+  }
+});
+
+// ============================================================
+// SmileID Job Status Polling
+// ============================================================
+exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { smileUserId, smileJobId } = data;
+
+  if (!smileUserId || !smileJobId) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'smileUserId and smileJobId are required');
+  }
+
+  logInfo('Checking SmileID job status', { userId, smileUserId, smileJobId });
+
+  // Check current kycStatus - only poll if pending_review
+  const userDoc = await db.collection('users').doc(userId).get();
+  if (!userDoc.exists) {
+    throwAppError(ERROR_CODES.USER_NOT_FOUND);
+  }
+
+  const userData = userDoc.data();
+  if (userData.kycStatus === 'verified') {
+    return { success: true, status: 'verified', message: 'Already verified' };
+  }
+  if (userData.kycStatus === 'failed') {
+    return { success: true, status: 'failed', message: 'Already failed' };
+  }
+
+  // Generate SmileID signature
+  const partnerId = process.env.SMILE_PARTNER_ID || '8244';
+  const apiKey = process.env.SMILE_API_KEY;
+
+  if (!apiKey) {
+    logInfo('SMILE_API_KEY not configured');
+    throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
+  }
+
+  const timestamp = new Date().toISOString();
+
+  // SmileID signature: hash of timestamp + partnerID + "sid_request" with API key
+  const hmac = crypto.createHmac('sha256', apiKey);
+  hmac.update(timestamp + partnerId + 'sid_request');
+  const signature = hmac.digest('base64');
+
+  // Determine API URL based on environment
+  const useSandbox = process.env.SMILE_USE_SANDBOX !== 'false';
+  const apiUrl = useSandbox
+    ? 'https://testapi.smileidentity.com/v1/job_status'
+    : 'https://api.smileidentity.com/v1/job_status';
+
+  try {
+    const fetch = (await import('node-fetch')).default;
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timestamp: timestamp,
+        signature: signature,
+        user_id: smileUserId,
+        job_id: smileJobId,
+        partner_id: partnerId,
+        image_links: false,
+        history: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logInfo('SmileID job_status API error', { status: response.status, error: errorText });
+      throw new functions.https.HttpsError('internal', 'SmileID API error: ' + response.status);
+    }
+
+    const result = await response.json();
+    logInfo('SmileID job status result', {
+      userId,
+      smileJobId,
+      jobComplete: result.job_complete,
+      jobSuccess: result.job_success,
+      resultCode: result.result?.ResultCode,
+      resultText: result.result?.ResultText,
+    });
+
+    // Job not yet complete
+    if (!result.job_complete) {
+      return { success: true, status: 'pending', message: 'Job still processing' };
+    }
+
+    // Job complete — check result
+    const resultCode = result.result?.ResultCode || '';
+    const resultText = result.result?.ResultText || '';
+    const actions = result.result?.Actions || {};
+
+    // Extract personal info if available
+    const fullName = result.result?.FullName || result.result?.full_name || null;
+    const dob = result.result?.DOB || result.result?.dob || null;
+    const idNumber = result.result?.IDNumber || result.result?.id_number || null;
+
+    // Check if verification passed
+    const selfieCheck = actions.Selfie_Check || actions.selfie_check || '';
+    const livenessCheck = actions.Liveness_Check || actions.liveness_check || '';
+    const docCheck = actions.Document_Verification || actions.document_verification || '';
+
+    const isApproved = resultCode === '0810' ||
+                       (selfieCheck.toLowerCase() === 'passed' &&
+                        (docCheck.toLowerCase() === 'passed' || docCheck === ''));
+
+    if (isApproved) {
+      // APPROVED — update user and create wallet
+      logInfo('SmileID verification APPROVED', { userId, resultCode });
+
+      // Build legal name from available data
+      let legalName = fullName;
+      if (!legalName) {
+        const firstName = result.result?.FirstName || result.result?.first_name || '';
+        const lastName = result.result?.LastName || result.result?.last_name || '';
+        if (firstName || lastName) {
+          legalName = `${firstName} ${lastName}`.trim();
+        }
+      }
+
+      // Update user document
+      const updateData = {
+        kycStatus: 'verified',
+        kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        kycCompleted: true,
+        kycVerified: true,
+        isVerified: true,
+      };
+
+      if (legalName) updateData.legalName = legalName;
+      if (dob) updateData.dateOfBirth = dob;
+      if (idNumber) updateData.idNumber = idNumber;
+
+      await db.collection('users').doc(userId).update(updateData);
+
+      // Update KYC documents subcollection
+      await db.collection('users').doc(userId).collection('kyc').doc('documents').set({
+        status: 'verified',
+        smileIdVerified: true,
+        resultCode: resultCode,
+        resultText: resultText,
+        actions: actions,
+        verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        verificationMethod: 'smile_id_job_status_poll',
+      }, { merge: true });
+
+      // Create wallet if not exists
+      const walletDoc = await db.collection('wallets').doc(userId).get();
+      if (!walletDoc.exists) {
+        const walletId = 'W' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+        await db.collection('wallets').doc(userId).set({
+          id: userId,
+          userId: userId,
+          walletId: walletId,
+          currency: userData.currency || 'GHS',
+          balance: 0,
+          isActive: true,
+          dailySpent: 0,
+          monthlySpent: 0,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await db.collection('users').doc(userId).update({
+          walletId: walletId,
+          walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        logInfo('Wallet created via job status poll', { userId, walletId });
+      }
+
+      return { success: true, status: 'verified', resultCode, message: 'Verification approved' };
+
+    } else {
+      // REJECTED
+      logInfo('SmileID verification REJECTED', { userId, resultCode, resultText });
+
+      await db.collection('users').doc(userId).update({
+        kycStatus: 'failed',
+        kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        kycFailureReason: resultText || 'Verification failed',
+      });
+
+      await db.collection('users').doc(userId).collection('kyc').doc('documents').set({
+        status: 'failed',
+        smileIdVerified: false,
+        resultCode: resultCode,
+        resultText: resultText,
+        actions: actions,
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+        verificationMethod: 'smile_id_job_status_poll',
+      }, { merge: true });
+
+      return { success: true, status: 'failed', resultCode, resultText, message: 'Verification failed' };
+    }
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logInfo('Error checking SmileID job status', { error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to check job status');
   }
 });
