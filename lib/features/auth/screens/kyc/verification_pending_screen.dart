@@ -1,26 +1,26 @@
 import 'dart:async';
-
+ 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+ 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
-
+ 
 class VerificationPendingScreen extends ConsumerStatefulWidget {
   const VerificationPendingScreen({super.key});
-
+ 
   @override
   ConsumerState<VerificationPendingScreen> createState() =>
       _VerificationPendingScreenState();
 }
-
+ 
 class _VerificationPendingScreenState
     extends ConsumerState<VerificationPendingScreen> {
   StreamSubscription<DocumentSnapshot>? _kycSubscription;
@@ -29,7 +29,7 @@ class _VerificationPendingScreenState
   bool _isPolling = false;
   String? _smileUserId;
   String? _smileJobId;
-
+ 
   @override
   void initState() {
     super.initState();
@@ -37,39 +37,39 @@ class _VerificationPendingScreenState
     _startPolling();
     _listenForKycStatusChange();
   }
-
+ 
   @override
   void dispose() {
     _pollTimer?.cancel();
     _kycSubscription?.cancel();
     super.dispose();
   }
-
+ 
   Future<void> _loadSmileJobInfo() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
+ 
     final kycDoc = await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('kyc')
         .doc('documents')
         .get();
-
+ 
     if (kycDoc.exists) {
       setState(() {
         _smileUserId = kycDoc.data()?['smileUserId'] as String?;
         _smileJobId = kycDoc.data()?['smileJobId'] as String?;
       });
     }
-
+ 
     // If no job info in KYC docs, try to get from user doc
     if (_smileUserId == null) {
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
-
+ 
       if (userDoc.exists) {
         setState(() {
           _smileUserId = userDoc.data()?['smileUserId'] as String?;
@@ -78,7 +78,7 @@ class _VerificationPendingScreenState
       }
     }
   }
-
+ 
   void _startPolling() {
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (_isPolling) return;
@@ -86,7 +86,7 @@ class _VerificationPendingScreenState
         await _loadSmileJobInfo();
         if (_smileUserId == null || _smileJobId == null) return;
       }
-
+ 
       _isPolling = true;
       try {
         final callable = FirebaseFunctions.instance.httpsCallable('checkSmileIdJobStatus');
@@ -94,10 +94,10 @@ class _VerificationPendingScreenState
           'smileUserId': _smileUserId,
           'smileJobId': _smileJobId,
         });
-
+ 
         final data = result.data as Map<String, dynamic>;
         final status = data['status'] as String?;
-
+ 
         if (status == 'verified' || status == 'failed') {
           // Job is done — the Firestore listener will handle navigation
           timer.cancel();
@@ -109,40 +109,43 @@ class _VerificationPendingScreenState
       }
     });
   }
-
+ 
   void _listenForKycStatusChange() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-
+ 
     _kycSubscription = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .snapshots()
         .listen((snapshot) async {
       if (!snapshot.exists || _isTransitioning) return;
-
+ 
       final data = snapshot.data()!;
       final kycStatus = data['kycStatus'] as String?;
-
+ 
       if (kycStatus == 'verified') {
         setState(() => _isTransitioning = true);
-
-        // Refresh wallet and currency now that verification is complete
-        await ref.read(walletNotifierProvider.notifier).refreshWallet();
-        await ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
-        await PushNotificationService().saveTokenToFirestore();
-
+ 
+        // Navigate immediately, then refresh in background
         if (!mounted) return;
         context.go(AppRoutes.main);
+ 
+        // Refresh in background after navigation
+        try {
+          ref.read(walletNotifierProvider.notifier).refreshWallet();
+          ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
+          PushNotificationService().saveTokenToFirestore();
+        } catch (_) {}
       } else if (kycStatus == 'failed') {
         setState(() => _isTransitioning = true);
-
+ 
         if (!mounted) return;
         _showFailedDialog();
       }
     });
   }
-
+ 
   void _showFailedDialog() {
     showDialog(
       context: context,
@@ -180,7 +183,7 @@ class _VerificationPendingScreenState
       ),
     );
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,7 +195,7 @@ class _VerificationPendingScreenState
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Spacer(),
-
+ 
               // Animated icon
               Container(
                 width: 120,
@@ -209,25 +212,25 @@ class _VerificationPendingScreenState
                   ),
                 ),
               ),
-
+ 
               const SizedBox(height: AppDimensions.spaceXXL),
-
+ 
               Text(
                 'Verification In Progress',
                 style: AppTextStyles.headlineMedium(),
                 textAlign: TextAlign.center,
               ),
-
+ 
               const SizedBox(height: AppDimensions.spaceMD),
-
+ 
               Text(
                 'Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.',
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
-
+ 
               const SizedBox(height: AppDimensions.spaceXXL),
-
+ 
               // Loading indicator
               const SizedBox(
                 width: 48,
@@ -237,16 +240,16 @@ class _VerificationPendingScreenState
                   strokeWidth: 3,
                 ),
               ),
-
+ 
               const SizedBox(height: AppDimensions.spaceMD),
-
+ 
               Text(
                 'Please wait...',
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
               ),
-
+ 
               const Spacer(),
-
+ 
               // Info card
               Container(
                 padding: const EdgeInsets.all(AppDimensions.spaceMD),
@@ -267,7 +270,7 @@ class _VerificationPendingScreenState
                   ],
                 ),
               ),
-
+ 
               const SizedBox(height: AppDimensions.spaceMD),
             ],
           ),
