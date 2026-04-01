@@ -126,11 +126,23 @@ class _VerificationPendingScreenState
  
       if (kycStatus == 'verified') {
         setState(() => _isTransitioning = true);
- 
-        // Navigate immediately, then refresh in background
+
+        // Wait for wallet to be created before navigating
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          for (int i = 0; i < 10; i++) {
+            final walletDoc = await FirebaseFirestore.instance
+                .collection('wallets')
+                .doc(user.uid)
+                .get();
+            if (walletDoc.exists) break;
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+
         if (!mounted) return;
         context.go(AppRoutes.main);
- 
+
         // Refresh in background after navigation
         try {
           ref.read(walletNotifierProvider.notifier).refreshWallet();
