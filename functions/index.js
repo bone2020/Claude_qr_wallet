@@ -1032,7 +1032,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 
     const paymentData = response.data;
     const amountInKobo = paymentData.amount;
-    const amount = amountInKobo / 100; // Convert from kobo to naira
+    const amount = amountInKobo; // Keep in minor units (pesewas/kobo) for consistency
     const currency = paymentData.currency;
 
     // Secondary idempotency check via payments collection (defense in depth)
@@ -1095,6 +1095,8 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
         status: 'completed',
         reference: reference,
         method: 'Bank Card',
+        receiverWalletId: walletDoc.id,
+        senderName: 'Bank Card',
         description: 'Wallet top-up via Paystack',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -1110,7 +1112,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     // Send push notification for deposit
     await sendPushNotification(userId, {
       title: 'Deposit Successful',
-      body: `${currency} ${amount.toFixed(2)} has been added to your wallet`,
+      body: `${currency} ${(amount/100).toFixed(2)} has been added to your wallet`,
       type: 'transaction',
       data: { action: 'deposit', amount: amount.toString(), reference },
     });
@@ -1245,7 +1247,7 @@ async function handleSuccessfulCharge(data) {
     }
   }
 
-  const amount = receivedAmountKobo / 100;
+  const amount = receivedAmountKobo; // Keep in minor units for consistency
 
   // Get user's wallet
   const walletSnapshot = await db.collection('wallets')
@@ -1303,7 +1305,7 @@ async function handleSuccessfulCharge(data) {
   // Send push notification for deposit via webhook
   await sendPushNotification(userId, {
     title: 'Deposit Successful',
-    body: `${currency} ${amount.toFixed(2)} has been added to your wallet via ${data.channel || 'card'}`,
+    body: `${currency} ${(amount/100).toFixed(2)} has been added to your wallet via ${data.channel || 'card'}`,
     type: 'transaction',
     data: { action: 'deposit', amount: amount.toString(), reference },
   });
@@ -1879,6 +1881,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
             currency: validatedCurrency,
             status: 'completed',
             reference: reference,
+            method: 'Mobile Money',
+            receiverWalletId: walletDoc.id,
+            senderName: 'Mobile Money',
             description: 'Mobile Money deposit',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
