@@ -2800,7 +2800,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
     const userData = userDoc.data();
 
     // Generate unique wallet ID
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
     const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
@@ -2933,7 +2933,7 @@ exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) =
     const userDoc = await db.collection('users').doc(userId).get();
     const userData = userDoc.exists ? userDoc.data() : {};
 
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
     const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
@@ -3885,6 +3885,7 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   }
   
 // Find wallet
+  console.log("Looking up walletId:", JSON.stringify(walletId), "length:", walletId.length);
   const walletQuery = await db.collection('wallets')
     .where('walletId', '==', walletId)
     .limit(1)
@@ -7830,7 +7831,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       // Create wallet if it doesn't exist
       const walletDoc = await admin.firestore().collection('wallets').doc(userId).get();
       if (!walletDoc.exists) {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
@@ -8046,7 +8047,7 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
       // Create wallet if not exists
       const walletDoc = await db.collection('wallets').doc(userId).get();
       if (!walletDoc.exists) {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
+        const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
         await db.collection('wallets').doc(userId).set({
           id: userId,
           userId: userId,

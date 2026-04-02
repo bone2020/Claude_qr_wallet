@@ -57,6 +57,7 @@ class WalletService {
   /// Uses Cloud Function with rate limiting to prevent enumeration attacks
 Future<WalletLookupResult> lookupWallet(String walletId) async {
     try {
+      debugPrint('LOOKING UP WALLET ID: [$walletId] length: ${walletId.length}');
       final callable = FirebaseFunctions.instance.httpsCallable('lookupWallet');
       final result = await callable.call<Map<String, dynamic>>({
         'walletId': walletId,
