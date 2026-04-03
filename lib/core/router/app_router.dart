@@ -485,6 +485,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               recipientName: extras?['recipientName'] ?? '',
               amount: extras?['amount'] ?? 0,
               note: extras?['note'],
+              items: extras?['items'] != null
+                  ? List<String>.from(extras!['items'] as List)
+                  : null,
               fromScan: extras?['fromScan'] ?? false,
               amountLocked: extras?['amountLocked'] ?? false,
               recipientCurrency: extras?['recipientCurrency'],

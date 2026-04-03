@@ -347,6 +347,12 @@ class TransactionDetailsScreen extends ConsumerWidget {
             ),
           ],
 
+          // Items (if present — merchant QR payments)
+          if (transaction.items != null && transaction.items!.isNotEmpty) ...[
+            _buildDivider(),
+            _buildItemsList(transaction.items!),
+          ],
+
           // Fee (if present)
           if (transaction.fee > 0) ...[
             _buildDivider(),
@@ -437,6 +443,37 @@ class TransactionDetailsScreen extends ConsumerWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsList(List<String> items) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceSM),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Items',
+            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+          ),
+          const SizedBox(height: AppDimensions.spaceXS),
+          ...items.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.circle, size: 6, color: AppColors.textSecondaryDark),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item,
+                    style: AppTextStyles.bodyMedium(),
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );

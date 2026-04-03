@@ -24,6 +24,7 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
   final String recipientName;
   final int amount;
   final String? note;
+  final List<String>? items;
   final bool fromScan;
   final bool amountLocked;
   final String? recipientCurrency;
@@ -35,6 +36,7 @@ class ConfirmSendScreen extends ConsumerStatefulWidget {
     required this.recipientName,
     required this.amount,
     this.note,
+    this.items,
     this.fromScan = false,
     this.amountLocked = false,
     this.recipientCurrency,
@@ -410,6 +412,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         recipientWalletId: widget.recipientWalletId,
         amount: _amountMinor,
         note: widget.note,
+        items: widget.items,
       ).timeout(
         const Duration(seconds: 30),
         onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
@@ -529,7 +532,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 child: Column(
                   children: [
                     // Payment Request Banner (if from merchant QR)
-                    if (widget.amountLocked && widget.note != null && widget.note!.isNotEmpty) ...[
+                    if (widget.amountLocked && ((widget.note != null && widget.note!.isNotEmpty) || (widget.items != null && widget.items!.isNotEmpty))) ...[
                       _buildPaymentRequestBanner()
                           .animate()
                           .fadeIn(duration: 400.ms),
@@ -625,6 +628,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   Widget _buildPaymentRequestBanner() {
+    final hasItems = widget.items != null && widget.items!.isNotEmpty;
+    final hasNote = widget.note != null && widget.note!.isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
@@ -633,25 +639,46 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.receipt_long, color: AppColors.primary),
-          const SizedBox(width: AppDimensions.spaceSM),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Payment Request',
-                  style: AppTextStyles.labelMedium(color: AppColors.primary),
-                ),
-                Text(
-                  widget.note!,
-                  style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-                ),
-              ],
-            ),
+          Row(
+            children: [
+              const Icon(Icons.receipt_long, color: AppColors.primary),
+              const SizedBox(width: AppDimensions.spaceSM),
+              Text(
+                'Payment Request',
+                style: AppTextStyles.labelMedium(color: AppColors.primary),
+              ),
+            ],
           ),
+          if (hasItems) ...[
+            const SizedBox(height: AppDimensions.spaceSM),
+            const Divider(color: AppColors.inputBorderDark),
+            const SizedBox(height: AppDimensions.spaceXS),
+            ...widget.items!.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.circle, size: 6, color: AppColors.textSecondaryDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item,
+                      style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+          if (hasNote && !hasItems) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Text(
+              widget.note!,
+              style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+            ),
+          ],
         ],
       ),
     );

@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/services/qr_signing_service.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../../providers/currency_provider.dart';
 
@@ -23,9 +24,11 @@ class RequestPaymentScreen extends ConsumerStatefulWidget {
 
 class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   final _amountController = TextEditingController();
-  final _noteController = TextEditingController();
+  final _itemController = TextEditingController();
+  final List<String> _items = [];
   bool _qrGenerated = false;
   String _qrData = '';
+  bool _isGenerating = false;
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isDownloading = false;
 
@@ -35,7 +38,29 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   String get _currencySymbol => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
 
-  void _generateQR() {
+  void _addItem() {
+    final item = _itemController.text.trim();
+    if (item.isEmpty) return;
+    if (_items.length >= 20) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum 20 items allowed'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _items.add(item);
+      _itemController.clear();
+    });
+  }
+
+  void _removeItem(int index) {
+    setState(() => _items.removeAt(index));
+  }
+
+  Future<void> _generateQR() async {
     if (_amountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -57,19 +82,41 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       return;
     }
 
-    // Build QR data URL
-    final note = _noteController.text.trim();
-    final encodedName = Uri.encodeComponent(_userName);
-    final encodedNote = Uri.encodeComponent(note);
+    setState(() => _isGenerating = true);
 
-    _qrData = 'qrwallet://pay?id=$_walletId&name=$encodedName&amount=${amount.toStringAsFixed(2)}&currency=$_currencyCode';
-    if (note.isNotEmpty) {
-      _qrData += '&note=$encodedNote';
+    try {
+      // Build note from items if items exist, otherwise empty
+      final note = _items.isNotEmpty ? _items.join(', ') : '';
+
+      // Generate signed QR for security
+      final signedPayload = await QrSigningService.signQrPayload(
+        walletId: _walletId,
+        amount: amount,
+        note: note,
+        items: _items.isNotEmpty ? _items : null,
+      );
+
+      if (signedPayload == null) {
+        throw Exception('Failed to generate secure QR code');
+      }
+
+      _qrData = QrSigningService.generateSignedQrData(signedPayload);
+
+      setState(() {
+        _qrGenerated = true;
+        _isGenerating = false;
+      });
+    } catch (e) {
+      setState(() => _isGenerating = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating QR: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
-
-    setState(() {
-      _qrGenerated = true;
-    });
   }
 
   void _resetQR() {
@@ -77,7 +124,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       _qrGenerated = false;
       _qrData = '';
       _amountController.clear();
-      _noteController.clear();
+      _itemController.clear();
+      _items.clear();
     });
   }
 
@@ -177,7 +225,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   @override
   void dispose() {
     _amountController.dispose();
-    _noteController.dispose();
+    _itemController.dispose();
     super.dispose();
   }
 
@@ -239,7 +287,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               ),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Enter the amount you want to receive. Customers can scan the QR code to pay you instantly.',
+                'Enter the amount and add items. Customers can scan the QR code to pay you instantly.',
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -294,43 +342,134 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         ),
         const SizedBox(height: AppDimensions.spaceLG),
 
-        // Note Input (Optional)
+        // Items Section
         Text(
-          'Description (optional)',
+          'Items (optional)',
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
+
+        // Add Item Input
         Container(
           decoration: BoxDecoration(
             color: AppColors.surfaceDark,
             borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
             border: Border.all(color: AppColors.inputBorderDark),
           ),
-          child: TextField(
-            controller: _noteController,
-            maxLength: 50,
-            style: AppTextStyles.bodyLarge(),
-            decoration: InputDecoration(
-              hintText: 'e.g., Bowl of Tomatoes, Lunch, Service',
-              hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
-              prefixIcon: const Icon(Icons.note_alt_outlined, color: AppColors.textSecondaryDark),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(AppDimensions.spaceMD),
-              counterStyle: AppTextStyles.caption(color: AppColors.textTertiaryDark),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _itemController,
+                  maxLength: 100,
+                  style: AppTextStyles.bodyLarge(),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _addItem(),
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Jollof Rice, Chicken, Drinks',
+                    hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
+                    prefixIcon: const Icon(Icons.add_shopping_cart, color: AppColors.textSecondaryDark),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(AppDimensions.spaceMD),
+                    counterText: '',
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: _addItem,
+                child: Container(
+                  margin: const EdgeInsets.only(right: AppDimensions.spaceSM),
+                  padding: const EdgeInsets.all(AppDimensions.spaceXS),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                  ),
+                  child: const Icon(Icons.add, color: AppColors.backgroundDark, size: 20),
+                ),
+              ),
+            ],
           ),
         ),
+
+        // Items List
+        if (_items.isNotEmpty) ...[
+          const SizedBox(height: AppDimensions.spaceSM),
+          Container(
+            padding: const EdgeInsets.all(AppDimensions.spaceSM),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceDark,
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+              border: Border.all(color: AppColors.inputBorderDark),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: AppDimensions.spaceXS,
+                    bottom: AppDimensions.spaceXS,
+                  ),
+                  child: Text(
+                    '${_items.length} item${_items.length == 1 ? '' : 's'}',
+                    style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
+                  ),
+                ),
+                ..._items.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final item = entry.value;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.spaceSM,
+                      vertical: AppDimensions.spaceXS,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.circle, size: 6, color: AppColors.primary.withOpacity(0.5)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: AppTextStyles.bodyMedium(),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => _removeItem(index),
+                          child: const Icon(Icons.close, size: 16, color: AppColors.textTertiaryDark),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+
         const SizedBox(height: AppDimensions.spaceXXL),
 
         // Generate Button
         SizedBox(
           height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _generateQR,
-            child: Text(
-              'Generate QR Code',
-              style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
-            ),
+            onPressed: _isGenerating ? null : _generateQR,
+            child: _isGenerating
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.backgroundDark,
+                    ),
+                  )
+                : Text(
+                    'Generate QR Code',
+                    style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
+                  ),
           ),
         ),
       ],
@@ -339,7 +478,6 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
   Widget _buildQRDisplay() {
     final amount = _amountController.text;
-    final note = _noteController.text.trim();
 
     return Column(
       children: [
@@ -350,13 +488,16 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
           '$_currencySymbol$amount',
           style: AppTextStyles.displayLarge(color: AppColors.primary),
         ),
-        if (note.isNotEmpty) ...[
+
+        // Items summary
+        if (_items.isNotEmpty) ...[
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            note,
-            style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
+            '${_items.length} item${_items.length == 1 ? '' : 's'}',
+            style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],
+
         const SizedBox(height: AppDimensions.spaceXL),
 
         // QR Code Container
@@ -396,9 +537,25 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                   style: AppTextStyles.bodyLarge(color: AppColors.backgroundDark),
                 ),
                 Text(
-                  '$_currencySymbol${_amountController.text}',
+                  '$_currencySymbol$amount',
                   style: AppTextStyles.headlineMedium(color: AppColors.primary),
                 ),
+                // Show items in the QR card
+                if (_items.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Divider(color: Colors.grey),
+                  const SizedBox(height: 4),
+                  ..._items.map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  )),
+                ],
               ],
             ),
           ),

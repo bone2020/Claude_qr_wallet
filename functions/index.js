@@ -3674,7 +3674,7 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('failed-precondition', 'Your account is suspended.');
   }
 
-  const { walletId, amount, note } = data;
+  const { walletId, amount, note, items } = data;
 
   if (!walletId || typeof walletId !== 'string') {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid wallet ID.');
@@ -3695,6 +3695,7 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
     walletId,
     amount: amount || 0,
     note: note || '',
+    items: Array.isArray(items) ? items.slice(0, 20) : [],
     nonce,
     timestamp,
     userId,
@@ -3708,6 +3709,7 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
     nonce,
     walletId,
     amount: amount || 0,
+    items: Array.isArray(items) ? items.slice(0, 20) : [],
     createdBy: userId,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt: admin.firestore.Timestamp.fromMillis(expiresAt),
@@ -3844,12 +3846,19 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
     nonce,
   });
 
+  // Use legalName (title-cased, masked) for privacy
+  const userData = userDoc.exists ? userDoc.data() : {};
+  const verifiedDisplayName = userData.legalName
+    ? titleCaseName(userData.legalName)
+    : (userData.fullName || 'QR Wallet User');
+
   return {
     valid: true,
     walletId: parsedPayload.walletId,
     amount: parsedPayload.amount,
     note: parsedPayload.note,
-    recipientName: userDoc.exists ? userDoc.data().fullName : 'QR Wallet User',
+    items: parsedPayload.items || [],
+    recipientName: maskName(verifiedDisplayName),
     nonce,
   };
 });
@@ -6624,7 +6633,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
   // Enforce persistent rate limiting (20 sends per hour)
   await enforceRateLimit(senderUid, 'sendMoney');
 
-  const { recipientWalletId, amount, note, idempotencyKey } = data;
+  const { recipientWalletId, amount, note, items, idempotencyKey } = data;
 
   // 2. Validate inputs
   if (!recipientWalletId || typeof recipientWalletId !== 'string') {
@@ -6818,6 +6827,11 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       });
 
       // Transaction data
+      // Sanitize items: must be array of strings, max 20 items, max 100 chars each
+      const sanitizedItems = Array.isArray(items)
+        ? items.filter(i => typeof i === 'string').slice(0, 20).map(i => i.substring(0, 100))
+        : [];
+
       const baseTxData = {
         id: txId,
         senderWalletId: senderData.walletId,
@@ -6830,6 +6844,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
         senderCurrency: senderData.currency || 'GHS',
         receiverCurrency: recipientData.currency || 'GHS',
         note: note || '',
+        items: sanitizedItems.length > 0 ? sanitizedItems : null,
         status: 'completed',
         createdAt: timestamps.serverTimestamp(),
         completedAt: timestamps.serverTimestamp(),

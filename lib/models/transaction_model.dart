@@ -94,6 +94,9 @@ class TransactionModel {
   @HiveField(19)
   final String? method;
 
+  @HiveField(20)
+  final List<String>? items;
+
   TransactionModel({
     required this.id,
     required this.senderWalletId,
@@ -115,6 +118,7 @@ class TransactionModel {
     this.convertedAmount,
     this.exchangeRate,
     this.method,
+    this.items,
   });
 
   /// Create transaction from Firestore document
@@ -156,6 +160,9 @@ class TransactionModel {
       convertedAmount: (json['convertedAmount'] as num?)?.toInt(),
       exchangeRate: (json['exchangeRate'] as num?)?.toDouble(),
       method: json['method'] as String?,
+      items: json['items'] != null
+          ? (json['items'] as List<dynamic>).map((e) => e.toString()).toList()
+          : null,
     );
   }
 
@@ -182,6 +189,7 @@ class TransactionModel {
       'convertedAmount': convertedAmount,
       'exchangeRate': exchangeRate,
       'method': method,
+      'items': items,
     };
   }
 
@@ -207,6 +215,7 @@ class TransactionModel {
     int? convertedAmount,
     double? exchangeRate,
     String? method,
+    List<String>? items,
   }) {
     return TransactionModel(
       id: id ?? this.id,
@@ -229,6 +238,7 @@ class TransactionModel {
       convertedAmount: convertedAmount ?? this.convertedAmount,
       exchangeRate: exchangeRate ?? this.exchangeRate,
       method: method ?? this.method,
+      items: items ?? this.items,
     );
   }
 

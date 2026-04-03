@@ -165,6 +165,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     required String recipientWalletId,
     required int amount,
     String? note,
+    List<String>? items,
   }) async {
     if (_userId == null) {
       return TransactionResult.failure('User not authenticated');
@@ -177,6 +178,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
         'recipientWalletId': recipientWalletId,
         'amount': amount,
         'note': note ?? '',
+        if (items != null && items.isNotEmpty) 'items': items,
         'idempotencyKey': idempotencyKey,
       });
 

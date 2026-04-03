@@ -56,6 +56,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
       int? amount;
       String? currency;
       String? note;
+      List<String>? items;
       bool isVerifiedQr = false;
 
       // First, try to parse as signed QR (v2 format)
@@ -79,6 +80,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
         walletId = verification.walletId;
         amount = verification.amount != null ? (verification.amount! * 100).round() : null;
         note = verification.note;
+        items = verification.items;
         isVerifiedQr = true;
       } else {
         // Try legacy format: qrwallet://pay?id=...
@@ -145,6 +147,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
           'recipientName': name ?? 'Unknown',
           'amount': amount ?? 0,
           'note': note,
+          'items': items,
           'fromScan': true,
           'amountLocked': amount != null && amount > 0,
           'recipientCurrency': recipientCurrency,

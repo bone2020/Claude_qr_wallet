@@ -9,6 +9,7 @@ class QrSigningService {
     required String walletId,
     double? amount,
     String? note,
+    List<String>? items,
   }) async {
     try {
       final callable = _functions.httpsCallable('signQrPayload');
@@ -16,6 +17,7 @@ class QrSigningService {
         'walletId': walletId,
         'amount': amount ?? 0,
         'note': note ?? '',
+        if (items != null && items.isNotEmpty) 'items': items,
       });
 
       return SignedQrPayload(
@@ -45,11 +47,20 @@ class QrSigningService {
       final data = result.data;
       
       if (data['valid'] == true) {
+        // Parse items list from server response
+        List<String>? itemsList;
+        if (data['items'] != null) {
+          itemsList = (data['items'] as List<dynamic>)
+              .map((e) => e.toString())
+              .toList();
+        }
+
         return QrVerificationResult(
           isValid: true,
           walletId: data['walletId'] as String?,
           amount: (data['amount'] as num?)?.toDouble(),
           note: data['note'] as String?,
+          items: itemsList,
           recipientName: data['recipientName'] as String?,
           profilePhotoUrl: data['profilePhotoUrl'] as String?,
         );
@@ -128,6 +139,7 @@ class QrVerificationResult {
   final String? walletId;
   final double? amount;
   final String? note;
+  final List<String>? items;
   final String? recipientName;
   final String? profilePhotoUrl;
   final String? errorReason;
@@ -137,6 +149,7 @@ class QrVerificationResult {
     this.walletId,
     this.amount,
     this.note,
+    this.items,
     this.recipientName,
     this.profilePhotoUrl,
     this.errorReason,
