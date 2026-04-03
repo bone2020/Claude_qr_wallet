@@ -102,7 +102,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     try {
       final result = await _paymentService.getOrCreateVirtualAccount(
         email: user.email,
-        name: user.fullName,
+        name: user.displayName,
       );
 
       if (mounted) {

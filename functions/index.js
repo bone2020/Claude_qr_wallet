@@ -3854,6 +3854,37 @@ exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
   };
 });
 
+// ============================================================
+// NAME HELPERS — Title-casing and masking for legal names
+// ============================================================
+
+/**
+ * Title-case a name: "JOE LEO DOE" → "Joe Leo Doe"
+ * Handles edge cases: empty strings, single names, hyphens, apostrophes
+ */
+function titleCaseName(name) {
+  if (!name || typeof name !== 'string') return name;
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/(?:^|\s|[-'])\S/g, (char) => char.toUpperCase());
+}
+
+/**
+ * Mask a name for privacy: "Joe Leo Doe" → "Joe D."
+ * Shows first name + last name initial + period.
+ * If only one name part, returns it as-is.
+ * Falls back to 'QR Wallet User' if empty.
+ */
+function maskName(name) {
+  if (!name || typeof name !== 'string' || !name.trim()) return 'QR Wallet User';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const firstName = parts[0];
+  const lastInitial = parts[parts.length - 1][0].toUpperCase();
+  return `${firstName} ${lastInitial}.`;
+}
+
 // Lookup wallet with rate limiting
 exports.lookupWallet = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -3903,11 +3934,17 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
   const userDoc = await db.collection('users').doc(walletDoc.id).get();
   const userData = userDoc.exists ? userDoc.data() : {};
 
-  // Return only wallet ID and display name — no profile photo, email, phone, or other PII
-return {
+  // Use legalName (title-cased) if available, fall back to fullName
+  const displayName = userData.legalName
+    ? titleCaseName(userData.legalName)
+    : (userData.fullName || 'QR Wallet User');
+
+  // Return full verified name for sender confirmation + masked version for transaction history
+  return {
     found: true,
     walletId: walletData.walletId,
-    recipientName: userData.fullName || 'QR Wallet User',
+    recipientName: displayName,
+    maskedName: maskName(displayName),
     currency: walletData.currency || 'NGN',
   };
 });
@@ -6689,8 +6726,20 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // senderUserDoc already fetched above for block check
       const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
 
-      const senderName = senderUserDoc.exists ? senderUserDoc.data().fullName : 'Unknown';
-      const recipientName = recipientUserDoc.exists ? recipientUserDoc.data().fullName : 'Unknown';
+      // Use legalName (title-cased) if KYC verified, otherwise fullName
+      const senderData_ = senderUserDoc.exists ? senderUserDoc.data() : {};
+      const recipientData_ = recipientUserDoc.exists ? recipientUserDoc.data() : {};
+
+      const senderDisplayName = senderData_.legalName
+        ? titleCaseName(senderData_.legalName)
+        : (senderData_.fullName || 'Unknown');
+      const recipientDisplayName = recipientData_.legalName
+        ? titleCaseName(recipientData_.legalName)
+        : (recipientData_.fullName || 'Unknown');
+
+      // Store MASKED names in transaction records for privacy
+      const senderName = maskName(senderDisplayName);
+      const recipientName = maskName(recipientDisplayName);
 
       // Check if recipient account is blocked
       if (recipientUserDoc.exists && recipientUserDoc.data().accountBlocked === true) {
@@ -6832,17 +6881,17 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       ipHash: hashIp(context),
     });
 
-    // Send push notifications to both parties
+    // Send push notifications to both parties (using masked names for privacy)
     await Promise.all([
       sendPushNotification(senderUid, {
         title: 'Money Sent',
-        body: `You sent ${result.senderCurrency || ''}${amount.toFixed(2)} to ${result.recipientName || 'a wallet'}`,
+        body: `You sent ${result.senderCurrency || ''}${(amount / 100).toFixed(2)} to ${result.recipientName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_sent', amount: amount.toString(), transactionId: result.transactionId },
       }),
       sendPushNotification(result.recipientUid, {
         title: 'Money Received',
-        body: `You received ${result.recipientCurrency || ''}${amount.toFixed(2)} from ${result.senderName || 'a wallet'}`,
+        body: `You received ${result.recipientCurrency || ''}${(amount / 100).toFixed(2)} from ${result.senderName || 'a wallet'}`,
         type: 'transaction',
         data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
       }),
@@ -7821,9 +7870,9 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
         'kycDetails.verifiedAt': admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      // Store legal name if extracted
+      // Store legal name if extracted (title-cased)
       if (legalName) {
-        updateData.legalName = legalName;
+        updateData.legalName = titleCaseName(legalName);
       }
 
       await userRef.update(updateData);
@@ -8027,7 +8076,7 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
         isVerified: true,
       };
 
-      if (legalName) updateData.legalName = legalName;
+      if (legalName) updateData.legalName = titleCaseName(legalName);
       if (dob) updateData.dateOfBirth = dob;
       if (idNumber) updateData.idNumber = idNumber;
 

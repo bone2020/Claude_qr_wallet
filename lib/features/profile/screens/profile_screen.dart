@@ -312,7 +312,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     // Get real user data from provider
     final user = ref.watch(currentUserProvider);
-    final userName = user?.fullName ?? 'User';
+    final userName = user?.displayName ?? 'User';
     final email = user?.email ?? '';
     final phone = user?.phoneNumber ?? '';
     final profilePhoto = user?.profilePhotoUrl;

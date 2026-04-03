@@ -75,6 +75,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
         walletId: data['walletId'] as String,
         userId: '',
         fullName: data['recipientName'] as String? ?? 'Unknown',
+        maskedName: data['maskedName'] as String?,
         profilePhotoUrl: data['profilePhotoUrl'] as String?,
         currency: currency,
         currencySymbol: _getCurrencySymbol(currency),
@@ -447,6 +448,7 @@ class WalletLookupResult {
   final String? walletId;
   final String? userId;
   final String? fullName;
+  final String? maskedName;
   final String? profilePhotoUrl;
   final String? currency;
   final String? currencySymbol;
@@ -456,6 +458,7 @@ class WalletLookupResult {
     this.walletId,
     this.userId,
     this.fullName,
+    this.maskedName,
     this.profilePhotoUrl,
     this.currency,
     this.currencySymbol,
@@ -465,6 +468,7 @@ class WalletLookupResult {
     required String walletId,
     required String userId,
     required String fullName,
+    String? maskedName,
     String? profilePhotoUrl,
     required String currency,
     required String currencySymbol,
@@ -474,6 +478,7 @@ class WalletLookupResult {
       walletId: walletId,
       userId: userId,
       fullName: fullName,
+      maskedName: maskedName,
       profilePhotoUrl: profilePhotoUrl,
       currency: currency,
       currencySymbol: currencySymbol,

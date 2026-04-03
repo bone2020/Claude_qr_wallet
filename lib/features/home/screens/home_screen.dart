@@ -42,7 +42,7 @@ class HomeScreen extends ConsumerWidget {
     final walletState = ref.watch(walletNotifierProvider);
     final recentTransactions = ref.watch(recentTransactionsProvider);
 
-    final userName = _getFirstName(user?.fullName);
+    final userName = _getFirstName(user?.displayName);
     final balance = walletState.balance;
     final currency = walletState.currencySymbol;
     final walletId = walletState.walletId;

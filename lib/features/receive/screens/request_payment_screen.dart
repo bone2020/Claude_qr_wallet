@@ -30,7 +30,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   bool _isDownloading = false;
 
   String get _walletId => ref.watch(walletNotifierProvider).wallet?.walletId ?? '';
-  String get _userName => ref.watch(currentUserProvider)?.fullName ?? 'User';
+  String get _userName => ref.watch(currentUserProvider)?.displayName ?? 'User';
   String? get _businessLogoUrl => ref.watch(currentUserProvider)?.businessLogoUrl;
   String get _currencySymbol => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;

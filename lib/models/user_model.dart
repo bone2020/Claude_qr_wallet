@@ -170,33 +170,59 @@ class UserModel {
     );
   }
 
-  /// Get display name — prefers legalName over fullName
-  String get displayName => legalName ?? fullName;
+  /// Get display name — prefers legalName (title-cased) over fullName
+  String get displayName => legalName != null ? _titleCase(legalName!) : fullName;
 
-  /// Get display name (first name)
+  /// Title-case a name: "JOE LEO DOE" → "Joe Leo Doe"
+  static String _titleCase(String name) {
+    if (name.isEmpty) return name;
+    return name.trim().toLowerCase().replaceAllMapped(
+      RegExp(r"(?:^|\s|[-'])\S"),
+      (match) => match.group(0)!.toUpperCase(),
+    );
+  }
+
+  /// Mask name for privacy: "Joe Leo Doe" → "Joe D."
+  String get maskedName {
+    final name = displayName;
+    if (name.isEmpty) return 'User';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0];
+    final firstName = parts[0];
+    final lastInitial = parts.last[0].toUpperCase();
+    return '$firstName $lastInitial.';
+  }
+
+  /// Get first name from display name
   String get firstName {
-    if (fullName.isEmpty) return '';
-    final parts = fullName.trim().split(' ');
+    final name = displayName;
+    if (name.isEmpty) return '';
+    final parts = name.trim().split(' ');
     return parts.isNotEmpty ? parts.first : '';
   }
 
-  /// Get last name
+  /// Get last name from display name
   String get lastName {
-    if (fullName.isEmpty) return '';
-    final parts = fullName.trim().split(' ');
+    final name = displayName;
+    if (name.isEmpty) return '';
+    final parts = name.trim().split(' ');
     return parts.length > 1 ? parts.skip(1).join(' ') : '';
   }
 
-  /// Get initials for avatar
+  /// Get initials for avatar from display name
   String get initials {
-    if (fullName.isEmpty) return '??';
-    final parts = fullName.trim().split(' ');
+    final name = displayName;
+    if (name.isEmpty) return '??';
+    final parts = name.trim().split(' ');
     if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
-    if (fullName.length >= 2) {
-      return fullName.substring(0, 2).toUpperCase();
+    if (name.length >= 2) {
+      return name.substring(0, 2).toUpperCase();
     }
-    return fullName.isNotEmpty ? fullName[0].toUpperCase() : '??';
+    return name.isNotEmpty ? name[0].toUpperCase() : '??';
   }
+
+  /// Whether the user has completed KYC and name is locked
+  bool get isNameLocked => kycStatus == 'verified' && legalName != null;
 }

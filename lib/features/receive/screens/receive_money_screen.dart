@@ -125,7 +125,7 @@ Or scan my QR code in the app.
     // Get real data from providers
     final walletId = ref.watch(walletNotifierProvider).walletId;
     final user = ref.watch(currentUserProvider);
-    final userName = user?.fullName ?? 'User';
+    final userName = user?.displayName ?? 'User';
 
     // Generate QR data with real values
     final qrData = 'qrwallet://pay?id=$walletId&name=${Uri.encodeComponent(userName)}';

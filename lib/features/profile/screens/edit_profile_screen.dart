@@ -42,7 +42,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void _loadCurrentUserData() {
     final user = ref.read(currentUserProvider);
     if (user != null) {
-      _fullNameController.text = user.fullName;
+      _fullNameController.text = user.displayName;
       _emailController.text = user.email;
       _phoneController.text = user.phoneNumber;
       _currentPhotoUrl = user.profilePhotoUrl;
@@ -164,21 +164,26 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         photoUrl = await _uploadProfilePhoto(firebaseUser.uid);
       }
 
-      // Update display name in Firebase Auth
-      await firebaseUser.updateDisplayName(_fullNameController.text.trim());
+      // Update display name in Firebase Auth (skip if name is locked by KYC)
+      final isNameLocked = ref.read(currentUserProvider)?.isNameLocked ?? false;
+      if (!isNameLocked) {
+        await firebaseUser.updateDisplayName(_fullNameController.text.trim());
+      }
       if (photoUrl != null) {
         await firebaseUser.updatePhotoURL(photoUrl);
       }
 
       // Update user document in Firestore
+      final isLocked = ref.read(currentUserProvider)?.isNameLocked ?? false;
+      final updateData = <String, dynamic>{
+        if (!isLocked) 'fullName': _fullNameController.text.trim(),
+        if (photoUrl != null) 'profilePhotoUrl': photoUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
       await FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)
-          .update({
-        'fullName': _fullNameController.text.trim(),
-        if (photoUrl != null) 'profilePhotoUrl': photoUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(updateData);
 
       // Refresh auth state
       ref.read(authNotifierProvider.notifier).refreshUser();
@@ -211,8 +216,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final initials = user?.fullName.isNotEmpty == true
-        ? user!.fullName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+    final initials = user?.displayName.isNotEmpty == true
+        ? user!.displayName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
         : 'U';
 
     return Scaffold(
@@ -245,6 +250,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         label: AppStrings.fullName,
                         hintText: AppStrings.fullNameHint,
                         controller: _fullNameController,
+                        readOnly: ref.watch(currentUserProvider)?.isNameLocked ?? false,
                         textInputAction: TextInputAction.next,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -253,6 +259,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           return null;
                         },
                       ),
+                      // Show lock notice if name is verified
+                      if (ref.watch(currentUserProvider)?.isNameLocked ?? false) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.verified, size: 14, color: AppColors.success),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Name verified via KYC — cannot be changed',
+                              style: AppTextStyles.caption(color: AppColors.success),
+                            ),
+                          ],
+                        ),
+                      ],
 
                       const SizedBox(height: AppDimensions.spaceMD),
 
