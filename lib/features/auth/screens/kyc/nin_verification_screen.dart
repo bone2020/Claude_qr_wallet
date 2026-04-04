@@ -142,7 +142,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
-        idType: 'NIN_V2',
+        idType: 'NIN',
         idNumber: _idNumberController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,
@@ -198,7 +198,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           await submitKyc.call({
             'smileUserId': _userId,
             'country': widget.countryCode,
-            'idType': 'NIN_V2',
+            'idType': 'NIN',
             'idNumber': _idNumberController.text.trim(),
           });
         } catch (e) {
