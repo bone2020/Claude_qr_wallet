@@ -8,7 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
-import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
+import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -74,11 +74,8 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => _SmileIdBiometricScreen(
+        builder: (context) => _SmileIdSmartSelfieScreen(
           userId: _userId!,
-          countryCode: widget.countryCode,
-          idType: 'NIN',
-          idNumber: idNumber,
         ),
       ),
     );
@@ -89,7 +86,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         _verificationResult = result;
         _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
       });
-      _showSuccess('Document captured successfully');
+      _showSuccess('Selfie captured successfully');
     }
   }
 
@@ -145,12 +142,12 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
-        idType: 'NIN',
+        idType: 'NIN_V2',
         idNumber: _idNumberController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,
-        idFront: _smileIdFiles?.documentFront,
-        idBack: _smileIdFiles?.documentBack,
+        idFront: null,
+        idBack: null,
         smileIdVerified: false,
         smileIdResult: _verificationResult,
       );
@@ -193,6 +190,19 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           }
         } catch (e) {
           debugPrint('Error saving SmileID job info: $e');
+        }
+
+        // Submit Biometric KYC via server-side API
+        try {
+          final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
+          await submitKyc.call({
+            'smileUserId': _userId,
+            'country': widget.countryCode,
+            'idType': 'NIN_V2',
+            'idNumber': _idNumberController.text.trim(),
+          });
+        } catch (e) {
+          debugPrint('Error submitting biometric KYC: $e');
         }
 
         await PushNotificationService().saveTokenToFirestore();
@@ -324,38 +334,30 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 }
 
-/// Internal Smile ID Biometric KYC Screen
-class _SmileIdBiometricScreen extends StatelessWidget {
+/// Internal SmartSelfie Enrollment Screen (selfie only, no document)
+class _SmileIdSmartSelfieScreen extends StatelessWidget {
   final String userId;
-  final String countryCode;
-  final String idType;
-  final String idNumber;
 
-  const _SmileIdBiometricScreen({
+  const _SmileIdSmartSelfieScreen({
     required this.userId,
-    required this.countryCode,
-    required this.idType,
-    required this.idNumber,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SmileIDBiometricKYC(
-        country: countryCode,
-        idType: idType,
-        idNumber: idNumber,
+      body: SmileIDSmartSelfieEnrollment(
         userId: userId,
-        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
+        allowNewEnroll: true,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
+        extraPartnerParams: {
+          "callback_url": _smileIdCallbackUrl,
+        },
         onSuccess: (result) {
           Navigator.pop(context, result);
         },
-        onError: (error) async {
-          // "Already enrolled" means SmileID has seen this user before
-          // Still require webhook verification — don't bypass
+        onError: (error) {
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
             if (context.mounted) {
               Navigator.pop(context, 'already_enrolled_pending');

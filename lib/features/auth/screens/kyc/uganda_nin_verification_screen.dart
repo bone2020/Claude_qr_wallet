@@ -8,7 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
-import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
+import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -83,14 +83,12 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
       return;
     }
 
-    // Use Biometric KYC with NIN
+    // Use SmartSelfie enrollment (selfie only, no document)
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => _UgandaSmileIdBiometricScreen(
+        builder: (context) => _SmileIdSmartSelfieScreen(
           userId: _userId!,
-          idNumber: nin,
-          secondaryIdNumber: cardNumber,
         ),
       ),
     );
@@ -164,8 +162,8 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
         idNumber: _ninController.text.trim(),
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,
-        idFront: _smileIdFiles?.documentFront,
-        idBack: _smileIdFiles?.documentBack,
+        idFront: null,
+        idBack: null,
         smileIdVerified: false,
         smileIdResult: _verificationResult,
       );
@@ -208,6 +206,19 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
           }
         } catch (e) {
           debugPrint('Error saving SmileID job info: $e');
+        }
+
+        // Submit Biometric KYC via server-side API
+        try {
+          final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
+          await submitKyc.call({
+            'smileUserId': _userId,
+            'country': widget.countryCode,
+            'idType': 'NATIONAL_ID_NO_PHOTO',
+            'idNumber': _ninController.text.trim(),
+          });
+        } catch (e) {
+          debugPrint('Error submitting biometric KYC: $e');
         }
 
         await PushNotificationService().saveTokenToFirestore();
@@ -352,37 +363,30 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   }
 }
 
-/// Internal Smile ID Biometric KYC Screen for Uganda
-/// Sends NIN as id_number and card number as secondary_id_number
-class _UgandaSmileIdBiometricScreen extends StatelessWidget {
+/// Internal SmartSelfie Enrollment Screen (selfie only, no document)
+class _SmileIdSmartSelfieScreen extends StatelessWidget {
   final String userId;
-  final String idNumber;
-  final String secondaryIdNumber;
 
-  const _UgandaSmileIdBiometricScreen({
+  const _SmileIdSmartSelfieScreen({
     required this.userId,
-    required this.idNumber,
-    required this.secondaryIdNumber,
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SmileIDBiometricKYC(
-        country: 'UG',
-        idType: 'NATIONAL_ID_NO_PHOTO',
-        idNumber: idNumber,
+      body: SmileIDSmartSelfieEnrollment(
         userId: userId,
-        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
+        allowNewEnroll: true,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
+        extraPartnerParams: {
+          "callback_url": _smileIdCallbackUrl,
+        },
         onSuccess: (result) {
           Navigator.pop(context, result);
         },
-        onError: (error) async {
-          // "Already enrolled" means SmileID has seen this user before
-          // Still require webhook verification — don't bypass
+        onError: (error) {
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
             if (context.mounted) {
               Navigator.pop(context, 'already_enrolled_pending');

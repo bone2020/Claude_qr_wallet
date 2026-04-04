@@ -8164,3 +8164,107 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('internal', 'Failed to check job status');
   }
 });
+
+// ============================================================
+// SMILE ID BIOMETRIC KYC — SERVER-SIDE SUBMISSION
+// Used when SmartSelfie enrollment is done on-device and we need
+// to submit ID number verification against government database
+// ============================================================
+exports.submitBiometricKycVerification = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const userId = context.auth.uid;
+  const { smileUserId, country, idType, idNumber, firstName, lastName, dob } = data;
+
+  if (!smileUserId || !country || !idType || !idNumber) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'smileUserId, country, idType, and idNumber are required');
+  }
+
+  logInfo('Submitting Biometric KYC verification', { userId, smileUserId, country, idType });
+
+  const partnerId = SMILE_ID_PARTNER_ID;
+  const apiKey = SMILE_ID_API_KEY;
+
+  if (!apiKey) {
+    logError('SMILE_API_KEY not configured for biometric KYC submission');
+    throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
+  }
+
+  const timestamp = new Date().toISOString();
+  const signature = generateSmileIdSignature(timestamp);
+  const jobId = `job_${partnerId}_${crypto.randomUUID()}`;
+  const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+
+  try {
+    const fetch = (await import('node-fetch')).default;
+
+    // Prepare upload (get upload URL from SmileID)
+    const prepResponse = await fetch(`https://${SMILE_ID_BASE_URL}/v1/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_sdk: 'rest_api',
+        source_sdk_version: '1.0.0',
+        file_name: 'selfie.zip',
+        smile_client_id: partnerId,
+        partner_params: {
+          user_id: smileUserId,
+          job_id: jobId,
+          job_type: 1, // Biometric KYC
+        },
+        timestamp: timestamp,
+        signature: signature,
+        callback_url: callbackUrl,
+        model_parameters: {},
+        id_info: {
+          country: country,
+          id_type: idType,
+          id_number: idNumber,
+          first_name: firstName || '',
+          last_name: lastName || '',
+          dob: dob || '',
+          entered: true,
+        },
+      }),
+    });
+
+    if (!prepResponse.ok) {
+      const errorText = await prepResponse.text();
+      logError('SmileID prep upload failed', { status: prepResponse.status, error: errorText });
+      throw new functions.https.HttpsError('internal', 'SmileID upload preparation failed');
+    }
+
+    const prepResult = await prepResponse.json();
+    logInfo('SmileID prep upload success', { uploadUrl: prepResult.upload_url ? 'present' : 'missing' });
+
+    // Save the job info to Firestore so we can track it
+    await db.collection('users').doc(userId).update({
+      smileUserId: smileUserId,
+      smileJobId: jobId,
+      kycStatus: 'pending_review',
+    });
+
+    // Save job details in kyc subcollection
+    await db.collection('users').doc(userId).collection('kyc').doc('pending_job').set({
+      jobId: jobId,
+      smileUserId: smileUserId,
+      country: country,
+      idType: idType,
+      idNumber: idNumber,
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'submitted',
+    });
+
+    return {
+      success: true,
+      jobId: jobId,
+      message: 'Biometric KYC verification submitted. The selfie from your enrollment will be used for face matching.',
+    };
+  } catch (error) {
+    logError('Error submitting biometric KYC', { userId, error: error.message });
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', 'Failed to submit verification: ' + error.message);
+  }
+});
