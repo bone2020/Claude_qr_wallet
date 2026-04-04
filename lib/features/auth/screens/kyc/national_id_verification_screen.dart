@@ -46,7 +46,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   String? _userId;
 
   // South Africa requires ID number
-  bool get _requiresIdNumber => widget.countryCode == 'ZA' || widget.countryCode == 'ZM';
+  bool get _requiresIdNumber => widget.countryCode == 'ZA' || widget.countryCode == 'ZM' || widget.countryCode == 'ZW';
 
   String get _documentType {
     switch (widget.countryCode) {
@@ -120,7 +120,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
           builder: (context) => _SmileIdBiometricScreen(
             userId: _userId!,
             countryCode: widget.countryCode,
-            idType: 'NATIONAL_ID',
+            idType: _documentType,
             idNumber: idNumber,
           ),
         ),
@@ -214,7 +214,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
-        idType: 'NATIONAL_ID',
+       idType: _documentType, 
         idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,

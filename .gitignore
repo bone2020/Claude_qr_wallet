@@ -49,3 +49,6 @@ app.*.map.json
 node_modules
 functions/serviceAccountKey.json
 functions/serviceAccountKey.json
+
+# iOS build cache in android directory
+android/build/
