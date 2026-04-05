@@ -12,6 +12,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
+import '../../../../providers/auth_provider.dart';
  
 class VerificationPendingScreen extends ConsumerStatefulWidget {
   const VerificationPendingScreen({super.key});
@@ -145,6 +146,7 @@ class _VerificationPendingScreenState
 
         // Refresh in background after navigation
         try {
+          ref.read(authNotifierProvider.notifier).refreshUser();
           ref.read(walletNotifierProvider.notifier).refreshWallet();
           ref.read(currencyNotifierProvider.notifier).loadUserCurrency();
           PushNotificationService().saveTokenToFirestore();
