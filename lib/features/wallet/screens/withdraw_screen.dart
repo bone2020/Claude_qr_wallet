@@ -506,7 +506,8 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               'Confirm Withdrawal',
               style: AppTextStyles.headlineSmall(),
             ),
-            content: Column(
+            content: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -546,6 +547,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   ),
                 ),
               ],
+            ),
             ),
             actions: [
               TextButton(
