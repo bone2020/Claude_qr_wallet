@@ -81,6 +81,9 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     );
 
     if (result != null) {
+      debugPrint('=== SMILEID RESULT JSON START ===');
+      debugPrint(result);
+      debugPrint('=== SMILEID RESULT JSON END ===');
       setState(() {
         _isCaptured = true;
         _verificationResult = result;
