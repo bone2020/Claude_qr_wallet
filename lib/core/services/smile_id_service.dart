@@ -229,10 +229,22 @@ class SmileIDService {
 
     try {
       final Map<String, dynamic> data = jsonDecode(result);
+
+      // Parse liveness files array (from SmartSelfie capture)
+      final List<File> livenessImages = [];
+      if (data['livenessFiles'] is List) {
+        for (final path in data['livenessFiles'] as List) {
+          if (path is String && path.isNotEmpty) {
+            livenessImages.add(File(path));
+          }
+        }
+      }
+
       return SmileIdFiles(
         selfie: data['selfieFile'] != null ? File(data['selfieFile'] as String) : null,
         documentFront: data['documentFrontFile'] != null ? File(data['documentFrontFile'] as String) : null,
         documentBack: data['documentBackFile'] != null ? File(data['documentBackFile'] as String) : null,
+        livenessImages: livenessImages,
       );
     } catch (e) {
       debugPrint('Failed to parse Smile ID result files: $e');
@@ -515,10 +527,12 @@ class SmileIdFiles {
   final File? selfie;
   final File? documentFront;
   final File? documentBack;
+  final List<File> livenessImages;
 
   SmileIdFiles({
     this.selfie,
     this.documentFront,
     this.documentBack,
+    this.livenessImages = const [],
   });
 }
