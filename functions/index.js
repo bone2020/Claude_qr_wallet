@@ -8171,88 +8171,148 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
 // to submit ID number verification against government database
 // ============================================================
 exports.submitBiometricKycVerification = functions.https.onCall(async (data, context) => {
+  // Lazy requires — keeps all changes localized to this function
+  const SmileIdentityCore = require('smile-identity-core');
+  const SmileWebApi = SmileIdentityCore.WebApi;
+  const SmileImageType = SmileIdentityCore.IMAGE_TYPE;
+  const SmileJobType = SmileIdentityCore.JOB_TYPE;
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
 
   const userId = context.auth.uid;
-  const { smileUserId, country, idType, idNumber, firstName, lastName, dob } = data;
+  const {
+    smileUserId,
+    country,
+    idType,
+    idNumber,
+    selfieStoragePath,
+    livenessStoragePaths,
+    firstName,
+    lastName,
+    dob,
+  } = data;
 
+  // Validate required inputs
   if (!smileUserId || !country || !idType || !idNumber) {
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'smileUserId, country, idType, and idNumber are required');
   }
+  if (!selfieStoragePath) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'selfieStoragePath is required');
+  }
+  if (!Array.isArray(livenessStoragePaths) || livenessStoragePaths.length === 0) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'livenessStoragePaths must be a non-empty array');
+  }
 
-  logInfo('Submitting Biometric KYC verification', { userId, smileUserId, country, idType });
-
-  const partnerId = SMILE_ID_PARTNER_ID;
-  const apiKey = SMILE_ID_API_KEY;
-
-  if (!apiKey) {
-    logError('SMILE_API_KEY not configured for biometric KYC submission');
+  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+    logError('SmileID configuration missing for biometric KYC submission');
     throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
   }
 
-  const timestamp = new Date().toISOString();
-  const signature = generateSmileIdSignature(timestamp);
-  const jobId = `job_${partnerId}_${crypto.randomUUID()}`;
+  logInfo('Submitting Biometric KYC verification', {
+    userId,
+    smileUserId,
+    country,
+    idType,
+    livenessCount: livenessStoragePaths.length,
+  });
+
+  const jobId = `job_${SMILE_ID_PARTNER_ID}_${crypto.randomUUID()}`;
   const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+  const sidServer = SMILE_ID_BASE_URL.includes('testapi') ? 0 : 1;
+
+  // Track temp files for cleanup in finally block
+  const tempFiles = [];
 
   try {
-    const fetch = (await import('node-fetch')).default;
+    const bucket = admin.storage().bucket();
 
-    // Prepare upload (get upload URL from SmileID)
-    const prepResponse = await fetch(`https://${SMILE_ID_BASE_URL}/v1/upload`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source_sdk: 'rest_api',
-        source_sdk_version: '1.0.0',
-        file_name: 'selfie.zip',
-        smile_client_id: partnerId,
-        partner_params: {
-          user_id: smileUserId,
-          job_id: jobId,
-          job_type: 1, // Biometric KYC
-        },
-        timestamp: timestamp,
-        signature: signature,
-        callback_url: callbackUrl,
-        model_parameters: {},
-        id_info: {
-          country: country,
-          id_type: idType,
-          id_number: idNumber,
-          first_name: firstName || '',
-          last_name: lastName || '',
-          dob: dob || '',
-          entered: true,
-        },
-      }),
+    // Download selfie from Firebase Storage to /tmp
+    const selfieTempPath = path.join(os.tmpdir(), `${jobId}_selfie.jpg`);
+    await bucket.file(selfieStoragePath).download({ destination: selfieTempPath });
+    tempFiles.push(selfieTempPath);
+    logInfo('Selfie downloaded from Storage', { selfieStoragePath });
+
+    // Download all liveness images and base64-encode them
+    // (library zips files for type 0/1 only; type 6 must be base64 in info.json)
+    const livenessBase64Images = [];
+    for (let i = 0; i < livenessStoragePaths.length; i++) {
+      const livenessTempPath = path.join(os.tmpdir(), `${jobId}_liveness_${i}.jpg`);
+      await bucket.file(livenessStoragePaths[i]).download({ destination: livenessTempPath });
+      tempFiles.push(livenessTempPath);
+      const base64Image = fs.readFileSync(livenessTempPath).toString('base64');
+      livenessBase64Images.push(base64Image);
+    }
+    logInfo('Liveness images downloaded and encoded', { count: livenessBase64Images.length });
+
+    // Build image_details array for SmileID
+    // Selfie: file path (library will read and zip it)
+    // Liveness: base64 string (library will embed in info.json)
+    const imageDetails = [
+      {
+        image_type_id: SmileImageType.SELFIE_IMAGE_FILE,
+        image: selfieTempPath,
+      },
+      ...livenessBase64Images.map((base64) => ({
+        image_type_id: SmileImageType.LIVENESS_IMAGE_BASE64,
+        image: base64,
+      })),
+    ];
+
+    // partner_params: identifies the job to SmileID and our webhook
+    const partnerParams = {
+      user_id: smileUserId,
+      job_id: jobId,
+      job_type: SmileJobType.BIOMETRIC_KYC,
+    };
+
+    // id_info: tells SmileID which government database to query
+    // entered: 'true' means we're providing ID details for verification
+    const idInfo = {
+      country: country,
+      id_type: idType,
+      id_number: idNumber,
+      first_name: firstName || '',
+      last_name: lastName || '',
+      dob: dob || '',
+      entered: 'true',
+    };
+
+    // Submit via SmileID library — handles signature, ZIP, info.json, prep upload, S3 upload
+    const webApi = new SmileWebApi(
+      SMILE_ID_PARTNER_ID,
+      callbackUrl,
+      SMILE_ID_API_KEY,
+      sidServer
+    );
+
+    const submitResult = await webApi.submit_job(partnerParams, imageDetails, idInfo, {});
+    logInfo('SmileID submit_job completed', {
+      success: submitResult.success,
+      smileJobId: submitResult.smile_job_id,
     });
 
-    if (!prepResponse.ok) {
-      const errorText = await prepResponse.text();
-      logError('SmileID prep upload failed', { status: prepResponse.status, error: errorText });
-      throw new functions.https.HttpsError('internal', 'SmileID upload preparation failed');
-    }
-
-    const prepResult = await prepResponse.json();
-    logInfo('SmileID prep upload success', { uploadUrl: prepResult.upload_url ? 'present' : 'missing' });
-
-    // Save the job info to Firestore so we can track it
+    // Save job info to user document so verification_pending_screen can poll
     await db.collection('users').doc(userId).update({
       smileUserId: smileUserId,
       smileJobId: jobId,
       kycStatus: 'pending_review',
     });
 
-    // Save job details in kyc subcollection
+    // Save job details in kyc subcollection for audit trail
     await db.collection('users').doc(userId).collection('kyc').doc('pending_job').set({
       jobId: jobId,
       smileUserId: smileUserId,
+      smileServerJobId: submitResult.smile_job_id || null,
       country: country,
       idType: idType,
       idNumber: idNumber,
+      selfieStoragePath: selfieStoragePath,
+      livenessStoragePaths: livenessStoragePaths,
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       status: 'submitted',
     });
@@ -8260,11 +8320,27 @@ exports.submitBiometricKycVerification = functions.https.onCall(async (data, con
     return {
       success: true,
       jobId: jobId,
-      message: 'Biometric KYC verification submitted. The selfie from your enrollment will be used for face matching.',
+      smileJobId: submitResult.smile_job_id || null,
+      message: 'Biometric KYC verification submitted to SmileID. Awaiting webhook result.',
     };
   } catch (error) {
-    logError('Error submitting biometric KYC', { userId, error: error.message });
+    logError('Error submitting biometric KYC', {
+      userId,
+      error: error.message,
+      stack: error.stack,
+    });
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', 'Failed to submit verification: ' + error.message);
+  } finally {
+    // Cleanup temp files in /tmp (Firebase Storage copies remain for audit)
+    for (const tempFile of tempFiles) {
+      try {
+        if (fs.existsSync(tempFile)) {
+          fs.unlinkSync(tempFile);
+        }
+      } catch (cleanupError) {
+        logInfo('Failed to cleanup temp file', { tempFile, error: cleanupError.message });
+      }
+    }
   }
 });
