@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +44,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles;
   String? _userId;
+  String? _loadingMessage;
 
   @override
   void initState() {
@@ -129,11 +131,34 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Validate that we actually have the captured files on disk
+    final selfieFile = _smileIdFiles?.selfie;
+    final livenessFiles = _smileIdFiles?.livenessImages ?? const <File>[];
+
+    if (selfieFile == null || !selfieFile.existsSync()) {
+      _showError('Selfie image is missing. Please retake your selfie.');
+      return;
+    }
+    if (livenessFiles.isEmpty) {
+      _showError('Verification images are missing. Please retake your selfie.');
+      return;
+    }
+    for (final f in livenessFiles) {
+      if (!f.existsSync()) {
+        _showError('Verification images are missing. Please retake your selfie.');
+        return;
+      }
+    }
+
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'Starting verification...';
+    });
 
     try {
       // Phone verification step (optional for SmileID countries)
-      final phoneVerified = await context.push<bool>(
+      // Run BEFORE uploading photos so user can back out without wasting bandwidth
+      await context.push<bool>(
         AppRoutes.kycPhoneVerification,
         extra: {
           'countryCode': widget.countryCode,
@@ -143,83 +168,135 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       if (!mounted) return;
 
-      final userService = UserService();
-      final result = await userService.uploadKycDocuments(
-        idType: 'NIN',
-        idNumber: _idNumberController.text.trim(),
-        dateOfBirth: _dateOfBirth!,
-        selfie: _smileIdFiles?.selfie,
-        idFront: null,
-        idBack: null,
-        smileIdVerified: false,
-        smileIdResult: _verificationResult,
-      );
+      // Confirm we still have a Firebase user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        _showError('You are not signed in. Please sign in and try again.');
+        return;
+      }
+      if (_userId == null) {
+        _showError('Verification session expired. Please retake your selfie.');
+        return;
+      }
+
+      // Generate a client-side job ID used only for storage path naming
+      // (the server function generates its own SmileID job ID separately)
+      final clientJobId =
+          'job_${DateTime.now().millisecondsSinceEpoch}_${firebaseUser.uid.substring(0, 6)}';
+
+      final storage = FirebaseStorage.instance;
+      final basePath = 'kyc_documents/${firebaseUser.uid}';
+
+      // Upload selfie
+      setState(() => _loadingMessage = 'Uploading selfie...');
+      final selfieStoragePath = '$basePath/${clientJobId}_selfie.jpg';
+      await storage.ref(selfieStoragePath).putFile(
+            selfieFile,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
 
       if (!mounted) return;
 
-      if (result.success) {
-        if (result.user != null) {
-          ref.read(authNotifierProvider.notifier).updateUser(result.user!);
-        }
-
-        // Set kycStatus to pending_review (webhook will finalize to verified)
-        final completeKyc = FirebaseFunctions.instance.httpsCallable('completeKycVerification');
-        await completeKyc.call();
-
-        // Save SmileID userId and jobId for polling
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null && _userId != null) {
-            String? smileJobId;
-            if (_verificationResult != null && _verificationResult != 'already_enrolled_pending') {
-              try {
-                final jsonResult = json.decode(_verificationResult!);
-                smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
-                // Extract job ID from file paths if not found
-                if (smileJobId == null) {
-                  final selfieFile = jsonResult['selfieFile']?.toString() ?? '';
-                  final jobMatch = RegExp(r'job-[a-f0-9\-]+').firstMatch(selfieFile);
-                  if (jobMatch != null) smileJobId = jobMatch.group(0);
-                }
-              } catch (_) {}
-            }
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .update({
-              'smileUserId': _userId,
-              if (smileJobId != null) 'smileJobId': smileJobId,
-            });
-          }
-        } catch (e) {
-          debugPrint('Error saving SmileID job info: $e');
-        }
-
-        // Submit Biometric KYC via server-side API
-        try {
-          final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
-          await submitKyc.call({
-            'smileUserId': _userId,
-            'country': widget.countryCode,
-            'idType': 'NIN',
-            'idNumber': _idNumberController.text.trim(),
-          });
-        } catch (e) {
-          debugPrint('Error submitting biometric KYC: $e');
-        }
-
-        await PushNotificationService().saveTokenToFirestore();
+      // Upload each liveness image, updating the progress message as we go
+      final livenessStoragePaths = <String>[];
+      for (var i = 0; i < livenessFiles.length; i++) {
         if (!mounted) return;
-        context.go(AppRoutes.verificationPending);
-      } else {
-        _showError(result.error ?? 'Failed to complete verification');
+        setState(() {
+          _loadingMessage =
+              'Uploading verification images... (${i + 1} of ${livenessFiles.length})';
+        });
+        final livenessPath = '$basePath/${clientJobId}_liveness_$i.jpg';
+        await storage.ref(livenessPath).putFile(
+              livenessFiles[i],
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+        livenessStoragePaths.add(livenessPath);
       }
+
+      if (!mounted) return;
+
+      // Write the kyc/documents record so the verification_pending_screen
+      // can find smileUserId/smileJobId and so other parts of the app that
+      // read this doc continue to work.
+      setState(() => _loadingMessage = 'Saving verification details...');
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .collection('kyc')
+          .doc('documents')
+          .set({
+        'idType': 'NIN',
+        'idNumber': _idNumberController.text.trim(),
+        'dateOfBirth': _dateOfBirth!.toIso8601String(),
+        'submittedAt': FieldValue.serverTimestamp(),
+        'status': 'pending_review',
+        'smileIdVerified': false,
+        'smileUserId': _userId,
+        'clientJobId': clientJobId,
+        'selfieStoragePath': selfieStoragePath,
+        'livenessStoragePaths': livenessStoragePaths,
+        if (_verificationResult != null) 'smileIdResult': _verificationResult,
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      // Update legacy KYC fields on the user doc.
+      // Do NOT set kycStatus here — the server function does that.
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(firebaseUser.uid)
+          .update({
+        'kycCompleted': true,
+        'dateOfBirth': _dateOfBirth!.toIso8601String(),
+      });
+
+      if (!mounted) return;
+
+      // Call the server function — this is the moment SmileID actually
+      // gets the verification request. Errors here MUST be shown to the user.
+      setState(() => _loadingMessage = 'Submitting verification...');
+      final submitKyc = FirebaseFunctions.instance
+          .httpsCallable('submitBiometricKycVerification');
+      await submitKyc.call(<String, dynamic>{
+        'smileUserId': _userId,
+        'country': widget.countryCode,
+        'idType': 'NIN',
+        'idNumber': _idNumberController.text.trim(),
+        'selfieStoragePath': selfieStoragePath,
+        'livenessStoragePaths': livenessStoragePaths,
+      });
+
+      if (!mounted) return;
+
+      // Refresh local user state and navigate to the waiting screen
+      try {
+        await ref.read(authNotifierProvider.notifier).refreshUser();
+      } catch (_) {}
+
+      try {
+        await PushNotificationService().saveTokenToFirestore();
+      } catch (_) {}
+
+      if (!mounted) return;
+      context.go(AppRoutes.verificationPending);
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      debugPrint('submitBiometricKycVerification failed: ${e.code} ${e.message}');
+      _showError(e.message ?? 'Failed to submit verification. Please try again.');
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      debugPrint('Firebase error during KYC submission: ${e.code} ${e.message}');
+      _showError(e.message ?? 'Upload failed. Please check your connection and try again.');
     } catch (e) {
       if (!mounted) return;
-      _showError(e.toString());
+      debugPrint('Unexpected error during KYC submission: $e');
+      _showError('Something went wrong. Please try again.');
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = null;
+        });
       }
     }
   }
@@ -321,10 +398,28 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           child: ElevatedButton(
             onPressed: _isLoading ? null : _handleContinue,
             child: _isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark),
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.backgroundDark,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          _loadingMessage ?? 'Please wait...',
+                          style: AppTextStyles.labelMedium(
+                            color: AppColors.backgroundDark,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   )
                 : Text(
                     AppStrings.continueText,
