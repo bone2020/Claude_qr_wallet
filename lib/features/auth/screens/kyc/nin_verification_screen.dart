@@ -1,20 +1,15 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
-import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
+import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
-import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
@@ -42,7 +37,6 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   bool _isLoading = false;
   bool _isCaptured = false;
   String? _verificationResult;
-  SmileIdFiles? _smileIdFiles;
   String? _userId;
   String? _loadingMessage;
 
@@ -73,11 +67,27 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       return;
     }
 
+    if (_dateOfBirth == null) {
+      _showError('Please select your date of birth before taking the selfie');
+      return;
+    }
+
+    final user = ref.read(currentUserProvider);
+    final firstName = user?.firstName;
+    final lastName = user?.lastName;
+    final dobIso = _dateOfBirth!.toIso8601String().split('T').first; // YYYY-MM-DD
+
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => _SmileIdSmartSelfieScreen(
+        builder: (context) => _SmileIdBiometricKycScreen(
           userId: _userId!,
+          country: widget.countryCode,
+          idType: 'NATIONAL_ID_NO_PHOTO',
+          idNumber: idNumber,
+          firstName: firstName,
+          lastName: lastName,
+          dob: dobIso,
         ),
       ),
     );
@@ -89,9 +99,8 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       setState(() {
         _isCaptured = true;
         _verificationResult = result;
-        _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
       });
-      _showSuccess('Selfie captured successfully');
+      _showSuccess('Verification submitted successfully');
     }
   }
 
@@ -131,44 +140,23 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       return;
     }
 
-    // Validate that we actually have the captured files on disk
-    final selfieFile = _smileIdFiles?.selfie;
-    final livenessFiles = _smileIdFiles?.livenessImages ?? const <File>[];
-
-    if (selfieFile == null || !selfieFile.existsSync()) {
-      _showError('Selfie image is missing. Please retake your selfie.');
-      return;
-    }
-    if (livenessFiles.isEmpty) {
-      _showError('Verification images are missing. Please retake your selfie.');
-      return;
-    }
-    for (final f in livenessFiles) {
-      if (!f.existsSync()) {
-        _showError('Verification images are missing. Please retake your selfie.');
-        return;
-      }
-    }
-
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Starting verification...';
+      _loadingMessage = 'Finalizing verification...';
     });
 
     try {
       // Phone verification step (optional for SmileID countries)
-      // Run BEFORE uploading photos so user can back out without wasting bandwidth
       await context.push<bool>(
         AppRoutes.kycPhoneVerification,
         extra: {
           'countryCode': widget.countryCode,
-          'documentVerified': true, // SmileID already verified, skip is allowed
+          'documentVerified': true,
         },
       );
 
       if (!mounted) return;
 
-      // Confirm we still have a Firebase user
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser == null) {
         _showError('You are not signed in. Please sign in and try again.');
@@ -179,46 +167,8 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         return;
       }
 
-      // Generate a client-side job ID used only for storage path naming
-      // (the server function generates its own SmileID job ID separately)
-      final clientJobId =
-          'job_${DateTime.now().millisecondsSinceEpoch}_${firebaseUser.uid.substring(0, 6)}';
-
-      final storage = FirebaseStorage.instance;
-      final basePath = 'kyc_documents/${firebaseUser.uid}';
-
-      // Upload selfie
-      setState(() => _loadingMessage = 'Uploading selfie...');
-      final selfieStoragePath = '$basePath/${clientJobId}_selfie.jpg';
-      await storage.ref(selfieStoragePath).putFile(
-            selfieFile,
-            SettableMetadata(contentType: 'image/jpeg'),
-          );
-
-      if (!mounted) return;
-
-      // Upload each liveness image, updating the progress message as we go
-      final livenessStoragePaths = <String>[];
-      for (var i = 0; i < livenessFiles.length; i++) {
-        if (!mounted) return;
-        setState(() {
-          _loadingMessage =
-              'Uploading verification images... (${i + 1} of ${livenessFiles.length})';
-        });
-        final livenessPath = '$basePath/${clientJobId}_liveness_$i.jpg';
-        await storage.ref(livenessPath).putFile(
-              livenessFiles[i],
-              SettableMetadata(contentType: 'image/jpeg'),
-            );
-        livenessStoragePaths.add(livenessPath);
-      }
-
-      if (!mounted) return;
-
-      // Write the kyc/documents record so the verification_pending_screen
-      // can find smileUserId/smileJobId and so other parts of the app that
-      // read this doc continue to work.
-      setState(() => _loadingMessage = 'Saving verification details...');
+      // Save the kyc/documents record so verification_pending_screen can
+      // poll for smileUserId and listen for kycStatus updates from the webhook.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)
@@ -232,16 +182,11 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         'status': 'pending_review',
         'smileIdVerified': false,
         'smileUserId': _userId,
-        'clientJobId': clientJobId,
-        'selfieStoragePath': selfieStoragePath,
-        'livenessStoragePaths': livenessStoragePaths,
         if (_verificationResult != null) 'smileIdResult': _verificationResult,
       }, SetOptions(merge: true));
 
       if (!mounted) return;
 
-      // Update legacy KYC fields on the user doc.
-      // Do NOT set kycStatus here — the server function does that.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)
@@ -252,23 +197,6 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       if (!mounted) return;
 
-      // Call the server function — this is the moment SmileID actually
-      // gets the verification request. Errors here MUST be shown to the user.
-      setState(() => _loadingMessage = 'Submitting verification...');
-      final submitKyc = FirebaseFunctions.instance
-          .httpsCallable('submitBiometricKycVerification');
-      await submitKyc.call(<String, dynamic>{
-        'smileUserId': _userId,
-        'country': widget.countryCode,
-        'idType': 'NIN',
-        'idNumber': _idNumberController.text.trim(),
-        'selfieStoragePath': selfieStoragePath,
-        'livenessStoragePaths': livenessStoragePaths,
-      });
-
-      if (!mounted) return;
-
-      // Refresh local user state and navigate to the waiting screen
       try {
         await ref.read(authNotifierProvider.notifier).refreshUser();
       } catch (_) {}
@@ -279,17 +207,13 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       if (!mounted) return;
       context.go(AppRoutes.verificationPending);
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      debugPrint('submitBiometricKycVerification failed: ${e.code} ${e.message}');
-      _showError(e.message ?? 'Failed to submit verification. Please try again.');
     } on FirebaseException catch (e) {
       if (!mounted) return;
-      debugPrint('Firebase error during KYC submission: ${e.code} ${e.message}');
-      _showError(e.message ?? 'Upload failed. Please check your connection and try again.');
+      debugPrint('Firebase error during KYC finalization: ${e.code} ${e.message}');
+      _showError(e.message ?? 'Save failed. Please check your connection and try again.');
     } catch (e) {
       if (!mounted) return;
-      debugPrint('Unexpected error during KYC submission: $e');
+      debugPrint('Unexpected error during KYC finalization: $e');
       _showError('Something went wrong. Please try again.');
     } finally {
       if (mounted) {
@@ -356,20 +280,20 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
-                    KycVerificationCard(
-                      title: _isCaptured ? 'Document Captured' : 'Verify Your Identity',
-                      description: _isCaptured
-                          ? 'Your NIN has been captured. Verification will begin when you continue.'
-                          : 'We will verify your NIN and take a selfie for confirmation',
-                      isVerified: _isCaptured,
-                      onStartVerification: _startVerification,
+                    KycDateOfBirthPicker(
+                      selectedDate: _dateOfBirth,
+                      onTap: _selectDateOfBirth,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
-                    KycDateOfBirthPicker(
-                      selectedDate: _dateOfBirth,
-                      onTap: _selectDateOfBirth,
+                    KycVerificationCard(
+                      title: _isCaptured ? 'Verification Submitted' : 'Verify Your Identity',
+                      description: _isCaptured
+                          ? 'Your selfie has been captured and submitted. Tap continue to finish.'
+                          : 'Enter your NIN and date of birth above, then tap to take a selfie and submit verification.',
+                      isVerified: _isCaptured,
+                      onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXXL),
@@ -432,23 +356,47 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 }
 
-/// Internal SmartSelfie Enrollment Screen (selfie only, no document)
-class _SmileIdSmartSelfieScreen extends StatelessWidget {
+/// Internal Biometric KYC Screen — captures selfie AND submits the full
+/// Biometric KYC job (NIN lookup + selfie match) to SmileID in one step.
+class _SmileIdBiometricKycScreen extends StatelessWidget {
   final String userId;
+  final String country;
+  final String idType;
+  final String idNumber;
+  final String? firstName;
+  final String? lastName;
+  final String dob;
 
-  const _SmileIdSmartSelfieScreen({
+  const _SmileIdBiometricKycScreen({
     required this.userId,
+    required this.country,
+    required this.idType,
+    required this.idNumber,
+    required this.firstName,
+    required this.lastName,
+    required this.dob,
   });
 
   @override
   Widget build(BuildContext context) {
+    final nowIso = DateTime.now().toUtc().toIso8601String();
     return Scaffold(
-      body: SmileIDSmartSelfieEnrollment(
+      body: SmileIDBiometricKYC(
+        country: country,
+        idType: idType,
+        idNumber: idNumber,
+        firstName: firstName,
+        lastName: lastName,
+        dob: dob,
         userId: userId,
         allowNewEnroll: true,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
+        personalDetailsConsentGranted: true,
+        contactInformationConsentGranted: true,
+        documentInformationConsentGranted: true,
+        consentGrantedDate: nowIso,
         extraPartnerParams: {
           "callback_url": _smileIdCallbackUrl,
         },
