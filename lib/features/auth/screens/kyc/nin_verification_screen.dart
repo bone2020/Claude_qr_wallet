@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
-import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../core/router/app_router.dart';
@@ -14,8 +13,6 @@ import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
-
-const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
 
 class NinVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
@@ -77,17 +74,23 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     final lastName = user?.lastName;
     final dobIso = _dateOfBirth!.toIso8601String().split('T').first; // YYYY-MM-DD
 
+    // Capture the NIN form data so the Cloud Function can later submit
+    // it to SmileID Enhanced KYC together with the selfie job ID.
+    final ninFormData = {
+      'country': widget.countryCode,
+      'idType': 'NIN_V2',
+      'idNumber': idNumber,
+      'firstName': firstName,
+      'lastName': lastName,
+      'dob': dobIso,
+    };
+    debugPrint('NIN form data captured: $ninFormData');
+
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => _SmileIdBiometricKycScreen(
+        builder: (context) => _SmileIdSmartSelfieEnrollmentScreen(
           userId: _userId!,
-          country: widget.countryCode,
-          idType: 'NIN_V2',
-          idNumber: idNumber,
-          firstName: firstName,
-          lastName: lastName,
-          dob: dobIso,
         ),
       ),
     );
@@ -356,50 +359,25 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 }
 
-/// Internal Biometric KYC Screen — captures selfie AND submits the full
-/// Biometric KYC job (NIN lookup + selfie match) to SmileID in one step.
-class _SmileIdBiometricKycScreen extends StatelessWidget {
+/// Internal SmartSelfie Enrollment screen — captures a selfie and enrolls
+/// the user with SmileID. The NIN number lookup is performed separately
+/// by a Cloud Function after enrollment completes.
+class _SmileIdSmartSelfieEnrollmentScreen extends StatelessWidget {
   final String userId;
-  final String country;
-  final String idType;
-  final String idNumber;
-  final String? firstName;
-  final String? lastName;
-  final String dob;
 
-  const _SmileIdBiometricKycScreen({
+  const _SmileIdSmartSelfieEnrollmentScreen({
     required this.userId,
-    required this.country,
-    required this.idType,
-    required this.idNumber,
-    required this.firstName,
-    required this.lastName,
-    required this.dob,
   });
 
   @override
   Widget build(BuildContext context) {
-    final nowIso = DateTime.now().toUtc().toIso8601String();
     return Scaffold(
-      body: SmileIDBiometricKYC(
-        country: country,
-        idType: idType,
-        idNumber: idNumber,
-        firstName: firstName,
-        lastName: lastName,
-        dob: dob,
+      body: SmileIDSmartSelfieEnrollment(
         userId: userId,
         allowNewEnroll: true,
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
-        personalDetailsConsentGranted: true,
-        contactInformationConsentGranted: true,
-        documentInformationConsentGranted: true,
-        consentGrantedDate: nowIso,
-        extraPartnerParams: {
-          "callback_url": _smileIdCallbackUrl,
-        },
         onSuccess: (result) {
           Navigator.pop(context, result);
         },
