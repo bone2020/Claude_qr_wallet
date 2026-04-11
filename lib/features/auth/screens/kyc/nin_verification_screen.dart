@@ -83,7 +83,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         builder: (context) => _SmileIdBiometricKycScreen(
           userId: _userId!,
           country: widget.countryCode,
-          idType: 'NATIONAL_ID_NO_PHOTO',
+          idType: 'NIN_V2',
           idNumber: idNumber,
           firstName: firstName,
           lastName: lastName,
