@@ -66,6 +66,11 @@ void main() async {
 
   // Initialize Smile ID for KYC verification
   SmileID.initialize(useSandbox: kDebugMode, enableCrashReporting: !kDebugMode);
+  SmileID.setCallbackUrl(
+    callbackUrl: Uri.parse(
+      'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook',
+    ),
+  );
 
   // Initialize local storage (Hive)
   await LocalStorageService.initialize();

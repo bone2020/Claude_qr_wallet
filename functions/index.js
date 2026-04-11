@@ -7785,19 +7785,26 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
 
   try {
     const data = req.body;
-    logInfo('Smile ID webhook received', {
-      jobId: data.job_id,
-      jobType: data.job_type,
-      resultCode: data.result_code,
-    });
 
-    const partnerId = data.partner_id;
-    const jobId = data.job_id;
-    const userId = data.partner_params?.user_id;
-    const resultCode = data.result_code;
-    const resultText = data.result_text;
-    const smileJobId = data.smile_job_id;
-    const actions = data.actions || {};
+    // SmileID sends PascalCase field names with user_id/job_id nested inside PartnerParams.
+    // Fall back to snake_case variants so the webhook also works with test payloads.
+    const partnerParams = data.PartnerParams || data.partner_params || {};
+    const jobId = partnerParams.job_id || data.job_id;
+    const userId = partnerParams.user_id || data.partner_params?.user_id;
+    const jobType = partnerParams.job_type || data.job_type;
+    const resultCode = data.ResultCode || data.result_code;
+    const resultText = data.ResultText || data.result_text;
+    const smileJobId = data.SmileJobID || data.smile_job_id;
+    const partnerId = data.partner_id || null;
+    const actions = data.Actions || data.actions || {};
+
+    logInfo('Smile ID webhook received', {
+      jobId,
+      userId,
+      jobType,
+      resultCode,
+      smileJobId,
+    });
 
     if (!userId || !jobId) {
       logError('Smile ID webhook: missing userId or jobId', { data });
@@ -7805,20 +7812,25 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       return;
     }
 
-    // Extract face-matching and liveness results
-    const livenessResult = actions.Liveness || 'Not Available';
+    // Extract face-matching and liveness results.
+    // SmileID sends action names with underscores and PascalCase values.
+    const livenessResult = actions.Liveness_Check || actions.Liveness || 'Not Available';
     const selfieCheck = actions.Selfie_Check || 'Not Available';
+    const selfieToIdCompare = actions.Selfie_To_ID_Card_Compare || 'Not Available';
     const documentCheck = actions.Document_Verification || 'Not Available';
     const humanReview = actions.Human_Review_Compare || 'Not Available';
     const antiSpoofing = actions.Anti_Spoofing || 'Not Available';
-    const confidenceValue = data.confidence_value || null;
+    const verifyIdNumber = actions.Verify_ID_Number || 'Not Available';
+    const confidenceValue = data.ConfidenceValue || data.confidence_value || null;
 
-    // Determine if face matching passed
-    // Must have liveness pass AND (selfie match OR human review pass)
-    const livenessPass = livenessResult === 'Pass' || livenessResult === 'Passed';
-    const selfiePass = selfieCheck === 'Pass' || selfieCheck === 'Passed';
-    const humanReviewPass = humanReview === 'Pass' || humanReview === 'Passed';
-    const documentPass = documentCheck === 'Pass' || documentCheck === 'Passed' || documentCheck === 'Not Applicable';
+    // Determine if face matching passed.
+    // SmileID uses values like "Passed", "Failed", "Not Applicable", "Not Done", "Completed".
+    const isPass = (v) => v === 'Pass' || v === 'Passed' || v === 'Completed';
+    const isPassOrNa = (v) => isPass(v) || v === 'Not Applicable';
+    const livenessPass = isPassOrNa(livenessResult);
+    const selfiePass = isPass(selfieCheck) || isPass(selfieToIdCompare);
+    const humanReviewPass = isPass(humanReview);
+    const documentPass = isPassOrNa(documentCheck);
     const faceMatchPassed = livenessPass && (selfiePass || humanReviewPass);
 
     // Extract legal name from ID document results if available
@@ -7863,8 +7875,42 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
         },
       }, { merge: true });
 
-    // Verification passed: face match + valid result code
-    const validResultCode = resultCode === '0220' || resultCode === '0120';
+    // Verification passed: face match + valid result code.
+    // 0220/0120 = document/enhanced-doc verification success.
+    // 1012 = Biometric KYC success (Selfie matched ID + ID verified).
+    // 0810 = SmartSelfie enrollment success.
+    const validResultCode =
+      resultCode === '0220' ||
+      resultCode === '0120' ||
+      resultCode === '1012' ||
+      resultCode === '0810';
+
+    // Definitive failure codes — set kycStatus to 'failed' so the waiting
+    // screen can show a failure dialog instead of spinning forever.
+    const definitiveFailureCodes = ['1016', '1022', '1013', '1014'];
+    if (!validResultCode && definitiveFailureCodes.includes(String(resultCode))) {
+      try {
+        await admin.firestore()
+          .collection('users')
+          .doc(userId)
+          .update({
+            kycStatus: 'failed',
+            kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            kycFailureReason: resultText || 'Verification failed',
+            kycFailureCode: resultCode,
+          });
+      } catch (e) {
+        logError('Failed to set kycStatus=failed', { error: e.message, userId });
+      }
+      logInfo('Smile ID webhook: definitive failure recorded', {
+        userId,
+        jobId,
+        resultCode,
+        resultText,
+      });
+      res.status(200).send('OK');
+      return;
+    }
 
     if (validResultCode && faceMatchPassed) {
       // Full pass — set kycStatus to 'verified', create wallet
