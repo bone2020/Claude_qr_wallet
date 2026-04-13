@@ -179,7 +179,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           .collection('kyc')
           .doc('documents')
           .set({
-        'idType': 'NIN',
+        'idType': 'NIN_V2',
         'idNumber': _idNumberController.text.trim(),
         'dateOfBirth': _dateOfBirth!.toIso8601String(),
         'submittedAt': FieldValue.serverTimestamp(),
