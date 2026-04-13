@@ -59,11 +59,10 @@ service cloud.firestore {
       allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged() && pinHashUnchanged() && roleUnchanged();
       allow delete: if false;
 
-      // Transactions - read only (writes via Cloud Functions)
+ // Transactions - read only from client (all writes via Cloud Functions Admin SDK)
       match /transactions/{txId} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
+        allow create, update, delete: if false;
       }
 
       // Notifications — user can read, mark as read (update), and delete
@@ -77,36 +76,19 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
 
-      // Linked accounts — read only from client
-      // Writes via Cloud Functions with verification
-      match /linkedAccounts/{accountId} {
+      // Linked bank accounts — owner can manage their own saved bank accounts
+      // Used as reference data for withdrawals (bank name, account number, account name)
+      match /linkedBankAccounts/{accountId} {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+        allow update: if false;
       }
 
-      // Bank accounts — read only from client
-      // Adding bank accounts requires verification via Cloud Function
-      match /bankAccounts/{accountId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
-      }
-
-      // Payment cards — read only from client
-      // Card tokenization handled by Paystack, not stored directly
-      match /cards/{cardId} {
-        allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
-      }
-
-      // KYC documents — read only from client
-      // KYC writes handled by Cloud Functions only for integrity
+      // KYC documents — read only from client, writes via Cloud Functions only
       match /kyc/{docId} {
         allow read: if isOwner(userId);
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId);
+        allow create, update, delete: if false;
       }
     }
 
