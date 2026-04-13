@@ -22,7 +22,7 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const tokenResult = await firebaseUser.getIdTokenResult(true);
-        const userRole = tokenResult.claims.adminRole;
+        const userRole = tokenResult.claims.role;
 
         if (userRole && ['super_admin', 'admin', 'support'].includes(userRole)) {
           setUser(firebaseUser);
@@ -44,8 +44,21 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const credential = await signInWithEmailAndPassword(auth, email, password);
-    const tokenResult = await credential.user.getIdTokenResult(true);
-    const userRole = tokenResult.claims.adminRole;
+    let tokenResult = await credential.user.getIdTokenResult(true);
+    let userRole = tokenResult.claims.role;
+
+    // If no role yet, try to self-promote via setupSuperAdmin (only works for approved emails)
+    if (!userRole) {
+      try {
+        const setupSuperAdmin = httpsCallable(functions, 'setupSuperAdmin');
+        await setupSuperAdmin({});
+        // Force token refresh to pick up the new claim
+        tokenResult = await credential.user.getIdTokenResult(true);
+        userRole = tokenResult.claims.role;
+      } catch (e) {
+        console.log('setupSuperAdmin not available for this user:', e.message);
+      }
+    }
 
     if (!userRole || !['super_admin', 'admin', 'support'].includes(userRole)) {
       await signOut(auth);

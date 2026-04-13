@@ -4335,7 +4335,7 @@ async function verifyAdmin(context, requiredRole = 'support') {
 
   const uid = context.auth.uid;
   const claims = context.auth.token;
-  const role = claims.adminRole;
+  const role = claims.role;
 
   if (!role) {
     throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
@@ -4360,31 +4360,64 @@ async function verifyAdmin(context, requiredRole = 'support') {
  * Hardcoded UID for security — can only be called once.
  */
 exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
-  const SUPER_ADMIN_UID = 'TBQolEM1nkejIU4W83vqhuhpyLx2';
+  // Approved super admin emails. Add or remove emails here to control who can self-promote.
+  const APPROVED_SUPER_ADMIN_EMAILS = [
+    'bonstrahe@gmail.com',
+    'kojookoto3@gmail.com',
+    'ericayehbonstrah@gmail.com',
+  ];
 
-  if (!context.auth || context.auth.uid !== SUPER_ADMIN_UID) {
-    throw new functions.https.HttpsError('permission-denied', 'Not authorized to setup super admin.');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be signed in to setup super admin.');
   }
 
-  // Check if already set up
-  const userRecord = await admin.auth().getUser(SUPER_ADMIN_UID);
+  const callerUid = context.auth.uid;
+  const userRecord = await admin.auth().getUser(callerUid);
+  const callerEmail = (userRecord.email || '').toLowerCase();
+
+  if (!APPROVED_SUPER_ADMIN_EMAILS.map(e => e.toLowerCase()).includes(callerEmail)) {
+    throw new functions.https.HttpsError('permission-denied', 'Email not approved for super admin.');
+  }
+
+  // Already set up — idempotent return
   if (userRecord.customClaims && userRecord.customClaims.role === 'super_admin') {
+    // Make sure backup record in admin_users exists
+    await db.collection('admin_users').doc(callerEmail).set({
+      email: callerEmail,
+      uid: callerUid,
+      role: 'super_admin',
+      updatedAt: timestamps.serverTimestamp(),
+    }, { merge: true });
     return { success: true, message: 'Super admin already configured.' };
   }
 
-  await admin.auth().setCustomUserClaims(SUPER_ADMIN_UID, { role: 'super_admin' });
+  // Set the custom claim
+  await admin.auth().setCustomUserClaims(callerUid, { role: 'super_admin' });
 
-  // Update Firestore user document
-  await db.collection('users').doc(SUPER_ADMIN_UID).update({
+  // Update Firestore user document (best-effort — don't fail if user doc doesn't exist)
+  try {
+    await db.collection('users').doc(callerUid).set({
+      role: 'super_admin',
+      roleUpdatedAt: timestamps.serverTimestamp(),
+    }, { merge: true });
+  } catch (e) {
+    console.warn('Could not update user doc, continuing:', e.message);
+  }
+
+  // Backup record in admin_users keyed by email so it survives wallet account deletion
+  await db.collection('admin_users').doc(callerEmail).set({
+    email: callerEmail,
+    uid: callerUid,
     role: 'super_admin',
-    roleUpdatedAt: timestamps.serverTimestamp(),
-  });
+    createdAt: timestamps.serverTimestamp(),
+    updatedAt: timestamps.serverTimestamp(),
+  }, { merge: true });
 
   await auditLog({
-    userId: SUPER_ADMIN_UID,
+    userId: callerUid,
     operation: 'setupSuperAdmin',
     result: 'success',
-    metadata: { targetUid: SUPER_ADMIN_UID },
+    metadata: { targetUid: callerUid, email: callerEmail },
     ipHash: hashIp(context),
   });
 
