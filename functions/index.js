@@ -4140,73 +4140,7 @@ exports.changePin = functions.https.onCall(async (data, context) => {
   return { success: true, message: 'PIN updated successfully.' };
 });
 
-// ============================================================
-// RESET PIN (Forgot PIN)
-// ============================================================
 
-exports.resetPin = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
-
-  const userId = context.auth.uid;
-  const { newPinHash, method } = data;
-
-  if (!newPinHash || typeof newPinHash !== 'string' || newPinHash.length !== 64) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Invalid new PIN hash.');
-  }
-
-  if (!method || !['email', 'phone'].includes(method)) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Verification method is required.');
-  }
-
-  await enforceRateLimit(userId, 'resetPin');
-
-  const userDoc = await db.collection('users').doc(userId).get();
-  if (!userDoc.exists) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User not found.');
-  }
-
-  const userData = userDoc.data();
-
-  if (!userData.pinHash) {
-    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'No PIN is set. Use Change PIN instead.');
-  }
-
-  const authTime = context.auth.token.auth_time;
-  const now = Math.floor(Date.now() / 1000);
-  if (now - authTime > 5 * 60) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED, 'Your session has expired. Please verify your identity again.');
-  }
-
-  const newSalt = crypto.randomBytes(32).toString('hex');
-  const serverHash = hashPinServer(newPinHash, newSalt);
-
-  await db.collection('users').doc(userId).update({
-    pinHash: serverHash,
-    pinSalt: newSalt,
-    pinChangedAt: admin.firestore.FieldValue.serverTimestamp(),
-    pinResetAt: admin.firestore.FieldValue.serverTimestamp(),
-    pinResetMethod: method,
-  });
-
-  await auditLog({
-    userId,
-    operation: 'resetPin',
-    result: 'success',
-    metadata: { method },
-    ipHash: hashIp(context),
-  });
-
-  await sendPushNotification(userId, {
-    title: 'PIN Reset',
-    body: 'Your transaction PIN has been reset. If you did not make this change, block your account immediately.',
-    type: 'security',
-    data: { action: 'pin_changed' },
-  }).catch(() => {});
-
-  return { success: true, message: 'PIN reset successfully.' };
-});
 
 exports.blockAccount = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
@@ -6479,6 +6413,10 @@ exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
 
 // Check if phone verification is supported for a country
 exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
   const { country } = data;
   
   const supportedCountries = {
