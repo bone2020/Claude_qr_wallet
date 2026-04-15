@@ -85,10 +85,18 @@ service cloud.firestore {
         allow update: if false;
       }
 
-      // KYC documents — read only from client, writes via Cloud Functions only
+      // KYC documents — client can write their submission metadata;
+      // sensitive fields (smileIdVerified, verified*, smileIdResultCode) are
+      // server-only and cannot be set/modified by the client.
       match /kyc/{docId} {
         allow read: if isOwner(userId);
-        allow create, update, delete: if false;
+        allow create: if isOwner(userId)
+          && (!('smileIdVerified' in request.resource.data) || request.resource.data.smileIdVerified == false)
+          && !request.resource.data.keys().hasAny(['verifiedData', 'smileIdResultCode', 'verifiedAt', 'verifiedBy']);
+        allow update: if isOwner(userId)
+          && (!('smileIdVerified' in request.resource.data) || request.resource.data.smileIdVerified == resource.data.get('smileIdVerified', false))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verifiedData', 'smileIdResultCode', 'verifiedAt', 'verifiedBy']);
+        allow delete: if false;
       }
     }
 
