@@ -2805,12 +2805,20 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
     const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
     // Create wallet document
+    // heldBalance and availableBalance support the wallet holds feature.
+    // Invariant: availableBalance = balance - heldBalance.
+    // All money-moving Cloud Functions check availableBalance (not balance)
+    // when deciding if a user can spend. Holds increase heldBalance and
+    // decrease availableBalance without changing balance, so the user
+    // cannot double-spend money they've committed to a pending order.
     const walletData = {
       id: userId,
       userId: userId,
       walletId: walletId,
       currency: userData.currency || 'GHS',
       balance: 0,
+      heldBalance: 0,
+      availableBalance: 0,
       isActive: true,
       dailySpent: 0,
       monthlySpent: 0,

@@ -103,12 +103,18 @@ service cloud.firestore {
     // Wallets - read own only, create during signup, updates via Cloud Functions
     match /wallets/{walletId} {
       allow read: if isAuthenticated() && request.auth.uid == walletId;
-      // Create requires: balance must be 0, userId must match auth, and walletId must be present
+      // Create requires: balance must be 0, heldBalance must be 0,
+      // availableBalance must be 0, userId must match auth, walletId must be present.
+      // heldBalance and availableBalance are part of the wallet holds feature
+      // (added Phase 1). Any new wallet must initialize all three balance fields
+      // to zero. After creation, all balance changes go through Cloud Functions only.
       allow create: if isAuthenticated()
         && request.auth.uid == walletId
         && request.resource.data.balance == 0
+        && request.resource.data.heldBalance == 0
+        && request.resource.data.availableBalance == 0
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasAll(['walletId', 'currency', 'balance'])
+        && request.resource.data.keys().hasAll(['walletId', 'currency', 'balance', 'heldBalance', 'availableBalance'])
         && !request.resource.data.keys().hasAny(['isAdmin', 'role']);
       allow update, delete: if false;
 
@@ -122,6 +128,17 @@ service cloud.firestore {
       match /withdrawals/{docId} {
         allow read, write: if false;
       }
+    }
+
+    // Wallet holds - Cloud Functions only.
+    // Holds reserve money in a user's wallet for a future commitment
+    // (e.g. Shop Afrik pay-on-delivery orders). Clients never read or
+    // write hold documents directly. All hold operations (createHold,
+    // releaseHold, convertHoldToTransfer, getHoldStatus, listHoldsForWallet)
+    // go through callable Cloud Functions which handle authentication,
+    // authorization, atomicity, and audit logging.
+    match /wallet_holds/{holdId} {
+      allow read, write: if false;
     }
 
     // Exchange rates - read only
