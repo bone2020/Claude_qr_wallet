@@ -151,15 +151,22 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
     try {
       // Phone verification step (optional for SmileID countries)
-      await context.push<bool>(
-        AppRoutes.kycPhoneVerification,
-        extra: {
-          'countryCode': widget.countryCode,
-          'documentVerified': true,
-        },
-      );
+      // Phone verification: only run for SmileID countries.
+      // Non-SmileID countries already verified their phone at /phone-otp
+      // before reaching this KYC screen. Running it again here causes Firebase
+      // to throttle the second OTP request for the same number.
+      const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
+      if (smileIdCountries.contains(widget.countryCode.toUpperCase())) {
+        await context.push<bool>(
+          AppRoutes.kycPhoneVerification,
+          extra: {
+            'countryCode': widget.countryCode,
+            'documentVerified': true,
+          },
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
+      }
 
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser == null) {

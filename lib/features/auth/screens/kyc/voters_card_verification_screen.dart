@@ -117,15 +117,22 @@ class _VotersCardVerificationScreenState extends ConsumerState<VotersCardVerific
 
     try {
       // Phone verification step (optional for SmileID countries)
-      final phoneVerified = await context.push<bool>(
-        AppRoutes.kycPhoneVerification,
-        extra: {
-          'countryCode': widget.countryCode,
-          'documentVerified': true, // SmileID already verified, skip is allowed
-        },
-      );
+      // Phone verification: only run for SmileID countries.
+      // Non-SmileID countries already verified their phone at /phone-otp
+      // before reaching this KYC screen. Running it again here causes Firebase
+      // to throttle the second OTP request for the same number.
+      const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
+      if (smileIdCountries.contains(widget.countryCode.toUpperCase())) {
+        await context.push<bool>(
+          AppRoutes.kycPhoneVerification,
+          extra: {
+            'countryCode': widget.countryCode,
+            'documentVerified': true, // SmileID already verified, skip is allowed
+          },
+        );
 
-      if (!mounted) return;
+        if (!mounted) return;
+      }
 
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
