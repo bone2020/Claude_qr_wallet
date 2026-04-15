@@ -1,12 +1,30 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pinput/pinput.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/constants/constants.dart';
-import '../../../../core/services/smile_id_service.dart';
 import '../../../../providers/auth_provider.dart';
 
+/// Universal phone verification screen using Firebase SMS OTP.
+///
+/// Replaces the previous SmileID-based phone verification which only worked
+/// in 6 countries and was prone to UNAUTHENTICATED errors. This screen works
+/// for ALL countries because it uses Firebase Phone Auth directly.
+///
+/// Flow: KYC ID screen pushes here -> SMS OTP sent to user's registered phone
+/// -> user types 6-digit code -> on success sets users/{uid}.phoneVerified=true
+/// and pops with `true`.
+///
+/// Constructor signature kept identical to the old SmileID screen so the 7
+/// KYC screens that already call this route work without modification. The
+/// firstName/lastName/idNumber/documentVerified params are accepted but
+/// unused — Firebase SMS OTP doesn't need them.
 class PhoneVerificationScreen extends ConsumerStatefulWidget {
   final String countryCode;
   final String? firstName;
@@ -28,59 +46,119 @@ class PhoneVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScreen> {
-  final _smileIdService = SmileIDService.instance;
-  
-  String? _phoneNumber;
+  final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+
+  String _phoneNumber = '';
   bool _isLoading = false;
+  bool _isSendingOtp = false;
+  bool _otpSent = false;
   bool _isVerified = false;
-  bool _isSupported = true;
-  bool _checkFailed = false;
+  int _resendSeconds = 60;
+  Timer? _resendTimer;
   String? _errorMessage;
-  List<String>? _supportedOperators;
 
   @override
   void initState() {
     super.initState();
-    _checkSupport();
-    _loadUserPhone();
+    _initializePhone();
   }
 
-  void _loadUserPhone() {
-    final user = ref.read(authNotifierProvider).user;
-    if (user?.phoneNumber != null) {
+  @override
+  void dispose() {
+    _pinController.dispose();
+    _pinFocusNode.dispose();
+    _resendTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializePhone() async {
+    // Source 1: current Riverpod user
+    final user = ref.read(currentUserProvider);
+    if (user != null && user.phoneNumber.isNotEmpty) {
+      _phoneNumber = user.phoneNumber;
+      _sendOtp();
+      return;
+    }
+
+    // Source 2: Firestore (fallback)
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .get();
+        if (doc.exists && mounted) {
+          final phone = doc.data()?['phoneNumber'] as String? ?? '';
+          if (phone.isNotEmpty) {
+            setState(() => _phoneNumber = phone);
+            _sendOtp();
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching phone from Firestore: $e');
+      }
+    }
+
+    if (mounted) {
       setState(() {
-        _phoneNumber = user!.phoneNumber;
+        _errorMessage = 'No phone number found on your account. Please go back and re-enter it.';
       });
     }
   }
 
-  Future<void> _checkSupport() async {
-    try {
-      final support = await _smileIdService.checkPhoneVerificationSupport(widget.countryCode);
-      if (mounted) {
-        setState(() {
-          _checkFailed = false;
-          _isSupported = support.supported;
-          _supportedOperators = support.operators;
-          if (!support.supported) {
-            _errorMessage = support.message ?? 'Phone verification not available for this country';
-          }
-        });
+  void _startResendTimer() {
+    _resendSeconds = 60;
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendSeconds > 0) {
+        if (mounted) setState(() => _resendSeconds--);
+      } else {
+        timer.cancel();
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _checkFailed = true;
-          _isSupported = false;
-          _errorMessage = 'Could not check phone verification support. Please try again.';
-        });
+    });
+  }
+
+  Future<void> _sendOtp() async {
+    if (_phoneNumber.isEmpty) return;
+
+    setState(() {
+      _isSendingOtp = true;
+      _errorMessage = null;
+    });
+
+    final authNotifier = ref.read(authNotifierProvider.notifier);
+    final success = await authNotifier.sendPhoneOtp(
+      phoneNumber: _phoneNumber,
+      onError: (error) {
+        if (mounted) setState(() => _errorMessage = error);
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isSendingOtp = false;
+        _otpSent = success;
+      });
+
+      if (success) {
+        _startResendTimer();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP sent to your phone'),
+            backgroundColor: AppColors.success,
+          ),
+        );
       }
     }
   }
 
-  Future<void> _verifyPhone() async {
-    if (_phoneNumber == null || _phoneNumber!.isEmpty) {
-      _showError('No phone number found on your account');
+  Future<void> _verifyOtp() async {
+    final otp = _pinController.text;
+    if (otp.length != 6) {
+      setState(() => _errorMessage = 'Please enter the 6-digit code');
       return;
     }
 
@@ -90,64 +168,69 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
     });
 
     try {
-      final result = await _smileIdService.verifyPhoneNumber(
-        phoneNumber: _phoneNumber!,
-        country: widget.countryCode,
-        firstName: widget.firstName,
-        lastName: widget.lastName,
-        idNumber: widget.idNumber,
-      );
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final result = await authNotifier.verifyPhoneOtp(otp);
 
       if (!mounted) return;
 
-      if (result.success && result.verified) {
-        setState(() {
-          _isVerified = true;
-        });
-        _showSuccess('Phone number verified successfully!');
+      if (result.success) {
+        // Persist phoneVerified=true to Firestore for the router/KYC checks
+        try {
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          if (firebaseUser != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(firebaseUser.uid)
+                .update({'phoneVerified': true});
+          }
+        } catch (e) {
+          debugPrint('Failed to write phoneVerified flag: $e');
+        }
+
+        if (!mounted) return;
+        setState(() => _isVerified = true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone verified successfully!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Brief pause so the user sees the success state, then return
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) context.pop(true);
       } else {
         setState(() {
-          _errorMessage = result.error ?? result.resultText ?? 'Verification failed. Phone may not be registered to the ID holder.';
+          _errorMessage = result.error ?? 'Invalid code. Please try again.';
         });
-        _showError(_errorMessage!);
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString();
-      });
-      _showError(e.toString());
+      setState(() => _errorMessage = e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _handleContinue() {
-    context.pop(_isVerified);
-  }
-
-  void _handleSkip() {
-    context.pop(false);
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.error),
-    );
-  }
-
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.success),
-    );
+  String _maskedPhone() {
+    if (_phoneNumber.length < 4) return _phoneNumber;
+    final visible = _phoneNumber.substring(_phoneNumber.length - 3);
+    return '${'*' * (_phoneNumber.length - 3)}$visible';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final defaultPinTheme = PinTheme(
+      width: 48,
+      height: 56,
+      textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Phone Verification'),
@@ -167,249 +250,117 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
                 size: 80,
                 color: _isVerified ? AppColors.success : AppColors.primary,
               ).animate().fadeIn().scale(),
-              
+
               const SizedBox(height: 24),
-              
+
               Text(
-                _isVerified ? 'Phone Verified!' : 'Verify Your Phone Number',
+                _isVerified ? 'Phone Verified!' : 'Verify Your Phone',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ).animate().fadeIn(delay: 100.ms),
-              
+
               const SizedBox(height: 12),
-              
+
               Text(
                 _isVerified
-                    ? 'Your phone number has been verified and matches your ID'
-                    : 'We will verify that your registered phone number belongs to the ID holder',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
+                    ? 'Your phone number has been verified.'
+                    : _otpSent
+                        ? 'Enter the 6-digit code sent to ${_maskedPhone()}'
+                        : 'We will send a verification code to ${_maskedPhone()}',
+                style: Theme.of(context).textTheme.bodyMedium,
                 textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 200.ms),
+              ),
 
               const SizedBox(height: 32),
 
-              if (!_isSupported) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.warning),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.warning),
-                      SizedBox(height: 8),
-                      Text(
-                        'Phone verification is not available for your country yet. You can skip this step.',
-                        style: TextStyle(color: AppColors.warning),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+              if (_otpSent && !_isVerified) ...[
+                Center(
+                  child: Pinput(
+                    length: 6,
+                    controller: _pinController,
+                    focusNode: _pinFocusNode,
+                    defaultPinTheme: defaultPinTheme,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onCompleted: (_) => _verifyOtp(),
                   ),
                 ),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: _isVerified 
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _isVerified 
-                          ? AppColors.success 
-                          : isDark ? AppColors.inputBorderDark : AppColors.inputBorderLight,
-                      width: 1.5,
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _verifyOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Your Registered Phone Number',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.phone,
-                            color: _isVerified ? AppColors.success : AppColors.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Text(
-                              _phoneNumber ?? 'No phone number on file',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: _phoneNumber != null 
-                                    ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
-                                    : AppColors.error,
-                              ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
                             ),
-                          ),
-                          if (_isVerified) ...[
-                            const SizedBox(width: 12),
-                            const Icon(Icons.check_circle, color: AppColors.success),
-                          ],
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.info.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
+                          )
+                        : const Text('Verify Code'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: _resendSeconds > 0
+                      ? Text(
+                          'Resend code in ${_resendSeconds}s',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        )
+                      : TextButton(
+                          onPressed: _isSendingOtp ? null : _sendOtp,
+                          child: const Text('Resend Code'),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.lock_outline, size: 16, color: AppColors.info),
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: Text(
-                                'This number cannot be changed for security',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.info,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 300.ms),
-
-                if (_supportedOperators != null && _supportedOperators!.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Supported operators: ${_supportedOperators!.join(", ")}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-
-                if (_errorMessage != null) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _errorMessage!,
-                      style: const TextStyle(color: AppColors.error),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ],
+                ),
               ],
 
-              const SizedBox(height: 32),
-
-              if (_isSupported && !_isVerified && _phoneNumber != null)
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _verifyPhone,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              if (!_otpSent && !_isVerified) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isSendingOtp ? null : _sendOtp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
+                    child: _isSendingOtp
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Send Verification Code'),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Verify Phone Number'),
-                ).animate().fadeIn(delay: 400.ms),
+                ),
+              ],
 
-              if (_phoneNumber == null && _isSupported)
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    'No phone number found on your account. Please update your profile first.',
-                    style: TextStyle(color: AppColors.error),
+                  child: Text(
+                    _errorMessage!,
+                    style: const TextStyle(color: AppColors.error),
                     textAlign: TextAlign.center,
                   ),
-                ).animate().fadeIn(delay: 400.ms),
-
-              const SizedBox(height: 16),
-
-              if (_isVerified)
-                ElevatedButton(
-                  onPressed: _handleContinue,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Continue'),
-                ).animate().fadeIn(delay: 400.ms),
-
-              // Skip allowed: document already verified (SmileID) OR server says not supported
-              if (!_isVerified && !_checkFailed && (widget.documentVerified || !_isSupported))
-                TextButton(
-                  onPressed: _handleSkip,
-                  child: Text(
-                    _isSupported ? 'Skip for now' : 'Continue without phone verification',
-                    style: TextStyle(
-                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 500.ms),
-
-              // Check failed: show Retry + skip only if document already verified
-              if (_checkFailed) ...[
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _checkFailed = false;
-                      _errorMessage = null;
-                    });
-                    _checkSupport();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Retry'),
-                ).animate().fadeIn(delay: 500.ms),
-                if (widget.documentVerified) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _handleSkip,
-                    child: Text(
-                      'Skip for now',
-                      style: TextStyle(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ],
             ],
           ),
