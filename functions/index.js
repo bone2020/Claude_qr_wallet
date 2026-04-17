@@ -9086,3 +9086,137 @@ exports.convertHoldToTransfer = functions.https.onCall(async (data, context) => 
     creditAmount: result.creditAmount,
   };
 });
+
+// ============================================================
+// WALLET HOLDS — EXPIRE OLD HOLDS (SCHEDULED)
+// ============================================================
+
+/**
+ * Runs every hour. Finds active holds past their expiresAt deadline
+ * and releases them automatically, restoring funds to availableBalance.
+ *
+ * Safety net: if Shop Afrik crashes or a merchant abandons an order,
+ * buyer funds aren't frozen forever.
+ */
+exports.expireOldHolds = functions.pubsub
+  .schedule('every 1 hours')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    // Query active holds that have passed their expiration
+    const expiredQuery = await db.collection('wallet_holds')
+      .where('status', '==', 'active')
+      .where('expiresAt', '<=', now)
+      .limit(500)
+      .get();
+
+    if (expiredQuery.empty) {
+      logInfo('expireOldHolds: no expired holds found');
+      return null;
+    }
+
+    logInfo('expireOldHolds: processing expired holds', { count: expiredQuery.size });
+
+    let processed = 0;
+    let failed = 0;
+
+    for (const holdDoc of expiredQuery.docs) {
+      const holdData = holdDoc.data();
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          // Re-read hold inside transaction to avoid races
+          const freshHold = await transaction.get(holdDoc.ref);
+          const freshData = freshHold.data();
+
+          // Skip if already resolved (another process got here first)
+          if (freshData.status !== 'active') {
+            logInfo('expireOldHolds: hold already resolved, skipping', {
+              holdId: holdDoc.id,
+              status: freshData.status,
+            });
+            return;
+          }
+
+          // Read wallet
+          const walletRef = db.collection('wallets').doc(freshData.walletId);
+          const walletDoc2 = await transaction.get(walletRef);
+
+          if (!walletDoc2.exists) {
+            logError('expireOldHolds: wallet not found for hold', {
+              holdId: holdDoc.id,
+              walletId: freshData.walletId,
+            });
+            return;
+          }
+
+          // Release: decrease heldBalance, increase availableBalance
+          transaction.update(walletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-freshData.amount),
+            availableBalance: admin.firestore.FieldValue.increment(freshData.amount),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Update hold status
+          transaction.update(holdDoc.ref, {
+            status: 'expired',
+            releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+            releasedReason: 'expired',
+          });
+        });
+
+        processed++;
+
+        // Send FCM notification
+        try {
+          const userDoc = await db.collection('users').doc(holdData.walletId).get();
+          if (userDoc.exists) {
+            const fcmToken = userDoc.data().fcmToken;
+            if (fcmToken) {
+              await admin.messaging().send({
+                token: fcmToken,
+                notification: {
+                  title: 'Hold Expired',
+                  body: `Your hold of ${holdData.currency}${(holdData.amount / 100).toFixed(2)} for ${holdData.referenceId} has expired. The funds are available again.`,
+                },
+                data: {
+                  type: 'hold_expired',
+                  holdId: holdDoc.id,
+                },
+              });
+            }
+          }
+        } catch (fcmError) {
+          logError('expireOldHolds: FCM notification failed', {
+            holdId: holdDoc.id,
+            error: fcmError.message,
+          });
+        }
+
+        // Audit log
+        await auditLog({
+          action: 'expire_hold',
+          userId: holdData.walletId,
+          performedBy: 'system',
+          details: {
+            holdId: holdDoc.id,
+            amount: holdData.amount,
+            currency: holdData.currency,
+            reason: holdData.reason,
+            referenceId: holdData.referenceId,
+          },
+        });
+
+      } catch (error) {
+        failed++;
+        logError('expireOldHolds: failed to expire hold', {
+          holdId: holdDoc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('expireOldHolds: completed', { processed, failed, total: expiredQuery.size });
+    return null;
+  });
