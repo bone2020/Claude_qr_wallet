@@ -8657,3 +8657,125 @@ exports.releaseHold = functions.https.onCall(async (data, context) => {
 
   return { success: true };
 });
+
+// ============================================================
+// WALLET HOLDS — GET HOLD STATUS
+// ============================================================
+
+/**
+ * Returns the current status and details of a specific hold.
+ * Read-only — no mutations.
+ *
+ * Auth: Caller must be the wallet owner, the creating service, or an admin.
+ */
+exports.getHoldStatus = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const callerId = context.auth.uid;
+  const callerClaims = context.auth.token || {};
+
+  const { holdId } = data;
+
+  if (!holdId || typeof holdId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'holdId is required.');
+  }
+
+  const holdDoc = await db.collection('wallet_holds').doc(holdId).get();
+
+  if (!holdDoc.exists) {
+    throwAppError(ERROR_CODES.HOLD_NOT_FOUND);
+  }
+
+  const holdData = holdDoc.data();
+
+  // Authorization: wallet owner, creating service, or admin
+  const isOwner = callerId === holdData.walletId;
+  const isService = callerClaims.walletHoldsWrite === true;
+  const isAdmin = callerClaims.role === 'super_admin' || callerClaims.role === 'support';
+  if (!isOwner && !isService && !isAdmin) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to view this hold.');
+  }
+
+  return {
+    holdId: holdDoc.id,
+    walletId: holdData.walletId,
+    amount: holdData.amount,
+    currency: holdData.currency,
+    status: holdData.status,
+    reason: holdData.reason,
+    referenceId: holdData.referenceId,
+    referenceType: holdData.referenceType,
+    createdAt: holdData.createdAt ? holdData.createdAt.toDate().toISOString() : null,
+    expiresAt: holdData.expiresAt ? holdData.expiresAt.toDate().toISOString() : null,
+    releasedAt: holdData.releasedAt ? holdData.releasedAt.toDate().toISOString() : null,
+    releasedReason: holdData.releasedReason,
+    convertedTransactionId: holdData.convertedTransactionId,
+  };
+});
+
+// ============================================================
+// WALLET HOLDS — LIST HOLDS FOR WALLET
+// ============================================================
+
+/**
+ * Returns a list of holds for a specific wallet, optionally filtered by status.
+ * Read-only — no mutations.
+ *
+ * Auth: Caller must be the wallet owner.
+ */
+exports.listHoldsForWallet = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const callerId = context.auth.uid;
+
+  const { walletId, status, limit } = data;
+
+  if (!walletId || typeof walletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'walletId is required.');
+  }
+
+  // Only the wallet owner can list their holds
+  if (callerId !== walletId) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You can only view holds on your own wallet.');
+  }
+
+  const queryLimit = Math.min(Math.max(limit || 20, 1), 100);
+
+  let query = db.collection('wallet_holds')
+    .where('walletId', '==', walletId)
+    .orderBy('createdAt', 'desc')
+    .limit(queryLimit);
+
+  if (status && typeof status === 'string') {
+    query = db.collection('wallet_holds')
+      .where('walletId', '==', walletId)
+      .where('status', '==', status)
+      .orderBy('createdAt', 'desc')
+      .limit(queryLimit);
+  }
+
+  const snapshot = await query.get();
+
+  const holds = snapshot.docs.map(doc => {
+    const d = doc.data();
+    return {
+      holdId: doc.id,
+      amount: d.amount,
+      currency: d.currency,
+      status: d.status,
+      reason: d.reason,
+      referenceId: d.referenceId,
+      referenceType: d.referenceType,
+      createdAt: d.createdAt ? d.createdAt.toDate().toISOString() : null,
+      expiresAt: d.expiresAt ? d.expiresAt.toDate().toISOString() : null,
+      releasedAt: d.releasedAt ? d.releasedAt.toDate().toISOString() : null,
+      releasedReason: d.releasedReason,
+    };
+  });
+
+  return { holds, count: holds.length };
+});
