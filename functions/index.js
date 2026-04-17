@@ -1068,6 +1068,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       // Update wallet balance
       transaction.update(walletDoc.ref, {
         balance: newBalance,
+        availableBalance: newBalance - (freshData.heldBalance || 0),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1272,6 +1273,7 @@ async function handleSuccessfulCharge(data) {
 
     transaction.update(walletDoc.ref, {
       balance: newBalance,
+      availableBalance: newBalance - (freshData.heldBalance || 0),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -1390,6 +1392,7 @@ async function handleFailedTransfer(data) {
 
       transaction.update(walletDoc.ref, {
         balance: newBalance,
+        availableBalance: newBalance - (freshData.heldBalance || 0),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1532,6 +1535,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
       transaction.update(walletDoc.ref, {
         balance: newBalance,
+        availableBalance: newBalance - (freshData.heldBalance || 0),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -1588,6 +1592,7 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 
         transaction.update(walletDoc.ref, {
           balance: newBalance,
+          availableBalance: newBalance - (freshRefundData.heldBalance || 0),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
@@ -1869,6 +1874,7 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
           const creditBalance = safeAdd(freshData.balance, amount, 'chargeMobileMoney credit');
           transaction.update(walletDoc.ref, {
             balance: creditBalance,
+            availableBalance: creditBalance - (freshData.heldBalance || 0),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
@@ -3373,9 +3379,10 @@ exports.cleanupPendingMomoTransactions = functions.pubsub
               const walletDoc = await transaction.get(db.collection('wallets').doc(txData.userId));
               if (walletDoc.exists) {
                 const walletData = walletDoc.data();
-                const newBalance = safeAdd(walletData.balance, txData.amount, 'momoCleanup refund');
+               const newBalance = safeAdd(walletData.balance, txData.amount, 'momoCleanup refund');
                 transaction.update(walletDoc.ref, {
                   balance: newBalance,
+                  availableBalance: newBalance - (walletData.heldBalance || 0),
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
               }
@@ -6724,6 +6731,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // Deduct from sender
       transaction.update(senderWalletRef, {
         balance: admin.firestore.FieldValue.increment(-totalDebit),
+        availableBalance: admin.firestore.FieldValue.increment(-totalDebit),
         dailySpent: admin.firestore.FieldValue.increment(totalDebit),
         monthlySpent: admin.firestore.FieldValue.increment(totalDebit),
         updatedAt: timestamps.serverTimestamp()
@@ -6743,6 +6751,7 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
       // Add converted amount to recipient
       transaction.update(recipientRef, {
         balance: admin.firestore.FieldValue.increment(creditAmount),
+        availableBalance: admin.firestore.FieldValue.increment(creditAmount),
         updatedAt: timestamps.serverTimestamp()
       });
 
@@ -7207,6 +7216,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
                 const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus credit');
                 transaction.update(walletDoc.ref, {
                   balance: creditBalance,
+                  availableBalance: creditBalance - (walletData.heldBalance || 0),
                   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
 
@@ -7284,6 +7294,7 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
               const refundBalance = safeAdd(walletData.balance, txData.amount, 'momoCheckStatus refund');
               await walletDoc.ref.update({
                 balance: refundBalance,
+                availableBalance: refundBalance - (walletData.heldBalance || 0),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               });
 
@@ -7393,6 +7404,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
       transaction.update(walletDoc.ref, {
         balance: newBalance,
+        availableBalance: newBalance - (freshData.heldBalance || 0),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -7480,10 +7492,11 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
         const freshWallet = await transaction.get(walletDoc.ref);
         const freshRefundData = freshWallet.data();
         validateWalletDocument(freshRefundData, 'momoTransfer refund wallet');
-        const refundBalance = safeAdd(freshRefundData.balance, amount, 'momoTransfer refund');
+       const refundBalance = safeAdd(freshRefundData.balance, amount, 'momoTransfer refund');
 
         transaction.update(walletDoc.ref, {
           balance: refundBalance,
+          availableBalance: refundBalance - (freshRefundData.heldBalance || 0),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
@@ -7658,6 +7671,7 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
             const creditBalance = safeAdd(walletData.balance, txData.amount, 'momoWebhook collection credit');
             transaction.update(walletDoc.ref, {
               balance: creditBalance,
+              availableBalance: creditBalance - (walletData.heldBalance || 0),
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
@@ -7702,6 +7716,7 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
 
             transaction.update(walletDoc.ref, {
               balance: refundBalance,
+              availableBalance: refundBalance - (walletData.heldBalance || 0),
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
           }
