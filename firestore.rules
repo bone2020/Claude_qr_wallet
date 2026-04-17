@@ -212,5 +212,15 @@ service cloud.firestore {
     match /pending_transactions/{txId} {
       allow read, write: if false;
     }
+
+    // Business wallets — read access for listed owner users, writes via Cloud Functions only.
+    // Each business wallet doc contains an ownerUsers map of {uid: role}.
+    // Authorized users can read their business wallet metadata.
+    // All mutations (create, update, withdraw, refund) go through Cloud Functions.
+    match /businessWallets/{businessId} {
+      allow read: if isAuthenticated()
+        && resource.data.ownerUsers[request.auth.uid] != null;
+      allow write: if false;
+    }
   }
 }

@@ -9220,3 +9220,191 @@ exports.expireOldHolds = functions.pubsub
     logInfo('expireOldHolds: completed', { processed, failed, total: expiredQuery.size });
     return null;
   });
+
+  // ============================================================
+// BUSINESS WALLETS — ROLE VERIFICATION HELPER
+// ============================================================
+
+/**
+ * Verifies the caller has a sufficient role on a business wallet.
+ * Business wallet roles are separate from QR Wallet admin roles.
+ *
+ * Hierarchy: viewer(1) < admin(2) < admin_supervisor(3) < admin_manager(4) < super_admin(5)
+ *
+ * @param {string} callerId - The caller's uid
+ * @param {Object} businessWalletData - The businessWallets/{id} document data
+ * @param {string} requiredRole - Minimum role required
+ * @returns {{ uid: string, role: string }} Caller info
+ */
+function verifyBusinessWalletAccess(callerId, businessWalletData, requiredRole = 'viewer') {
+  const ownerUsers = businessWalletData.ownerUsers || {};
+  const callerRole = ownerUsers[callerId];
+
+  if (!callerRole) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to access this business wallet.');
+  }
+
+  const roleHierarchy = {
+    viewer: 1,
+    admin: 2,
+    admin_supervisor: 3,
+    admin_manager: 4,
+    super_admin: 5,
+  };
+
+  const callerLevel = roleHierarchy[callerRole] || 0;
+  const requiredLevel = roleHierarchy[requiredRole] || 0;
+
+  if (callerLevel < requiredLevel) {
+    throwAppError(
+      ERROR_CODES.AUTH_PERMISSION_DENIED,
+      `This action requires '${requiredRole}' role on this business wallet. Your role: '${callerRole}'.`
+    );
+  }
+
+  return { uid: callerId, role: callerRole };
+}
+
+// ============================================================
+// BUSINESS WALLETS — CREATE BUSINESS WALLET
+// ============================================================
+
+/**
+ * One-time setup for a new business wallet. Creates:
+ * 1. businessWallets/{id} — metadata + ownerUsers map
+ * 2. wallets/{id} — standard wallet doc (balance 0) so sendMoney works
+ * 3. users/{id} — backing user doc with isBusinessWallet:true so lookupWallet works
+ *
+ * Auth: QR Wallet super_admin only (not business wallet role — this is a platform-level action).
+ */
+exports.createBusinessWallet = functions.https.onCall(async (data, context) => {
+  // Only QR Wallet super_admin can create business wallets
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { name, country, currency, ownerEmail, logoUrl } = data;
+
+  // ── Input validation ──
+  if (!name || typeof name !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Business name is required.');
+  }
+  if (!country || typeof country !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Country is required.');
+  }
+  if (!currency || typeof currency !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Currency is required.');
+  }
+  if (!ownerEmail || typeof ownerEmail !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Owner email is required.');
+  }
+
+  // ── Look up the owner user by email ──
+  let ownerUid;
+  try {
+    const ownerUser = await admin.auth().getUserByEmail(ownerEmail);
+    ownerUid = ownerUser.uid;
+  } catch (error) {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, `No user found with email: ${ownerEmail}. They must have a QR Wallet account first.`);
+  }
+
+  // ── Generate wallet ID ──
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const walletId = `QRW-BIZ-${segment()}-${segment()}`;
+
+  // ── Generate a unique business wallet document ID ──
+  const businessId = `biz_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
+
+  await db.runTransaction(async (transaction) => {
+    // Check business wallet doesn't already exist with this name
+    // (outside transaction — just a safety check, not atomic)
+    const existingQuery = await db.collection('businessWallets')
+      .where('name', '==', name)
+      .limit(1)
+      .get();
+
+    if (!existingQuery.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, `A business wallet named '${name}' already exists.`);
+    }
+
+    // 1. Create businessWallets/{id} document
+    const businessWalletRef = db.collection('businessWallets').doc(businessId);
+    transaction.set(businessWalletRef, {
+      name: name,
+      logoUrl: logoUrl || null,
+      walletId: walletId,
+      country: country.toUpperCase(),
+      currency: currency.toUpperCase(),
+      isActive: true,
+      ownerUsers: {
+        [ownerUid]: 'super_admin',
+      },
+      allowedBankAccounts: [],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdBy: caller.uid,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 2. Create backing wallets/{id} document (standard wallet so sendMoney works)
+    const walletRef = db.collection('wallets').doc(businessId);
+    transaction.set(walletRef, {
+      id: businessId,
+      userId: businessId,
+      walletId: walletId,
+      currency: currency.toUpperCase(),
+      balance: 0,
+      heldBalance: 0,
+      availableBalance: 0,
+      isActive: true,
+      isBusinessWallet: true,
+      dailySpent: 0,
+      monthlySpent: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 3. Create backing users/{id} document (so lookupWallet and sendMoney find the "user")
+    const userRef = db.collection('users').doc(businessId);
+    transaction.set(userRef, {
+      displayName: name,
+      legalName: name,
+      email: `${businessId}@business.qrwallet.internal`,
+      country: country.toUpperCase(),
+      currency: currency.toUpperCase(),
+      isBusinessWallet: true,
+      kycStatus: 'verified',
+      phoneVerified: true,
+      emailVerified: true,
+      walletId: walletId,
+      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // ── Audit log ──
+  await auditLog({
+    action: 'create_business_wallet',
+    userId: businessId,
+    performedBy: caller.uid,
+    details: {
+      businessId,
+      name,
+      walletId,
+      country,
+      currency,
+      ownerEmail,
+      ownerUid,
+    },
+  });
+
+  logInfo('Business wallet created', { businessId, name, walletId, country, currency });
+
+  return {
+    success: true,
+    businessId: businessId,
+    walletId: walletId,
+    name: name,
+    currency: currency.toUpperCase(),
+    country: country.toUpperCase(),
+  };
+});
