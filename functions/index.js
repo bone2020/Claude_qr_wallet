@@ -7907,12 +7907,14 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
         const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
-        await admin.firestore().collection('wallets').doc(userId).set({
+       await admin.firestore().collection('wallets').doc(userId).set({
           id: userId,
           userId: userId,
           walletId: walletId,
           currency: userData.currency || 'GHS',
           balance: 0,
+          heldBalance: 0,
+          availableBalance: 0,
           isActive: true,
           dailySpent: 0,
           monthlySpent: 0,
@@ -8120,12 +8122,14 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
       const walletDoc = await db.collection('wallets').doc(userId).get();
       if (!walletDoc.exists) {
         const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
-        await db.collection('wallets').doc(userId).set({
+       await db.collection('wallets').doc(userId).set({
           id: userId,
           userId: userId,
           walletId: walletId,
           currency: userData.currency || 'GHS',
           balance: 0,
+          heldBalance: 0,
+          availableBalance: 0,
           isActive: true,
           dailySpent: 0,
           monthlySpent: 0,
