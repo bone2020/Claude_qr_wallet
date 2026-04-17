@@ -21,15 +21,19 @@ class SmileIDService {
   /// Country-specific ID types configuration
   static const Map<String, List<Map<String, dynamic>>> countryIdTypes = {
     'NG': [
-      {'value': 'NIN', 'label': 'National Identification Number (NIN)', 'requiresNumber': true, 'smileIdType': 'NIN'},
-      {'value': 'BVN', 'label': 'Bank Verification Number (BVN)', 'requiresNumber': true, 'smileIdType': 'BVN'},
+      // NIN and BVN temporarily hidden — awaiting SmileID entitlement activation.
+      // Uncomment both lines once SmileID confirms entitlement is active on partner 8244.
+      // {'value': 'NIN', 'label': 'National Identification Number (NIN)', 'requiresNumber': true, 'smileIdType': 'NIN'},
+      // {'value': 'BVN', 'label': 'Bank Verification Number (BVN)', 'requiresNumber': true, 'smileIdType': 'BVN'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
       {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
     ],
     'GH': [
       {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'GHANA_CARD'},
-      {'value': 'SSNIT', 'label': 'SSNIT', 'requiresNumber': true, 'smileIdType': 'SSNIT'},
+      // SSNIT temporarily hidden — awaiting SmileID entitlement activation.
+      // Uncomment once SmileID confirms SSNIT entitlement is active on partner 8244.
+      // {'value': 'SSNIT', 'label': 'SSNIT', 'requiresNumber': true, 'smileIdType': 'SSNIT'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
       {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
@@ -52,19 +56,31 @@ class SmileIDService {
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
     ],
     'UG': [
-      {'value': 'UGANDA_NIN', 'label': 'National ID (NIN)', 'requiresNumber': true, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      // Uganda NIN temporarily hidden — awaiting SmileID entitlement activation.
+      // Uncomment once SmileID confirms Uganda NIN entitlement is active on partner 8244.
+      // {'value': 'UGANDA_NIN', 'label': 'National ID (NIN)', 'requiresNumber': true, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': true, 'smileIdType': 'PASSPORT'},
       {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': true, 'smileIdType': 'DRIVERS_LICENSE'},
     ],
     'ZM': [
-      {'value': 'TPIN', 'label': 'Taxpayer PIN (TPIN)', 'requiresNumber': true, 'smileIdType': 'TPIN'},
-      {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
-    ],
-    'ZW': [
-      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      // TPIN temporarily hidden — awaiting SmileID entitlement activation (database lookup).
+      // Uncomment once SmileID confirms TPIN entitlement is active on partner 8244.
+      // {'value': 'TPIN', 'label': 'Taxpayer PIN (TPIN)', 'requiresNumber': true, 'smileIdType': 'TPIN'},
+      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
+      {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
+    ],
+    'ZW': [
+      // Zimbabwe National ID database lookup temporarily hidden — awaiting SmileID entitlement activation.
+      // Uncomment once SmileID confirms Zimbabwe NATIONAL_ID_NO_PHOTO entitlement is active on partner 8244.
+      // {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID_NO_PHOTO'},
+      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID'},
+      {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
+      {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
+      {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
     ],
     // Non-database MoMo countries (SmileID Document Verification only — no government database check)
     'SL': [

@@ -47,7 +47,9 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   String? _userId;
 
   // South Africa requires ID number
-  bool get _requiresIdNumber => widget.countryCode == 'ZA' || widget.countryCode == 'ZM' || widget.countryCode == 'ZW';
+  // ZM and ZW no longer require an ID number — switched from database lookup (TPIN / NATIONAL_ID_NO_PHOTO)
+  // to document verification (NATIONAL_ID). SA still uses database lookup and requires an ID number.
+  bool get _requiresIdNumber => widget.countryCode == 'ZA';
 
   String get _documentType {
     switch (widget.countryCode) {
@@ -59,10 +61,11 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
         return 'NATIONAL_ID';
       case 'CI':
         return 'NATIONAL_ID';
+      // ZM: was 'TPIN' (database). Switched to document verification pending SmileID entitlement.
+      // ZW: was 'NATIONAL_ID_NO_PHOTO' (database). Switched to document verification pending SmileID entitlement.
       case 'ZM':
-        return 'TPIN';
       case 'ZW':
-        return 'NATIONAL_ID_NO_PHOTO';
+        return 'NATIONAL_ID';
       default:
         return 'NATIONAL_ID';
     }
