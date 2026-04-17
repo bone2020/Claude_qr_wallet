@@ -57,9 +57,14 @@ const ERROR_CODES = Object.freeze({
   CONFIG_MISSING: 'CONFIG_MISSING',
   CONFIG_INVALID: 'CONFIG_INVALID',
 
-  // System Errors
+ // System Errors
   SYSTEM_INTERNAL_ERROR: 'SYSTEM_INTERNAL_ERROR',
   SYSTEM_VALIDATION_FAILED: 'SYSTEM_VALIDATION_FAILED',
+
+  // Wallet Holds
+  HOLD_NOT_FOUND: 'HOLD_NOT_FOUND',
+  HOLD_INVALID_STATE: 'HOLD_INVALID_STATE',
+  HOLD_CURRENCY_MISMATCH: 'HOLD_CURRENCY_MISMATCH',
 });
 
 /**
@@ -93,6 +98,9 @@ const ERROR_CODE_TO_HTTP = {
   CONFIG_INVALID: 'failed-precondition',
   SYSTEM_INTERNAL_ERROR: 'internal',
   SYSTEM_VALIDATION_FAILED: 'invalid-argument',
+  HOLD_NOT_FOUND: 'not-found',
+  HOLD_INVALID_STATE: 'failed-precondition',
+  HOLD_CURRENCY_MISMATCH: 'invalid-argument',
 };
 
 /**
@@ -126,8 +134,10 @@ const ERROR_MESSAGES = {
   CONFIG_INVALID: 'Service configuration error. Contact support.',
   SYSTEM_INTERNAL_ERROR: 'Something went wrong. Please try again later.',
   SYSTEM_VALIDATION_FAILED: 'Invalid data provided.',
+  HOLD_NOT_FOUND: 'Hold not found.',
+  HOLD_INVALID_STATE: 'This hold cannot be modified in its current state.',
+  HOLD_CURRENCY_MISMATCH: 'Currency does not match the wallet currency.',
 };
-
 /**
  * Throws a standardized application error with consistent structure.
  *
@@ -8370,4 +8380,280 @@ exports.submitBiometricKycVerification = functions.https.onCall(async (data, con
       }
     }
   }
+});
+
+// ============================================================
+// WALLET HOLDS — CREATE HOLD
+// ============================================================
+
+/**
+ * Creates a hold on a wallet, reserving funds for a future commitment.
+ * The held amount is deducted from availableBalance but NOT from balance.
+ * Primary use case: Shop Afrik pay-on-delivery orders.
+ *
+ * Auth: Caller must be the wallet owner OR have the 'walletHoldsWrite' custom claim.
+ */
+exports.createHold = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const callerId = context.auth.uid;
+  const callerClaims = context.auth.token || {};
+
+  const { walletId, amount, currency, reason, referenceId, referenceType, expiresAtSeconds, metadata } = data;
+
+  // ── Input validation ──
+  if (!walletId || typeof walletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'walletId is required.');
+  }
+  if (!amount || typeof amount !== 'number' || amount <= 0 || !Number.isInteger(amount)) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'amount must be a positive integer (minor units).');
+  }
+  if (!currency || typeof currency !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'currency is required.');
+  }
+  if (!reason || typeof reason !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'reason is required.');
+  }
+  if (!referenceId || typeof referenceId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'referenceId is required.');
+  }
+  if (!referenceType || typeof referenceType !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'referenceType is required.');
+  }
+
+  // ── Authorization: wallet owner or service with walletHoldsWrite claim ──
+  const isOwner = callerId === walletId;
+  const hasHoldsClaim = callerClaims.walletHoldsWrite === true;
+  if (!isOwner && !hasHoldsClaim) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to create holds on this wallet.');
+  }
+
+  // ── Determine expiration ──
+  const defaultExpiry = {
+    shop_afrik_order: 14 * 24 * 60 * 60,  // 14 days
+    withdrawal: 60 * 60,                    // 1 hour
+    escrow: 30 * 24 * 60 * 60,             // 30 days
+  };
+  const expirySeconds = expiresAtSeconds || defaultExpiry[reason] || 14 * 24 * 60 * 60;
+  const expiresAt = new Date(Date.now() + expirySeconds * 1000);
+
+  // ── Generate hold ID ──
+  const holdId = crypto.randomUUID();
+
+  // ── Atomic transaction ──
+  await db.runTransaction(async (transaction) => {
+    const walletRef = db.collection('wallets').doc(walletId);
+    const walletDoc = await transaction.get(walletRef);
+
+    if (!walletDoc.exists) {
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND);
+    }
+
+    const walletData = walletDoc.data();
+
+    // Validate wallet is active
+    if (walletData.accountBlocked === true || walletData.isActive === false) {
+      throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Cannot create hold on a blocked or inactive wallet.');
+    }
+
+    // Validate currency match
+    if (walletData.currency !== currency.toUpperCase()) {
+      throwAppError(ERROR_CODES.HOLD_CURRENCY_MISMATCH, `Wallet currency is ${walletData.currency}, but hold currency is ${currency}.`);
+    }
+
+    // Validate sufficient available balance
+    const currentAvailable = walletData.availableBalance ?? (walletData.balance - (walletData.heldBalance || 0));
+    if (currentAvailable < amount) {
+      throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Available balance is ${currentAvailable}, but hold requires ${amount}.`);
+    }
+
+    // Write hold document
+    const holdRef = db.collection('wallet_holds').doc(holdId);
+    transaction.set(holdRef, {
+      walletId: walletId,
+      amount: amount,
+      currency: currency.toUpperCase(),
+      reason: reason,
+      referenceId: referenceId,
+      referenceType: referenceType,
+      createdBy: callerId,
+      createdByService: hasHoldsClaim ? (callerClaims.serviceName || 'external_service') : 'qr_wallet_user',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+      status: 'active',
+      releasedAt: null,
+      releasedReason: null,
+      convertedTransactionId: null,
+      metadata: metadata || {},
+    });
+
+    // Update wallet: increase heldBalance, decrease availableBalance
+    transaction.update(walletRef, {
+      heldBalance: admin.firestore.FieldValue.increment(amount),
+      availableBalance: admin.firestore.FieldValue.increment(-amount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // ── Audit log (outside transaction for performance) ──
+  await auditLog({
+    action: 'create_hold',
+    userId: walletId,
+    performedBy: callerId,
+    details: {
+      holdId,
+      amount,
+      currency,
+      reason,
+      referenceId,
+      referenceType,
+      expiresAt: expiresAt.toISOString(),
+    },
+  });
+
+  logInfo('Hold created', { holdId, walletId, amount, reason, referenceId });
+
+  return {
+    success: true,
+    holdId: holdId,
+    expiresAt: expiresAt.toISOString(),
+  };
+});
+
+// ============================================================
+// WALLET HOLDS — RELEASE HOLD
+// ============================================================
+
+/**
+ * Releases an active hold, restoring the held amount to the wallet's
+ * availableBalance. Called when an order is cancelled or a hold is no
+ * longer needed.
+ *
+ * Idempotent: if the hold is already released or converted, returns
+ * success without error (no double-release).
+ *
+ * Auth: Caller must be the wallet owner, the service that created the
+ * hold (matched by createdByService), or a super_admin.
+ */
+exports.releaseHold = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const callerId = context.auth.uid;
+  const callerClaims = context.auth.token || {};
+
+  const { holdId, reason } = data;
+
+  // ── Input validation ──
+  if (!holdId || typeof holdId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'holdId is required.');
+  }
+  if (!reason || typeof reason !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'reason is required.');
+  }
+
+  let holdWalletId = null;
+  let holdAmount = 0;
+
+  // ── Atomic transaction ──
+  await db.runTransaction(async (transaction) => {
+    const holdRef = db.collection('wallet_holds').doc(holdId);
+    const holdDoc = await transaction.get(holdRef);
+
+    if (!holdDoc.exists) {
+      throwAppError(ERROR_CODES.HOLD_NOT_FOUND);
+    }
+
+    const holdData = holdDoc.data();
+
+    // ── Idempotency: if already released or converted, return silently ──
+    if (holdData.status === 'released' || holdData.status === 'expired') {
+      logInfo('releaseHold: hold already released/expired, no-op', { holdId, status: holdData.status });
+      return;
+    }
+    if (holdData.status === 'converted') {
+      logInfo('releaseHold: hold already converted, no-op', { holdId });
+      return;
+    }
+    if (holdData.status !== 'active') {
+      throwAppError(ERROR_CODES.HOLD_INVALID_STATE, `Hold status is '${holdData.status}', expected 'active'.`);
+    }
+
+    // ── Authorization ──
+    const isOwner = callerId === holdData.walletId;
+    const isCreatingService = callerClaims.walletHoldsWrite === true;
+    const isSuperAdmin = callerClaims.role === 'super_admin';
+    if (!isOwner && !isCreatingService && !isSuperAdmin) {
+      throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to release this hold.');
+    }
+
+    holdWalletId = holdData.walletId;
+    holdAmount = holdData.amount;
+
+    // ── Read wallet ──
+    const walletRef = db.collection('wallets').doc(holdData.walletId);
+    const walletDoc = await transaction.get(walletRef);
+
+    if (!walletDoc.exists) {
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Wallet for this hold no longer exists.');
+    }
+
+    // ── Update wallet: decrease heldBalance, increase availableBalance ──
+    transaction.update(walletRef, {
+      heldBalance: admin.firestore.FieldValue.increment(-holdAmount),
+      availableBalance: admin.firestore.FieldValue.increment(holdAmount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // ── Update hold status ──
+    transaction.update(holdRef, {
+      status: 'released',
+      releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+      releasedReason: reason,
+    });
+  });
+
+  // ── Audit log (outside transaction) ──
+  if (holdWalletId && holdAmount > 0) {
+    await auditLog({
+      action: 'release_hold',
+      userId: holdWalletId,
+      performedBy: callerId,
+      details: {
+        holdId,
+        amount: holdAmount,
+        reason,
+      },
+    });
+
+    // ── FCM notification to wallet owner ──
+    try {
+      const userDoc = await db.collection('users').doc(holdWalletId).get();
+      if (userDoc.exists) {
+        const fcmToken = userDoc.data().fcmToken;
+        if (fcmToken) {
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: {
+              title: 'Hold Released',
+              body: `Your hold of ${holdAmount} has been released and is available again.`,
+            },
+            data: {
+              type: 'hold_released',
+              holdId: holdId,
+            },
+          });
+        }
+      }
+    } catch (fcmError) {
+      logError('Failed to send hold release notification', { holdId, error: fcmError.message });
+    }
+  }
+
+  logInfo('Hold released', { holdId, walletId: holdWalletId, amount: holdAmount, reason });
+
+  return { success: true };
 });
