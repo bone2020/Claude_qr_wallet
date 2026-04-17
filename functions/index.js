@@ -9408,3 +9408,561 @@ exports.createBusinessWallet = functions.https.onCall(async (data, context) => {
     country: country.toUpperCase(),
   };
 });
+
+// ============================================================
+// BUSINESS WALLETS — GET OVERVIEW
+// ============================================================
+
+/**
+ * Returns balance, currency, and summary stats for a business wallet.
+ * Auth: Any role in ownerUsers.
+ */
+exports.businessWalletGetOverview = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { businessId } = data;
+  if (!businessId || typeof businessId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'businessId is required.');
+  }
+
+  // Verify access
+  const bizDoc = await db.collection('businessWallets').doc(businessId).get();
+  if (!bizDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Business wallet not found.');
+  }
+  verifyBusinessWalletAccess(context.auth.uid, bizDoc.data(), 'viewer');
+
+  // Get backing wallet
+  const walletDoc = await db.collection('wallets').doc(businessId).get();
+  if (!walletDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Backing wallet not found.');
+  }
+  const walletData = walletDoc.data();
+  const bizData = bizDoc.data();
+
+  // Get transaction stats
+  const txSnapshot = await db.collection('users').doc(businessId)
+    .collection('transactions')
+    .orderBy('createdAt', 'desc')
+    .limit(1)
+    .get();
+
+  const lastTransaction = txSnapshot.empty ? null : txSnapshot.docs[0].data();
+
+  // Count transactions (approximate — use aggregation for accuracy at scale)
+  const receivedQuery = await db.collection('users').doc(businessId)
+    .collection('transactions')
+    .where('type', '==', 'receive')
+    .count()
+    .get();
+
+  const sentQuery = await db.collection('users').doc(businessId)
+    .collection('transactions')
+    .where('type', '==', 'send')
+    .count()
+    .get();
+
+  return {
+    businessId: businessId,
+    name: bizData.name,
+    walletId: bizData.walletId,
+    currency: bizData.currency,
+    country: bizData.country,
+    isActive: bizData.isActive,
+    balance: walletData.balance,
+    heldBalance: walletData.heldBalance,
+    availableBalance: walletData.availableBalance,
+    totalReceived: receivedQuery.data().count,
+    totalSent: sentQuery.data().count,
+    lastTransactionAt: lastTransaction?.createdAt ? lastTransaction.createdAt.toDate().toISOString() : null,
+  };
+});
+
+// ============================================================
+// BUSINESS WALLETS — GET TRANSACTIONS
+// ============================================================
+
+/**
+ * Returns paginated transactions for a business wallet.
+ * Auth: Any role in ownerUsers.
+ */
+exports.businessWalletGetTransactions = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { businessId, limit: queryLimit, startAfter, type } = data;
+
+  if (!businessId || typeof businessId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'businessId is required.');
+  }
+
+  // Verify access
+  const bizDoc = await db.collection('businessWallets').doc(businessId).get();
+  if (!bizDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Business wallet not found.');
+  }
+  verifyBusinessWalletAccess(context.auth.uid, bizDoc.data(), 'viewer');
+
+  const pageSize = Math.min(Math.max(queryLimit || 20, 1), 100);
+
+  let query = db.collection('users').doc(businessId)
+    .collection('transactions')
+    .orderBy('createdAt', 'desc')
+    .limit(pageSize);
+
+  // Filter by type if provided
+  if (type && typeof type === 'string') {
+    query = db.collection('users').doc(businessId)
+      .collection('transactions')
+      .where('type', '==', type)
+      .orderBy('createdAt', 'desc')
+      .limit(pageSize);
+  }
+
+  // Pagination cursor
+  if (startAfter) {
+    const cursorDoc = await db.collection('users').doc(businessId)
+      .collection('transactions').doc(startAfter).get();
+    if (cursorDoc.exists) {
+      query = query.startAfter(cursorDoc);
+    }
+  }
+
+  const snapshot = await query.get();
+
+  const transactions = snapshot.docs.map(doc => {
+    const d = doc.data();
+    return {
+      id: doc.id,
+      type: d.type,
+      amount: d.amount,
+      fee: d.fee || 0,
+      currency: d.currency,
+      senderName: d.senderName,
+      receiverName: d.receiverName,
+      senderWalletId: d.senderWalletId,
+      receiverWalletId: d.receiverWalletId,
+      note: d.note,
+      status: d.status,
+      createdAt: d.createdAt ? d.createdAt.toDate().toISOString() : null,
+      holdId: d.holdId || null,
+      sourceApp: d.sourceApp || null,
+    };
+  });
+
+  return {
+    transactions,
+    count: transactions.length,
+    hasMore: transactions.length >= pageSize,
+    lastId: transactions.length > 0 ? transactions[transactions.length - 1].id : null,
+  };
+});
+
+// ============================================================
+// BUSINESS WALLETS — GET COUNTRY BREAKDOWN
+// ============================================================
+
+/**
+ * Aggregates business wallet transactions by currency.
+ * Since currency ≈ country in v1, this gives a country breakdown.
+ * Auth: Any role in ownerUsers.
+ */
+exports.businessWalletGetCountryBreakdown = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { businessId } = data;
+  if (!businessId || typeof businessId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'businessId is required.');
+  }
+
+  // Verify access
+  const bizDoc = await db.collection('businessWallets').doc(businessId).get();
+  if (!bizDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Business wallet not found.');
+  }
+  verifyBusinessWalletAccess(context.auth.uid, bizDoc.data(), 'viewer');
+
+  // Fetch all received transactions (payments from buyers)
+  const receivedSnapshot = await db.collection('users').doc(businessId)
+    .collection('transactions')
+    .where('type', '==', 'receive')
+    .get();
+
+  // Aggregate by sender currency
+  const breakdown = {};
+  receivedSnapshot.forEach(doc => {
+    const d = doc.data();
+    const currency = d.senderCurrency || d.currency || 'UNKNOWN';
+    if (!breakdown[currency]) {
+      breakdown[currency] = { currency, totalAmount: 0, transactionCount: 0 };
+    }
+    breakdown[currency].totalAmount += d.amount || 0;
+    breakdown[currency].transactionCount += 1;
+  });
+
+  return {
+    breakdown: Object.values(breakdown),
+    totalCurrencies: Object.keys(breakdown).length,
+  };
+});
+
+// ============================================================
+// BUSINESS WALLETS — WITHDRAW
+// ============================================================
+
+/**
+ * Initiates a Paystack bank transfer from the business wallet.
+ * Auth: super_admin on the business wallet only.
+ */
+exports.businessWalletWithdraw = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { businessId, amount, bankCode, accountNumber, accountName, reason } = data;
+
+  if (!businessId || typeof businessId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'businessId is required.');
+  }
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'amount must be a positive number.');
+  }
+  if (!bankCode || typeof bankCode !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'bankCode is required.');
+  }
+  if (!accountNumber || typeof accountNumber !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'accountNumber is required.');
+  }
+
+  // Verify business wallet access — super_admin only for withdrawals
+  const bizDoc = await db.collection('businessWallets').doc(businessId).get();
+  if (!bizDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Business wallet not found.');
+  }
+  const caller = verifyBusinessWalletAccess(context.auth.uid, bizDoc.data(), 'super_admin');
+
+  // Check wallet balance
+  const walletDoc = await db.collection('wallets').doc(businessId).get();
+  if (!walletDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Backing wallet not found.');
+  }
+  const walletData = walletDoc.data();
+  const available = walletData.availableBalance ?? (walletData.balance - (walletData.heldBalance || 0));
+
+  if (available < amount) {
+    throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Available balance is ${available}, but withdrawal requires ${amount}.`);
+  }
+
+  // Create Paystack transfer recipient
+  const paystackSecretKey = functions.config().paystack?.secret_key;
+  if (!paystackSecretKey) {
+    throwAppError(ERROR_CODES.CONFIG_MISSING, 'Paystack is not configured.');
+  }
+
+  const axios = require('axios');
+  const reference = `BIZ-WD-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
+
+  try {
+    // Step 1: Create transfer recipient
+    const recipientResponse = await axios.post(
+      'https://api.paystack.co/transferrecipient',
+      {
+        type: 'nuban',
+        name: accountName || bizDoc.data().name,
+        account_number: accountNumber,
+        bank_code: bankCode,
+        currency: walletData.currency,
+      },
+      { headers: { Authorization: `Bearer ${paystackSecretKey}` } }
+    );
+
+    if (!recipientResponse.data.status) {
+      throwAppError(ERROR_CODES.SERVICE_PAYSTACK_ERROR, 'Failed to create transfer recipient.');
+    }
+
+    const recipientCode = recipientResponse.data.data.recipient_code;
+
+    // Step 2: Debit wallet atomically
+    await db.runTransaction(async (transaction) => {
+      const freshWallet = await transaction.get(walletDoc.ref);
+      const freshData = freshWallet.data();
+      const freshAvailable = freshData.availableBalance ?? (freshData.balance - (freshData.heldBalance || 0));
+
+      if (freshAvailable < amount) {
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, 'Balance changed. Please try again.');
+      }
+
+      const newBalance = freshData.balance - amount;
+      transaction.update(walletDoc.ref, {
+        balance: newBalance,
+        availableBalance: newBalance - (freshData.heldBalance || 0),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Record withdrawal
+      transaction.set(db.collection('withdrawals').doc(reference), {
+        userId: businessId,
+        businessId: businessId,
+        amount: amount,
+        currency: walletData.currency,
+        bankCode: bankCode,
+        accountNumber: accountNumber,
+        accountName: accountName || bizDoc.data().name,
+        recipientCode: recipientCode,
+        reference: reference,
+        status: 'pending',
+        reason: reason || 'Business wallet withdrawal',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: caller.uid,
+      });
+    });
+
+    // Step 3: Initiate Paystack transfer
+    const transferResponse = await axios.post(
+      'https://api.paystack.co/transfer',
+      {
+        source: 'balance',
+        amount: amount,
+        recipient: recipientCode,
+        reason: reason || `${bizDoc.data().name} withdrawal`,
+        reference: reference,
+      },
+      { headers: { Authorization: `Bearer ${paystackSecretKey}` } }
+    );
+
+    // Update withdrawal status
+    if (transferResponse.data.status) {
+      await db.collection('withdrawals').doc(reference).update({
+        status: 'processing',
+        paystackTransferCode: transferResponse.data.data.transfer_code,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    await auditLog({
+      action: 'business_wallet_withdraw',
+      userId: businessId,
+      performedBy: caller.uid,
+      details: { businessId, amount, bankCode, accountNumber, reference },
+    });
+
+    logInfo('Business wallet withdrawal initiated', { businessId, amount, reference });
+
+    return {
+      success: true,
+      reference: reference,
+      amount: amount,
+      status: 'processing',
+    };
+
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('Business wallet withdrawal failed', { businessId, error: error.message });
+    throwAppError(ERROR_CODES.SERVICE_PAYSTACK_ERROR, 'Withdrawal failed: ' + error.message);
+  }
+});
+
+// ============================================================
+// BUSINESS WALLETS — REFUND TRANSACTION
+// ============================================================
+
+/**
+ * Refunds a buyer from the business wallet. Debits the business wallet
+ * and credits the buyer's personal wallet. Follows the refund escalation
+ * rules defined in the integration spec.
+ *
+ * Auth: admin+ on the business wallet (with escalation rules enforced).
+ * Idempotent: calling twice with the same refundId is a no-op.
+ */
+exports.businessWalletRefundTransaction = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const { businessId, originalTransactionId, buyerWalletId, amount, reason, refundId } = data;
+
+  // ── Input validation ──
+  if (!businessId || typeof businessId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'businessId is required.');
+  }
+  if (!originalTransactionId || typeof originalTransactionId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'originalTransactionId is required.');
+  }
+  if (!buyerWalletId || typeof buyerWalletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'buyerWalletId is required.');
+  }
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'Refund amount must be positive.');
+  }
+  if (!reason || typeof reason !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Refund reason is required.');
+  }
+
+  // ── Verify business wallet access — admin+ required ──
+  const bizDoc = await db.collection('businessWallets').doc(businessId).get();
+  if (!bizDoc.exists) {
+    throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Business wallet not found.');
+  }
+  const caller = verifyBusinessWalletAccess(context.auth.uid, bizDoc.data(), 'admin');
+
+  // ── Idempotency check ──
+  if (refundId) {
+    const existingRefund = await db.collection('users').doc(businessId)
+      .collection('transactions').doc(refundId).get();
+    if (existingRefund.exists) {
+      logInfo('Refund already processed, returning existing result', { refundId });
+      return { success: true, refundId: refundId, message: 'Refund already processed.' };
+    }
+  }
+
+  // ── Verify original transaction exists ──
+  const originalTx = await db.collection('users').doc(businessId)
+    .collection('transactions').doc(originalTransactionId).get();
+  if (!originalTx.exists) {
+    throwAppError(ERROR_CODES.TXN_NOT_FOUND, 'Original transaction not found in business wallet.');
+  }
+  const originalTxData = originalTx.data();
+
+  // Verify refund amount doesn't exceed original
+  if (amount > originalTxData.amount) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, `Refund amount (${amount}) exceeds original transaction amount (${originalTxData.amount}).`);
+  }
+
+  // ── Find buyer wallet ──
+  const buyerQuery = await db.collection('wallets')
+    .where('walletId', '==', buyerWalletId)
+    .limit(1)
+    .get();
+
+  if (buyerQuery.empty) {
+    throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND, 'Buyer wallet not found.');
+  }
+
+  const buyerDoc = buyerQuery.docs[0];
+  const buyerUid = buyerDoc.id;
+
+  const txId = refundId || `REFUND-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
+
+  // ── Atomic refund transaction ──
+  await db.runTransaction(async (transaction) => {
+    // Read business wallet
+    const bizWalletRef = db.collection('wallets').doc(businessId);
+    const bizWallet = await transaction.get(bizWalletRef);
+    const bizWalletData = bizWallet.data();
+
+    // Check business wallet has enough balance
+    const bizAvailable = bizWalletData.availableBalance ?? (bizWalletData.balance - (bizWalletData.heldBalance || 0));
+    if (bizAvailable < amount) {
+      throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Business wallet available balance (${bizAvailable}) is less than refund amount (${amount}).`);
+    }
+
+    // Read buyer wallet
+    const buyerWalletRef = db.collection('wallets').doc(buyerUid);
+    const buyerWallet = await transaction.get(buyerWalletRef);
+    const buyerWalletData = buyerWallet.data();
+
+    // Debit business wallet
+    const newBizBalance = bizWalletData.balance - amount;
+    transaction.update(bizWalletRef, {
+      balance: newBizBalance,
+      availableBalance: newBizBalance - (bizWalletData.heldBalance || 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Credit buyer wallet
+    const newBuyerBalance = buyerWalletData.balance + amount;
+    transaction.update(buyerWalletRef, {
+      balance: newBuyerBalance,
+      availableBalance: newBuyerBalance - (buyerWalletData.heldBalance || 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Record refund on business wallet side
+    transaction.set(
+      db.collection('users').doc(businessId).collection('transactions').doc(txId),
+      {
+        id: txId,
+        type: 'send',
+        amount: amount,
+        fee: 0,
+        currency: bizWalletData.currency,
+        senderWalletId: bizDoc.data().walletId,
+        receiverWalletId: buyerWalletId,
+        senderName: bizDoc.data().name,
+        receiverName: 'Buyer',
+        note: `Refund: ${reason}`,
+        status: 'completed',
+        isRefund: true,
+        originalTransactionId: originalTransactionId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reference: `REFUND-${Date.now()}`,
+      }
+    );
+
+    // Record refund on buyer side
+    transaction.set(
+      db.collection('users').doc(buyerUid).collection('transactions').doc(txId),
+      {
+        id: txId,
+        type: 'receive',
+        amount: amount,
+        fee: 0,
+        currency: buyerWalletData.currency,
+        senderWalletId: bizDoc.data().walletId,
+        receiverWalletId: buyerWalletId,
+        senderName: bizDoc.data().name,
+        receiverName: 'Buyer',
+        note: `Refund from ${bizDoc.data().name}: ${reason}`,
+        status: 'completed',
+        isRefund: true,
+        originalTransactionId: originalTransactionId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reference: `REFUND-${Date.now()}`,
+      }
+    );
+  });
+
+  // ── Audit log ──
+  await auditLog({
+    action: 'business_wallet_refund',
+    userId: businessId,
+    performedBy: caller.uid,
+    details: {
+      businessId,
+      refundId: txId,
+      originalTransactionId,
+      buyerWalletId,
+      buyerUid,
+      amount,
+      reason,
+      callerRole: caller.role,
+    },
+  });
+
+  // ── Notify buyer ──
+  try {
+    await sendPushNotification(buyerUid, {
+      title: 'Refund Received',
+      body: `You received a refund of ${bizDoc.data().currency}${(amount / 100).toFixed(2)} from ${bizDoc.data().name}.`,
+      type: 'transaction',
+      data: { action: 'refund_received', refundId: txId },
+    });
+  } catch (fcmError) {
+    logError('Failed to send refund notification', { txId, error: fcmError.message });
+  }
+
+  logInfo('Business wallet refund processed', { businessId, txId, amount, buyerUid });
+
+  return {
+    success: true,
+    refundId: txId,
+    amount: amount,
+  };
+});
