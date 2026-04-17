@@ -8779,3 +8779,310 @@ exports.listHoldsForWallet = functions.https.onCall(async (data, context) => {
 
   return { holds, count: holds.length };
 });
+
+
+// ============================================================
+// WALLET HOLDS — CONVERT HOLD TO TRANSFER
+// ============================================================
+
+/**
+ * Converts an active hold into a real money transfer in a single atomic
+ * operation. The held amount is deducted from the sender's balance (and
+ * heldBalance), and the net amount (after fee) is credited to the
+ * recipient's wallet.
+ *
+ * This is essentially sendMoney but starting from held funds instead of
+ * available balance. No intermediate state where money is "half-moved."
+ *
+ * Auth: Caller must be the service that created the hold (walletHoldsWrite
+ * claim) or a super_admin. The wallet owner CANNOT convert their own hold.
+ */
+exports.convertHoldToTransfer = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const callerId = context.auth.uid;
+  const callerClaims = context.auth.token || {};
+
+  const { holdId, recipientWalletId, note, metadata } = data;
+
+  // ── Input validation ──
+  if (!holdId || typeof holdId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'holdId is required.');
+  }
+  if (!recipientWalletId || typeof recipientWalletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'recipientWalletId is required.');
+  }
+
+  // ── Authorization: only creating service or super_admin ──
+  const isService = callerClaims.walletHoldsWrite === true;
+  const isSuperAdmin = callerClaims.role === 'super_admin';
+  if (!isService && !isSuperAdmin) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Only the creating service or a super_admin can convert a hold.');
+  }
+
+  // ── Fetch exchange rates (outside transaction, read-only) ──
+  const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+  const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+
+  // ── Generate transaction ID ──
+  const txId = generateSecureTransactionId();
+  const now = new Date();
+
+  // ── Atomic transaction ──
+  const result = await db.runTransaction(async (transaction) => {
+    // 1. Read hold
+    const holdRef = db.collection('wallet_holds').doc(holdId);
+    const holdDoc = await transaction.get(holdRef);
+
+    if (!holdDoc.exists) {
+      throwAppError(ERROR_CODES.HOLD_NOT_FOUND);
+    }
+
+    const holdData = holdDoc.data();
+
+    // 2. Validate hold is active
+    if (holdData.status !== 'active') {
+      throwAppError(ERROR_CODES.HOLD_INVALID_STATE, `Hold status is '${holdData.status}', expected 'active'.`);
+    }
+
+    // 3. Read sender wallet
+    const senderWalletRef = db.collection('wallets').doc(holdData.walletId);
+    const senderWallet = await transaction.get(senderWalletRef);
+
+    if (!senderWallet.exists) {
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
+    }
+
+    const senderData = senderWallet.data();
+    validateWalletDocument(senderData, 'convertHoldToTransfer sender wallet');
+
+    // 4. Find recipient wallet by walletId string (e.g. QRW-XXXX-XXXX-XXXX)
+    const recipientQuery = await transaction.get(
+      db.collection('wallets').where('walletId', '==', recipientWalletId)
+    );
+
+    // Firestore transactions don't support .where().get() directly in all SDK versions.
+    // Fall back to reading outside transaction if needed.
+    let recipientDoc, recipientUid, recipientRef, recipientData;
+
+    if (recipientQuery && !recipientQuery.empty) {
+      recipientDoc = recipientQuery.docs[0];
+      recipientUid = recipientDoc.id;
+      recipientRef = recipientDoc.ref;
+      recipientData = recipientDoc.data();
+    } else {
+      throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND, 'Recipient wallet not found.');
+    }
+
+    validateWalletDocument(recipientData, 'convertHoldToTransfer recipient wallet');
+
+    // 5. Check recipient is not blocked
+    const recipientUserDoc = await transaction.get(db.collection('users').doc(recipientUid));
+    if (recipientUserDoc.exists && recipientUserDoc.data().accountBlocked === true) {
+      throwAppError(ERROR_CODES.WALLET_SUSPENDED, 'Recipient account is suspended.');
+    }
+
+    // 6. Calculate fee
+    const senderCurrency = senderData.currency || 'GHS';
+    const recipientCurrency = recipientData.currency || 'GHS';
+    const isCrossCountry = senderCurrency !== recipientCurrency;
+    const fee = calculateFee(holdData.amount, isCrossCountry);
+
+    // 7. Validate hold covers the fee
+    if (holdData.amount < fee) {
+      throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, `Hold amount (${holdData.amount}) does not cover the fee (${fee}).`);
+    }
+
+    const transferAmount = holdData.amount - fee;
+
+    // 8. Currency conversion if cross-country
+    let creditAmount = transferAmount;
+    let txExchangeRate = null;
+
+    if (isCrossCountry) {
+      const senderRate = rates[senderCurrency] || 1;
+      const recipientRate = rates[recipientCurrency] || 1;
+      txExchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+      creditAmount = Math.round(transferAmount * txExchangeRate);
+    }
+
+    // 9. Update sender wallet:
+    //    - balance decreases by hold amount (total goes down)
+    //    - heldBalance decreases by hold amount (hold consumed)
+    //    - availableBalance unchanged (money was already excluded from available)
+    transaction.update(senderWalletRef, {
+      balance: admin.firestore.FieldValue.increment(-holdData.amount),
+      heldBalance: admin.firestore.FieldValue.increment(-holdData.amount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 10. Update recipient wallet
+    transaction.update(recipientRef, {
+      balance: admin.firestore.FieldValue.increment(creditAmount),
+      availableBalance: admin.firestore.FieldValue.increment(creditAmount),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 11. Collect platform fee
+    const exchangeRate = rates[senderCurrency] || 1;
+    const feeInUSD = fee / exchangeRate;
+
+    const platformWalletRef = db.collection('wallets').doc('platform');
+    transaction.update(platformWalletRef, {
+      totalBalanceUSD: admin.firestore.FieldValue.increment(feeInUSD),
+      totalTransactions: admin.firestore.FieldValue.increment(1),
+      totalFeesCollected: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
+    transaction.set(currencyBalanceRef, {
+      currency: senderCurrency,
+      amount: admin.firestore.FieldValue.increment(fee),
+      usdEquivalent: admin.firestore.FieldValue.increment(feeInUSD),
+      txCount: admin.firestore.FieldValue.increment(1),
+      lastTransactionAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
+    transaction.set(feeRecordRef, {
+      transactionId: txId,
+      originalAmount: fee,
+      currency: senderCurrency,
+      usdAmount: feeInUSD,
+      exchangeRate: exchangeRate,
+      senderUid: holdData.walletId,
+      transferAmount: holdData.amount,
+      holdId: holdId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 12. Record transaction documents
+    // Get display names (masked for privacy)
+    const senderUserDoc = await transaction.get(db.collection('users').doc(holdData.walletId));
+    const senderDisplayName = senderUserDoc.exists ? (senderUserDoc.data().displayName || senderUserDoc.data().legalName || 'User') : 'User';
+    const recipientDisplayName = recipientUserDoc.exists ? (recipientUserDoc.data().displayName || recipientUserDoc.data().legalName || 'Merchant') : 'Merchant';
+
+    const baseTxData = {
+      id: txId,
+      senderWalletId: senderData.walletId,
+      receiverWalletId: recipientWalletId,
+      senderName: senderDisplayName,
+      receiverName: recipientDisplayName,
+      amount: holdData.amount,
+      fee: fee,
+      currency: senderCurrency,
+      senderCurrency: senderCurrency,
+      receiverCurrency: recipientCurrency,
+      note: note || `Hold conversion: ${holdData.reason} - ${holdData.referenceId}`,
+      items: null,
+      status: 'completed',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reference: `TXN-${now.getTime()}`,
+      exchangeRate: txExchangeRate,
+      convertedAmount: isCrossCountry ? creditAmount : null,
+      failureReason: null,
+      holdId: holdId,
+      holdReason: holdData.reason,
+      holdReferenceId: holdData.referenceId,
+    };
+
+    // Sender transaction record
+    transaction.set(
+      db.collection('users').doc(holdData.walletId).collection('transactions').doc(txId),
+      { ...baseTxData, type: 'send' }
+    );
+
+    // Recipient transaction record
+    transaction.set(
+      db.collection('users').doc(recipientUid).collection('transactions').doc(txId),
+      {
+        ...baseTxData,
+        type: 'receive',
+        fee: 0,
+        amount: creditAmount,
+        currency: recipientCurrency,
+      }
+    );
+
+    // 13. Update hold status
+    transaction.update(holdRef, {
+      status: 'converted',
+      releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+      releasedReason: 'delivered',
+      convertedTransactionId: txId,
+    });
+
+    return {
+      transactionId: txId,
+      holdId: holdId,
+      senderWalletId: holdData.walletId,
+      recipientWalletId: recipientWalletId,
+      amount: holdData.amount,
+      fee: fee,
+      transferAmount: transferAmount,
+      creditAmount: creditAmount,
+      exchangeRate: txExchangeRate,
+      senderCurrency: senderCurrency,
+      recipientCurrency: recipientCurrency,
+      senderUid: holdData.walletId,
+      recipientUid: recipientUid,
+      senderName: senderDisplayName,
+      recipientName: recipientDisplayName,
+    };
+  });
+
+  // ── Post-transaction: audit, notifications, fraud check ──
+  logFinancialOperation('convertHoldToTransfer', 'success', { transactionId: result.transactionId, holdId });
+
+  await auditLog({
+    action: 'convert_hold_to_transfer',
+    userId: result.senderUid,
+    performedBy: callerId,
+    details: {
+      holdId,
+      transactionId: result.transactionId,
+      amount: result.amount,
+      fee: result.fee,
+      transferAmount: result.transferAmount,
+      creditAmount: result.creditAmount,
+      recipientWalletId,
+    },
+  });
+
+  // FCM notifications
+  await Promise.all([
+    sendPushNotification(result.senderUid, {
+      title: 'Payment Completed',
+      body: `Your held funds of ${result.senderCurrency}${(result.amount / 100).toFixed(2)} have been transferred to ${result.recipientName}.`,
+      type: 'transaction',
+      data: { action: 'hold_converted', holdId, transactionId: result.transactionId },
+    }),
+    sendPushNotification(result.recipientUid, {
+      title: 'Payment Received',
+      body: `You received ${result.recipientCurrency}${(result.creditAmount / 100).toFixed(2)} from ${result.senderName}.`,
+      type: 'transaction',
+      data: { action: 'hold_payment_received', transactionId: result.transactionId },
+    }),
+  ]);
+
+  // Fraud detection
+  await checkForFraud(result.senderUid, {
+    id: result.transactionId,
+    type: 'send',
+    amount: result.amount,
+    currency: result.senderCurrency,
+  });
+
+  return {
+    success: true,
+    transactionId: result.transactionId,
+    transferAmount: result.transferAmount,
+    fee: result.fee,
+    creditAmount: result.creditAmount,
+  };
+});
