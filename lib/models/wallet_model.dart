@@ -40,8 +40,14 @@ class WalletModel {
   @HiveField(10)
   final int dailySpent;
 
-  @HiveField(11)
+ @HiveField(11)
   final int monthlySpent;
+
+  @HiveField(12)
+  final int heldBalance;
+
+  @HiveField(13)
+  final int availableBalance;
 
   WalletModel({
     required this.id,
@@ -56,6 +62,8 @@ class WalletModel {
     this.monthlyLimit = 500000000,
     this.dailySpent = 0,
     this.monthlySpent = 0,
+    this.heldBalance = 0,
+    this.availableBalance = 0,
   });
 
   /// Create wallet from Firestore document
@@ -73,6 +81,8 @@ class WalletModel {
       monthlyLimit: (json['monthlyLimit'] as num?)?.toInt() ?? 500000000,
       dailySpent: (json['dailySpent'] as num?)?.toInt() ?? 0,
       monthlySpent: (json['monthlySpent'] as num?)?.toInt() ?? 0,
+      heldBalance: (json['heldBalance'] as num?)?.toInt() ?? 0,
+      availableBalance: (json['availableBalance'] as num?)?.toInt() ?? ((json['balance'] as num?)?.toInt() ?? 0),
     );
   }
 
@@ -91,11 +101,13 @@ class WalletModel {
       'monthlyLimit': monthlyLimit,
       'dailySpent': dailySpent,
       'monthlySpent': monthlySpent,
+      'heldBalance': heldBalance,
+      'availableBalance': availableBalance,
     };
   }
 
   /// Copy with new values
-  WalletModel copyWith({
+WalletModel copyWith({
     String? id,
     String? walletId,
     String? userId,
@@ -108,6 +120,8 @@ class WalletModel {
     int? monthlyLimit,
     int? dailySpent,
     int? monthlySpent,
+    int? heldBalance,
+    int? availableBalance,
   }) {
     return WalletModel(
       id: id ?? this.id,
@@ -122,13 +136,17 @@ class WalletModel {
       monthlyLimit: monthlyLimit ?? this.monthlyLimit,
       dailySpent: dailySpent ?? this.dailySpent,
       monthlySpent: monthlySpent ?? this.monthlySpent,
+      heldBalance: heldBalance ?? this.heldBalance,
+      availableBalance: availableBalance ?? this.availableBalance,
     );
   }
 
   /// Check if user can make transaction of given amount (minor units)
+  /// Check if user can make transaction of given amount (minor units).
+  /// Uses availableBalance (not total balance) to prevent spending held funds.
   bool canTransact(int amount) {
     if (!isActive) return false;
-    if (amount > balance) return false;
+    if (amount > availableBalance) return false;
     if (dailySpent + amount > dailyLimit) return false;
     if (monthlySpent + amount > monthlyLimit) return false;
     return true;
@@ -140,8 +158,17 @@ class WalletModel {
   /// Get remaining monthly limit (minor units)
   int get remainingMonthlyLimit => monthlyLimit - monthlySpent;
 
-  /// Format minor units to display string (e.g. 150050 -> "1500.50")
+ /// Format minor units to display string (e.g. 150050 -> "1500.50")
   String get displayBalance => (balance / 100).toStringAsFixed(2);
+
+  /// Format available balance for display
+  String get displayAvailableBalance => (availableBalance / 100).toStringAsFixed(2);
+
+  /// Format held balance for display
+  String get displayHeldBalance => (heldBalance / 100).toStringAsFixed(2);
+
+  /// Whether this wallet has any active holds
+  bool get hasHolds => heldBalance > 0;
 
   /// Get currency symbol for African and common currencies
   String get currencySymbol {

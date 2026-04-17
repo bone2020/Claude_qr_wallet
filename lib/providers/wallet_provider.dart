@@ -50,6 +50,9 @@ class WalletState {
   }
 
   int get balance => wallet?.balance ?? 0;
+  int get heldBalance => wallet?.heldBalance ?? 0;
+  int get availableBalance => wallet?.availableBalance ?? (wallet?.balance ?? 0);
+  bool get hasHolds => heldBalance > 0;
   String get walletId => wallet?.walletId ?? '';
   String get currency => wallet?.currency ?? CurrencyService.defaultCurrency.code;
   String get currencySymbol => wallet?.currencySymbol ?? CurrencyService.defaultCurrency.symbol;

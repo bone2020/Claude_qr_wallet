@@ -7,6 +7,8 @@ import '../../../core/constants/constants.dart';
 /// Balance card widget displaying wallet balance
 class BalanceCard extends StatelessWidget {
   final int balance;
+  final int heldBalance;
+  final int availableBalance;
   final String currency;
   final bool isHidden;
   final String walletId;
@@ -15,6 +17,8 @@ class BalanceCard extends StatelessWidget {
   const BalanceCard({
     super.key,
     required this.balance,
+    this.heldBalance = 0,
+    this.availableBalance = 0,
     required this.currency,
     required this.isHidden,
     required this.walletId,
@@ -149,6 +153,66 @@ class BalanceCard extends StatelessWidget {
               ),
             ],
           ),
+
+          // Show held/available breakdown if there are active holds
+          if (heldBalance > 0 && !isHidden) ...[
+            const SizedBox(height: AppDimensions.spaceSM),
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.spaceSM,
+                      vertical: AppDimensions.spaceXS,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Available',
+                          style: AppTextStyles.caption(color: AppColors.success),
+                        ),
+                        Text(
+                          '$currency ${(availableBalance / 100).toStringAsFixed(2)}',
+                          style: AppTextStyles.bodySmall(color: AppColors.success),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppDimensions.spaceSM),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.spaceSM,
+                      vertical: AppDimensions.spaceXS,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'On Hold',
+                          style: AppTextStyles.caption(color: AppColors.warning),
+                        ),
+                        Text(
+                          '$currency ${(heldBalance / 100).toStringAsFixed(2)}',
+                          style: AppTextStyles.bodySmall(color: AppColors.warning),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: AppDimensions.spaceLG),
 

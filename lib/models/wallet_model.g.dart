@@ -29,13 +29,15 @@ class WalletModelAdapter extends TypeAdapter<WalletModel> {
       monthlyLimit: fields[9] as int,
       dailySpent: fields[10] as int,
       monthlySpent: fields[11] as int,
+      heldBalance: fields[12] as int,
+      availableBalance: fields[13] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, WalletModel obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +61,11 @@ class WalletModelAdapter extends TypeAdapter<WalletModel> {
       ..writeByte(10)
       ..write(obj.dailySpent)
       ..writeByte(11)
-      ..write(obj.monthlySpent);
+      ..write(obj.monthlySpent)
+      ..writeByte(12)
+      ..write(obj.heldBalance)
+      ..writeByte(13)
+      ..write(obj.availableBalance);
   }
 
   @override

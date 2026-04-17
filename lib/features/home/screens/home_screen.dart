@@ -113,8 +113,10 @@ class HomeScreen extends ConsumerWidget {
                 const SizedBox(height: AppDimensions.spaceXL),
 
                 // Balance Card
-                BalanceCard(
+               BalanceCard(
                   balance: balance,
+                  heldBalance: walletState.heldBalance,
+                  availableBalance: walletState.availableBalance,
                   currency: currency,
                   isHidden: balanceHidden,
                   walletId: walletId,
