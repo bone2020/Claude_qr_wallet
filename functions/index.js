@@ -7875,6 +7875,38 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       return;
     }
 
+    // ============================================================
+    // B-02 — Reverse-lookup Firebase UID from SmileID user_id.
+    //
+    // SmileID's PartnerParams.user_id is NOT the Firebase Auth UID.
+    // The app generates it via SmileIDService.generateUserId() as
+    // `user_${millisecondsSinceEpoch}` and stores it on the user
+    // doc as the `smileUserId` field. We need the Firebase UID to
+    // update the correct user document.
+    // ============================================================
+    const userQuerySnap = await admin.firestore()
+      .collection('users')
+      .where('smileUserId', '==', userId)
+      .limit(1)
+      .get();
+
+    if (userQuerySnap.empty) {
+      logInfo('Smile ID webhook: no user found for smileUserId — orphan or test callback', {
+        smileUserId: userId,
+        jobId,
+        smileJobId,
+      });
+      res.status(200).send('OK');
+      return;
+    }
+
+    const firebaseUid = userQuerySnap.docs[0].id;
+    logInfo('Smile ID webhook: resolved Firebase UID from smileUserId', {
+      smileUserId: userId,
+      firebaseUid,
+      jobId,
+    });
+
     // Extract face-matching and liveness results.
     // SmileID sends action names with underscores and PascalCase values.
     const livenessResult = actions.Liveness_Check || actions.Liveness || 'Not Available';
@@ -7912,7 +7944,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
     // Store full result in Firestore (always, regardless of pass/fail)
     await admin.firestore()
       .collection('users')
-      .doc(userId)
+      .doc(firebaseUid)
       .collection('kyc')
       .doc('smile_id_results')
       .set({
@@ -7955,7 +7987,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       try {
         await admin.firestore()
           .collection('users')
-          .doc(userId)
+          .doc(firebaseUid)
           .update({
             kycStatus: 'failed',
             kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -7977,7 +8009,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
 
     if (validResultCode && faceMatchPassed) {
       // Full pass — set kycStatus to 'verified', create wallet
-      const userRef = admin.firestore().collection('users').doc(userId);
+      const userRef = admin.firestore().collection('users').doc(firebaseUid);
       const userDoc = await userRef.get();
       const userData = userDoc.exists ? userDoc.data() : {};
 
@@ -8002,15 +8034,15 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       await userRef.update(updateData);
 
       // Create wallet if it doesn't exist
-      const walletDoc = await admin.firestore().collection('wallets').doc(userId).get();
+      const walletDoc = await admin.firestore().collection('wallets').doc(firebaseUid).get();
       if (!walletDoc.exists) {
         const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
         const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
 
-       await admin.firestore().collection('wallets').doc(userId).set({
-          id: userId,
-          userId: userId,
+       await admin.firestore().collection('wallets').doc(firebaseUid).set({
+          id: firebaseUid,
+          userId: firebaseUid,
           walletId: walletId,
           currency: userData.currency || 'GHS',
           balance: 0,
@@ -8036,7 +8068,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       // Document verified but face match failed — mark as failed
       await admin.firestore()
         .collection('users')
-        .doc(userId)
+        .doc(firebaseUid)
         .update({
           kycStatus: 'failed',
           kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -8051,7 +8083,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
       // Non-passing result code
       await admin.firestore()
         .collection('users')
-        .doc(userId)
+        .doc(firebaseUid)
         .update({
           kycStatus: 'failed',
           kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
