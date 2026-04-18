@@ -7923,7 +7923,7 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
           partnerId,
           resultCode,
           resultText,
-          jobType: data.job_type,
+          jobType: jobType || null,
           actions,
           confidence: confidenceValue,
           livenessScore: livenessResult,
