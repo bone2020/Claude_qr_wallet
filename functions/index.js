@@ -7771,6 +7771,82 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
   }
 
   try {
+    // ============================================================
+    // C-01 — Verify SmileID webhook signature BEFORE any DB write.
+    //
+    // SmileID signs callbacks by placing `timestamp` and `signature`
+    // in the POST body (not headers). The signature is:
+    //   HMAC-SHA256(API_KEY, timestamp + partner_id + "sid_request")
+    // encoded as base64 — same recipe as outbound requests; see
+    // generateSmileIdSignature() above.
+    //
+    // An unsigned, mis-signed, or stale callback cannot mutate user
+    // state. Valid callbacks fall through to the existing processing.
+    // ============================================================
+    const receivedSignature = req.body?.signature;
+    const receivedTimestamp = req.body?.timestamp;
+
+    if (!receivedSignature || !receivedTimestamp) {
+      logError('SmileID webhook rejected: missing signature or timestamp', {
+        hasSignature: !!receivedSignature,
+        hasTimestamp: !!receivedTimestamp,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      res.status(403).send('Forbidden');
+      return;
+    }
+
+    if (!SMILE_ID_API_KEY) {
+      logError('SmileID webhook rejected: SMILE_ID_API_KEY not configured — refusing to process callbacks unauthenticated');
+      res.status(500).send('Server misconfigured');
+      return;
+    }
+
+    // Replay protection: reject timestamps outside ±10 minutes of server time.
+    const receivedMs = Date.parse(receivedTimestamp);
+    if (Number.isNaN(receivedMs)) {
+      logError('SmileID webhook rejected: unparseable timestamp', {
+        receivedTimestamp,
+        ip: req.ip,
+      });
+      res.status(403).send('Forbidden');
+      return;
+    }
+    const TEN_MINUTES_MS = 10 * 60 * 1000;
+    const skewMs = Date.now() - receivedMs;
+    if (Math.abs(skewMs) > TEN_MINUTES_MS) {
+      logError('SmileID webhook rejected: timestamp outside replay window', {
+        receivedTimestamp,
+        skewMs,
+        ip: req.ip,
+      });
+      res.status(403).send('Forbidden');
+      return;
+    }
+
+    // Generate expected signature using the existing outbound recipe,
+    // then timing-safe compare with the received one.
+    const expectedSignature = generateSmileIdSignature(receivedTimestamp);
+    const receivedSigStr = String(receivedSignature);
+    let signatureValid = false;
+    if (expectedSignature.length === receivedSigStr.length) {
+      signatureValid = crypto.timingSafeEqual(
+        Buffer.from(expectedSignature, 'utf8'),
+        Buffer.from(receivedSigStr, 'utf8')
+      );
+    }
+    if (!signatureValid) {
+      logError('SmileID webhook rejected: signature mismatch', {
+        receivedTimestamp,
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      res.status(403).send('Forbidden');
+      return;
+    }
+
+    // Signature verified — safe to process payload below.
     const data = req.body;
 
     // SmileID sends PascalCase field names with user_id/job_id nested inside PartnerParams.
