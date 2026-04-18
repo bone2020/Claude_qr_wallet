@@ -143,51 +143,6 @@ class UserService {
     // Errors are propagated to the caller - KYC is not complete if this fails
   }
 
-  /// Mark user as KYC verified when SmileID returns "already enrolled" error.
-  /// This means the user was previously verified via SmileID, so we should
-  /// immediately set their kycStatus to 'verified' without requiring them
-  /// to complete the full KYC flow again.
-  ///
-  /// This calls the markUserAlreadyEnrolled Cloud Function which handles
-  /// all the server-side updates atomically.
-  Future<UserResult> markKycVerifiedForAlreadyEnrolledUser({
-    String? idType,
-    DateTime? dateOfBirth,
-  }) async {
-    if (_userId == null) {
-      return UserResult.failure('User not authenticated');
-    }
-
-    try {
-      // Call the dedicated Cloud Function for "already enrolled" users
-      // This function sets kycStatus: 'verified' directly without requiring
-      // prior KYC document approval (since SmileID already verified them)
-      final callable = FirebaseFunctions.instance.httpsCallable('markUserAlreadyEnrolled');
-      final result = await callable.call({
-        'idType': idType,
-      });
-
-      final data = result.data as Map<String, dynamic>;
-      if (data['success'] != true) {
-        return UserResult.failure(data['error'] ?? 'Failed to update KYC status');
-      }
-
-      // Update date of birth locally if provided
-      if (dateOfBirth != null) {
-        await _firestore.collection('users').doc(_userId).update({
-          'dateOfBirth': dateOfBirth.toIso8601String(),
-        });
-      }
-
-      final updatedUser = await getCurrentUser();
-      return UserResult.success(updatedUser);
-    } catch (e) {
-      // ignore: avoid_print
-      debugPrint('Error in markKycVerifiedForAlreadyEnrolledUser: $e');
-      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
-    }
-  }
-
   /// Upload KYC documents
   Future<UserResult> uploadKycDocuments({
     File? idFront,

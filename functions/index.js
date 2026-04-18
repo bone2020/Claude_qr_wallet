@@ -2893,85 +2893,16 @@ exports.updateWalletCurrency = functions.https.onCall(async (data, context) => {
   return { success: true, currency: validatedCurrency };
 });
 
-exports.markUserAlreadyEnrolled = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
-  }
-
-  const userId = context.auth.uid;
-  const { idType } = data || {};
-
-  logInfo('Processing SmileID already enrolled user', { userId, idType });
-
-  // Create or update the KYC documents subcollection
-  const kycDocRef = db.collection('users').doc(userId).collection('kyc').doc('documents');
-  const kycDoc = await kycDocRef.get();
-
-  if (!kycDoc.exists) {
-    // Create a new KYC document for already enrolled users
-    await kycDocRef.set({
-      idType: idType || 'SMILE_ID_ENROLLED',
-      status: 'verified',
-      verificationMethod: 'smile_id_already_enrolled',
-      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
-      smileIdVerified: true,
-    });
-  } else {
-    // Update existing document to verified status
-    await kycDocRef.update({
-      status: 'verified',
-      smileIdVerified: true,
-      verificationMethod: 'smile_id_already_enrolled',
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  // Set the canonical kycStatus field
-  await db.collection('users').doc(userId).update({
-    kycStatus: 'verified',
-    kycStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    kycCompleted: true,
-    kycVerified: true,
-  });
-
-  // Create wallet if it doesn't exist yet
-  const walletDoc = await db.collection('wallets').doc(userId).get();
-  if (!walletDoc.exists) {
-    const userDoc = await db.collection('users').doc(userId).get();
-    const userData = userDoc.exists ? userDoc.data() : {};
-
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    const walletId = `QRW-${segment()}-${segment()}-${segment()}`;
-
-    await db.collection('wallets').doc(userId).set({
-      id: userId,
-      userId: userId,
-      walletId: walletId,
-      currency: userData.currency || 'GHS',
-      balance: 0,
-      isActive: true,
-      dailySpent: 0,
-      monthlySpent: 0,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await db.collection('users').doc(userId).update({
-      walletId: walletId,
-      walletCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    logInfo('Wallet created during markUserAlreadyEnrolled', { userId, walletId });
-  }
-
-  logInfo('User marked as KYC verified (SmileID already enrolled)', { userId });
-
-  return {
-    success: true,
-    kycStatus: 'verified',
-  };
-});
+// C-02 — markUserAlreadyEnrolled removed.
+// The previous callable set kycStatus: 'verified' and created a wallet
+// for any authenticated caller based solely on a client-provided idType
+// string. That allowed any authenticated user to bypass KYC entirely.
+// No active Flutter screen called this function (the 'already_enrolled'
+// flow in the app uses a pop signal and re-routes through the normal
+// webhook-verified path). When database-lookup KYC is re-enabled and a
+// legitimate "already enrolled" short-circuit is needed, implement a
+// replacement that server-side verifies the claim via SmileID's
+// /v1/job_status endpoint with smileUserId + smileJobId.
 
 // ============================================================
 // GDPR DATA EXPORT & DELETION
