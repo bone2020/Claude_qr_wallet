@@ -44,22 +44,12 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const credential = await signInWithEmailAndPassword(auth, email, password);
-    let tokenResult = await credential.user.getIdTokenResult(true);
-    let userRole = tokenResult.claims.role;
+    const tokenResult = await credential.user.getIdTokenResult(true);
+    const userRole = tokenResult.claims.role;
 
-    // If no role yet, try to self-promote via setupSuperAdmin (only works for approved emails)
-    if (!userRole) {
-      try {
-        const setupSuperAdmin = httpsCallable(functions, 'setupSuperAdmin');
-        await setupSuperAdmin({});
-        // Force token refresh to pick up the new claim
-        tokenResult = await credential.user.getIdTokenResult(true);
-        userRole = tokenResult.claims.role;
-      } catch (e) {
-        console.log('setupSuperAdmin not available for this user:', e.message);
-      }
-    }
-
+    // H-03: Removed auto-call to setupSuperAdmin. Users without a role are
+    // rejected here. Admins are provisioned via adminPromoteUser (requires an
+    // existing super_admin to authorize), not by auto-escalation on login.
     if (!userRole || !['super_admin', 'admin', 'support'].includes(userRole)) {
       await signOut(auth);
       throw new Error('You do not have admin privileges.');

@@ -4284,6 +4284,11 @@ async function verifyAdmin(context, requiredRole = 'support') {
  */
 exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
   // Approved super admin emails. Add or remove emails here to control who can self-promote.
+  // H-03: This function is ONE-TIME-ONLY. After the initial super_admin exists
+  // in admin_users, this function refuses all further calls. New super_admins
+  // must be created via adminPromoteUser (which requires an existing super_admin
+  // to authorize). To re-bootstrap after losing the initial super_admin account,
+  // use the Firebase Admin SDK directly from a trusted shell.
   const APPROVED_SUPER_ADMIN_EMAILS = [
     'bonstrahe@gmail.com',
     'kojookoto3@gmail.com',
@@ -4292,6 +4297,22 @@ exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
 
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be signed in to setup super admin.');
+  }
+
+  // H-03: One-time-only guard. If any super_admin already exists in admin_users,
+  // refuse this call regardless of caller identity. Closes the auto-escalation
+  // path that would otherwise grant super_admin to anyone with access to an
+  // allowlisted email.
+  const existingSuperAdmins = await db.collection('admin_users')
+    .where('role', '==', 'super_admin')
+    .limit(1)
+    .get();
+
+  if (!existingSuperAdmins.empty) {
+    throw new functions.https.HttpsError(
+      'permission-denied',
+      'Super admin bootstrap is closed. Use adminPromoteUser (requires existing super_admin).'
+    );
   }
 
   const callerUid = context.auth.uid;
