@@ -1905,6 +1905,12 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
         const walletData = walletDoc.data();
         validateWalletDocument(walletData, 'chargeMobileMoney wallet');
 
+        // H-02: write to payments/{reference} inside the transaction so that
+        // the later paystackWebhook (which fires for the same reference) sees
+        // processed: true in its H-01 transaction check and exits without
+        // re-crediting. Shape matches what handleSuccessfulCharge writes.
+        const paymentRef = db.collection('payments').doc(reference);
+
         await db.runTransaction(async (transaction) => {
           // Read fresh wallet data inside transaction to prevent stale balance
           const freshWallet = await transaction.get(walletDoc.ref);
@@ -1915,6 +1921,21 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
             balance: creditBalance,
             availableBalance: creditBalance - (freshData.heldBalance || 0),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // H-02: record the canonical payment document so the late Paystack
+          // webhook sees this reference as already processed.
+          transaction.set(paymentRef, {
+            userId: userId,
+            walletId: walletDoc.id,
+            reference: reference,
+            amount: amount,
+            currency: validatedCurrency,
+            type: 'deposit',
+            channel: 'mobile_money',
+            status: 'success',
+            processed: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
           // Record transaction
