@@ -4863,7 +4863,14 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
       error: smsError.message,
       targetUid,
     });
-    // Don't fail the function — OTP is still shown on dashboard as fallback
+    // H-04: SMS is now the only delivery mechanism. If it fails, surface
+    // the error to the admin so they can retry. Previously the OTP was
+    // returned in the response as a fallback — removed for insider-risk
+    // reasons.
+    throw new functions.https.HttpsError(
+      'unavailable',
+      'Failed to send recovery OTP via SMS. Please retry. If the problem persists, check SMS provider configuration.'
+    );
   }
 
   await auditLog({
@@ -4887,11 +4894,14 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  // Return OTP to admin for manual delivery (secure internal process)
+  // H-04: OTP is NEVER returned to the admin. It's delivered only via SMS
+  // to the user's phone. If SMS delivery fails, the admin should re-trigger
+  // the send (logs will show the SMS failure), not have OTP displayed to
+  // them. Support staff with the OTP value can impersonate users — this
+  // was a critical insider-risk hole.
  return {
     success: true,
-    message: 'Recovery OTP sent via SMS.',
-    otp, // Keep as fallback in case SMS fails — remove this line when going fully live
+    message: 'Recovery OTP sent to user\'s phone via SMS. User should share the code they receive.',
     phoneNumber: maskedPhone,
     expiresInMinutes: 10,
   };
