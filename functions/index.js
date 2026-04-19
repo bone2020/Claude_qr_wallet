@@ -1045,13 +1045,9 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     const amount = amountInKobo; // Keep in minor units (pesewas/kobo) for consistency
     const currency = paymentData.currency;
 
-    // Secondary idempotency check via payments collection (defense in depth)
+    // Secondary idempotency: paymentRef check is performed INSIDE the transaction below
+    // (H-01 fix) to prevent a race between verifyPayment and paystackWebhook.
     const paymentRef = db.collection('payments').doc(reference);
-    const paymentDoc = await paymentRef.get();
-
-    if (paymentDoc.exists && paymentDoc.data().processed) {
-      return { success: true, message: 'Payment already processed', alreadyProcessed: true };
-    }
 
     // Get user's wallet
     const walletSnapshot = await db.collection('wallets')
@@ -1068,7 +1064,18 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     validateWalletDocument(walletData, 'verifyPayment wallet');
 
     // Credit wallet using transaction
-    await db.runTransaction(async (transaction) => {
+    // H-01: paymentRef read + processed check moved inside the transaction.
+    // Firestore retries the transaction body on conflicting writes to any
+    // document read inside it, so concurrent invocations of verifyPayment
+    // and paystackWebhook for the same reference are serialized — only the
+    // first crediting transaction commits; subsequent ones see
+    // processed: true on retry and exit without re-crediting.
+    const txnResult = await db.runTransaction(async (transaction) => {
+      const freshPayment = await transaction.get(paymentRef);
+      if (freshPayment.exists && freshPayment.data().processed) {
+        return { alreadyProcessed: true };
+      }
+
       const freshWallet = await transaction.get(walletDoc.ref);
       const freshData = freshWallet.data();
       validateWalletDocument(freshData, 'verifyPayment fresh wallet');
@@ -1111,7 +1118,15 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
         description: 'Wallet top-up via Paystack',
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      return { alreadyProcessed: false, newBalance };
     });
+
+    // H-01: if the transaction detected a prior processed payment, return early
+    // with the same response shape as the pre-fix outside-transaction check.
+    if (txnResult.alreadyProcessed) {
+      return { success: true, message: 'Payment already processed', alreadyProcessed: true };
+    }
 
     await auditLog({
       userId, operation: 'verifyPayment', result: 'success',
@@ -1135,7 +1150,7 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
       success: true,
       amount: amount,
       currency: currency,
-      newBalance: safeAdd(walletData.balance, amount, 'verifyPayment response balance'),
+      newBalance: txnResult.newBalance,
       _correlationId: correlation.correlationId,
     };
 
@@ -1217,14 +1232,9 @@ async function handleSuccessfulCharge(data) {
     return;
   }
 
-  // Check if already processed
+  // Check if already processed — the actual check is inside the transaction below
+  // (H-01 fix) to prevent a race between verifyPayment and paystackWebhook.
   const paymentRef = db.collection('payments').doc(reference);
-  const paymentDoc = await paymentRef.get();
-
-  if (paymentDoc.exists && paymentDoc.data().processed) {
-    logInfo('Payment already processed', { reference });
-    return;
-  }
 
   const receivedAmountKobo = data.amount;
   const currency = data.currency;
@@ -1274,7 +1284,18 @@ async function handleSuccessfulCharge(data) {
   const walletDoc = walletSnapshot.docs[0];
 
   // Credit wallet
-  await db.runTransaction(async (transaction) => {
+  // H-01: paymentRef read + processed check moved inside the transaction.
+  // Firestore retries the transaction body on conflicting writes to any
+  // document read inside it, so concurrent invocations of handleSuccessfulCharge
+  // (e.g. Paystack webhook retries) and verifyPayment for the same reference
+  // are serialized — only the first crediting transaction commits; subsequent
+  // ones see processed: true on retry and exit without re-crediting.
+  const alreadyProcessed = await db.runTransaction(async (transaction) => {
+    const freshPayment = await transaction.get(paymentRef);
+    if (freshPayment.exists && freshPayment.data().processed) {
+      return true;
+    }
+
     const freshWallet = await transaction.get(walletDoc.ref);
     const freshData = freshWallet.data();
     validateWalletDocument(freshData, 'handleSuccessfulCharge wallet');
@@ -1312,7 +1333,15 @@ async function handleSuccessfulCharge(data) {
       description: `Deposit via ${data.channel}`,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    return false;
   });
+
+  // H-01: if already processed, exit early (no push notification, no fraud check)
+  if (alreadyProcessed) {
+    logInfo('Payment already processed (detected inside transaction)', { reference });
+    return;
+  }
 
   // Send push notification for deposit via webhook
   await sendPushNotification(userId, {
