@@ -2345,9 +2345,15 @@ async function checkRateLimitPersistent(userId, operation) {
     });
 
     return result;
-  } catch (error) {
-    logError('Rate limit check failed', { userId, operation, error: error.message });
-    return true; // Fail open to avoid blocking legitimate users
+ } catch (error) {
+    // H-07: Fail CLOSED (not open) on Firestore errors. If we can't verify
+    // that a request is within rate limit, we reject it. An attacker who
+    // can induce Firestore errors (or natural transient failures during
+    // traffic spikes) would otherwise get unlimited request capacity for
+    // rate-limited operations. Legitimate users see a temporary rate-limit
+    // error they can retry — a much smaller cost than financial abuse.
+    logError('Rate limit check failed — failing closed', { userId, operation, error: error.message });
+    return false;
   }
 }
 
