@@ -4252,8 +4252,15 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
  * Verifies that the calling user has admin privileges.
  * Checks Firebase Auth custom claims for role-based access.
  *
+ * Unified 7-role hierarchy (Q-03 decision) used by both platform admin
+ * (here) and business wallet (verifyBusinessWalletAccess, updated in
+ * commit 11):
+ *   viewer < auditor < support < admin < admin_supervisor < admin_manager < super_admin
+ *
  * @param {Object} context - Firebase callable context
- * @param {string} requiredRole - Minimum role required ('support', 'admin', 'super_admin')
+ * @param {string} requiredRole - Minimum role required. Valid values:
+ *   'viewer', 'auditor', 'support', 'admin', 'admin_supervisor',
+ *   'admin_manager', 'super_admin'
  * @returns {Object} - { uid, role } of the verified admin
  * @throws {HttpsError} permission-denied if not authorized
  */
@@ -4270,7 +4277,15 @@ async function verifyAdmin(context, requiredRole = 'support') {
     throw new functions.https.HttpsError('permission-denied', 'You do not have admin privileges.');
   }
 
-  const roleHierarchy = { support: 1, admin: 2, super_admin: 3 };
+  const roleHierarchy = {
+    viewer: 1,
+    auditor: 2,
+    support: 3,
+    admin: 4,
+    admin_supervisor: 5,
+    admin_manager: 6,
+    super_admin: 7,
+  };
   const userLevel = roleHierarchy[role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
 
