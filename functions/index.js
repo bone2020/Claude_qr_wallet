@@ -9810,9 +9810,17 @@ exports.expireOldHolds = functions.pubsub
 
 /**
  * Verifies the caller has a sufficient role on a business wallet.
- * Business wallet roles are separate from QR Wallet admin roles.
+ * Business wallet roles use the same 8-role naming as the platform admin
+ * hierarchy (Q-03 decision — unified naming across both systems).
  *
- * Hierarchy: viewer(1) < admin(2) < admin_supervisor(3) < admin_manager(4) < super_admin(5)
+ * Hierarchy: viewer(1) < auditor(2) < support(3) < admin(4)
+ *          < admin_supervisor(5) < finance(6) < admin_manager(7) < super_admin(8)
+ *
+ * Existing businessWallets/{id}.ownerUsers role assignments (viewer, admin,
+ * admin_supervisor, admin_manager, super_admin) continue to work: role NAMES
+ * retain their relative positions in the expanded hierarchy. New roles
+ * (auditor, support, finance) become available for assignment via the
+ * business wallet admin UI.
  *
  * @param {string} callerId - The caller's uid
  * @param {Object} businessWalletData - The businessWallets/{id} document data
@@ -9829,10 +9837,13 @@ function verifyBusinessWalletAccess(callerId, businessWalletData, requiredRole =
 
   const roleHierarchy = {
     viewer: 1,
-    admin: 2,
-    admin_supervisor: 3,
-    admin_manager: 4,
-    super_admin: 5,
+    auditor: 2,
+    support: 3,
+    admin: 4,
+    admin_supervisor: 5,
+    finance: 6,
+    admin_manager: 7,
+    super_admin: 8,
   };
 
   const callerLevel = roleHierarchy[callerRole] || 0;
