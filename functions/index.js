@@ -4252,15 +4252,17 @@ exports.unblockAccount = functions.https.onCall(async (data, context) => {
  * Verifies that the calling user has admin privileges.
  * Checks Firebase Auth custom claims for role-based access.
  *
- * Unified 7-role hierarchy (Q-03 decision) used by both platform admin
- * (here) and business wallet (verifyBusinessWalletAccess, updated in
- * commit 11):
- *   viewer < auditor < support < admin < admin_supervisor < admin_manager < super_admin
+ * Unified 8-role hierarchy used by both platform admin (here) and
+ * business wallet (verifyBusinessWalletAccess, updated in commit 11):
+ *   viewer < auditor < support < admin < admin_supervisor < finance < admin_manager < super_admin
+ *
+ * The `finance` role handles money validation and co-signs platform
+ * transfers with admin_manager. It is NOT in the holds approval workflow.
  *
  * @param {Object} context - Firebase callable context
  * @param {string} requiredRole - Minimum role required. Valid values:
  *   'viewer', 'auditor', 'support', 'admin', 'admin_supervisor',
- *   'admin_manager', 'super_admin'
+ *   'finance', 'admin_manager', 'super_admin'
  * @returns {Object} - { uid, role } of the verified admin
  * @throws {HttpsError} permission-denied if not authorized
  */
@@ -4283,8 +4285,9 @@ async function verifyAdmin(context, requiredRole = 'support') {
     support: 3,
     admin: 4,
     admin_supervisor: 5,
-    admin_manager: 6,
-    super_admin: 7,
+    finance: 6,
+    admin_manager: 7,
+    super_admin: 8,
   };
   const userLevel = roleHierarchy[role] || 0;
   const requiredLevel = roleHierarchy[requiredRole] || 0;
