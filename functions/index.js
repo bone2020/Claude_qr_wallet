@@ -6141,6 +6141,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
 
     return {
       success: true,
+      otpRequired: true,
       transfer: {
         reference,
         transferCode,
