@@ -4684,6 +4684,105 @@ async function performDemotion(targetUid, targetEmail, previousRole, newRole, ca
 }
 
 /**
+ * Promote a user to super_admin. Separate from adminPromoteUser because
+ * super_admin is special and requires extra safeguards:
+ *  - Only an existing super_admin can perform this
+ *  - Target email must be on the Firestore allowlist
+ *    (admin_bootstrap_config/allowed_emails)
+ *  - Forces refresh token revocation so new claim activates within seconds
+ *  - Intended to be invoked via a dedicated high-risk UI with confirmation
+ *    (dashboard side shipped in master plan Commit 19)
+ */
+exports.promoteSuperAdmin = functions.https.onCall(async (data, context) => {
+  const { targetUid } = data;
+
+  if (!targetUid) {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+
+  // Only super_admin can promote another super_admin
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  // D-09: Prevent self-modification (defense in depth — caller already is
+  // super_admin per verifyAdmin check above, so this is mainly a clarity guard).
+  if (targetUid === caller.uid) {
+    throw new functions.https.HttpsError('permission-denied',
+      'You cannot modify your own role.');
+  }
+
+  // Verify target user exists, get email
+  let targetUser;
+  try {
+    targetUser = await admin.auth().getUser(targetUid);
+  } catch (e) {
+    throw new functions.https.HttpsError('not-found', 'Target user not found.');
+  }
+  const targetEmail = (targetUser.email || '').toLowerCase();
+  if (!targetEmail) {
+    throw new functions.https.HttpsError('failed-precondition',
+      'Target user has no email address.');
+  }
+
+  // L-05: Check allowlist (Firestore-backed)
+  const allowlistDoc = await db.collection('admin_bootstrap_config').doc('allowed_emails').get();
+  if (!allowlistDoc.exists) {
+    throw new functions.https.HttpsError('failed-precondition',
+      'Super admin allowlist not configured.');
+  }
+  const allowedEmails = (allowlistDoc.data().emails || []).map(e => String(e).toLowerCase());
+  if (!allowedEmails.includes(targetEmail)) {
+    throw new functions.https.HttpsError('permission-denied',
+      `Target email is not on the super_admin allowlist. Add it first via updateSuperAdminAllowlist.`);
+  }
+
+  // Set custom claim
+  await admin.auth().setCustomUserClaims(targetUid, { role: 'super_admin' });
+
+  // Revoke refresh tokens so new claim activates immediately
+  await admin.auth().revokeRefreshTokens(targetUid);
+
+  // Update users collection
+  await db.collection('users').doc(targetUid).set({
+    role: 'super_admin',
+    roleUpdatedAt: timestamps.serverTimestamp(),
+    roleUpdatedBy: caller.uid,
+  }, { merge: true });
+
+  // Update admin_users collection
+  await db.collection('admin_users').doc(targetEmail).set({
+    email: targetEmail,
+    uid: targetUid,
+    role: 'super_admin',
+    updatedAt: timestamps.serverTimestamp(),
+    updatedBy: caller.uid,
+  }, { merge: true });
+
+  // Audit log
+  await auditLog({
+    userId: caller.uid,
+    operation: 'promoteSuperAdmin',
+    result: 'success',
+    metadata: { targetUid, targetEmail, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  // Admin activity log
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
+    role: caller.role,
+    action: 'promote_super_admin',
+    targetUid,
+    targetEmail,
+    details: `Promoted ${targetEmail} to super_admin`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, message: `User ${targetEmail} promoted to super_admin.` };
+});
+
+/**
  * Search for users by email, phone, or name.
  */
 exports.adminSearchUser = functions.https.onCall(async (data, context) => {
