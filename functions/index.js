@@ -4505,23 +4505,69 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
  * Only super_admin can demote admins; admin+ can demote support.
  */
 exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
-  const { targetUid } = data;
+  const { targetUid, newRole } = data;
 
   if (!targetUid) {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
   }
 
-  // Get target's current role
-  const targetUser = await admin.auth().getUser(targetUid);
+  // Get target's current role and email
+  let targetUser;
+  try {
+    targetUser = await admin.auth().getUser(targetUid);
+  } catch (e) {
+    throw new functions.https.HttpsError('not-found', 'Target user not found.');
+  }
   const targetRole = targetUser.customClaims?.role;
+  const targetEmail = (targetUser.email || '').toLowerCase();
 
   if (!targetRole) {
     throw new functions.https.HttpsError('not-found', 'User does not have an admin role.');
   }
 
-  // Only super_admin can demote admins
-  const requiredRole = targetRole === 'admin' ? 'super_admin' : 'admin';
-  const caller = await verifyAdmin(context, requiredRole);
+  // 8-role hierarchy (matches verifyAdmin).
+  const ROLE_HIERARCHY = {
+    viewer: 1, auditor: 2, support: 3, admin: 4,
+    admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8,
+  };
+
+  const targetLevel = ROLE_HIERARCHY[targetRole];
+  if (!targetLevel) {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Target has unrecognized role '${targetRole}'. Cannot determine authorization.`);
+  }
+
+  // If a downgrade (newRole provided), validate newRole is below current level.
+  if (newRole !== undefined && newRole !== null) {
+    const newLevel = ROLE_HIERARCHY[newRole];
+    if (!newLevel) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `Invalid newRole. Must be one of: ${Object.keys(ROLE_HIERARCHY).join(', ')}`);
+    }
+    if (newLevel >= targetLevel) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `newRole '${newRole}' (level ${newLevel}) must be strictly below current role '${targetRole}' (level ${targetLevel}).`);
+    }
+  }
+
+  // Caller must be strictly above target's current level.
+  const requiredCallerLevel = targetLevel + 1;
+  const minimumCallerRole = Object.entries(ROLE_HIERARCHY)
+    .find(([, level]) => level === requiredCallerLevel)?.[0];
+
+  if (!minimumCallerRole) {
+    // Target is super_admin (level 8). Only another super_admin can demote.
+    // (super_admin demotion was previously blocked entirely; now allowed for
+    // another super_admin, blocked for self via D-09.)
+    const caller = await verifyAdmin(context, 'super_admin');
+    if (targetUid === caller.uid) {
+      throw new functions.https.HttpsError('permission-denied',
+        'You cannot modify your own role. Ask another super_admin to change it.');
+    }
+    return await performDemotion(targetUid, targetEmail, targetRole, newRole, caller, context);
+  }
+
+  const caller = await verifyAdmin(context, minimumCallerRole);
 
   // D-09: Prevent self-modification
   if (targetUid === caller.uid) {
@@ -4529,41 +4575,113 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
       'You cannot modify your own role. Ask another super_admin to change it.');
   }
 
-  // Cannot demote super_admin
-  if (targetRole === 'super_admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Cannot demote super_admin.');
+  return await performDemotion(targetUid, targetEmail, targetRole, newRole, caller, context);
+});
+
+/**
+ * Internal helper for adminDemoteUser. Performs the actual claim update,
+ * token revocation, and Firestore writes.
+ *
+ * Two modes:
+ *   - Full demote (newRole null/undefined): clears all admin claims,
+ *     deletes the admin_users doc.
+ *   - Downgrade (newRole provided): sets {role: newRole}, updates
+ *     the admin_users doc with the new role.
+ *
+ * Token revocation (admin.auth().revokeRefreshTokens) forces the
+ * demoted user's ID token to refresh within seconds rather than up to
+ * 1 hour (the default Firebase ID token cache).
+ */
+async function performDemotion(targetUid, targetEmail, previousRole, newRole, caller, context) {
+  const isFullDemote = newRole === undefined || newRole === null;
+
+  // Update the custom claim
+  if (isFullDemote) {
+    await admin.auth().setCustomUserClaims(targetUid, {});
+  } else {
+    await admin.auth().setCustomUserClaims(targetUid, { role: newRole });
   }
 
-  await admin.auth().setCustomUserClaims(targetUid, {});
+  // CRITICAL: revoke refresh tokens so the new claim activates immediately.
+  // Without this, the demoted user's cached ID token retains the old role
+  // for up to 1 hour after demotion.
+  await admin.auth().revokeRefreshTokens(targetUid);
 
-  await db.collection('users').doc(targetUid).update({
-    role: admin.firestore.FieldValue.delete(),
-    roleUpdatedAt: timestamps.serverTimestamp(),
-    roleUpdatedBy: caller.uid,
-  });
+  // Update users collection
+  if (isFullDemote) {
+    await db.collection('users').doc(targetUid).update({
+      role: admin.firestore.FieldValue.delete(),
+      roleUpdatedAt: timestamps.serverTimestamp(),
+      roleUpdatedBy: caller.uid,
+    });
+  } else {
+    await db.collection('users').doc(targetUid).set({
+      role: newRole,
+      roleUpdatedAt: timestamps.serverTimestamp(),
+      roleUpdatedBy: caller.uid,
+    }, { merge: true });
+  }
 
+  // Update admin_users collection
+  if (targetEmail) {
+    if (isFullDemote) {
+      // Remove from admin_users on full demote
+      try {
+        await db.collection('admin_users').doc(targetEmail).delete();
+      } catch (e) {
+        // Doc may not exist; non-fatal
+        logWarning('admin_users doc not found for full demote', { targetEmail });
+      }
+    } else {
+      // Update role on partial demote
+      await db.collection('admin_users').doc(targetEmail).set({
+        email: targetEmail,
+        uid: targetUid,
+        role: newRole,
+        updatedAt: timestamps.serverTimestamp(),
+        updatedBy: caller.uid,
+      }, { merge: true });
+    }
+  }
+
+  // Audit log
   await auditLog({
     userId: caller.uid,
     operation: 'adminDemoteUser',
     result: 'success',
-    metadata: { targetUid, previousRole: targetRole, callerRole: caller.role },
+    metadata: {
+      targetUid,
+      targetEmail,
+      previousRole,
+      newRole: isFullDemote ? null : newRole,
+      isFullDemote,
+      callerRole: caller.role,
+    },
     ipHash: hashIp(context),
   });
 
-  // Log admin activity
+  // Admin activity log
   await db.collection('admin_activity').add({
     uid: caller.uid,
     email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
     role: caller.role,
-    action: 'demote_user',
+    action: isFullDemote ? 'demote_user_full' : 'demote_user_downgrade',
     targetUid,
-    details: `Removed ${targetRole} role`,
+    targetEmail,
+    details: isFullDemote
+      ? `Removed all admin roles (was ${previousRole})`
+      : `Downgraded from ${previousRole} to ${newRole}`,
     ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return { success: true, message: `User demoted from ${targetRole}.` };
-});
+  return {
+    success: true,
+    message: isFullDemote
+      ? `User demoted from ${previousRole} (all admin roles removed).`
+      : `User downgraded from ${previousRole} to ${newRole}.`,
+  };
+}
 
 /**
  * Search for users by email, phone, or name.
