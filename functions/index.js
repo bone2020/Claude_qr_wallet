@@ -4413,13 +4413,32 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'targetUid and role are required.');
   }
 
-  if (!['support', 'admin'].includes(newRole)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Role must be "support" or "admin".');
+  // Valid target roles. super_admin goes through the separate promoteSuperAdmin CF.
+  const VALID_PROMOTE_ROLES = ['viewer', 'auditor', 'support', 'admin', 'admin_supervisor', 'finance', 'admin_manager'];
+  if (!VALID_PROMOTE_ROLES.includes(newRole)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `Role must be one of: ${VALID_PROMOTE_ROLES.join(', ')}. For super_admin promotion, use promoteSuperAdmin.`);
   }
 
-  // Only super_admin can promote to admin; admin+ can promote to support
-  const requiredRole = newRole === 'admin' ? 'super_admin' : 'admin';
-  const caller = await verifyAdmin(context, requiredRole);
+  // 8-role hierarchy — caller must be strictly above target level.
+  const ROLE_HIERARCHY = {
+    viewer: 1, auditor: 2, support: 3, admin: 4,
+    admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8,
+  };
+  const targetLevel = ROLE_HIERARCHY[newRole];
+  const requiredCallerLevel = targetLevel + 1;
+
+  // Find the lowest caller role that satisfies the requirement (for verifyAdmin gate).
+  const minimumCallerRole = Object.entries(ROLE_HIERARCHY)
+    .find(([, level]) => level === requiredCallerLevel)?.[0];
+
+  if (!minimumCallerRole) {
+    // Target level 8 (super_admin) would require caller level 9, which does not exist.
+    throw new functions.https.HttpsError('invalid-argument',
+      'Cannot promote to this role. Use promoteSuperAdmin for super_admin.');
+  }
+
+  const caller = await verifyAdmin(context, minimumCallerRole);
 
   // D-09: Prevent self-modification
   if (targetUid === caller.uid) {
@@ -4427,36 +4446,52 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
       'You cannot modify your own role. Ask another super_admin to change it.');
   }
 
-  // Verify target user exists
+  // Verify target user exists; capture their email for the admin_users doc.
+  let targetUser;
   try {
-    await admin.auth().getUser(targetUid);
+    targetUser = await admin.auth().getUser(targetUid);
   } catch (e) {
     throw new functions.https.HttpsError('not-found', 'Target user not found.');
   }
+  const targetEmail = (targetUser.email || '').toLowerCase();
 
+  // Set the Firebase Auth custom claim.
   await admin.auth().setCustomUserClaims(targetUid, { role: newRole });
 
-  await db.collection('users').doc(targetUid).update({
+  // Update the users collection (merge to be safe if fields are missing).
+  await db.collection('users').doc(targetUid).set({
     role: newRole,
     roleUpdatedAt: timestamps.serverTimestamp(),
     roleUpdatedBy: caller.uid,
-  });
+  }, { merge: true });
+
+  // Update the admin_users collection so the Current Admins UI reflects it.
+  if (targetEmail) {
+    await db.collection('admin_users').doc(targetEmail).set({
+      email: targetEmail,
+      uid: targetUid,
+      role: newRole,
+      updatedAt: timestamps.serverTimestamp(),
+      updatedBy: caller.uid,
+    }, { merge: true });
+  }
 
   await auditLog({
     userId: caller.uid,
     operation: 'adminPromoteUser',
     result: 'success',
-    metadata: { targetUid, newRole, callerRole: caller.role },
+    metadata: { targetUid, targetEmail, newRole, callerRole: caller.role },
     ipHash: hashIp(context),
   });
 
-  // Log admin activity
+  // Admin activity log.
   await db.collection('admin_activity').add({
     uid: caller.uid,
     email: (await admin.auth().getUser(caller.uid)).email || 'unknown',
     role: caller.role,
     action: 'promote_user',
     targetUid,
+    targetEmail,
     details: `Promoted to ${newRole}`,
     ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
