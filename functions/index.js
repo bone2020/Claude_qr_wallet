@@ -4304,17 +4304,27 @@ async function verifyAdmin(context, requiredRole = 'support') {
  * Hardcoded UID for security — can only be called once.
  */
 exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
-  // Approved super admin emails. Add or remove emails here to control who can self-promote.
+  // L-05: Allowlist is stored in Firestore at admin_bootstrap_config/allowed_emails.
+  // Managed via updateSuperAdminAllowlist CF (super_admin only). See commit 10.
   // H-03: This function is ONE-TIME-ONLY. After the initial super_admin exists
   // in admin_users, this function refuses all further calls. New super_admins
   // must be created via adminPromoteUser (which requires an existing super_admin
   // to authorize). To re-bootstrap after losing the initial super_admin account,
   // use the Firebase Admin SDK directly from a trusted shell.
-  const APPROVED_SUPER_ADMIN_EMAILS = [
-    'bonstrahe@gmail.com',
-    'kojookoto3@gmail.com',
-    'ericayehbonstrah@gmail.com',
-  ];
+  const allowlistDoc = await db.collection('admin_bootstrap_config').doc('allowed_emails').get();
+  if (!allowlistDoc.exists) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Super admin allowlist not configured. Contact system administrator.'
+    );
+  }
+  const APPROVED_SUPER_ADMIN_EMAILS = allowlistDoc.data().emails || [];
+  if (APPROVED_SUPER_ADMIN_EMAILS.length === 0) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Super admin allowlist is empty. Cannot bootstrap.'
+    );
+  }
 
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be signed in to setup super admin.');
