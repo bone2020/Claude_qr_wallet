@@ -5022,7 +5022,7 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
   const snapshot = await db.collection('users')
-    .where('role', 'in', ['super_admin', 'admin', 'support'])
+    .where('role', 'in', ['super_admin', 'admin_manager', 'finance', 'admin_supervisor', 'admin', 'support', 'auditor', 'viewer'])
     .get();
 
   const admins = snapshot.docs.map(doc => {
