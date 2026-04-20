@@ -5189,7 +5189,7 @@ exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
  * Admin update user email.
  */
 exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { targetUid, newEmail } = data;
   if (!targetUid || !newEmail) {
@@ -5233,7 +5233,7 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
  * Admin send recovery OTP to a user's phone number.
  */
 exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid } = data;
   if (!targetUid) {
@@ -5338,7 +5338,7 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
  * Admin verify recovery OTP.
  */
 exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid, otp } = data;
   if (!targetUid || !otp) {
@@ -5412,7 +5412,7 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
  * List all admin/support users.
  */
 exports.adminListAdmins = functions.https.onCall(async (data, context) => {
-  await verifyAdmin(context, 'admin');
+  await verifyAdmin(context, 'admin_manager');
 
   const snapshot = await db.collection('users')
     .where('role', 'in', ['super_admin', 'admin_manager', 'finance', 'admin_supervisor', 'admin', 'support', 'auditor', 'viewer'])
@@ -5436,7 +5436,7 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
  * Get platform stats for admin dashboard.
  */
 exports.adminGetStats = functions.https.onCall(async (data, context) => {
-  await verifyAdmin(context, 'support');
+  await verifyAdmin(context, 'auditor');
 
   // Total users
   const usersSnapshot = await db.collection('users').count().get();
@@ -5544,16 +5544,11 @@ exports.adminExportUsers = functions.https.onCall(async (data, context) => {
  * Called by the dashboard when an admin signs in or out.
  */
 exports.adminLogActivity = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
-  }
-
-  // Verify caller is admin staff
-  const callerRecord = await admin.auth().getUser(context.auth.uid);
-  const callerRole = callerRecord.customClaims?.role;
-  if (!callerRole || !['support', 'admin', 'super_admin'].includes(callerRole)) {
-    throw new functions.https.HttpsError('permission-denied', 'Admin access required.');
-  }
+  // Modernized from manual 3-role check to verifyAdmin helper in Commit 13.
+  // Previously hardcoded ['support', 'admin', 'super_admin'] — which locked
+  // out admin_manager, admin_supervisor, finance, auditor, viewer roles.
+  // verifyAdmin(context, 'support') accepts any role at level 3 or higher.
+  await verifyAdmin(context, 'support');
 
   const uid = context.auth.uid;
   const { action, metadata } = data;
@@ -5596,7 +5591,7 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
  * Support can only see their own logs. Admin/super_admin can see all.
  */
 exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, filterUid, filterAction } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -5626,7 +5621,7 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
  * Admin: Get audit logs (admin and super_admin only).
  */
 exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, filterUserId, filterOperation } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -5657,7 +5652,7 @@ exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
  * Admin: Get platform wallet overview — total revenue, per-currency balances.
  */
 exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'finance');
 
   try {
     // Get platform wallet document
@@ -5704,7 +5699,7 @@ exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) =>
  * Admin: Get platform fee history with pagination.
  */
 exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'finance');
 
   const { limit: queryLimit, currency: filterCurrency } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -5872,7 +5867,7 @@ exports.adminPlatformWithdraw = functions.https.onCall(async (data, context) => 
  * Admin: Get platform withdrawal history.
  */
 exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'finance');
 
   const { limit: queryLimit } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -6172,7 +6167,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
  * Supports filtering by type, status, currency, and date range.
  */
 exports.adminGetAllTransactions = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const {
     limit: queryLimit,
@@ -6253,7 +6248,7 @@ exports.adminGetAllTransactions = functions.https.onCall(async (data, context) =
  * Admin: Get transaction volume statistics.
  */
 exports.adminGetTransactionStats = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const { days } = data || {};
   const lookbackDays = Math.min(days || 7, 90);
@@ -6348,7 +6343,7 @@ exports.adminGetTransactionStats = functions.https.onCall(async (data, context) 
  * Admin: Flag a transaction for review.
  */
 exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { userId, transactionId, reason } = data;
 
@@ -6429,7 +6424,7 @@ exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
  * Admin: Get flagged transactions.
  */
 exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, resolved } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -6461,7 +6456,7 @@ exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, contex
  * Admin: Resolve a flagged transaction.
  */
 exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { transactionId, resolution } = data;
 
@@ -6509,7 +6504,7 @@ exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, con
  * Admin: Get fraud alerts.
  */
 exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'support');
+  const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, status: filterStatus, severity: filterSeverity } = data || {};
   const fetchLimit = Math.min(queryLimit || 50, 200);
@@ -6546,7 +6541,7 @@ exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
  * Admin: Resolve a fraud alert.
  */
 exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'admin');
+  const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { alertId, resolution, action } = data;
   if (!alertId || !resolution) {
@@ -6613,7 +6608,7 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
  * Admin: Get fraud alert statistics.
  */
 exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
-  await verifyAdmin(context, 'support');
+  await verifyAdmin(context, 'auditor');
 
   try {
     const openSnapshot = await db.collection('fraud_alerts').where('status', '==', 'open').count().get();
@@ -7981,7 +7976,7 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 
 exports.momoGetBalance = functions.https.onCall(async (data, context) => {
   // Restricted to admin — exposes platform MoMo balance
-  await verifyAdmin(context, 'admin');
+  await verifyAdmin(context, 'finance');
 
   const { product } = data; // 'collection' or 'disbursement'
 
