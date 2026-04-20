@@ -8737,10 +8737,23 @@ exports.releaseHold = functions.https.onCall(async (data, context) => {
     }
 
     // ── Authorization ──
+    // D-02: Use verifyAdmin helper for consistency with the 8-role hierarchy.
+    // Emergency executor path: super_admin or admin_manager can manually
+    // release a hold when the creating service (e.g., a partner app) is
+    // unable to do so automatically. Disputes and investigations run
+    // through the separate approval workflow — not this direct path.
     const isOwner = callerId === holdData.walletId;
     const isCreatingService = callerClaims.walletHoldsWrite === true;
-    const isSuperAdmin = callerClaims.role === 'super_admin';
-    if (!isOwner && !isCreatingService && !isSuperAdmin) {
+    let isAuthorizedAdmin = false;
+    if (!isOwner && !isCreatingService) {
+      try {
+        await verifyAdmin(context, 'admin_manager');
+        isAuthorizedAdmin = true;
+      } catch (e) {
+        // Not admin_manager or above; fall through to denial
+      }
+    }
+    if (!isOwner && !isCreatingService && !isAuthorizedAdmin) {
       throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to release this hold.');
     }
 
@@ -8844,11 +8857,22 @@ exports.getHoldStatus = functions.https.onCall(async (data, context) => {
 
   const holdData = holdDoc.data();
 
-  // Authorization: wallet owner, creating service, or admin
+  // Authorization: wallet owner, creating service, or any admin (support+)
+  // D-02: Use verifyAdmin for 8-role hierarchy compliance.
+  // Widened from 'super_admin || support' to 'support+' (any admin level)
+  // for read-only visibility — consistent with other read endpoints.
   const isOwner = callerId === holdData.walletId;
   const isService = callerClaims.walletHoldsWrite === true;
-  const isAdmin = callerClaims.role === 'super_admin' || callerClaims.role === 'support';
-  if (!isOwner && !isService && !isAdmin) {
+  let isAuthorizedAdmin = false;
+  if (!isOwner && !isService) {
+    try {
+      await verifyAdmin(context, 'support');
+      isAuthorizedAdmin = true;
+    } catch (e) {
+      // Not an admin; fall through to denial
+    }
+  }
+  if (!isOwner && !isService && !isAuthorizedAdmin) {
     throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You are not authorized to view this hold.');
   }
 
@@ -8969,11 +8993,23 @@ exports.convertHoldToTransfer = functions.https.onCall(async (data, context) => 
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'recipientWalletId is required.');
   }
 
-  // ── Authorization: only creating service or super_admin ──
+  // ── Authorization: creating service or admin_manager+ (emergency path) ──
+  // D-02: Use verifyAdmin for 8-role hierarchy compliance.
+  // Emergency executor path: super_admin or admin_manager can manually
+  // convert a hold when the creating service is unable to do so.
+  // Owner cannot convert their own hold (prevents self-payment abuse).
   const isService = callerClaims.walletHoldsWrite === true;
-  const isSuperAdmin = callerClaims.role === 'super_admin';
-  if (!isService && !isSuperAdmin) {
-    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Only the creating service or a super_admin can convert a hold.');
+  let isAuthorizedAdmin = false;
+  if (!isService) {
+    try {
+      await verifyAdmin(context, 'admin_manager');
+      isAuthorizedAdmin = true;
+    } catch (e) {
+      // Not admin_manager or above; fall through to denial
+    }
+  }
+  if (!isService && !isAuthorizedAdmin) {
+    throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'Only the creating service or an admin_manager+ can convert a hold.');
   }
 
   // ── Fetch exchange rates (outside transaction, read-only) ──
