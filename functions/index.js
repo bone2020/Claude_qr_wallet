@@ -4783,6 +4783,135 @@ exports.promoteSuperAdmin = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Manage the super_admin bootstrap allowlist stored at
+ * admin_bootstrap_config/allowed_emails in Firestore.
+ *
+ * Only callable by an existing super_admin. Accepts an action ('add' or
+ * 'remove') and an email address. Updates the allowlist array atomically
+ * inside a Firestore transaction.
+ *
+ * Guards:
+ *  - Email format validation (basic regex)
+ *  - Cannot remove your own email (prevents self-lockout)
+ *  - Cannot reduce the list to empty (at least one email must remain)
+ *  - Adding a duplicate is rejected with 'already-exists'
+ *  - Removing a non-existent email is rejected with 'not-found'
+ *
+ * Ref: L-05
+ */
+exports.updateSuperAdminAllowlist = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { action, email } = data;
+  if (!['add', 'remove'].includes(action)) {
+    throw new functions.https.HttpsError('invalid-argument', 'action must be "add" or "remove"');
+  }
+  if (!email || typeof email !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'email is required');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Basic email format validation
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid email format');
+  }
+
+  // Get caller's email to prevent self-removal from the allowlist
+  const callerRecord = await admin.auth().getUser(caller.uid);
+  const callerEmail = (callerRecord.email || '').toLowerCase();
+
+  const allowlistRef = db.collection('admin_bootstrap_config').doc('allowed_emails');
+
+  await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(allowlistRef);
+    if (!doc.exists) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'Allowlist doc does not exist. Initial bootstrap required.');
+    }
+
+    const currentEmails = (doc.data().emails || []).map(e => String(e).toLowerCase());
+    let newEmails;
+
+    if (action === 'add') {
+      if (currentEmails.includes(normalizedEmail)) {
+        throw new functions.https.HttpsError('already-exists',
+          `${normalizedEmail} is already in the allowlist.`);
+      }
+      newEmails = [...currentEmails, normalizedEmail];
+    } else {
+      // action === 'remove'
+      if (normalizedEmail === callerEmail) {
+        throw new functions.https.HttpsError('permission-denied',
+          'You cannot remove your own email from the allowlist.');
+      }
+      if (!currentEmails.includes(normalizedEmail)) {
+        throw new functions.https.HttpsError('not-found',
+          `${normalizedEmail} is not in the allowlist.`);
+      }
+      newEmails = currentEmails.filter(e => e !== normalizedEmail);
+      if (newEmails.length === 0) {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Cannot reduce allowlist to empty. At least one email must remain.');
+      }
+    }
+
+    transaction.update(allowlistRef, {
+      emails: newEmails,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: caller.uid,
+    });
+  });
+
+  // Audit log
+  await auditLog({
+    userId: caller.uid,
+    operation: 'updateSuperAdminAllowlist',
+    result: 'success',
+    metadata: { action, email: normalizedEmail, callerEmail },
+    ipHash: hashIp(context),
+  });
+
+  // Admin activity log
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: callerEmail,
+    role: caller.role,
+    action: 'allowlist_update',
+    details: `${action} ${normalizedEmail}`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, action, email: normalizedEmail };
+});
+
+/**
+ * Read the super_admin bootstrap allowlist.
+ * Super_admin only — keeps the list of bootstrap emails confidential from
+ * lower-level roles.
+ *
+ * Ref: L-05
+ */
+exports.adminGetAllowlist = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'super_admin');
+
+  const allowlistDoc = await db.collection('admin_bootstrap_config').doc('allowed_emails').get();
+  if (!allowlistDoc.exists) {
+    return { success: true, emails: [], note: 'Allowlist doc does not exist.' };
+  }
+
+  const data_ = allowlistDoc.data();
+  return {
+    success: true,
+    emails: data_.emails || [],
+    updatedAt: data_.updatedAt || null,
+    updatedBy: data_.updatedBy || null,
+  };
+});
+
+/**
  * Search for users by email, phone, or name.
  */
 exports.adminSearchUser = functions.https.onCall(async (data, context) => {
