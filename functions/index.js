@@ -4421,6 +4421,12 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
   const requiredRole = newRole === 'admin' ? 'super_admin' : 'admin';
   const caller = await verifyAdmin(context, requiredRole);
 
+  // D-09: Prevent self-modification
+  if (targetUid === caller.uid) {
+    throw new functions.https.HttpsError('permission-denied',
+      'You cannot modify your own role. Ask another super_admin to change it.');
+  }
+
   // Verify target user exists
   try {
     await admin.auth().getUser(targetUid);
@@ -4481,6 +4487,12 @@ exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
   // Only super_admin can demote admins
   const requiredRole = targetRole === 'admin' ? 'super_admin' : 'admin';
   const caller = await verifyAdmin(context, requiredRole);
+
+  // D-09: Prevent self-modification
+  if (targetUid === caller.uid) {
+    throw new functions.https.HttpsError('permission-denied',
+      'You cannot modify your own role. Ask another super_admin to change it.');
+  }
 
   // Cannot demote super_admin
   if (targetRole === 'super_admin') {
