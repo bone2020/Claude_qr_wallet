@@ -213,6 +213,22 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // admin_users — Cloud Functions only.
+    // Map of admin staff by email. Written by adminPromoteUser, adminDemoteUser,
+    // promoteSuperAdmin, updateSuperAdminAllowlist. Read by adminListAdmins.
+    // Clients never access directly.
+    match /admin_users/{email} {
+      allow read, write: if false;
+    }
+
+    // admin_bootstrap_config — Cloud Functions only.
+    // Stores the super_admin email allowlist at /admin_bootstrap_config/allowed_emails.
+    // Written by setupSuperAdmin and updateSuperAdminAllowlist, read by
+    // promoteSuperAdmin and adminGetAllowlist. Never accessed by clients.
+    match /admin_bootstrap_config/{docId} {
+      allow read, write: if false;
+    }
+
     // Business wallets — read access for listed owner users, writes via Cloud Functions only.
     // Each business wallet doc contains an ownerUsers map of {uid: role}.
     // Authorized users can read their business wallet metadata.
