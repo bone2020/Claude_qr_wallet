@@ -5698,6 +5698,27 @@ exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) =>
 });
 
 /**
+ * Admin: Get platform transfer limits (perTransferUSD, dailyUSD).
+ * Reads from app_config/platform_limits. Returns defaults if doc missing.
+ *
+ * Required by RevenuePage to display caps in the bank transfer form.
+ *
+ * Ref: D-08, L-35
+ */
+exports.adminGetPlatformLimits = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'finance');
+  const doc = await db.collection('app_config').doc('platform_limits').get();
+  if (!doc.exists) {
+    return { perTransferUSD: 50000, dailyUSD: 100000 };
+  }
+  const d = doc.data();
+  return {
+    perTransferUSD: d.perTransferUSD || 50000,
+    dailyUSD: d.dailyUSD || 100000,
+  };
+});
+
+/**
  * Admin: Get platform fee history with pagination.
  */
 exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {

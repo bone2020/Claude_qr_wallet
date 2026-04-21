@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
+import { v4 as uuidv4 } from 'uuid';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToCSV } from '../utils/csvExport';
@@ -34,6 +35,17 @@ function RevenuePage() {
   const [verified, setVerified] = useState(false);
   const [bankCountry, setBankCountry] = useState('nigeria');
 
+  // OTP confirmation modal (L-35)
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpModalData, setOtpModalData] = useState(null);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpAttempts, setOtpAttempts] = useState(0);
+  const [otpRemaining, setOtpRemaining] = useState(3);
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  // Platform limits (D-08)
+  const [limits, setLimits] = useState({ perTransferUSD: 50000, dailyUSD: 100000 });
+
   useEffect(() => {
     loadData();
   }, []);
@@ -48,6 +60,19 @@ function RevenuePage() {
         httpsCallable(functions, 'adminGetFeeHistory')({ limit: 50 }),
         httpsCallable(functions, 'adminGetPlatformWithdrawals')({ limit: 50 }),
       ]);
+
+      // D-08: Try to load platform limits (fallback to defaults if missing)
+      try {
+        const limitsResult = await httpsCallable(functions, 'adminGetPlatformLimits')();
+        if (limitsResult.data) {
+          setLimits({
+            perTransferUSD: limitsResult.data.perTransferUSD || 50000,
+            dailyUSD: limitsResult.data.dailyUSD || 100000,
+          });
+        }
+      } catch (e) {
+        console.log('Could not load platform limits, using defaults');
+      }
 
       setWallet(walletResult.data.wallet);
       setBalances(walletResult.data.balances || []);
@@ -104,6 +129,7 @@ function RevenuePage() {
     setMessage('');
 
     try {
+      const idempotencyKey = uuidv4(); // D-07
       const result = await httpsCallable(functions, 'adminInitiateTransfer')({
         amount: parseFloat(wdAmount),
         currency: wdCurrency,
@@ -112,22 +138,114 @@ function RevenuePage() {
         accountName,
         purpose: wdPurpose,
         notes: wdNotes || null,
+        idempotencyKey,
       });
 
-      setMessage(`Transfer initiated: ${wdCurrency} ${parseFloat(wdAmount).toFixed(2)} to ${accountName}. Reference: ${result.data.transfer.reference}`);
-      setWdAmount('');
-      setWdCurrency('');
-      setWdPurpose('');
-      setWdNotes('');
-      setBankCode('');
-      setAccountNumber('');
-      setAccountName('');
-      setVerified(false);
-      await loadData();
+      // L-35: Check if Paystack requires OTP
+      if (result.data.otpRequired === true) {
+        // Open OTP modal — do NOT clear form yet (in case OTP fails and user wants to retry)
+        setOtpModalData({
+          reference: result.data.transfer.reference,
+          transferCode: result.data.transfer.transferCode,
+          amount: result.data.transfer.amount,
+          currency: result.data.transfer.currency,
+          accountName: result.data.transfer.accountName,
+          purpose: result.data.transfer.purpose,
+        });
+        setOtpAttempts(0);
+        setOtpRemaining(3);
+        setOtpInput('');
+        setOtpModalOpen(true);
+      } else {
+        // Auto-completed (no OTP needed)
+        setMessage(`Transfer completed: ${wdCurrency} ${parseFloat(wdAmount).toFixed(2)} to ${accountName}. Reference: ${result.data.transfer.reference}`);
+        clearTransferForm();
+        await loadData();
+      }
     } catch (err) {
       setError(err.message || 'Transfer failed.');
     } finally {
       setWdLoading(false);
+    }
+  };
+
+  const clearTransferForm = () => {
+    setWdAmount('');
+    setWdCurrency('');
+    setWdPurpose('');
+    setWdNotes('');
+    setBankCode('');
+    setAccountNumber('');
+    setAccountName('');
+    setVerified(false);
+  };
+
+  // L-35: Submit OTP to finalize transfer
+  const handleOtpSubmit = async () => {
+    if (!otpInput.trim()) return;
+    setOtpLoading(true);
+    setError('');
+
+    try {
+      const idempotencyKey = uuidv4();
+      const result = await httpsCallable(functions, 'adminFinalizeTransfer')({
+        action: 'finalize',
+        reference: otpModalData.reference,
+        transferCode: otpModalData.transferCode,
+        otp: otpInput.trim(),
+        idempotencyKey,
+      });
+
+      if (result.data.success === true && result.data.status === 'completed') {
+        setMessage(`Transfer completed: ${otpModalData.currency} ${otpModalData.amount.toFixed(2)} to ${otpModalData.accountName}. Reference: ${otpModalData.reference}`);
+        setOtpModalOpen(false);
+        setOtpModalData(null);
+        clearTransferForm();
+        await loadData();
+      } else if (result.data.status === 'cancelled') {
+        // Auto-cancelled (3 strikes)
+        setError(result.data.message || 'Transfer auto-cancelled after 3 wrong OTP attempts. Balance refunded.');
+        setOtpModalOpen(false);
+        setOtpModalData(null);
+        clearTransferForm();
+        await loadData();
+      } else {
+        // Wrong OTP, attempts remaining
+        setOtpAttempts(result.data.attemptsUsed || otpAttempts + 1);
+        setOtpRemaining(result.data.attemptsRemaining || (otpRemaining - 1));
+        setOtpInput('');
+        setError(result.data.message || `OTP rejected. ${result.data.attemptsRemaining || 0} attempts remaining.`);
+      }
+    } catch (err) {
+      setError(err.message || 'OTP submission failed.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // L-35: Cancel transfer (refund balance)
+  const handleOtpCancel = async () => {
+    if (!window.confirm('Cancel this transfer and refund the platform balance?')) return;
+    setOtpLoading(true);
+    setError('');
+
+    try {
+      const idempotencyKey = uuidv4();
+      const result = await httpsCallable(functions, 'adminFinalizeTransfer')({
+        action: 'cancel',
+        reference: otpModalData.reference,
+        idempotencyKey,
+      });
+
+      setMessage(`Transfer cancelled. ${result.data.currency} ${result.data.refundedAmount.toFixed(2)} refunded to platform balance.`);
+      setOtpModalOpen(false);
+      setOtpModalData(null);
+      clearTransferForm();
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Cancel failed.');
+    } finally {
+      setOtpLoading(false);
     }
   };
 
@@ -339,8 +457,11 @@ function RevenuePage() {
       {activeTab === 'transfer' && isSuper && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-w-xl">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Bank Transfer</h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-gray-500 mb-2">
             Initiate a bank transfer from the platform wallet via Paystack.
+          </p>
+          <p className="text-xs text-gray-400 mb-6">
+            Limits: ${limits.perTransferUSD.toLocaleString()} USD per transfer, ${limits.dailyUSD.toLocaleString()} USD per day.
           </p>
 
           <form onSubmit={handleBankTransfer} className="space-y-4">
@@ -500,6 +621,77 @@ function RevenuePage() {
               <p className="text-xs text-amber-600 text-center">Please verify the bank account before initiating the transfer.</p>
             )}
           </form>
+        </div>
+      )}
+
+      {/* L-35: OTP Confirmation Modal */}
+      {otpModalOpen && otpModalData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Confirm Transfer</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Paystack has sent an OTP to your registered phone. Enter it below to complete the transfer.
+            </p>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">To:</span>
+                <span className="font-medium">{otpModalData.accountName}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">Amount:</span>
+                <span className="font-medium">{otpModalData.currency} {otpModalData.amount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">Purpose:</span>
+                <span className="font-medium">{otpModalData.purpose}</span>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-2">
+                <span>Reference:</span>
+                <span className="font-mono">{otpModalData.reference}</span>
+              </div>
+            </div>
+
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Enter OTP from Paystack
+            </label>
+            <input
+              type="text"
+              value={otpInput}
+              onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="6-digit OTP"
+              maxLength={6}
+              autoFocus
+              className="w-full text-center text-2xl tracking-[0.5em] font-mono border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+
+            {otpAttempts > 0 && (
+              <p className="text-xs text-amber-600 mt-2 text-center">
+                {otpAttempts} wrong attempt{otpAttempts === 1 ? '' : 's'}. {otpRemaining} remaining before auto-cancel.
+              </p>
+            )}
+
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={handleOtpSubmit}
+                disabled={otpInput.length !== 6 || otpLoading}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg py-3 font-medium transition-colors disabled:opacity-50"
+              >
+                {otpLoading ? 'Confirming...' : 'Confirm Transfer'}
+              </button>
+              <button
+                onClick={handleOtpCancel}
+                disabled={otpLoading}
+                className="px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg py-3 font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 text-center mt-4">
+              The platform balance has already been deducted. Cancelling will refund it.
+            </p>
+          </div>
         </div>
       )}
     </div>
