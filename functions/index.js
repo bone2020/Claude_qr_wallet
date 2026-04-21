@@ -2288,6 +2288,7 @@ const RATE_LIMITS = {
   resetPin:           { windowMs: 60 * 60 * 1000, maxRequests: 3,  message: 'Too many PIN reset attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
   adminFinalizeTransfer: { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many admin OTP attempts. Please try again later.' },
+  adminInitiateTransfer: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many transfer initiations. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -5961,7 +5962,20 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
 exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
-  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes } = data;
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
+
+  // D-07: Idempotency key required (prevents double-submit)
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'idempotencyKey is required (min 16 chars). Generate a UUID v4 client-side and pass it.');
+  }
+
+  // D-06: Rate limit
+  const rateLimitOk = await checkRateLimitPersistent(caller.uid, 'adminInitiateTransfer');
+  if (!rateLimitOk) {
+    throw new functions.https.HttpsError('resource-exhausted',
+      RATE_LIMITS.adminInitiateTransfer.message);
+  }
 
   if (!amount || amount <= 0) {
     throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
@@ -5976,6 +5990,50 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required.');
   }
 
+  // D-08: Amount caps. Read limits from Firestore (configurable without redeploy).
+  const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+  const DEFAULT_PER_TRANSFER_USD = 50000;
+  const DEFAULT_DAILY_USD = 100000;
+  const perTransferUSD = limitsDoc.exists ? (limitsDoc.data().perTransferUSD || DEFAULT_PER_TRANSFER_USD) : DEFAULT_PER_TRANSFER_USD;
+  const dailyUSD = limitsDoc.exists ? (limitsDoc.data().dailyUSD || DEFAULT_DAILY_USD) : DEFAULT_DAILY_USD;
+
+  // Compute USD equivalent NOW (before caps check). Reuses logic from later in function.
+  const ratesDocForCaps = await db.collection('app_config').doc('exchange_rates').get();
+  const ratesForCaps = ratesDocForCaps.exists ? ratesDocForCaps.data().rates : {};
+  const exchangeRateForCaps = ratesForCaps[currency] || 1;
+  const amountInUSDForCaps = amount / exchangeRateForCaps;
+
+  // Per-transfer cap
+  if (amountInUSDForCaps > perTransferUSD) {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Transfer amount $${amountInUSDForCaps.toFixed(2)} USD exceeds per-transfer cap of $${perTransferUSD.toFixed(2)} USD. ` +
+      `Adjust caps via app_config/platform_limits or split the transfer.`);
+  }
+
+  // Daily cap (per super_admin, rolling 24h window)
+  const twentyFourHoursAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+  const recentWithdrawalsSnap = await db.collection('wallets').doc('platform')
+    .collection('withdrawals')
+    .where('withdrawnBy', '==', caller.uid)
+    .where('createdAt', '>=', twentyFourHoursAgo)
+    .get();
+  const dailyTotalUSD = recentWithdrawalsSnap.docs.reduce((sum, doc) => {
+    const d = doc.data();
+    if (d.refunded === true) return sum;
+    return sum + (d.usdEquivalent || 0);
+  }, 0);
+
+  if (dailyTotalUSD + amountInUSDForCaps > dailyUSD) {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Transfer would exceed your daily cap. ` +
+      `Used today: $${dailyTotalUSD.toFixed(2)} USD. ` +
+      `Requested: $${amountInUSDForCaps.toFixed(2)} USD. ` +
+      `Daily cap: $${dailyUSD.toFixed(2)} USD. ` +
+      `Available headroom: $${(dailyUSD - dailyTotalUSD).toFixed(2)} USD.`);
+  }
+
+  // D-07: Wrap main body in idempotency to prevent double-submission
+  return withIdempotency(idempotencyKey, 'adminInitiateTransfer', caller.uid, async () => {
   try {
     // Verify sufficient platform balance
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -6158,6 +6216,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     if (error instanceof functions.https.HttpsError) throw error;
     throw new functions.https.HttpsError('internal', `Transfer failed: ${error.message}`);
   }
+  }); // end withIdempotency wrapper
 });
 
 /**
