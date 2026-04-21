@@ -48,9 +48,64 @@ function AdminManagementPage() {
   // Allowlist form state
   const [allowlistEmail, setAllowlistEmail] = useState('');
 
+  // Lookup state for current-role display under email/UID inputs
+  const [changeRoleLookup, setChangeRoleLookup] = useState(null);    // {exists, role, isAdmin, email} | null
+  const [superAdminLookup, setSuperAdminLookup] = useState(null);
+  const [changeRoleLookupLoading, setChangeRoleLookupLoading] = useState(false);
+  const [superAdminLookupLoading, setSuperAdminLookupLoading] = useState(false);
+
   useEffect(() => {
     loadAll();
   }, []);
+
+  // Debounced lookup helper (used by both forms)
+  const lookupUserRole = async (input) => {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    try {
+      const adminLookupUserRole = httpsCallable(functions, 'adminLookupUserRole');
+      const payload = trimmed.includes('@')
+        ? { targetEmail: trimmed }
+        : { targetUid: trimmed };
+      const result = await adminLookupUserRole(payload);
+      return result.data;
+    } catch (e) {
+      // Treat lookup failures as 'not found' for graceful UI
+      return { exists: false, role: null, isAdmin: false };
+    }
+  };
+
+  // Debounce: trigger lookup 500ms after user stops typing in Change Role form
+  useEffect(() => {
+    const trimmed = targetUid.trim();
+    if (!trimmed) {
+      setChangeRoleLookup(null);
+      return;
+    }
+    setChangeRoleLookupLoading(true);
+    const timer = setTimeout(async () => {
+      const result = await lookupUserRole(trimmed);
+      setChangeRoleLookup(result);
+      setChangeRoleLookupLoading(false);
+    }, 500);
+    return () => { clearTimeout(timer); setChangeRoleLookupLoading(false); };
+  }, [targetUid]);
+
+  // Debounce: trigger lookup 500ms after user stops typing in Promote SA form
+  useEffect(() => {
+    const trimmed = superAdminUid.trim();
+    if (!trimmed) {
+      setSuperAdminLookup(null);
+      return;
+    }
+    setSuperAdminLookupLoading(true);
+    const timer = setTimeout(async () => {
+      const result = await lookupUserRole(trimmed);
+      setSuperAdminLookup(result);
+      setSuperAdminLookupLoading(false);
+    }, 500);
+    return () => { clearTimeout(timer); setSuperAdminLookupLoading(false); };
+  }, [superAdminUid]);
 
   const loadAll = async () => {
     try {
@@ -88,13 +143,20 @@ function AdminManagementPage() {
   // === CHANGE ROLE ===
   const handleChangeRole = async (e) => {
     e.preventDefault();
-    if (!targetUid.trim() || !targetRole) return;
+    const trimmed = targetUid.trim();
+    if (!trimmed || !targetRole) return;
 
     setActionLoading('change');
     try {
       const adminPromoteUser = httpsCallable(functions, 'adminPromoteUser');
-      await adminPromoteUser({ targetUid: targetUid.trim(), role: targetRole });
+      // Backend accepts either targetEmail OR targetUid (Commit 23a).
+      // Detect format and send the appropriate field.
+      const identityField = trimmed.includes('@')
+        ? { targetEmail: trimmed }
+        : { targetUid: trimmed };
+      await adminPromoteUser({ ...identityField, role: targetRole });
       setTargetUid('');
+      setChangeRoleLookup(null);
       showMessage(`User role changed to ${ROLE_DISPLAY_NAMES[targetRole]}.`);
       await loadAll();
     } catch (err) {
@@ -127,12 +189,17 @@ function AdminManagementPage() {
 
   // === PROMOTE TO SUPER ADMIN ===
   const handlePromoteSuperAdmin = async () => {
-    if (!superAdminUid.trim()) return;
+    const trimmed = superAdminUid.trim();
+    if (!trimmed) return;
     setActionLoading('super');
     try {
       const promoteSuperAdmin = httpsCallable(functions, 'promoteSuperAdmin');
-      await promoteSuperAdmin({ targetUid: superAdminUid.trim() });
+      const identityField = trimmed.includes('@')
+        ? { targetEmail: trimmed }
+        : { targetUid: trimmed };
+      await promoteSuperAdmin(identityField);
       setSuperAdminUid('');
+      setSuperAdminLookup(null);
       setShowSuperAdminConfirm(false);
       showMessage('User promoted to Super Admin.');
       await loadAll();
@@ -212,18 +279,38 @@ function AdminManagementPage() {
       {/* === CHANGE USER ROLE === */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <h3 className="text-lg font-semibold mb-2">Change User Role</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          You can promote or demote users to any role below your own level.
+        <p className="text-sm text-gray-500 mb-2">
+          Sets a user's role to your selection. You can move users <span className="font-medium">up or down</span> the
+          hierarchy as long as the target role is below your own level.
+        </p>
+        <p className="text-xs text-gray-400 mb-4">
           Your role: <span className="font-medium">{ROLE_DISPLAY_NAMES[callerRole]}</span>.
+          Type a user's email or UID below.
         </p>
         <form onSubmit={handleChangeRole} className="flex flex-wrap gap-4">
-          <input
-            type="text"
-            value={targetUid}
-            onChange={(e) => setTargetUid(e.target.value)}
-            placeholder="User UID"
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-          />
+          <div className="flex-1 min-w-[200px]">
+            <input
+              type="text"
+              value={targetUid}
+              onChange={(e) => setTargetUid(e.target.value)}
+              placeholder="User email or UID"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+            {targetUid.trim() && (
+              <p className="text-xs mt-1 ml-1">
+                {changeRoleLookupLoading && <span className="text-gray-400">Looking up...</span>}
+                {!changeRoleLookupLoading && changeRoleLookup && changeRoleLookup.exists && changeRoleLookup.isAdmin && (
+                  <span className="text-gray-600">Currently: <span className="font-medium">{ROLE_DISPLAY_NAMES[changeRoleLookup.role] || changeRoleLookup.role}</span></span>
+                )}
+                {!changeRoleLookupLoading && changeRoleLookup && changeRoleLookup.exists && !changeRoleLookup.isAdmin && (
+                  <span className="text-gray-600">Currently: <span className="font-medium">no admin role</span> (will be granted on submit)</span>
+                )}
+                {!changeRoleLookupLoading && changeRoleLookup && !changeRoleLookup.exists && (
+                  <span className="text-amber-600">User not found.</span>
+                )}
+              </p>
+            )}
+          </div>
           <select
             value={targetRole}
             onChange={(e) => setTargetRole(e.target.value)}
@@ -254,13 +341,29 @@ function AdminManagementPage() {
             Only promote trusted users. The user's email must already be on the allowlist below.
           </p>
           <div className="flex flex-wrap gap-4">
-            <input
-              type="text"
-              value={superAdminUid}
-              onChange={(e) => setSuperAdminUid(e.target.value)}
-              placeholder="User UID"
-              className="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500"
-            />
+            <div className="flex-1 min-w-[200px]">
+              <input
+                type="text"
+                value={superAdminUid}
+                onChange={(e) => setSuperAdminUid(e.target.value)}
+                placeholder="User email or UID"
+                className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500"
+              />
+              {superAdminUid.trim() && (
+                <p className="text-xs mt-1 ml-1">
+                  {superAdminLookupLoading && <span className="text-gray-400">Looking up...</span>}
+                  {!superAdminLookupLoading && superAdminLookup && superAdminLookup.exists && superAdminLookup.isAdmin && (
+                    <span className="text-gray-600">Currently: <span className="font-medium">{ROLE_DISPLAY_NAMES[superAdminLookup.role] || superAdminLookup.role}</span></span>
+                  )}
+                  {!superAdminLookupLoading && superAdminLookup && superAdminLookup.exists && !superAdminLookup.isAdmin && (
+                    <span className="text-gray-600">Currently: <span className="font-medium">no admin role</span></span>
+                  )}
+                  {!superAdminLookupLoading && superAdminLookup && !superAdminLookup.exists && (
+                    <span className="text-amber-600">User not found.</span>
+                  )}
+                </p>
+              )}
+            </div>
             <button
               onClick={() => setShowSuperAdminConfirm(true)}
               disabled={!superAdminUid.trim() || !!actionLoading}
