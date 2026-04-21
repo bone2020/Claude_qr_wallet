@@ -2287,6 +2287,7 @@ const RATE_LIMITS = {
   changePin:          { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many PIN change attempts. Please try again later.' },
   resetPin:           { windowMs: 60 * 60 * 1000, maxRequests: 3,  message: 'Too many PIN reset attempts. Please try again later.' },
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
+  adminFinalizeTransfer: { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many admin OTP attempts. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -6158,6 +6159,283 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
     throw new functions.https.HttpsError('internal', `Transfer failed: ${error.message}`);
   }
 });
+
+/**
+ * Admin: Finalize or cancel a pending_otp platform transfer.
+ *
+ * Two actions:
+ *   action='finalize': submit OTP to Paystack to complete the transfer
+ *   action='cancel': abandon the transfer and refund the platform balance
+ *
+ * Q-05 decision: 3 wrong OTP attempts trigger auto-cancel + refund.
+ *
+ * Security:
+ *   - super_admin only (verifyAdmin)
+ *   - Rate limited (10 attempts/hour per admin)
+ *   - Idempotency required
+ *   - Failed attempt tracking on the withdrawal doc
+ *
+ * Ref: L-35, Q-05, D-06, D-07
+ */
+exports.adminFinalizeTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { action, reference, transferCode, otp, idempotencyKey } = data;
+
+  // Validate action
+  if (!['finalize', 'cancel'].includes(action)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'action must be "finalize" or "cancel"');
+  }
+
+  // Validate reference
+  if (!reference || typeof reference !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'reference is required');
+  }
+
+  // Validate idempotency key (D-07)
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'idempotencyKey is required (min 16 chars)');
+  }
+
+  // Action-specific validation
+  if (action === 'finalize') {
+    if (!transferCode || !otp) {
+      throw new functions.https.HttpsError('invalid-argument',
+        'transferCode and otp are required for finalize action');
+    }
+  }
+
+  // D-06: Rate limit
+  const allowed = await checkRateLimitPersistent(caller.uid, 'adminFinalizeTransfer');
+  if (!allowed) {
+    throw new functions.https.HttpsError('resource-exhausted',
+      RATE_LIMITS.adminFinalizeTransfer.message);
+  }
+
+  return withIdempotency(idempotencyKey, 'adminFinalizeTransfer', caller.uid, async () => {
+    const withdrawalRef = db.collection('wallets').doc('platform')
+      .collection('withdrawals').doc(reference);
+
+    const withdrawalDoc = await withdrawalRef.get();
+    if (!withdrawalDoc.exists) {
+      throw new functions.https.HttpsError('not-found',
+        `Withdrawal ${reference} not found`);
+    }
+
+    const wd = withdrawalDoc.data();
+
+    // Validate state — must be pending_otp
+    if (wd.status !== 'pending_otp') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Withdrawal status is '${wd.status}', expected 'pending_otp'. ` +
+        `Cannot ${action} a transfer that is not awaiting OTP confirmation.`);
+    }
+
+    // Get caller email for audit
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+
+    // ====== ACTION: CANCEL ======
+    if (action === 'cancel') {
+      return await cancelTransfer(
+        withdrawalRef, wd, reference, caller, callerEmail, context,
+        'manual_cancel'
+      );
+    }
+
+    // ====== ACTION: FINALIZE ======
+
+    // Submit OTP to Paystack
+    let otpResponse;
+    try {
+      otpResponse = await paystackRequest('POST', '/transfer/finalize_transfer', {
+        transfer_code: transferCode,
+        otp: otp,
+      });
+      logInfo('Paystack adminFinalizeTransfer response', {
+        reference, status: otpResponse.status
+      });
+    } catch (paystackError) {
+      logError('Paystack adminFinalizeTransfer call failed', {
+        reference,
+        error: paystackError.message,
+      });
+      throw new functions.https.HttpsError('internal',
+        `Paystack call failed: ${paystackError.message}`);
+    }
+
+    // OTP succeeded
+    if (otpResponse.status === true) {
+      await withdrawalRef.update({
+        status: 'completed',
+        otpVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        completedBy: caller.uid,
+        completedByEmail: callerEmail,
+        otpFailedAttempts: admin.firestore.FieldValue.delete(),
+      });
+
+      // Audit log
+      await auditLog({
+        userId: caller.uid,
+        operation: 'adminFinalizeTransfer',
+        result: 'success',
+        amount: wd.amount,
+        currency: wd.currency,
+        metadata: { reference, action: 'finalize' },
+        ipHash: hashIp(context),
+      });
+
+      // Admin activity log
+      await db.collection('admin_activity').add({
+        uid: caller.uid,
+        email: callerEmail,
+        role: caller.role,
+        action: 'transfer_finalize',
+        details: `Finalized transfer ${reference} via OTP`,
+        ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        action: 'finalize',
+        status: 'completed',
+        reference,
+        message: 'Transfer completed successfully.',
+      };
+    }
+
+    // OTP FAILED — track attempts (Q-05: 3 strikes)
+    const previousAttempts = wd.otpFailedAttempts || 0;
+    const newAttempts = previousAttempts + 1;
+    const MAX_ATTEMPTS = 3;
+
+    await withdrawalRef.update({
+      otpFailedAttempts: newAttempts,
+      lastOtpAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Audit failed attempt
+    await auditLog({
+      userId: caller.uid,
+      operation: 'adminFinalizeTransfer',
+      result: 'failure',
+      metadata: {
+        reference,
+        action: 'finalize',
+        attempt: newAttempts,
+        paystackMessage: otpResponse.message || 'OTP rejected',
+      },
+      ipHash: hashIp(context),
+    });
+
+    if (newAttempts >= MAX_ATTEMPTS) {
+      // Auto-cancel and refund
+      logWarning('adminFinalizeTransfer: max OTP attempts reached, auto-cancelling', {
+        reference, attempts: newAttempts,
+      });
+
+      return await cancelTransfer(
+        withdrawalRef, wd, reference, caller, callerEmail, context,
+        'auto_cancelled_max_otp_attempts'
+      );
+    }
+
+    // Still has attempts left — return failure with attempt count
+    const remaining = MAX_ATTEMPTS - newAttempts;
+    return {
+      success: false,
+      action: 'finalize',
+      status: 'pending_otp',
+      reference,
+      attemptsUsed: newAttempts,
+      attemptsRemaining: remaining,
+      message: `OTP rejected. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before auto-cancel.`,
+      paystackMessage: otpResponse.message || 'OTP verification failed',
+    };
+  });
+});
+
+/**
+ * Internal helper for adminFinalizeTransfer cancellation path.
+ * Refunds platform balance atomically and marks withdrawal as cancelled.
+ *
+ * @param {DocumentReference} withdrawalRef
+ * @param {Object} wd - withdrawal data
+ * @param {string} reference
+ * @param {Object} caller - { uid, role }
+ * @param {string} callerEmail
+ * @param {Object} context - CF context for IP logging
+ * @param {string} cancelReason - 'manual_cancel' or 'auto_cancelled_max_otp_attempts'
+ */
+async function cancelTransfer(withdrawalRef, wd, reference, caller, callerEmail, context, cancelReason) {
+  // Atomic refund of platform balance
+  await db.runTransaction(async (transaction) => {
+    const balanceRef = db.collection('wallets').doc('platform')
+      .collection('balances').doc(wd.currency);
+
+    transaction.update(balanceRef, {
+      amount: admin.firestore.FieldValue.increment(wd.amount),
+      usdEquivalent: admin.firestore.FieldValue.increment(wd.usdEquivalent),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    transaction.update(db.collection('wallets').doc('platform'), {
+      totalBalanceUSD: admin.firestore.FieldValue.increment(wd.usdEquivalent),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    transaction.update(withdrawalRef, {
+      status: 'cancelled',
+      cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+      cancelledBy: caller.uid,
+      cancelledByEmail: callerEmail,
+      cancelReason: cancelReason,
+      refunded: true,
+      refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // Audit log
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminFinalizeTransfer',
+    result: 'success',
+    amount: wd.amount,
+    currency: wd.currency,
+    metadata: {
+      reference,
+      action: 'cancel',
+      cancelReason,
+    },
+    ipHash: hashIp(context),
+  });
+
+  // Admin activity log
+  await db.collection('admin_activity').add({
+    uid: caller.uid,
+    email: callerEmail,
+    role: caller.role,
+    action: 'transfer_cancel',
+    details: `Cancelled transfer ${reference} (${cancelReason}). Refunded ${wd.currency} ${wd.amount.toFixed(2)} to platform balance.`,
+    ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return {
+    success: true,
+    action: 'cancel',
+    status: 'cancelled',
+    reference,
+    refundedAmount: wd.amount,
+    currency: wd.currency,
+    reason: cancelReason,
+    message: cancelReason === 'auto_cancelled_max_otp_attempts'
+      ? 'Maximum OTP attempts reached. Transfer cancelled and balance refunded.'
+      : 'Transfer cancelled and balance refunded.',
+  };
+}
 
 // ============================================================
 // TRANSACTION MONITORING
