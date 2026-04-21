@@ -6704,10 +6704,23 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
         transferStatus = transferResponse.data.status;
       }
 
+      // Map Paystack response status -> our internal withdrawal status:
+      //   'success' -> 'completed'    (Paystack finished the transfer, no OTP needed)
+      //   'otp'     -> 'pending_otp'  (Paystack is holding, waiting for us to submit OTP)
+      //   other     -> 'pending'      (queued / processing / unknown; check paystackStatus for detail)
+      let internalStatus;
+      if (transferStatus === 'success') {
+        internalStatus = 'completed';
+      } else if (transferStatus === 'otp') {
+        internalStatus = 'pending_otp';
+      } else {
+        internalStatus = 'pending';
+      }
+
       await withdrawalRef.update({
         transferCode: transferCode,
         paystackStatus: transferStatus,
-        status: transferStatus === 'success' ? 'completed' : 'pending',
+        status: internalStatus,
       });
     } catch (transferError) {
       // Paystack failed — refund the platform balance
@@ -6762,7 +6775,7 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
 
     return {
       success: true,
-      otpRequired: true,
+      otpRequired: transferStatus === 'otp',
       transfer: {
         reference,
         transferCode,
