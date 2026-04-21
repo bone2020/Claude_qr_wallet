@@ -4826,6 +4826,442 @@ exports.promoteSuperAdmin = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * ============================================================
+ * STAFF ONBOARDING WORKFLOW (Commit 26a)
+ * ============================================================
+ *
+ * Two-tier onboarding flow:
+ *
+ *   Direct path (admin_manager / super_admin):
+ *     staffOnboardingDirect -> creates Firebase Auth user immediately
+ *
+ *   Approval path (admin_supervisor):
+ *     staffOnboardingRequest -> creates pending request
+ *     staffOnboardingApprove (admin_manager+) -> creates Auth user
+ *     staffOnboardingReject (admin_manager+) -> closes request
+ *
+ * Auto-expiry:
+ *     staffOnboardingExpireOld (scheduled, daily at 4 AM UTC)
+ *     -> marks pending requests older than 5 days as 'expired'
+ *
+ * Setup-complete detection:
+ *     onUserAuthVerified (auth trigger)
+ *     -> when employee verifies email (sets password), updates the
+ *        request to 'setup_complete' so it surfaces in the
+ *        "Ready to Promote" list on the dashboard
+ *
+ * Firestore: staff_onboarding_requests/{requestId}
+ *   {
+ *     email, displayName, reason,
+ *     requestedBy: {uid, email, role},
+ *     requestedAt, dueBy (createdAt + 5 days),
+ *     status: 'pending'|'approved'|'rejected'|'expired'|'setup_complete'|'promoted',
+ *     decidedBy?, decidedAt?, decisionReason?,
+ *     firebaseUid?,            // set on approval/direct
+ *     passwordResetLink?,      // set on approval/direct (for manager to copy/email)
+ *     setupCompletedAt?,       // set when employee verifies email
+ *     promotedAt?, promotedRole?, promotedBy?  // set if/when promoted via existing CFs
+ *   }
+ *
+ * Audit: every action also writes to audit_logs.
+ *
+ * Email sending: NOT YET WIRED. The password reset link is returned to the
+ * dashboard so the manager can copy/email manually. Email infrastructure is
+ * the next-session task.
+ */
+
+// Internal helper used by both Direct and Approve paths.
+// Creates the Firebase Auth user and generates a password reset link.
+async function _createStaffAccount(email, displayName) {
+  // Check if email already exists
+  try {
+    const existing = await admin.auth().getUserByEmail(email);
+    throw new functions.https.HttpsError('already-exists',
+      `An account with email ${email} already exists (UID ${existing.uid}).`);
+  } catch (e) {
+    if (e.code !== 'auth/user-not-found') {
+      // Either it's already-exists (we re-throw) or another error
+      if (e instanceof functions.https.HttpsError) throw e;
+      throw new functions.https.HttpsError('internal',
+        `Failed to check existing user: ${e.message}`);
+    }
+    // Not found = good, proceed to create
+  }
+
+  // Create Auth user. emailVerified=false; the password-reset link will
+  // verify them implicitly when they set their password.
+  const userRecord = await admin.auth().createUser({
+    email,
+    emailVerified: false,
+    displayName: displayName || undefined,
+    disabled: false,
+  });
+
+  // Generate a password reset link. Manager copies this and emails the staff.
+  const passwordResetLink = await admin.auth().generatePasswordResetLink(email);
+
+  return { uid: userRecord.uid, passwordResetLink };
+}
+
+/**
+ * Supervisor: submit a request to onboard a new staff member.
+ * Manager/super_admin will approve or reject.
+ */
+exports.staffOnboardingRequest = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+
+  const email = data.email ? String(data.email).trim().toLowerCase() : null;
+  const displayName = data.displayName ? String(data.displayName).trim() : null;
+  const reason = data.reason ? String(data.reason).trim() : null;
+
+  if (!email || !email.includes('@') || email.length < 5) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'Valid email is required.');
+  }
+  if (!reason || reason.length < 5) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'Reason is required (at least 5 characters).');
+  }
+
+  // Rate limit: 5 requests per supervisor per day
+  await checkRateLimitPersistent({
+    uid: caller.uid,
+    operation: 'staffOnboardingRequest',
+    limit: 5,
+    windowSeconds: 86400,
+  });
+
+  // Check for existing pending request for the same email
+  const existing = await db.collection('staff_onboarding_requests')
+    .where('email', '==', email)
+    .where('status', '==', 'pending')
+    .limit(1)
+    .get();
+  if (!existing.empty) {
+    throw new functions.https.HttpsError('already-exists',
+      `A pending request already exists for ${email}.`);
+  }
+
+  const callerRecord = await admin.auth().getUser(caller.uid);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+  const dueBy = admin.firestore.Timestamp.fromMillis(
+    Date.now() + 5 * 24 * 60 * 60 * 1000  // 5 days
+  );
+
+  const docRef = await db.collection('staff_onboarding_requests').add({
+    email,
+    displayName: displayName || null,
+    reason,
+    requestedBy: {
+      uid: caller.uid,
+      email: callerRecord.email || null,
+      role: caller.role,
+    },
+    requestedAt: now,
+    dueBy,
+    status: 'pending',
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'staffOnboardingRequest',
+    result: 'success',
+    metadata: { requestId: docRef.id, email, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, requestId: docRef.id };
+});
+
+/**
+ * Manager/super_admin: approve a pending onboarding request.
+ * Creates the Firebase Auth user and returns the password reset link
+ * (manager copies it to email to the new employee).
+ */
+exports.staffOnboardingApprove = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const requestId = data.requestId ? String(data.requestId).trim() : null;
+  if (!requestId) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId is required.');
+  }
+
+  const docRef = db.collection('staff_onboarding_requests').doc(requestId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Request not found.');
+  }
+  const req = doc.data();
+  if (req.status !== 'pending') {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Request is ${req.status}, not pending. Cannot approve.`);
+  }
+
+  const { uid: newUid, passwordResetLink } = await _createStaffAccount(req.email, req.displayName);
+
+  await docRef.update({
+    status: 'approved',
+    decidedBy: { uid: caller.uid, role: caller.role },
+    decidedAt: admin.firestore.FieldValue.serverTimestamp(),
+    firebaseUid: newUid,
+    passwordResetLink,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'staffOnboardingApprove',
+    result: 'success',
+    metadata: { requestId, email: req.email, newUid, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return {
+    success: true,
+    uid: newUid,
+    email: req.email,
+    passwordResetLink,
+    message: 'Account created. Send the password setup link to the employee.',
+  };
+});
+
+/**
+ * Manager/super_admin: reject a pending onboarding request.
+ */
+exports.staffOnboardingReject = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const requestId = data.requestId ? String(data.requestId).trim() : null;
+  const reason = data.reason ? String(data.reason).trim() : null;
+  if (!requestId) {
+    throw new functions.https.HttpsError('invalid-argument', 'requestId is required.');
+  }
+  if (!reason || reason.length < 5) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'Rejection reason is required (at least 5 characters).');
+  }
+
+  const docRef = db.collection('staff_onboarding_requests').doc(requestId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new functions.https.HttpsError('not-found', 'Request not found.');
+  }
+  const req = doc.data();
+  if (req.status !== 'pending') {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Request is ${req.status}, not pending.`);
+  }
+
+  await docRef.update({
+    status: 'rejected',
+    decidedBy: { uid: caller.uid, role: caller.role },
+    decidedAt: admin.firestore.FieldValue.serverTimestamp(),
+    decisionReason: reason,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'staffOnboardingReject',
+    result: 'success',
+    metadata: { requestId, email: req.email, reason, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return { success: true, requestId };
+});
+
+/**
+ * Manager/super_admin: directly onboard a staff member without approval queue.
+ * Skips the supervisor request step entirely.
+ */
+exports.staffOnboardingDirect = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const email = data.email ? String(data.email).trim().toLowerCase() : null;
+  const displayName = data.displayName ? String(data.displayName).trim() : null;
+
+  if (!email || !email.includes('@') || email.length < 5) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'Valid email is required.');
+  }
+
+  // Rate limit: 10 direct onboardings per caller per day
+  await checkRateLimitPersistent({
+    uid: caller.uid,
+    operation: 'staffOnboardingDirect',
+    limit: 10,
+    windowSeconds: 86400,
+  });
+
+  const { uid: newUid, passwordResetLink } = await _createStaffAccount(email, displayName);
+
+  const callerRecord = await admin.auth().getUser(caller.uid);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  // Record this direct onboarding in the same collection for unified history
+  const docRef = await db.collection('staff_onboarding_requests').add({
+    email,
+    displayName: displayName || null,
+    reason: 'Direct onboarding (no supervisor request)',
+    requestedBy: {
+      uid: caller.uid,
+      email: callerRecord.email || null,
+      role: caller.role,
+    },
+    requestedAt: now,
+    decidedBy: { uid: caller.uid, role: caller.role },
+    decidedAt: now,
+    status: 'approved',
+    firebaseUid: newUid,
+    passwordResetLink,
+  });
+
+  await auditLog({
+    userId: caller.uid,
+    operation: 'staffOnboardingDirect',
+    result: 'success',
+    metadata: { requestId: docRef.id, email, newUid, callerRole: caller.role },
+    ipHash: hashIp(context),
+  });
+
+  return {
+    success: true,
+    requestId: docRef.id,
+    uid: newUid,
+    email,
+    passwordResetLink,
+    message: 'Account created. Send the password setup link to the employee.',
+  };
+});
+
+/**
+ * Read-only: list onboarding requests by status.
+ * supervisor sees only their own requests; admin_manager+ sees all.
+ */
+exports.staffOnboardingListPending = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+
+  const status = data.status ? String(data.status) : 'pending';
+  const validStatuses = ['pending', 'approved', 'rejected', 'expired', 'setup_complete', 'promoted'];
+  if (!validStatuses.includes(status)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `status must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  let query = db.collection('staff_onboarding_requests')
+    .where('status', '==', status);
+
+  // Supervisors only see their own requests; admin_manager+ see all
+  if (caller.role === 'admin_supervisor') {
+    query = query.where('requestedBy.uid', '==', caller.uid);
+  }
+
+  const snap = await query.orderBy('requestedAt', 'desc').limit(50).get();
+  const requests = snap.docs.map(d => {
+    const data = d.data();
+    return {
+      id: d.id,
+      email: data.email,
+      displayName: data.displayName,
+      reason: data.reason,
+      requestedBy: data.requestedBy,
+      requestedAt: data.requestedAt,
+      status: data.status,
+      decidedBy: data.decidedBy || null,
+      decidedAt: data.decidedAt || null,
+      decisionReason: data.decisionReason || null,
+      firebaseUid: data.firebaseUid || null,
+      // Only return passwordResetLink to the manager who decided (security)
+      passwordResetLink:
+        data.decidedBy && data.decidedBy.uid === caller.uid
+          ? data.passwordResetLink || null
+          : null,
+      setupCompletedAt: data.setupCompletedAt || null,
+    };
+  });
+
+  return { success: true, status, requests };
+});
+
+/**
+ * Scheduled (daily): expire pending requests older than 5 days.
+ */
+exports.staffOnboardingExpireOld = functions.pubsub
+  .schedule('0 4 * * *')  // Daily at 4:00 AM UTC
+  .timeZone('UTC')
+  .onRun(async () => {
+    const cutoff = admin.firestore.Timestamp.fromMillis(
+      Date.now() - 5 * 24 * 60 * 60 * 1000
+    );
+
+    const snap = await db.collection('staff_onboarding_requests')
+      .where('status', '==', 'pending')
+      .where('requestedAt', '<', cutoff)
+      .limit(500)
+      .get();
+
+    if (snap.empty) {
+      logInfo('staffOnboardingExpireOld: no pending requests to expire');
+      return null;
+    }
+
+    const batch = db.batch();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    snap.docs.forEach(doc => {
+      batch.update(doc.ref, {
+        status: 'expired',
+        decidedAt: now,
+      });
+    });
+    await batch.commit();
+
+    logInfo('staffOnboardingExpireOld: expired pending requests', { count: snap.size });
+    return null;
+  });
+
+/**
+ * Auth trigger: when a Firebase Auth user's record is updated AND emailVerified
+ * becomes true, check if they have an approved staff onboarding request and
+ * mark it as 'setup_complete'.
+ *
+ * Fires on every user metadata refresh, but the early return on already-marked
+ * docs makes the work cheap.
+ */
+exports.onUserAuthVerified = functions.auth.user().onCreate(async (user) => {
+  // onCreate fires once per user. We use the user's email to look up any
+  // approved onboarding request that matches.
+  if (!user.email) return null;
+
+  const email = user.email.toLowerCase();
+  const snap = await db.collection('staff_onboarding_requests')
+    .where('email', '==', email)
+    .where('status', '==', 'approved')
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+
+  const doc = snap.docs[0];
+  // Only update if the firebaseUid matches (defensive: ensures we're updating
+  // the right request, not a same-email coincidence)
+  if (doc.data().firebaseUid !== user.uid) {
+    logWarning('onUserAuthVerified: uid mismatch on staff onboarding request', {
+      requestId: doc.id, expectedUid: doc.data().firebaseUid, actualUid: user.uid,
+    });
+    return null;
+  }
+
+  await doc.ref.update({
+    status: 'setup_complete',
+    setupCompletedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  logInfo('onUserAuthVerified: marked staff onboarding as setup_complete', {
+    requestId: doc.id, uid: user.uid, email,
+  });
+  return null;
+});
+
+/**
  * Manage the super_admin bootstrap allowlist stored at
  * admin_bootstrap_config/allowed_emails in Firestore.
  *
