@@ -3460,7 +3460,10 @@ exports.cleanupExpiredData = functions.pubsub
         name: 'audit_logs',
         collection: 'audit_logs',
         field: 'timestamp',
-        maxAgeMs: 365 * 24 * 60 * 60 * 1000, // 365 days
+        // Q-06: 2-year retention. LEGAL NOTE: may be shorter than required by
+        // financial regulators in target markets (Nigeria 10y, UK 6y, Ghana 5y).
+        // Review with legal counsel before production launch and adjust here.
+        maxAgeMs: 730 * 24 * 60 * 60 * 1000, // 730 days (2 years)
       },
     ];
 
