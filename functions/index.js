@@ -5479,6 +5479,67 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Look up a user's current role by email or UID.
+ *
+ * Used by the admin dashboard to display the target user's CURRENT role
+ * before promote/demote actions, so the operator can see what they're
+ * changing FROM. Permissive on not-found (returns {exists: false} rather
+ * than throwing) so a typing-in-progress UI can render gracefully.
+ *
+ * Auth: requires admin or above (anyone managing users needs this info).
+ *
+ * Input: { targetEmail?: string, targetUid?: string }
+ * Output: {
+ *   exists: boolean,
+ *   uid?: string,
+ *   email?: string,
+ *   role: string | null,    // from Firebase Auth custom claims
+ *   isAdmin: boolean,        // true if role is in the 8-role hierarchy
+ * }
+ *
+ * Ref: bundle commit 23b
+ */
+exports.adminLookupUserRole = functions.https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'admin');
+
+  const email = data.targetEmail ? String(data.targetEmail).trim().toLowerCase() : null;
+  const uid = data.targetUid ? String(data.targetUid).trim() : null;
+
+  if (!email && !uid) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'Either targetEmail or targetUid is required.');
+  }
+
+  let userRecord;
+  try {
+    if (email) {
+      userRecord = await admin.auth().getUserByEmail(email);
+    } else {
+      userRecord = await admin.auth().getUser(uid);
+    }
+  } catch (e) {
+    if (e.code === 'auth/user-not-found') {
+      return { exists: false, role: null, isAdmin: false };
+    }
+    throw new functions.https.HttpsError('internal',
+      `Lookup failed: ${e.message}`);
+  }
+
+  const role = userRecord.customClaims?.role || null;
+  const VALID_ADMIN_ROLES = ['viewer', 'auditor', 'support', 'admin',
+    'admin_supervisor', 'finance', 'admin_manager', 'super_admin'];
+  const isAdmin = role !== null && VALID_ADMIN_ROLES.includes(role);
+
+  return {
+    exists: true,
+    uid: userRecord.uid,
+    email: userRecord.email || null,
+    role,
+    isAdmin,
+  };
+});
+
+/**
  * Get platform stats for admin dashboard.
  */
 exports.adminGetStats = functions.https.onCall(async (data, context) => {
