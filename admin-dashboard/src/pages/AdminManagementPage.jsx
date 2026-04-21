@@ -48,6 +48,10 @@ function AdminManagementPage() {
   // Allowlist form state
   const [allowlistEmail, setAllowlistEmail] = useState('');
 
+  // Offboarding modal state (Commit 23d)
+  const [removeModal, setRemoveModal] = useState(null);  // {uid, email, role} | null
+  const [removeProcessing, setRemoveProcessing] = useState(false);
+
   // Lookup state for current-role display under email/UID inputs
   const [changeRoleLookup, setChangeRoleLookup] = useState(null);    // {exists, role, isAdmin, email} | null
   const [superAdminLookup, setSuperAdminLookup] = useState(null);
@@ -167,23 +171,37 @@ function AdminManagementPage() {
   };
 
   // === DEMOTE (full removal) ===
-  const handleDemote = async (uid, currentRole) => {
-    if (uid === user?.uid) {
+  // Open the offboarding confirmation modal (Commit 23d).
+  // Actual demotion happens in confirmDemote when user clicks confirm.
+  const handleDemote = (adminUser) => {
+    if (adminUser.uid === user?.uid) {
       showError('You cannot demote yourself.');
       return;
     }
-    if (!window.confirm(`Remove all admin privileges from this user (currently ${ROLE_DISPLAY_NAMES[currentRole]})?`)) return;
+    setRemoveModal({
+      uid: adminUser.uid,
+      email: adminUser.email || '(unknown)',
+      role: adminUser.role,
+    });
+  };
 
-    setActionLoading(uid);
+  // Perform the actual demote after the operator confirms in the modal.
+  const confirmDemote = async () => {
+    if (!removeModal) return;
+    const { uid, role } = removeModal;
+    setRemoveProcessing(true);
     try {
       const adminDemoteUser = httpsCallable(functions, 'adminDemoteUser');
+      // Send by UID (we already have it from the table). Could send by email
+      // too — backend accepts either since 23a — but UID is more direct.
       await adminDemoteUser({ targetUid: uid });
-      showMessage(`Admin privileges removed.`);
+      setRemoveModal(null);
+      showMessage(`Admin privileges removed (was ${ROLE_DISPLAY_NAMES[role]}).`);
       await loadAll();
     } catch (err) {
       showError(err.message || 'Failed to demote user.');
     } finally {
-      setActionLoading('');
+      setRemoveProcessing(false);
     }
   };
 
@@ -488,11 +506,11 @@ function AdminManagementPage() {
                         <span className="text-xs text-gray-400 italic">Cannot modify self</span>
                       ) : canDemote ? (
                         <button
-                          onClick={() => handleDemote(adminUser.uid, adminUser.role)}
+                          onClick={() => handleDemote(adminUser)}
                           disabled={!!actionLoading}
                           className="text-red-600 hover:text-red-900 text-sm font-medium disabled:opacity-50"
                         >
-                          {actionLoading === adminUser.uid ? 'Removing...' : 'Remove'}
+                          {actionLoading === adminUser.uid ? 'Removing...' : 'Remove from Admin Team'}
                         </button>
                       ) : (
                         <span className="text-xs text-gray-400 italic">Above your level</span>
@@ -505,6 +523,55 @@ function AdminManagementPage() {
           </table>
         )}
       </div>
+
+      {/* Offboarding confirmation modal (Commit 23d) */}
+      {removeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Remove from Admin Team?</h3>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm">
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-500">User:</span>
+                <span className="font-medium">{removeModal.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Current role:</span>
+                <span className="font-medium">{ROLE_DISPLAY_NAMES[removeModal.role] || removeModal.role}</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-gray-700 mb-2">This will:</p>
+            <ul className="text-sm text-gray-600 space-y-1 mb-4 ml-4 list-disc">
+              <li>Remove their admin role and all admin access</li>
+              <li>Force-log them out within minutes</li>
+              <li>Remove them from this admin list</li>
+            </ul>
+
+            <p className="text-xs text-gray-500 mb-6 bg-gray-50 rounded p-2">
+              Their wallet account remains active. They can still use the app
+              as a regular customer.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setRemoveModal(null)}
+                disabled={removeProcessing}
+                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDemote}
+                disabled={removeProcessing}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {removeProcessing ? 'Removing...' : 'Remove from Admin Team'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
