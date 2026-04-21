@@ -4411,12 +4411,56 @@ exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
  * Promote a user to admin or support role.
  * Only super_admin can promote to admin; admin+ can promote to support.
  */
-exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
-  const { targetUid, role: newRole } = data;
+/**
+ * Helper: resolve a target user identifier to a Firebase Auth UID.
+ *
+ * Accepts EITHER targetEmail (preferred for UX — humans know emails, not UIDs)
+ * OR targetUid (for direct API/script callers, backward compatible).
+ *
+ * If both are provided, targetEmail wins (user-friendly path).
+ * If neither is provided, throws invalid-argument.
+ *
+ * Throws not-found if the email doesn't match any user.
+ *
+ * @param {Object} data - the CF input data
+ * @param {string} [data.targetEmail] - email to look up
+ * @param {string} [data.targetUid] - UID to use directly
+ * @returns {Promise<string>} the resolved UID
+ */
+async function resolveTargetUid(data) {
+  const email = data.targetEmail ? String(data.targetEmail).trim().toLowerCase() : null;
+  const uid = data.targetUid ? String(data.targetUid).trim() : null;
 
-  if (!targetUid || !newRole) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetUid and role are required.');
+  if (email) {
+    try {
+      const user = await admin.auth().getUserByEmail(email);
+      return user.uid;
+    } catch (e) {
+      if (e.code === 'auth/user-not-found') {
+        throw new functions.https.HttpsError('not-found',
+          `No user found with email ${email}.`);
+      }
+      throw new functions.https.HttpsError('internal',
+        `Failed to look up user by email: ${e.message}`);
+    }
   }
+
+  if (uid) {
+    return uid;
+  }
+
+  throw new functions.https.HttpsError('invalid-argument',
+    'Either targetEmail or targetUid is required.');
+}
+
+exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
+  const { role: newRole } = data;
+
+  if (!newRole) {
+    throw new functions.https.HttpsError('invalid-argument', 'role is required.');
+  }
+
+  const targetUid = await resolveTargetUid(data);
 
   // Valid target roles. super_admin goes through the separate promoteSuperAdmin CF.
   const VALID_PROMOTE_ROLES = ['viewer', 'auditor', 'support', 'admin', 'admin_supervisor', 'finance', 'admin_manager'];
@@ -4510,11 +4554,9 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
  * Only super_admin can demote admins; admin+ can demote support.
  */
 exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
-  const { targetUid, newRole } = data;
+  const { newRole } = data;
 
-  if (!targetUid) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
-  }
+  const targetUid = await resolveTargetUid(data);
 
   // Get target's current role and email
   let targetUser;
@@ -4699,11 +4741,7 @@ async function performDemotion(targetUid, targetEmail, previousRole, newRole, ca
  *    (dashboard side shipped in master plan Commit 19)
  */
 exports.promoteSuperAdmin = functions.https.onCall(async (data, context) => {
-  const { targetUid } = data;
-
-  if (!targetUid) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
-  }
+  const targetUid = await resolveTargetUid(data);
 
   // Only super_admin can promote another super_admin
   const caller = await verifyAdmin(context, 'super_admin');
@@ -5419,18 +5457,21 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
 exports.adminListAdmins = functions.https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin_manager');
 
-  const snapshot = await db.collection('users')
+  // Read from admin_users (the registry of admins), not users (the registry of
+  // all signed-up wallet users). admin_users is keyed by email; each doc has
+  // {uid, email, role, createdAt, updatedAt} as written by adminPromoteUser /
+  // adminDemoteUser / promoteSuperAdmin.
+  const snapshot = await db.collection('admin_users')
     .where('role', 'in', ['super_admin', 'admin_manager', 'finance', 'admin_supervisor', 'admin', 'support', 'auditor', 'viewer'])
     .get();
 
   const admins = snapshot.docs.map(doc => {
-    const userData = doc.data();
+    const data = doc.data();
     return {
-      uid: doc.id,
-      email: userData.email || '',
-      fullName: userData.fullName || '',
-      role: userData.role || '',
-      roleUpdatedAt: userData.roleUpdatedAt || null,
+      uid: data.uid || '',
+      email: data.email || doc.id,
+      role: data.role || '',
+      updatedAt: data.updatedAt || null,
     };
   });
 
