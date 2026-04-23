@@ -7330,6 +7330,156 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
   }
 });
 
+/**
+ * Admin: Emergency platform transfer — super_admin only.
+ * Bypasses the propose → approve flow by creating a proposal directly
+ * with emergency: true and status: 'proposed'. The human-pair commit
+ * that modifies adminInitiateTransfer will detect emergency: true and
+ * skip the approval step.
+ *
+ * Requires a detailed justification reason (min 50 chars).
+ * Subject to a separate emergency daily cap.
+ *
+ * Ref: Phase 2a agent commit 4/6
+ */
+exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, reason, notes, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'amount must be a positive number.');
+  }
+  if (!currency || typeof currency !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'currency is required.');
+  }
+  if (!bankCode || typeof bankCode !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'bankCode is required.');
+  }
+  if (!accountNumber || typeof accountNumber !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'accountNumber is required.');
+  }
+  if (!accountName || typeof accountName !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'accountName is required.');
+  }
+  if (!purpose || typeof purpose !== 'string' || purpose.trim().length < 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'purpose is required and must be at least 5 characters.');
+  }
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'Emergency reason is required and must be at least 50 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit (3/hour for emergency)
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminEmergencyTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminEmergencyTransfer.message);
+  }
+
+  try {
+    // Compute USD equivalent
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+    const exchangeRate = rates[currency] || 1;
+    const usdEquivalent = amount / exchangeRate;
+
+    // Emergency daily cap check
+    const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+    const emergencyDailyUSD = limitsDoc.exists ? (limitsDoc.data().emergencyDailyUSD || 250000) : 250000;
+
+    const startOfTodayUTC = new Date();
+    startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+    const startOfTodayTimestamp = admin.firestore.Timestamp.fromDate(startOfTodayUTC);
+
+    const todayEmergencySnap = await db.collection('platform_transfer_proposals')
+      .where('emergencyInvokedBy.uid', '==', caller.uid)
+      .where('proposedAt', '>=', startOfTodayTimestamp)
+      .get();
+
+    const dailyEmergencyUSD = todayEmergencySnap.docs.reduce((sum, doc) => {
+      return sum + (doc.data().usdEquivalent || 0);
+    }, 0);
+
+    if (dailyEmergencyUSD + usdEquivalent > emergencyDailyUSD) {
+      const headroom = emergencyDailyUSD - dailyEmergencyUSD;
+      throw new functions.https.HttpsError('resource-exhausted',
+        `Emergency transfer would exceed your daily emergency cap. ` +
+        `Used today: $${dailyEmergencyUSD.toFixed(2)} USD. ` +
+        `This transfer: $${usdEquivalent.toFixed(2)} USD. ` +
+        `Daily emergency cap: $${emergencyDailyUSD.toFixed(2)} USD. ` +
+        `Available headroom: $${headroom.toFixed(2)} USD.`);
+    }
+
+    // Generate proposal ID
+    const proposalId = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    const callerIdentity = {
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      displayName: callerDisplayName,
+    };
+
+    // Write proposal doc
+    await db.collection('platform_transfer_proposals').doc(proposalId).set({
+      proposalId,
+      status: 'proposed',
+      amount,
+      currency,
+      usdEquivalent,
+      exchangeRate,
+      bankCode,
+      accountNumber,
+      accountName,
+      purpose: purpose.trim(),
+      notes: notes || null,
+      priorityFlag: true,
+      proposedBy: callerIdentity,
+      proposedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000),
+      idempotencyKey,
+      emergency: true,
+      emergencyReason: reason.trim(),
+      emergencyInvokedBy: callerIdentity,
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_emergency',
+      result: 'success',
+      amount,
+      currency,
+      metadata: { proposalId, emergency: true, reason: reason.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'transfer_emergency',
+      details: `Emergency transfer proposal ${proposalId} for ${amount} ${currency}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'proposed', emergency: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminEmergencyTransfer failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to create emergency transfer: ' + error.message);
+  }
+});
+
 // ============================================================
 // TRANSACTION MONITORING
 // ============================================================
