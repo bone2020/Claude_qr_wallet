@@ -54,3 +54,4 @@ functions/serviceAccountKey.json
 android/build/
 # iOS build cache in android directory
 android/build/
+functions/.env.*
