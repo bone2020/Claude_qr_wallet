@@ -7136,6 +7136,200 @@ exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
   }
 });
 
+/**
+ * Admin: Reject a pending platform transfer proposal.
+ * Only admin_manager (level 7) and above can reject.
+ * Updates proposal status from 'proposed' to 'rejected' (terminal state).
+ *
+ * Ref: Phase 2a agent commit 3/6
+ */
+exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const { proposalId, reason, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'reason is required and must be at least 5 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminRejectTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminRejectTransfer.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    if (proposalSnap.data().status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposalSnap.data().status}). Cannot reject.`);
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'rejected',
+        rejectedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rejectionReason: reason.trim(),
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_rejected',
+      result: 'success',
+      metadata: { proposalId, reason: reason.trim(), rejectedBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'reject_proposal',
+      details: `Rejected proposal ${proposalId}: ${reason.trim()}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'rejected' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminRejectTransfer failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to reject proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Cancel a pending platform transfer proposal.
+ * Finance (level 6) and above can call, but only the original proposer
+ * or a super_admin can actually cancel.
+ * Updates proposal status from 'proposed' to 'cancelled' (terminal state).
+ *
+ * Ref: Phase 2a agent commit 3/6
+ */
+exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminCancelProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminCancelProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot cancel.`);
+    }
+
+    // Authorization: only the original proposer or a super_admin can cancel
+    if (caller.uid !== proposal.proposedBy.uid && caller.role !== 'super_admin') {
+      throw new functions.https.HttpsError('permission-denied',
+        'Only the original proposer or a super_admin can cancel.');
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'cancelled',
+        cancelledBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancelReason: 'finance_cancel',
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_cancelled',
+      result: 'success',
+      metadata: { proposalId, cancelledBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'cancel_proposal',
+      details: `Cancelled proposal ${proposalId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'cancelled' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminCancelProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to cancel proposal: ' + error.message);
+  }
+});
+
 // ============================================================
 // TRANSACTION MONITORING
 // ============================================================
