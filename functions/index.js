@@ -7480,6 +7480,74 @@ exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) =>
   }
 });
 
+/**
+ * Admin: List platform transfer proposals with optional filters and pagination.
+ * Auditor (level 3) and above can call.
+ * Finance role sees only their own proposals; admin_manager+ and auditor see all.
+ *
+ * Ref: Phase 2a agent commit 5/6
+ */
+exports.adminListTransferProposals = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+
+  const { status: filterStatus, limit: requestedLimit, startAfter } = data || {};
+
+  // Validate inputs
+  const validStatuses = ['proposed', 'approved', 'rejected', 'cancelled', 'expired', 'completed', 'pending_otp'];
+  if (filterStatus && !validStatuses.includes(filterStatus)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `Invalid status filter. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') {
+    limit = Math.min(Math.max(requestedLimit, 1), 200);
+  }
+
+  try {
+    let query = db.collection('platform_transfer_proposals')
+      .orderBy('proposedAt', 'desc')
+      .limit(limit);
+
+    if (filterStatus) {
+      query = query.where('status', '==', filterStatus);
+    }
+
+    // Role-based filtering: finance (level 6 exactly) sees only own proposals
+    const roleHierarchy = { viewer: 1, auditor: 2, support: 3, admin: 4, admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8 };
+    const callerLevel = roleHierarchy[caller.role] || 0;
+    if (caller.role === 'finance' && callerLevel === 6) {
+      query = query.where('proposedBy.uid', '==', caller.uid);
+    }
+
+    // Pagination cursor
+    if (startAfter && typeof startAfter === 'string') {
+      const cursorDoc = await db.collection('platform_transfer_proposals').doc(startAfter).get();
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    }
+
+    const snapshot = await query.get();
+    const proposals = snapshot.docs.map(doc => {
+      const d = doc.data();
+      const { idempotencyKey, approvalIdempotencyKey, ...safeData } = d;
+      return safeData;
+    });
+
+    return {
+      success: true,
+      proposals,
+      count: proposals.length,
+      hasMore: proposals.length === limit,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminListTransferProposals failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to list proposals: ' + error.message);
+  }
+});
+
 // ============================================================
 // TRANSACTION MONITORING
 // ============================================================
