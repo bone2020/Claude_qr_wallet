@@ -19,6 +19,15 @@ const PIN_SECRET_PARAM            = defineSecret('PIN_SECRET');
 const QR_SECRET_PARAM             = defineSecret('QR_SECRET');
 const PAYSTACK_SECRET_KEY_PARAM   = defineSecret('PAYSTACK_SECRET_KEY');
 
+const MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM  = defineSecret('MOMO_COLLECTIONS_SUBSCRIPTION_KEY');
+const MOMO_COLLECTIONS_API_USER_PARAM          = defineSecret('MOMO_COLLECTIONS_API_USER');
+const MOMO_COLLECTIONS_API_KEY_PARAM           = defineSecret('MOMO_COLLECTIONS_API_KEY');
+const MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM = defineSecret('MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY');
+const MOMO_DISBURSEMENTS_API_USER_PARAM        = defineSecret('MOMO_DISBURSEMENTS_API_USER');
+const MOMO_DISBURSEMENTS_API_KEY_PARAM         = defineSecret('MOMO_DISBURSEMENTS_API_KEY');
+const MOMO_WEBHOOK_SECRET_PARAM                = defineSecret('MOMO_WEBHOOK_SECRET_VAL');
+const MOMO_ENVIRONMENT                         = defineString('MOMO_ENVIRONMENT', { default: 'sandbox' });
+
 const admin = require('firebase-admin');
 const https = require('https');
 const crypto = require('crypto');
@@ -8201,22 +8210,25 @@ exports.sendMoney = functions.https.onCall(async (data, context) => {
 
 // MTN MoMo configuration - set via: firebase functions:config:set momo.collections_subscription_key="xxx" etc.
 // IMPORTANT: webhook_secret MUST be configured for production to verify callback authenticity
-const MOMO_WEBHOOK_SECRET = functions.config().momo?.webhook_secret || '';
+// MOMO_WEBHOOK_SECRET wrapper: defer .value() to runtime. Usage stays `MOMO_WEBHOOK_SECRET.value` (no parens).
+const MOMO_WEBHOOK_SECRET = { get value() { return MOMO_WEBHOOK_SECRET_PARAM.value() || ''; } };
 
+// MOMO_CONFIG with getters: defers secret resolution to runtime (required by params API).
+// Usage at call sites stays identical: MOMO_CONFIG.collections.apiKey, MOMO_CONFIG.environment, etc.
 const MOMO_CONFIG = {
   collections: {
-    subscriptionKey: functions.config().momo?.collections_subscription_key || '',
-    apiUser: functions.config().momo?.collections_api_user || '',
-    apiKey: functions.config().momo?.collections_api_key || '',
+    get subscriptionKey() { return MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM.value() || ''; },
+    get apiUser()         { return MOMO_COLLECTIONS_API_USER_PARAM.value() || ''; },
+    get apiKey()          { return MOMO_COLLECTIONS_API_KEY_PARAM.value() || ''; },
   },
   disbursements: {
-    subscriptionKey: functions.config().momo?.disbursements_subscription_key || '',
-    apiUser: functions.config().momo?.disbursements_api_user || '',
-    apiKey: functions.config().momo?.disbursements_api_key || '',
+    get subscriptionKey() { return MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM.value() || ''; },
+    get apiUser()         { return MOMO_DISBURSEMENTS_API_USER_PARAM.value() || ''; },
+    get apiKey()          { return MOMO_DISBURSEMENTS_API_KEY_PARAM.value() || ''; },
   },
   environment: (() => {
-    const momoEnv = functions.config().momo?.environment;
-    const appEnv = functions.config().app?.environment;
+    const momoEnv = MOMO_ENVIRONMENT.value();
+    const appEnv = APP_ENVIRONMENT.value();
 
     if (momoEnv) {
       // Prevent sandbox in production
@@ -8349,7 +8361,9 @@ async function momoRequest(product, method, path, data, referenceId) {
 // MTN MOMO COLLECTIONS - REQUEST TO PAY (Add Money)
 // ============================================================
 
-exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
+exports.momoRequestToPay = functions
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -8454,7 +8468,9 @@ exports.momoRequestToPay = functions.https.onCall(async (data, context) => {
 // MTN MOMO - CHECK TRANSACTION STATUS
 // ============================================================
 
-exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
+exports.momoCheckStatus = functions
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -8629,7 +8645,9 @@ exports.momoCheckStatus = functions.https.onCall(async (data, context) => {
 // MTN MOMO DISBURSEMENTS - TRANSFER (Withdraw)
 // ============================================================
 
-exports.momoTransfer = functions.https.onCall(async (data, context) => {
+exports.momoTransfer = functions
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -8822,7 +8840,9 @@ exports.momoTransfer = functions.https.onCall(async (data, context) => {
 // MTN MOMO - GET BALANCE
 // ============================================================
 
-exports.momoGetBalance = functions.https.onCall(async (data, context) => {
+exports.momoGetBalance = functions
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   // Restricted to admin — exposes platform MoMo balance
   await verifyAdmin(context, 'finance');
 
@@ -8856,7 +8876,9 @@ exports.momoGetBalance = functions.https.onCall(async (data, context) => {
 // MTN MOMO - WEBHOOK (Callback for async notifications)
 // ============================================================
 
-exports.momoWebhook = functions.https.onRequest(async (req, res) => {
+exports.momoWebhook = functions
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
     `webhook_momo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   logSecurityEvent('momo_webhook_received', 'low', { correlationId: webhookCorrelationId, externalId: req.body?.externalId, status: req.body?.status });
