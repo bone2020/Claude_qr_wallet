@@ -713,79 +713,64 @@ function requireConfig(value, name) {
 }
 
 // ============================================================
-// ENVIRONMENT CONFIGURATION ENFORCEMENT
+// ENVIRONMENT CONFIGURATION ENFORCEMENT (Phase 2.0.4 — params-based)
 // ============================================================
+//
+// After the Phase 2.0.x migration, secrets come from Firebase Secrets Manager
+// via defineSecret() params. Values are resolved at runtime (inside CF handlers)
+// — not at module-load time. The old CRITICAL_CONFIGS map that read
+// functions.config() at cold-start has been removed.
+//
+// Each CF that needs a secret is responsible for:
+//   1. Declaring it via runWith({ secrets: [...] })
+//   2. Accessing it via SECRET.value()  (or SECRET.value for our getter wrappers)
+//   3. Optionally calling requireConfig(SECRET.value, 'name') for clear errors
+//
+// requireServiceReady() is preserved for user-facing "service unavailable"
+// messages (e.g., "Mobile Money is coming soon"). It checks params at runtime.
 
 /**
- * Critical configs: Financial and security keys that MUST be set in production.
- * Functions depending on these will fail loudly at call time via requireConfig().
- * Missing critical configs are tracked at cold-start for fast runtime checks.
- */
-const CRITICAL_CONFIGS = {
-  'paystack.secret_key': functions.config().paystack?.secret_key,
-  'qr.secret': functions.config().qr?.secret,
-  'momo.collections_subscription_key': functions.config().momo?.collections_subscription_key,
-  'momo.collections_api_user': functions.config().momo?.collections_api_user,
-  'momo.collections_api_key': functions.config().momo?.collections_api_key,
-  'momo.disbursements_subscription_key': functions.config().momo?.disbursements_subscription_key,
-  'momo.disbursements_api_user': functions.config().momo?.disbursements_api_user,
-  'momo.disbursements_api_key': functions.config().momo?.disbursements_api_key,
-  'momo.webhook_secret': functions.config().momo?.webhook_secret,
-};
-
-/**
- * Service-to-config mapping: which configs each service needs.
- * Used by requireServiceReady() to validate all configs for a service at once.
- */
-const SERVICE_CONFIGS = {
-  paystack: ['paystack.secret_key'],
-  qr: ['qr.secret'],
-  momo_collections: ['momo.collections_subscription_key', 'momo.collections_api_user', 'momo.collections_api_key'],
-  momo_disbursements: ['momo.disbursements_subscription_key', 'momo.disbursements_api_user', 'momo.disbursements_api_key'],
-  momo_webhook: ['momo.webhook_secret'],
-};
-
-/** Set of config keys known to be missing at cold-start */
-const MISSING_CRITICAL_CONFIGS = new Set();
-
-// Validate all configs at cold-start and log appropriately
-(function enforceEnvironmentConfig() {
-  const missingCritical = [];
-
-  for (const [key, value] of Object.entries(CRITICAL_CONFIGS)) {
-    if (!value) {
-      missingCritical.push(key);
-      MISSING_CRITICAL_CONFIGS.add(key);
-    }
-  }
-
-  if (missingCritical.length > 0) {
-    logError('CRITICAL CONFIG MISSING', { count: missingCritical.length, keys: missingCritical.join(', '), action: 'Set via: firebase functions:config:set KEY="value". Functions depending on these keys will fail at call time.' });
-  } else {
-    logInfo('All critical environment configs present');
-  }
-})();
-
-/**
- * Validates that all required configs for a service are present.
- * Uses the cold-start MISSING_CRITICAL_CONFIGS set for O(1) lookup.
- * Throws a clear HttpsError listing exactly which keys are missing.
+ * Validates that all required configs for a service are present at RUNTIME.
+ * Reads secret values via the params API.
  *
- * @param {string} serviceName - Service name from SERVICE_CONFIGS (e.g., 'paystack', 'momo_collections')
+ * @param {string} serviceName - Service name (e.g., 'paystack', 'momo_collections')
  * @throws {HttpsError} failed-precondition if any required config is missing
  */
 function requireServiceReady(serviceName) {
-  const requiredKeys = SERVICE_CONFIGS[serviceName];
-  if (!requiredKeys) return; // Unknown service, skip check
+  let allPresent = true;
 
-  const missing = requiredKeys.filter(key => MISSING_CRITICAL_CONFIGS.has(key));
-  if (missing.length > 0) {
-    // Provide user-friendly messages based on service type
+  switch (serviceName) {
+    case 'paystack':
+      allPresent = !!PAYSTACK_SECRET_KEY.value;
+      break;
+    case 'qr':
+      allPresent = !!QR_SECRET_KEY.value;
+      break;
+    case 'momo_collections':
+      allPresent =
+        !!MOMO_CONFIG.collections.subscriptionKey &&
+        !!MOMO_CONFIG.collections.apiUser &&
+        !!MOMO_CONFIG.collections.apiKey;
+      break;
+    case 'momo_disbursements':
+      allPresent =
+        !!MOMO_CONFIG.disbursements.subscriptionKey &&
+        !!MOMO_CONFIG.disbursements.apiUser &&
+        !!MOMO_CONFIG.disbursements.apiKey;
+      break;
+    case 'momo_webhook':
+      allPresent = !!MOMO_WEBHOOK_SECRET.value;
+      break;
+    default:
+      return; // Unknown service, skip check
+  }
+
+  if (!allPresent) {
     let userMessage;
     if (serviceName.startsWith('momo')) {
       userMessage = 'Mobile Money is coming soon! This feature is not yet available in your region.';
     } else {
-      userMessage = `Service temporarily unavailable. Please try again later or use a different payment method.`;
+      userMessage = 'Service temporarily unavailable. Please try again later or use a different payment method.';
     }
     throwAppError(ERROR_CODES.CONFIG_MISSING, userMessage);
   }
@@ -1211,7 +1196,7 @@ exports.paystackWebhook = functions
   logSecurityEvent('paystack_webhook_received', 'low', { correlationId: webhookCorrelationId, event: req.body?.event });
 
   // Fail fast if Paystack secret key is not configured
-  if (MISSING_CRITICAL_CONFIGS.has('paystack.secret_key')) {
+  if (!PAYSTACK_SECRET_KEY.value) {
     logSecurityEvent('paystack_webhook_not_configured', 'high', { correlationId: webhookCorrelationId });
     return res.status(503).send('Service not configured');
   }
@@ -7497,7 +7482,7 @@ const SMILE_ID_PARTNER_ID = { get value() { return SMILE_ID_PARTNER_ID_PARAM.val
  * Set via: firebase functions:config:set smileid.environment="production"
  * Fails secure: production deployment requires explicit config.
  */
-const SMILE_ID_BASE_URL = (() => {
+function computeSmileIdBaseUrl() {
   const smileEnv = SMILE_ID_ENVIRONMENT.value();
   const appEnv = APP_ENVIRONMENT.value();
 
@@ -7516,7 +7501,8 @@ const SMILE_ID_BASE_URL = (() => {
     // Default to sandbox for development
     return 'testapi.smileidentity.com';
   }
-})();
+}
+const SMILE_ID_BASE_URL = { get value() { return computeSmileIdBaseUrl(); } };
 
 // Helper: Generate Smile ID signature
 function generateSmileIdSignature(timestamp) {
@@ -7533,7 +7519,7 @@ function smileIdRequest(method, path, data = null) {
     const signature = generateSmileIdSignature(timestamp);
 
     const options = {
-      hostname: SMILE_ID_BASE_URL,
+      hostname: SMILE_ID_BASE_URL.value,
       port: 443,
       path: path,
       method: method,
@@ -9678,7 +9664,7 @@ exports.submitBiometricKycVerification = functions
 
   const jobId = `job_${SMILE_ID_PARTNER_ID}_${crypto.randomUUID()}`;
   const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
-  const sidServer = SMILE_ID_BASE_URL.includes('testapi') ? 0 : 1;
+  const sidServer = SMILE_ID_BASE_URL.value.includes('testapi') ? 0 : 1;
 
   // Track temp files for cleanup in finally block
   const tempFiles = [];
