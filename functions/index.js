@@ -7002,6 +7002,141 @@ async function cancelTransfer(withdrawalRef, wd, reference, caller, callerEmail,
 }
 
 // ============================================================
+// DUAL-SIG PLATFORM TRANSFER PROPOSALS (Phase 2a)
+// ============================================================
+
+/**
+ * Admin: Approve a pending platform transfer proposal.
+ * Only admin_manager (level 7) and above can approve.
+ * Updates proposal status from 'proposed' to 'approved'.
+ * Does NOT execute Paystack transfer — that happens in a separate step.
+ *
+ * Ref: Phase 2a agent commit 2/6
+ */
+exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const { proposalId, idempotencyKey, approvalNote } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminApproveTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminApproveTransfer.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot approve.`);
+    }
+
+    const now = Date.now();
+    const expiresAtMs = proposal.expiresAt && proposal.expiresAt.toMillis ? proposal.expiresAt.toMillis() : 0;
+    if (expiresAtMs <= now) {
+      throw new functions.https.HttpsError('failed-precondition', 'Proposal has expired. Ask finance to re-submit.');
+    }
+
+    // Manager daily cap check
+    const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+    const managerDailyUSD = limitsDoc.exists ? (limitsDoc.data().managerDailyUSD || 100000) : 100000;
+
+    const startOfTodayUTC = new Date();
+    startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+    const startOfTodayTimestamp = admin.firestore.Timestamp.fromDate(startOfTodayUTC);
+
+    const todayApprovalsSnap = await db.collection('platform_transfer_proposals')
+      .where('approvedBy.uid', '==', caller.uid)
+      .where('approvedAt', '>=', startOfTodayTimestamp)
+      .get();
+
+    const dailyApprovedUSD = todayApprovalsSnap.docs.reduce((sum, doc) => {
+      return sum + (doc.data().usdEquivalent || 0);
+    }, 0);
+
+    if (dailyApprovedUSD + (proposal.usdEquivalent || 0) > managerDailyUSD) {
+      const headroom = managerDailyUSD - dailyApprovedUSD;
+      throw new functions.https.HttpsError('resource-exhausted',
+        `Approval would exceed your daily cap. ` +
+        `Approved today: $${dailyApprovedUSD.toFixed(2)} USD. ` +
+        `This proposal: $${(proposal.usdEquivalent || 0).toFixed(2)} USD. ` +
+        `Daily cap: $${managerDailyUSD.toFixed(2)} USD. ` +
+        `Available headroom: $${headroom.toFixed(2)} USD.`);
+    }
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'approved',
+        approvedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        approvalIdempotencyKey: idempotencyKey,
+        approvalNote: approvalNote || null,
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_approved',
+      result: 'success',
+      amount: proposal.amount,
+      currency: proposal.currency,
+      metadata: { proposalId, approvedBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'approve_proposal',
+      details: `Approved proposal ${proposalId} for ${proposal.amount} ${proposal.currency}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'approved' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminApproveTransfer failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to approve proposal: ' + error.message);
+  }
+});
+
+// ============================================================
 // TRANSACTION MONITORING
 // ============================================================
 
