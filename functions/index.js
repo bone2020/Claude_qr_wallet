@@ -11971,3 +11971,131 @@ exports.businessWalletRefundTransaction = functions.https.onCall(async (data, co
     amount: amount,
   };
 });
+
+// ============================================================
+// SCHEDULED: PLATFORM TRANSFER PROPOSAL AUTO-EXPIRY (Phase 2a)
+// ============================================================
+
+/**
+ * Scheduled: Auto-expire proposals that have passed their expiresAt window.
+ * Runs every 1 minute. Transitions status from 'proposed' to 'expired'.
+ *
+ * Ref: Phase 2a agent commit 6/6
+ */
+exports.autoExpireProposals = functions.pubsub
+  .schedule('every 1 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    const expiredSnap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'proposed')
+      .where('expiresAt', '<', now)
+      .limit(100)
+      .get();
+
+    if (expiredSnap.empty) {
+      return null;
+    }
+
+    let expiredCount = 0;
+    const batch = db.batch();
+
+    for (const doc of expiredSnap.docs) {
+      try {
+        batch.update(doc.ref, {
+          status: 'expired',
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelReason: 'expired',
+        });
+        expiredCount++;
+      } catch (error) {
+        logError('autoExpireProposals: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    if (expiredCount > 0) {
+      await batch.commit();
+
+      // Write audit log entries for each expiration
+      const auditBatch = db.batch();
+      for (const doc of expiredSnap.docs) {
+        const auditRef = db.collection('audit_logs').doc();
+        auditBatch.set(auditRef, {
+          userId: 'system',
+          operation: 'proposal_expired',
+          result: 'success',
+          metadata: { proposalId: doc.id, amount: doc.data().amount, currency: doc.data().currency },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      await auditBatch.commit();
+    }
+
+    logInfo('autoExpireProposals completed', { expiredCount });
+    return null;
+  });
+
+/**
+ * Scheduled: Auto-cancel proposals stuck in pending_otp past their otpExpiresAt.
+ * Runs every 1 minute. Transitions status from 'pending_otp' to 'cancelled'.
+ *
+ * NOTE: This commit only handles the doc-state update. It does NOT do Paystack
+ * balance refunds — those happen in the human-pair commit that modifies
+ * adminFinalizeTransfer.
+ *
+ * Ref: Phase 2a agent commit 6/6
+ */
+exports.autoExpireOtpTransfers = functions.pubsub
+  .schedule('every 1 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    const expiredOtpSnap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'pending_otp')
+      .where('otpExpiresAt', '<', now)
+      .limit(100)
+      .get();
+
+    if (expiredOtpSnap.empty) {
+      return null;
+    }
+
+    let cancelledCount = 0;
+
+    for (const doc of expiredOtpSnap.docs) {
+      try {
+        await doc.ref.update({
+          status: 'cancelled',
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelReason: 'auto_cancelled_otp_timeout',
+        });
+
+        // TODO(Phase 2a human-pair commit 7): refund platform balance here.
+        // For now, balance remains deducted. Manual reconciliation required.
+
+        // Audit log
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'otp_transfer_expired',
+          result: 'success',
+          metadata: { proposalId: doc.id, reason: 'auto_cancelled_otp_timeout' },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        cancelledCount++;
+      } catch (error) {
+        logError('autoExpireOtpTransfers: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('autoExpireOtpTransfers completed', { cancelledCount });
+    return null;
+  });
