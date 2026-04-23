@@ -1,4 +1,21 @@
 const functions = require('firebase-functions');
+const { defineSecret, defineString } = require('firebase-functions/params');
+
+// ============================================================
+// PARAMS (Phase 2.0.2 migration — non-critical configs)
+// ============================================================
+// Secrets — encrypted, stored in Firebase Secrets Manager
+const AT_API_KEY                 = defineSecret('AT_API_KEY');
+const SMILE_ID_API_KEY_PARAM     = defineSecret('SMILE_ID_API_KEY');
+const ADMIN_EXCHANGE_RATE_SECRET = defineSecret('ADMIN_EXCHANGE_RATE_SECRET');
+
+// Non-secret params (plaintext strings)
+const AT_USERNAME                = defineString('AT_USERNAME', { default: 'sandbox' });
+const AT_ENVIRONMENT             = defineString('AT_ENVIRONMENT', { default: 'sandbox' });
+const SMILE_ID_PARTNER_ID_PARAM  = defineString('SMILE_ID_PARTNER_ID', { default: '8244' });
+const SMILE_ID_ENVIRONMENT       = defineString('SMILE_ID_ENVIRONMENT', { default: 'sandbox' });
+const APP_ENVIRONMENT            = defineString('APP_ENVIRONMENT', { default: 'sandbox' });
+
 const admin = require('firebase-admin');
 const https = require('https');
 const crypto = require('crypto');
@@ -893,7 +910,9 @@ exports.updateExchangeRatesDaily = functions.pubsub
   });
 
 // HTTP function - manual trigger (Admin-Only, Signature-Protected)
-exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
+exports.updateExchangeRatesNow = functions
+  .runWith({ secrets: [ADMIN_EXCHANGE_RATE_SECRET] })
+  .https.onRequest(async (req, res) => {
   // Only allow POST requests
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -901,7 +920,7 @@ exports.updateExchangeRatesNow = functions.https.onRequest(async (req, res) => {
   }
 
   // Validate admin secret is configured
-  const adminSecret = functions.config().admin?.exchange_rate_secret;
+  const adminSecret = ADMIN_EXCHANGE_RATE_SECRET.value();
   if (!adminSecret) {
     logError('Exchange rate endpoint called but admin secret not configured');
     res.status(503).json({ error: 'Service not configured' });
@@ -5711,7 +5730,9 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
 /**
  * Admin send recovery OTP to a user's phone number.
  */
-exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
+exports.adminSendRecoveryOTP = functions
+  .runWith({ secrets: [AT_API_KEY] })
+  .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid } = data;
@@ -5748,8 +5769,8 @@ exports.adminSendRecoveryOTP = functions.https.onCall(async (data, context) => {
   // Send SMS via Africa's Talking
   try {
     const atCredentials = {
-      apiKey: functions.config().africastalking?.api_key,
-      username: functions.config().africastalking?.username || 'sandbox',
+      apiKey: AT_API_KEY.value(),
+      username: AT_USERNAME.value() || 'sandbox',
     };
     const AfricasTalking = require('africastalking')(atCredentials);
     const sms = AfricasTalking.SMS;
@@ -7413,8 +7434,10 @@ exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
 // SMILE ID PHONE VERIFICATION
 // ============================================================
 
-const SMILE_ID_API_KEY = functions.config().smileid?.api_key || '';
-const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
+// Getter wrappers defer .value() to runtime (required by SDK 5.x params API).
+// Note: usage sites read .value; NOT .value() — the getter evaluates on access.
+const SMILE_ID_API_KEY = { get value() { return SMILE_ID_API_KEY_PARAM.value() || ''; } };
+const SMILE_ID_PARTNER_ID = { get value() { return SMILE_ID_PARTNER_ID_PARAM.value() || '8244'; } };
 
 /**
  * Smile ID API base URL — environment-aware.
@@ -7422,8 +7445,8 @@ const SMILE_ID_PARTNER_ID = functions.config().smileid?.partner_id || '8244';
  * Fails secure: production deployment requires explicit config.
  */
 const SMILE_ID_BASE_URL = (() => {
-  const smileEnv = functions.config().smileid?.environment;
-  const appEnv = functions.config().app?.environment;
+  const smileEnv = SMILE_ID_ENVIRONMENT.value();
+  const appEnv = APP_ENVIRONMENT.value();
 
   if (smileEnv === 'production') {
     return 'api.smileidentity.com';
@@ -7500,7 +7523,9 @@ function smileIdRequest(method, path, data = null) {
 }
 
 // Verify phone number belongs to ID holder
-exports.verifyPhoneNumber = functions.https.onCall(async (data, context) => {
+exports.verifyPhoneNumber = functions
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -8977,7 +9002,9 @@ exports.momoWebhook = functions.https.onRequest(async (req, res) => {
 // ============================================================
 // SMILE ID WEBHOOK — Receives verification results from Smile ID
 // ============================================================
-exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
+exports.smileIdWebhook = functions
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .https.onRequest(async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed');
     return;
@@ -9318,7 +9345,9 @@ exports.smileIdWebhook = functions.https.onRequest(async (req, res) => {
 // ============================================================
 // SmileID Job Status Polling
 // ============================================================
-exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => {
+exports.checkSmileIdJobStatus = functions
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -9528,7 +9557,9 @@ exports.checkSmileIdJobStatus = functions.https.onCall(async (data, context) => 
 // Used when SmartSelfie enrollment is done on-device and we need
 // to submit ID number verification against government database
 // ============================================================
-exports.submitBiometricKycVerification = functions.https.onCall(async (data, context) => {
+exports.submitBiometricKycVerification = functions
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   // Lazy requires — keeps all changes localized to this function
   const SmileIdentityCore = require('smile-identity-core');
   const SmileWebApi = SmileIdentityCore.WebApi;
