@@ -16,7 +16,7 @@
     "africastalking": "^0.7.9",
     "archiver": "^7.0.1",
     "firebase-admin": "^11.11.1",
-    "firebase-functions": "^4.5.0",
+    "firebase-functions": "^5.1.0",
     "node-fetch": "^2.7.0",
     "smile-identity-core": "^3.1.0"
   },
