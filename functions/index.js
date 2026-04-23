@@ -15,6 +15,7 @@ const AT_ENVIRONMENT             = defineString('AT_ENVIRONMENT', { default: 'sa
 const SMILE_ID_PARTNER_ID_PARAM  = defineString('SMILE_ID_PARTNER_ID', { default: '8244' });
 const SMILE_ID_ENVIRONMENT       = defineString('SMILE_ID_ENVIRONMENT', { default: 'sandbox' });
 const APP_ENVIRONMENT            = defineString('APP_ENVIRONMENT', { default: 'sandbox' });
+const PIN_SECRET_PARAM            = defineSecret('PIN_SECRET');
 
 const admin = require('firebase-admin');
 const https = require('https');
@@ -2194,7 +2195,8 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
 // REQUIRED: Must be configured. QR signing will fail if missing.
 const QR_SECRET_KEY = functions.config().qr?.secret || '';
-const PIN_SECRET = process.env.PIN_SECRET || '';
+// PIN_SECRET wrapper: defer .value() to runtime. Usage stays `PIN_SECRET.value` (no parens).
+const PIN_SECRET = { get value() { return PIN_SECRET_PARAM.value() || ''; } };
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // Helper: Generate HMAC signature
@@ -3986,7 +3988,9 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
  * User must re-authenticate via email/password or phone OTP on the client,
  * then call this function with the new PIN hash.
  */
-exports.resetPin = functions.https.onCall(async (data, context) => {
+exports.resetPin = functions
+  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -4083,8 +4087,8 @@ exports.resetPin = functions.https.onCall(async (data, context) => {
 // ============================================================
 
 function hashPinServer(clientHash, salt) {
-  requireConfig(PIN_SECRET, 'pin.secret');
-  return crypto.createHmac('sha256', salt + PIN_SECRET)
+  requireConfig(PIN_SECRET.value, 'pin.secret');
+  return crypto.createHmac('sha256', salt + PIN_SECRET.value)
     .update(clientHash)
     .digest('hex');
 }
@@ -4098,7 +4102,9 @@ function verifyPinServer(clientHash, storedHash, salt) {
 // CHANGE PIN
 // ============================================================
 
-exports.changePin = functions.https.onCall(async (data, context) => {
+exports.changePin = functions
+  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -4161,7 +4167,9 @@ exports.changePin = functions.https.onCall(async (data, context) => {
 
 
 
-exports.blockAccount = functions.https.onCall(async (data, context) => {
+exports.blockAccount = functions
+  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -4214,7 +4222,9 @@ const userData = userDoc.data();
  * Requires PIN verification.
  * Only allows unblock if the account was blocked by the user (not admin).
  */
-exports.unblockAccount = functions.https.onCall(async (data, context) => {
+exports.unblockAccount = functions
+  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
