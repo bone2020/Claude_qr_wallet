@@ -238,5 +238,16 @@ service cloud.firestore {
         && resource.data.ownerUsers[request.auth.uid] != null;
       allow write: if false;
     }
+
+    // platform_transfer_proposals — Cloud Functions only.
+    // Dual-signature workflow for platform transfers: finance proposes, admin_manager
+    // approves, super_admin enters Paystack OTP. Written only by:
+    //   adminProposeTransfer, adminApproveTransfer, adminRejectTransfer,
+    //   adminCancelProposal, adminEmergencyTransfer, adminFinalizeTransfer,
+    //   autoExpireProposals, autoExpireOtpTransfers
+    // Read via adminListTransferProposals. Clients never access directly.
+    match /platform_transfer_proposals/{proposalId} {
+      allow read, write: if false;
+    }
   }
 }
