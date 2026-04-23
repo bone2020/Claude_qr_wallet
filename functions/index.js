@@ -16,6 +16,7 @@ const SMILE_ID_PARTNER_ID_PARAM  = defineString('SMILE_ID_PARTNER_ID', { default
 const SMILE_ID_ENVIRONMENT       = defineString('SMILE_ID_ENVIRONMENT', { default: 'sandbox' });
 const APP_ENVIRONMENT            = defineString('APP_ENVIRONMENT', { default: 'sandbox' });
 const PIN_SECRET_PARAM            = defineSecret('PIN_SECRET');
+const QR_SECRET_PARAM             = defineSecret('QR_SECRET');
 
 const admin = require('firebase-admin');
 const https = require('https');
@@ -2194,15 +2195,16 @@ exports.initializeTransaction = functions.https.onCall(async (data, context) => 
 
 // Secret key for signing QR codes (set via: firebase functions:config:set qr.secret="your-secret-key")
 // REQUIRED: Must be configured. QR signing will fail if missing.
-const QR_SECRET_KEY = functions.config().qr?.secret || '';
+// QR_SECRET_KEY wrapper: defer .value() to runtime. Usage stays `QR_SECRET_KEY.value` (no parens).
+const QR_SECRET_KEY = { get value() { return QR_SECRET_PARAM.value() || ''; } };
 // PIN_SECRET wrapper: defer .value() to runtime. Usage stays `PIN_SECRET.value` (no parens).
 const PIN_SECRET = { get value() { return PIN_SECRET_PARAM.value() || ''; } };
 const QR_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
 
 // Helper: Generate HMAC signature
 function generateQrSignature(payload) {
-  requireConfig(QR_SECRET_KEY, 'qr.secret');
-  return crypto.createHmac('sha256', QR_SECRET_KEY)
+  requireConfig(QR_SECRET_KEY.value, 'qr.secret');
+  return crypto.createHmac('sha256', QR_SECRET_KEY.value)
     .update(payload)
     .digest('hex');
 }
@@ -3679,7 +3681,9 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
 // ============================================================
 
 // Sign QR payload for payment requests (with nonce for replay protection)
-exports.signQrPayload = functions.https.onCall(async (data, context) => {
+exports.signQrPayload = functions
+  .runWith({ secrets: [QR_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3753,7 +3757,9 @@ exports.signQrPayload = functions.https.onCall(async (data, context) => {
 });
 
 // Verify QR signature before processing payment (with nonce replay protection)
-exports.verifyQrSignature = functions.https.onCall(async (data, context) => {
+exports.verifyQrSignature = functions
+  .runWith({ secrets: [QR_SECRET_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
