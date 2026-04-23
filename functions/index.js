@@ -17,6 +17,7 @@ const SMILE_ID_ENVIRONMENT       = defineString('SMILE_ID_ENVIRONMENT', { defaul
 const APP_ENVIRONMENT            = defineString('APP_ENVIRONMENT', { default: 'sandbox' });
 const PIN_SECRET_PARAM            = defineSecret('PIN_SECRET');
 const QR_SECRET_PARAM             = defineSecret('QR_SECRET');
+const PAYSTACK_SECRET_KEY_PARAM   = defineSecret('PAYSTACK_SECRET_KEY');
 
 const admin = require('firebase-admin');
 const https = require('https');
@@ -787,14 +788,15 @@ function requireServiceReady(serviceName) {
 
 // Paystack configuration - set via: firebase functions:config:set paystack.secret_key="sk_live_xxx"
 // REQUIRED: Must be configured. Functions will fail with clear errors if missing.
-const PAYSTACK_SECRET_KEY = functions.config().paystack?.secret_key || '';
+// PAYSTACK_SECRET_KEY wrapper: defer .value() to runtime. Usage stays `PAYSTACK_SECRET_KEY.value` (no parens).
+const PAYSTACK_SECRET_KEY = { get value() { return PAYSTACK_SECRET_KEY_PARAM.value() || ''; } };
 const PAYSTACK_BASE_URL = 'api.paystack.co';
 
 // Helper function for Paystack API calls
 const HTTP_TIMEOUT_MS = 15000; // 15 seconds for all external API calls
 
 function paystackRequest(method, path, data = null) {
-  requireConfig(PAYSTACK_SECRET_KEY, 'paystack.secret_key');
+  requireConfig(PAYSTACK_SECRET_KEY.value, 'paystack.secret_key');
   return new Promise((resolve, reject) => {
     const options = {
       hostname: PAYSTACK_BASE_URL,
@@ -802,7 +804,7 @@ function paystackRequest(method, path, data = null) {
       path: path,
       method: method,
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY.value}`,
         'Content-Type': 'application/json',
       },
       timeout: HTTP_TIMEOUT_MS,
@@ -1020,7 +1022,9 @@ exports.updateExchangeRatesNow = functions
 // ============================================================
 
 // Verify Paystack payment and credit wallet
-exports.verifyPayment = functions.https.onCall(async (data, context) => {
+exports.verifyPayment = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   // Check authentication
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -1190,7 +1194,9 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
 });
 
 // Handle Paystack webhook events
-exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
+exports.paystackWebhook = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onRequest(async (req, res) => {
   const webhookCorrelationId = req.headers['x-correlation-id'] ||
     `webhook_paystack_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   logSecurityEvent('paystack_webhook_received', 'low', { correlationId: webhookCorrelationId, event: req.body?.event });
@@ -1203,7 +1209,7 @@ exports.paystackWebhook = functions.https.onRequest(async (req, res) => {
 
   // Verify webhook signature
   const hash = crypto
-    .createHmac('sha512', PAYSTACK_SECRET_KEY)
+    .createHmac('sha512', PAYSTACK_SECRET_KEY.value)
     .update(JSON.stringify(req.body))
     .digest('hex');
 
@@ -1491,7 +1497,9 @@ async function handleFailedTransfer(data) {
 }
 
 // Initiate withdrawal to bank or mobile money
-exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
+exports.initiateWithdrawal = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -1726,7 +1734,9 @@ exports.initiateWithdrawal = functions.https.onCall(async (data, context) => {
 });
 
 // Finalize transfer with OTP
-exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
+exports.finalizeTransfer = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -1798,7 +1808,9 @@ exports.finalizeTransfer = functions.https.onCall(async (data, context) => {
 });
 
 // Get list of banks
-exports.getBanks = functions.https.onCall(async (data, context) => {
+exports.getBanks = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -1827,7 +1839,9 @@ exports.getBanks = functions.https.onCall(async (data, context) => {
 });
 
 // Verify bank account
-exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
+exports.verifyBankAccount = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -1862,7 +1876,9 @@ exports.verifyBankAccount = functions.https.onCall(async (data, context) => {
 // ============================================================
 // MOBILE MONEY CHARGE (For adding funds via Mobile Money)
 // ============================================================
-exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
+exports.chargeMobileMoney = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -2010,7 +2026,9 @@ exports.chargeMobileMoney = functions.https.onCall(async (data, context) => {
 // ============================================================
 // VIRTUAL ACCOUNT (For Bank Transfer deposits)
 // ============================================================
-exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context) => {
+exports.getOrCreateVirtualAccount = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -2109,7 +2127,9 @@ exports.getOrCreateVirtualAccount = functions.https.onCall(async (data, context)
 // ============================================================
 // INITIALIZE TRANSACTION (For Card Payment via Browser)
 // ============================================================
-exports.initializeTransaction = functions.https.onCall(async (data, context) => {
+exports.initializeTransaction = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -6366,7 +6386,9 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
 /**
  * Admin: Get list of banks for a country (reuses Paystack API).
  */
-exports.adminGetBanks = functions.https.onCall(async (data, context) => {
+exports.adminGetBanks = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
   const country = data.country || 'nigeria';
@@ -6395,7 +6417,9 @@ exports.adminGetBanks = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Verify a bank account via Paystack.
  */
-exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) => {
+exports.adminVerifyBankAccount = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
   const { accountNumber, bankCode } = data;
@@ -6424,7 +6448,9 @@ exports.adminVerifyBankAccount = functions.https.onCall(async (data, context) =>
  * Admin: Initiate a real bank transfer from platform wallet via Paystack.
  * Only super_admin can initiate transfers.
  */
-exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => {
+exports.adminInitiateTransfer = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
   const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
@@ -6714,7 +6740,9 @@ exports.adminInitiateTransfer = functions.https.onCall(async (data, context) => 
  *
  * Ref: L-35, Q-05, D-06, D-07
  */
-exports.adminFinalizeTransfer = functions.https.onCall(async (data, context) => {
+exports.adminFinalizeTransfer = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
   const { action, reference, transferCode, otp, idempotencyKey } = data;
@@ -11034,7 +11062,9 @@ exports.businessWalletGetCountryBreakdown = functions.https.onCall(async (data, 
  * Initiates a Paystack bank transfer from the business wallet.
  * Auth: super_admin on the business wallet only.
  */
-exports.businessWalletWithdraw = functions.https.onCall(async (data, context) => {
+exports.businessWalletWithdraw = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -11074,7 +11104,7 @@ exports.businessWalletWithdraw = functions.https.onCall(async (data, context) =>
   }
 
   // Create Paystack transfer recipient
-  const paystackSecretKey = functions.config().paystack?.secret_key;
+  const paystackSecretKey = PAYSTACK_SECRET_KEY.value;
   if (!paystackSecretKey) {
     throwAppError(ERROR_CODES.CONFIG_MISSING, 'Paystack is not configured.');
   }
