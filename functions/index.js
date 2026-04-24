@@ -8019,6 +8019,112 @@ exports.adminEditProposal = functions.https.onCall(async (data, context) => {
   }
 });
 
+/**
+ * Admin: Close a completed proposal after evidence is uploaded.
+ * Finance user (proposer) or super_admin can close.
+ * Unblocks finance user if they had overdue evidence.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, idempotencyKey } = data || {};
+
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminCloseProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminCloseProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+    const allowedStatuses = ['completed', 'evidence_pending', 'evidence_overdue'];
+    if (!allowedStatuses.includes(proposal.status)) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal status is '${proposal.status}'. Must be one of: ${allowedStatuses.join(', ')}.`);
+    }
+
+    if (caller.uid !== proposal.proposedBy.uid && caller.role !== 'super_admin') {
+      throw new functions.https.HttpsError('permission-denied',
+        'Only the original proposer or a super_admin can close this proposal.');
+    }
+
+    // TODO(Phase 2b commit 4 human-pair): verify proposal.documents.receipt exists
+    // and proposal.documents.evidence.length >= 1 before allowing closure.
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || !allowedStatuses.includes(freshSnap.data().status)) {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'closed',
+        closedAt: admin.firestore.FieldValue.serverTimestamp(),
+        closedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        evidenceUploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Finance unblock: check if proposer still has other overdue proposals
+    const stillOverdue = await db.collection('platform_transfer_proposals')
+      .where('proposedBy.uid', '==', proposal.proposedBy.uid)
+      .where('status', '==', 'evidence_overdue')
+      .limit(1)
+      .get();
+    if (stillOverdue.empty) {
+      await db.collection('blocked_finance_users').doc(proposal.proposedBy.uid).delete();
+    }
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_closed',
+      result: 'success',
+      metadata: { proposalId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'close_proposal',
+      details: `Closed proposal ${proposalId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'closed' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminCloseProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to close proposal: ' + error.message);
+  }
+});
+
 exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
@@ -12899,5 +13005,131 @@ exports.processSmsQueue = functions.pubsub
     }
 
     logInfo('processSmsQueue completed', { attempted, succeeded, failedPermanently });
+    return null;
+  });
+
+// ============================================================
+// EVIDENCE LIFECYCLE SCHEDULERS (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Mark completed proposals as evidence_overdue after 7 days
+ * without evidence upload.
+ * Runs every 60 minutes.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.markEvidenceOverdueScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const snap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'completed')
+      .where('completedAt', '<', sevenDaysAgo)
+      .limit(100)
+      .get();
+
+    let overdueCount = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      if (d.evidenceUploadedAt) continue;
+
+      try {
+        await doc.ref.update({
+          status: 'evidence_overdue',
+          evidenceOverdueAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // TODO(commit 9): email proposer + manager when proposal is marked overdue.
+
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'proposal_evidence_overdue',
+          result: 'success',
+          metadata: { proposalId: doc.id },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        overdueCount++;
+      } catch (error) {
+        logError('markEvidenceOverdueScheduled: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('markEvidenceOverdueScheduled completed', { overdueCount });
+    return null;
+  });
+
+/**
+ * Scheduled: Block finance users with proposals overdue for 21+ days.
+ * Runs every 60 minutes.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.markFinanceBlockedScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const twentyOneDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 21 * 24 * 60 * 60 * 1000);
+
+    const snap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'evidence_overdue')
+      .where('completedAt', '<', twentyOneDaysAgo)
+      .limit(100)
+      .get();
+
+    let blockedCount = 0;
+
+    for (const doc of snap.docs) {
+      const proposal = doc.data();
+      if (proposal.financeBlockedAt) continue;
+
+      try {
+        await doc.ref.update({
+          financeBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const blockedRef = db.collection('blocked_finance_users').doc(proposal.proposedBy.uid);
+        const blockedDoc = await blockedRef.get();
+        if (blockedDoc.exists) {
+          await blockedRef.update({
+            openOverdueProposals: admin.firestore.FieldValue.arrayUnion(proposal.proposalId),
+          });
+        } else {
+          await blockedRef.set({
+            uid: proposal.proposedBy.uid,
+            email: proposal.proposedBy.email,
+            blockedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reason: 'overdue_evidence',
+            openOverdueProposals: [proposal.proposalId],
+          });
+        }
+
+        // TODO(commit 9): email proposer about being blocked.
+
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'finance_user_blocked',
+          result: 'success',
+          metadata: { proposalId: doc.id, blockedUid: proposal.proposedBy.uid },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        blockedCount++;
+      } catch (error) {
+        logError('markFinanceBlockedScheduled: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('markFinanceBlockedScheduled completed', { blockedCount });
     return null;
   });
