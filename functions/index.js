@@ -7218,7 +7218,9 @@ async function cancelTransfer(withdrawalRef, wd, reference, caller, callerEmail,
  *
  * Ref: Phase 2a agent commit 2/6
  */
-exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
+exports.adminApproveTransfer = functions
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
   const { proposalId, idempotencyKey, approvalNote } = data || {};
@@ -7312,6 +7314,195 @@ exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
       });
     });
 
+    // ========================================================
+    // Paystack execution (copied from adminInitiateTransfer)
+    // ========================================================
+    // Use the proposalId as the Paystack reference (same as the withdrawal doc ID).
+    // adminFinalizeTransfer reads from wallets/platform/withdrawals/{reference} so
+    // we must keep the withdrawal doc schema identical to adminInitiateTransfer.
+
+    const amount = proposal.amount;
+    const currency = proposal.currency;
+    const bankCode = proposal.bankCode;
+    const accountNumber = proposal.accountNumber;
+    const accountName = proposal.accountName;
+    const purpose = proposal.purpose;
+    const notes = proposal.notes;
+    const exchangeRate = proposal.exchangeRate;
+    const amountInUSD = proposal.usdEquivalent;
+    const reference = proposalId;
+
+    // Verify sufficient platform balance
+    const balanceDoc = await db.collection('wallets').doc('platform')
+      .collection('balances').doc(currency).get();
+
+    if (!balanceDoc.exists) {
+      throw new functions.https.HttpsError('failed-precondition', `No balance found for ${currency}.`);
+    }
+
+    const currentBalance = balanceDoc.data().amount || 0;
+    if (currentBalance < amount) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+    }
+
+    // Step 1: Create transfer recipient on Paystack
+    const recipientResponse = await paystackRequest('POST', '/transferrecipient', {
+      type: 'nuban',
+      name: accountName,
+      account_number: accountNumber,
+      bank_code: bankCode,
+      currency: currency,
+    });
+
+    if (!recipientResponse.status) {
+      throw new functions.https.HttpsError('internal', 'Failed to create transfer recipient on Paystack.');
+    }
+
+    const recipientCode = recipientResponse.data.recipient_code;
+
+    // Step 2: Deduct balance FIRST (atomic) + write withdrawal doc
+    const amountInSmallestUnit = Math.round(amount * 100);
+    const withdrawalRef = db.collection('wallets').doc('platform')
+      .collection('withdrawals').doc(reference);
+
+    await db.runTransaction(async (transaction) => {
+      const freshBalance = await transaction.get(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency)
+      );
+      const freshAmount = freshBalance.data()?.amount || 0;
+
+      if (freshAmount < amount) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
+      }
+
+      transaction.update(
+        db.collection('wallets').doc('platform').collection('balances').doc(currency),
+        {
+          amount: admin.firestore.FieldValue.increment(-amount),
+          usdEquivalent: admin.firestore.FieldValue.increment(-amountInUSD),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }
+      );
+
+      transaction.update(db.collection('wallets').doc('platform'), {
+        totalBalanceUSD: admin.firestore.FieldValue.increment(-amountInUSD),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(withdrawalRef, {
+        id: reference,
+        type: 'bank_transfer',
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        exchangeRate,
+        purpose,
+        notes: notes || null,
+        bankCode,
+        accountNumber,
+        accountName,
+        recipientCode,
+        paystackReference: reference,
+        status: 'pending',
+        withdrawnBy: caller.uid,
+        withdrawnByEmail: callerEmail,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Step 3: Call Paystack /transfer (balance already deducted)
+    let transferCode = null;
+    let transferStatus = 'pending';
+    let internalStatus = 'pending';
+
+    try {
+      const transferResponse = await paystackRequest('POST', '/transfer', {
+        source: 'balance',
+        amount: amountInSmallestUnit,
+        recipient: recipientCode,
+        reason: `Platform withdrawal: ${purpose}`,
+        reference: reference,
+      });
+
+      if (transferResponse.status) {
+        transferCode = transferResponse.data.transfer_code;
+        transferStatus = transferResponse.data.status;
+      }
+
+      // Map Paystack status -> internal status
+      if (transferStatus === 'success') {
+        internalStatus = 'completed';
+      } else if (transferStatus === 'otp') {
+        internalStatus = 'pending_otp';
+      } else {
+        internalStatus = 'pending';
+      }
+
+      await withdrawalRef.update({
+        transferCode: transferCode,
+        paystackStatus: transferStatus,
+        status: internalStatus,
+      });
+    } catch (transferError) {
+      // Paystack failed — refund the platform balance atomically
+      logError('Paystack transfer failed (adminApproveTransfer), refunding platform balance',
+        { error: transferError.message, proposalId, reference });
+
+      await db.runTransaction(async (transaction) => {
+        transaction.update(
+          db.collection('wallets').doc('platform').collection('balances').doc(currency),
+          {
+            amount: admin.firestore.FieldValue.increment(amount),
+            usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }
+        );
+        transaction.update(db.collection('wallets').doc('platform'), {
+          totalBalanceUSD: admin.firestore.FieldValue.increment(amountInUSD),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      await withdrawalRef.update({
+        status: 'failed',
+        failureReason: transferError.message,
+        refunded: true,
+        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Also mark proposal as failed
+      await proposalRef.update({
+        status: 'failed',
+        failureReason: transferError.message,
+        failedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      throw new functions.https.HttpsError('internal',
+        `Paystack transfer failed: ${transferError.message}. Balance has been refunded. Proposal marked failed.`);
+    }
+
+    // Reflect Paystack result back onto the proposal doc
+    const proposalStatusUpdate = {
+      paystackStatus: transferStatus,
+      transferCode: transferCode,
+      recipientCode: recipientCode,
+    };
+    if (internalStatus === 'pending_otp') {
+      proposalStatusUpdate.status = 'pending_otp';
+      proposalStatusUpdate.otpExpiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000);
+    } else if (internalStatus === 'completed') {
+      proposalStatusUpdate.status = 'completed';
+      proposalStatusUpdate.completedAt = admin.firestore.FieldValue.serverTimestamp();
+      proposalStatusUpdate.completedBy = {
+        uid: caller.uid,
+        email: callerEmail,
+        role: caller.role,
+        displayName: callerDisplayName,
+      };
+    }
+    await proposalRef.update(proposalStatusUpdate);
+
     // Audit log
     await db.collection('audit_logs').add({
       userId: caller.uid,
@@ -7319,7 +7510,12 @@ exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
       result: 'success',
       amount: proposal.amount,
       currency: proposal.currency,
-      metadata: { proposalId, approvedBy: caller.uid },
+      metadata: {
+        proposalId,
+        approvedBy: caller.uid,
+        paystackStatus: transferStatus,
+        internalStatus: internalStatus,
+      },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -7329,11 +7525,17 @@ exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
       email: callerEmail,
       role: caller.role,
       action: 'approve_proposal',
-      details: `Approved proposal ${proposalId} for ${proposal.amount} ${proposal.currency}`,
+      details: `Approved proposal ${proposalId} for ${proposal.amount} ${proposal.currency} — Paystack: ${transferStatus}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return { success: true, proposalId, status: 'approved' };
+    return {
+      success: true,
+      proposalId,
+      status: proposalStatusUpdate.status || 'approved',
+      otpRequired: internalStatus === 'pending_otp',
+      transferCode: transferCode,
+    };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
     logError('adminApproveTransfer failed', { proposalId, caller: caller.uid, error: error.message });
