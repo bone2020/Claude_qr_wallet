@@ -901,6 +901,52 @@ async function sendProposalEmail({ to, toName, subject, htmlBody, textBody, repl
   }
 }
 
+/**
+ * Helper: send SMS via Africa's Talking. If AT fails, queue for retry.
+ * Never throws.
+ *
+ * @param {Object} params
+ * @param {string} params.phoneNumber  E.164 format (+233...)
+ * @param {string} params.message      max 160 chars per single-part SMS
+ * @param {string} [params.relatedTo]
+ */
+async function sendCustomerSms({ phoneNumber, message, relatedTo }) {
+  try {
+    const africastalking = require('africastalking')({
+      apiKey: AT_API_KEY.value(),
+      username: AT_USERNAME.value() || 'sandbox',
+    });
+    const sms = africastalking.SMS;
+
+    await sms.send({
+      to: [phoneNumber],
+      message,
+      from: AT_ENVIRONMENT.value() === 'production' ? 'QRWALLET' : undefined,
+    });
+
+    logInfo('sendCustomerSms succeeded', { phoneNumber, relatedTo });
+    return { queued: false, sent: true };
+  } catch (error) {
+    logWarning('sendCustomerSms failed, queueing for retry', { phoneNumber, error: error.message });
+    try {
+      await db.collection('sms_queue').add({
+        phoneNumber,
+        message,
+        attemptCount: 1,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastError: error.message,
+        sentAt: null,
+        relatedTo: relatedTo || null,
+      });
+    } catch (queueError) {
+      logError('sendCustomerSms ALSO failed to queue', { error: queueError.message });
+    }
+    return { queued: true, sent: false };
+  }
+}
+
 // ============================================================
 // EXCHANGE RATE CONFIGURATION
 // ============================================================
@@ -12638,5 +12684,60 @@ exports.processEmailQueue = functions.pubsub
     }
 
     logInfo('processEmailQueue completed', { attempted, succeeded, failedPermanently });
+    return null;
+  });
+
+/**
+ * Scheduled: Retry SMS messages that failed to send.
+ * Runs every 5 minutes. After 3 attempts, marks failed_permanently.
+ */
+exports.processSmsQueue = functions.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('UTC')
+  .runWith({ secrets: [AT_API_KEY] })
+  .onRun(async (context) => {
+    const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
+
+    const snap = await db.collection('sms_queue')
+      .where('status', '==', 'pending')
+      .where('attemptCount', '<', 3)
+      .limit(50)
+      .get();
+
+    let attempted = 0, succeeded = 0, failedPermanently = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      if (d.lastAttemptAt && d.lastAttemptAt.toMillis() > fifteenMinAgo.toMillis()) continue;
+
+      attempted++;
+      try {
+        const africastalking = require('africastalking')({
+          apiKey: AT_API_KEY.value(),
+          username: AT_USERNAME.value() || 'sandbox',
+        });
+        await africastalking.SMS.send({ to: [d.phoneNumber], message: d.message });
+
+        await doc.ref.update({
+          status: 'sent',
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        succeeded++;
+      } catch (error) {
+        const newCount = (d.attemptCount || 0) + 1;
+        const update = {
+          attemptCount: newCount,
+          lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastError: error.message,
+        };
+        if (newCount >= 3) {
+          update.status = 'failed_permanently';
+          failedPermanently++;
+        }
+        await doc.ref.update(update);
+      }
+    }
+
+    logInfo('processSmsQueue completed', { attempted, succeeded, failedPermanently });
     return null;
   });
