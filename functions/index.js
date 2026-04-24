@@ -14128,3 +14128,159 @@ exports.userRespondToDispute = functions
     throw new functions.https.HttpsError('internal', 'Failed to respond: ' + error.message);
   }
 });
+
+/**
+ * Admin: Assign an admin to investigate a dispute.
+ * admin_supervisor or higher can assign.
+ */
+exports.adminAssignDispute = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+  const { disputeId, adminUid, idempotencyKey } = data || {};
+
+  if (!disputeId || typeof disputeId !== 'string') throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!adminUid || typeof adminUid !== 'string') throw new functions.https.HttpsError('invalid-argument', 'adminUid is required.');
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminAssignDispute');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminAssignDispute.message);
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    if (dispute.status !== 'filed' && !(dispute.status === 'investigating' && !dispute.assignedAdmin)) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Dispute status is '${dispute.status}'. Can only assign when filed or investigating without admin.`);
+    }
+
+    // Verify adminUid is a valid admin+ user
+    const adminUserDoc = await db.collection('users').doc(adminUid).get();
+    if (!adminUserDoc.exists) throw new functions.https.HttpsError('not-found', 'Assigned admin user not found.');
+    const adminData = adminUserDoc.data();
+    const adminRole = adminData.role;
+    const roleHierarchy = { viewer: 1, auditor: 2, support: 3, admin: 4, admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8 };
+    if (!adminRole || (roleHierarchy[adminRole] || 0) < (roleHierarchy['admin'] || 0)) {
+      throw new functions.https.HttpsError('invalid-argument', 'Assigned user must have admin role or higher.');
+    }
+
+    const assignedAdminRecord = await admin.auth().getUser(adminUid);
+    const assignedEmail = assignedAdminRecord.email || 'unknown';
+    const assignedDisplayName = assignedAdminRecord.displayName || assignedEmail;
+
+    await disputeRef.update({
+      assignedAdmin: { uid: adminUid, email: assignedEmail, displayName: assignedDisplayName },
+      status: 'investigating',
+    });
+
+    await sendProposalEmail({
+      to: assignedEmail,
+      toName: assignedDisplayName,
+      subject: `You've been assigned to investigate dispute ${disputeId}`,
+      htmlBody: `<p>You've been assigned to investigate dispute <strong>${disputeId}</strong>.</p>
+<p><strong>Issue:</strong> ${dispute.issueType}<br>
+<strong>Amount:</strong> ${dispute.disputedAmount} ${dispute.disputedCurrency}<br>
+<strong>Filed by:</strong> ${dispute.filedBy.displayName}</p>
+<p>Please review and submit your findings via the admin dashboard.</p>`,
+      textBody: `Assigned to investigate dispute ${disputeId}. Review in admin dashboard.`,
+      relatedTo: `dispute:${disputeId}`,
+    });
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminAssignDispute', result: 'success',
+      metadata: { disputeId, assignedAdminUid: adminUid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'assign_dispute', details: `Assigned ${assignedDisplayName} to dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId, assignedAdmin: { uid: adminUid, email: assignedEmail, displayName: assignedDisplayName } };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminAssignDispute failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to assign dispute: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Submit investigation findings for a dispute.
+ * Assigned admin submits findings, moves dispute to supervisor_review.
+ */
+exports.adminSubmitInvestigation = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin');
+  const { disputeId, findings, idempotencyKey } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!findings || typeof findings !== 'string' || findings.trim().length < 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'findings must be at least 50 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminSubmitInvestigation');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminSubmitInvestigation.message);
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    if (dispute.status !== 'investigating') {
+      throw new functions.https.HttpsError('failed-precondition', `Dispute status is '${dispute.status}', expected 'investigating'.`);
+    }
+    if (!dispute.assignedAdmin || dispute.assignedAdmin.uid !== caller.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Only the assigned admin can submit investigation findings.');
+    }
+
+    await disputeRef.update({
+      investigationFindings: findings.trim(),
+      investigationSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: 'supervisor_review',
+    });
+
+    // Email admin_supervisors
+    const supervisorsSnap = await db.collection('admin_users')
+      .where('role', '==', 'admin_supervisor')
+      .get();
+    const callerDisplayName = (await admin.auth().getUser(caller.uid)).displayName || 'Admin';
+    for (const sv of supervisorsSnap.docs) {
+      await sendProposalEmail({
+        to: sv.id,
+        toName: sv.data().displayName || null,
+        subject: `Investigation submitted for dispute ${disputeId} — supervisor review needed`,
+        htmlBody: `<p>Admin ${callerDisplayName} has submitted investigation findings for dispute <strong>${disputeId}</strong>.</p>
+<p>Please review and either agree or kick back via the admin dashboard.</p>`,
+        textBody: `Investigation submitted for ${disputeId}. Supervisor review needed.`,
+        relatedTo: `dispute:${disputeId}`,
+      });
+    }
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminSubmitInvestigation', result: 'success',
+      metadata: { disputeId }, timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'submit_investigation', details: `Submitted findings for dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId, status: 'supervisor_review' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminSubmitInvestigation failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to submit investigation: ' + error.message);
+  }
+});
