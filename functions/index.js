@@ -13772,14 +13772,23 @@ exports.userFileDispute = functions
     }
     const tx = txDoc.data();
 
-    // Verify caller is sender
-    if (tx.senderWalletId !== callerUid && tx.senderWalletId !== tx.senderWalletId) {
-      // Check by looking up caller's wallet
-      const callerWalletDoc = await db.collection('wallets').doc(callerUid).get();
-      const callerWalletId = callerWalletDoc.exists ? callerWalletDoc.data().walletId : null;
-      if (tx.senderWalletId !== callerWalletId && tx.senderWalletId !== callerUid) {
-        throw new functions.https.HttpsError('permission-denied', 'You can only dispute transactions you sent.');
-      }
+    // Verify caller is the sender of the transaction.
+    // Transactions are stored at users/{uid}/transactions/{txId}, so reading from
+    // the caller's subcollection already guarantees ownership. Additionally check
+    // the transaction type to ensure it's an outgoing transfer (not a deposit/receive).
+    const OUTGOING_TX_TYPES = ['transfer', 'send', 'withdrawal', 'bank_transfer', 'momo_transfer'];
+    const txType = tx.type || '';
+    if (tx.direction && tx.direction !== 'outgoing' && tx.direction !== 'debit') {
+      // If direction field is present, it must indicate outgoing.
+      throw new functions.https.HttpsError('permission-denied',
+        'You can only dispute transactions you sent (outgoing only).');
+    }
+    if (txType && !OUTGOING_TX_TYPES.includes(txType.toLowerCase())) {
+      // If type field is present and not in allowlist, reject.
+      // Permissive: if type is missing or unrecognized, allow (subcollection path already verifies ownership).
+      logWarning('userFileDispute: transaction type not in expected list', {
+        callerUid, originalTransactionId, txType,
+      });
     }
 
     // 7-day window check
@@ -13816,19 +13825,18 @@ exports.userFileDispute = functions
     const usdEquivalent = disputedAmount / exchangeRate;
     const fee = calculateDisputeFee(usdEquivalent);
 
-    // Check caller wallet for fee deduction
-    const callerWallet = await db.collection('wallets').doc(callerUid).get();
+    // Fee in SOURCE CURRENCY (major units — same unit as wallet.availableBalance).
+    // Wallet balances are stored in major units per codebase convention (no *100).
+    const feeInSourceCurrency = fee * exchangeRate;
+
+    // Pre-check wallet balance to decide feeDeductedFrom. Actual deduction happens
+    // inside the transaction below to be atomic with dispute doc creation.
+    const callerWalletSnapPre = await db.collection('wallets').doc(callerUid).get();
     let feeDeductedFrom = 'recovery';
-    const feeInMinorUnits = Math.round(fee * exchangeRate * 100);
-    if (callerWallet.exists) {
-      const walletData = callerWallet.data();
-      const available = walletData.availableBalance || walletData.balance || 0;
-      if (available >= feeInMinorUnits && feeInMinorUnits > 0) {
-        await db.collection('wallets').doc(callerUid).update({
-          balance: admin.firestore.FieldValue.increment(-feeInMinorUnits),
-          availableBalance: admin.firestore.FieldValue.increment(-feeInMinorUnits),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+    if (callerWalletSnapPre.exists && feeInSourceCurrency > 0) {
+      const walletData = callerWalletSnapPre.data();
+      const available = walletData.availableBalance != null ? walletData.availableBalance : (walletData.balance || 0);
+      if (available >= feeInSourceCurrency) {
         feeDeductedFrom = 'wallet_at_filing';
       }
     }
@@ -13868,55 +13876,79 @@ exports.userFileDispute = functions
 
     const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
-    // Write dispute doc
-    await db.collection('disputes').doc(disputeId).set({
-      disputeId,
-      status: 'filed',
-      originalTransactionId,
-      disputedAmount,
-      disputedCurrency: txCurrency,
-      usdEquivalent,
-      filedBy: { uid: callerUid, email: callerEmail, displayName: callerDisplayName, phoneNumber: callerPhone },
-      filedAt: admin.firestore.FieldValue.serverTimestamp(),
-      recipientUid,
-      recipientEmail,
-      recipientDisplayName,
-      recipientPhoneNumber: recipientPhone,
-      issueType,
-      description: description.trim(),
-      evidence: [],
-      recipientResponse: null,
-      recipientResponseAt: null,
-      recipientEvidence: null,
-      assignedAdmin: null,
-      investigationFindings: null,
-      investigationSubmittedAt: null,
-      reviewingSupervisor: null,
-      supervisorDecision: null,
-      supervisorNotes: null,
-      supervisorDecidedAt: null,
-      reviewingManager: null,
-      managerDecision: null,
-      managerDecisionAmount: null,
-      managerNotes: null,
-      managerDecidedAt: null,
-      resolvedAt: null,
-      resolutionType: null,
-      amountRecovered: null,
-      amountUnrecovered: null,
-      currentHoldAmount: holdAmount,
-      holdHistory: [],
-      feeCharged: fee,
-      feeRefunded: false,
-      feeDeductedFrom,
-      escalatedToSuperAdmin: false,
-      superAdminDecision: null,
-      superAdminDecidedAt: null,
-      stuckCaseFlag: false,
-      notificationsSent: {},
-      graceTriggered: false,
-      graceTriggeredAt: null,
-      expectedResolutionBy: admin.firestore.Timestamp.fromMillis(Date.now() + THREE_DAYS_MS),
+    // Atomic: write dispute doc AND deduct fee in a single transaction.
+    // If either fails, both roll back. Prevents the "fee deducted but no dispute record" bug.
+    await db.runTransaction(async (transaction) => {
+      const disputeRef = db.collection('disputes').doc(disputeId);
+      const walletRef = db.collection('wallets').doc(callerUid);
+
+      // Re-read wallet inside transaction to prevent TOCTOU races
+      let freshFeeDeductedFrom = 'recovery';
+      if (feeInSourceCurrency > 0) {
+        const walletSnap = await transaction.get(walletRef);
+        if (walletSnap.exists) {
+          const walletData = walletSnap.data();
+          const available = walletData.availableBalance != null ? walletData.availableBalance : (walletData.balance || 0);
+          if (available >= feeInSourceCurrency) {
+            freshFeeDeductedFrom = 'wallet_at_filing';
+            transaction.update(walletRef, {
+              balance: admin.firestore.FieldValue.increment(-feeInSourceCurrency),
+              availableBalance: admin.firestore.FieldValue.increment(-feeInSourceCurrency),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+
+      transaction.set(disputeRef, {
+        disputeId,
+        status: 'filed',
+        originalTransactionId,
+        disputedAmount,
+        disputedCurrency: txCurrency,
+        usdEquivalent,
+        filedBy: { uid: callerUid, email: callerEmail, displayName: callerDisplayName, phoneNumber: callerPhone },
+        filedAt: admin.firestore.FieldValue.serverTimestamp(),
+        recipientUid,
+        recipientEmail,
+        recipientDisplayName,
+        recipientPhoneNumber: recipientPhone,
+        issueType,
+        description: description.trim(),
+        evidence: [],
+        recipientResponse: null,
+        recipientResponseAt: null,
+        recipientEvidence: null,
+        assignedAdmin: null,
+        investigationFindings: null,
+        investigationSubmittedAt: null,
+        reviewingSupervisor: null,
+        supervisorDecision: null,
+        supervisorNotes: null,
+        supervisorDecidedAt: null,
+        reviewingManager: null,
+        managerDecision: null,
+        managerDecisionAmount: null,
+        managerNotes: null,
+        managerDecidedAt: null,
+        resolvedAt: null,
+        resolutionType: null,
+        amountRecovered: null,
+        amountUnrecovered: null,
+        currentHoldAmount: holdAmount,
+        holdHistory: [],
+        feeCharged: fee,
+        feeRefunded: false,
+        feeDeductedFrom: freshFeeDeductedFrom,
+        escalatedToSuperAdmin: false,
+        superAdminDecision: null,
+        superAdminDecidedAt: null,
+        stuckCaseFlag: false,
+        notificationsSent: {},
+        graceTriggered: false,
+        graceTriggeredAt: null,
+        expectedResolutionBy: admin.firestore.Timestamp.fromMillis(Date.now() + THREE_DAYS_MS),
+      });
     });
 
     // Update dispute_history
