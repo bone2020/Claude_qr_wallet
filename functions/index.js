@@ -2326,6 +2326,11 @@ const RATE_LIMITS = {
   finalizeTransfer:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many OTP attempts. Please try again later.' },
   adminFinalizeTransfer: { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many admin OTP attempts. Please try again later.' },
   adminInitiateTransfer: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many transfer initiations. Please try again later.' },
+  adminProposeTransfer:       { windowMs: 60 * 60 * 1000, maxRequests: 10,  message: 'Too many proposals. Please try again later.' },
+  adminApproveTransfer:       { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many approvals. Please try again later.' },
+  adminRejectTransfer:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many rejections. Please try again later.' },
+  adminCancelProposal:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many cancellations. Please try again later.' },
+  adminEmergencyTransfer:     { windowMs: 60 * 60 * 1000, maxRequests: 3,   message: 'Too many emergency transfers. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -6997,6 +7002,553 @@ async function cancelTransfer(withdrawalRef, wd, reference, caller, callerEmail,
 }
 
 // ============================================================
+// DUAL-SIG PLATFORM TRANSFER PROPOSALS (Phase 2a)
+// ============================================================
+
+/**
+ * Admin: Approve a pending platform transfer proposal.
+ * Only admin_manager (level 7) and above can approve.
+ * Updates proposal status from 'proposed' to 'approved'.
+ * Does NOT execute Paystack transfer — that happens in a separate step.
+ *
+ * Ref: Phase 2a agent commit 2/6
+ */
+exports.adminApproveTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const { proposalId, idempotencyKey, approvalNote } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminApproveTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminApproveTransfer.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot approve.`);
+    }
+
+    const now = Date.now();
+    const expiresAtMs = proposal.expiresAt && proposal.expiresAt.toMillis ? proposal.expiresAt.toMillis() : 0;
+    if (expiresAtMs <= now) {
+      throw new functions.https.HttpsError('failed-precondition', 'Proposal has expired. Ask finance to re-submit.');
+    }
+
+    // Manager daily cap check
+    const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+    const managerDailyUSD = limitsDoc.exists ? (limitsDoc.data().managerDailyUSD || 100000) : 100000;
+
+    const startOfTodayUTC = new Date();
+    startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+    const startOfTodayTimestamp = admin.firestore.Timestamp.fromDate(startOfTodayUTC);
+
+    const todayApprovalsSnap = await db.collection('platform_transfer_proposals')
+      .where('approvedBy.uid', '==', caller.uid)
+      .where('approvedAt', '>=', startOfTodayTimestamp)
+      .get();
+
+    const dailyApprovedUSD = todayApprovalsSnap.docs.reduce((sum, doc) => {
+      return sum + (doc.data().usdEquivalent || 0);
+    }, 0);
+
+    if (dailyApprovedUSD + (proposal.usdEquivalent || 0) > managerDailyUSD) {
+      const headroom = managerDailyUSD - dailyApprovedUSD;
+      throw new functions.https.HttpsError('resource-exhausted',
+        `Approval would exceed your daily cap. ` +
+        `Approved today: $${dailyApprovedUSD.toFixed(2)} USD. ` +
+        `This proposal: $${(proposal.usdEquivalent || 0).toFixed(2)} USD. ` +
+        `Daily cap: $${managerDailyUSD.toFixed(2)} USD. ` +
+        `Available headroom: $${headroom.toFixed(2)} USD.`);
+    }
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'approved',
+        approvedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        approvalIdempotencyKey: idempotencyKey,
+        approvalNote: approvalNote || null,
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_approved',
+      result: 'success',
+      amount: proposal.amount,
+      currency: proposal.currency,
+      metadata: { proposalId, approvedBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'approve_proposal',
+      details: `Approved proposal ${proposalId} for ${proposal.amount} ${proposal.currency}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'approved' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminApproveTransfer failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to approve proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Reject a pending platform transfer proposal.
+ * Only admin_manager (level 7) and above can reject.
+ * Updates proposal status from 'proposed' to 'rejected' (terminal state).
+ *
+ * Ref: Phase 2a agent commit 3/6
+ */
+exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+
+  const { proposalId, reason, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'reason is required and must be at least 5 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminRejectTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminRejectTransfer.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    if (proposalSnap.data().status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposalSnap.data().status}). Cannot reject.`);
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'rejected',
+        rejectedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        rejectionReason: reason.trim(),
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_rejected',
+      result: 'success',
+      metadata: { proposalId, reason: reason.trim(), rejectedBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'reject_proposal',
+      details: `Rejected proposal ${proposalId}: ${reason.trim()}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'rejected' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminRejectTransfer failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to reject proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Cancel a pending platform transfer proposal.
+ * Finance (level 6) and above can call, but only the original proposer
+ * or a super_admin can actually cancel.
+ * Updates proposal status from 'proposed' to 'cancelled' (terminal state).
+ *
+ * Ref: Phase 2a agent commit 3/6
+ */
+exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminCancelProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminCancelProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot cancel.`);
+    }
+
+    // Authorization: only the original proposer or a super_admin can cancel
+    if (caller.uid !== proposal.proposedBy.uid && caller.role !== 'super_admin') {
+      throw new functions.https.HttpsError('permission-denied',
+        'Only the original proposer or a super_admin can cancel.');
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'cancelled',
+        cancelledBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancelReason: 'finance_cancel',
+      });
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_cancelled',
+      result: 'success',
+      metadata: { proposalId, cancelledBy: caller.uid },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'cancel_proposal',
+      details: `Cancelled proposal ${proposalId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'cancelled' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminCancelProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to cancel proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Emergency platform transfer — super_admin only.
+ * Bypasses the propose → approve flow by creating a proposal directly
+ * with emergency: true and status: 'proposed'. The human-pair commit
+ * that modifies adminInitiateTransfer will detect emergency: true and
+ * skip the approval step.
+ *
+ * Requires a detailed justification reason (min 50 chars).
+ * Subject to a separate emergency daily cap.
+ *
+ * Ref: Phase 2a agent commit 4/6
+ */
+exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, reason, notes, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!amount || typeof amount !== 'number' || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'amount must be a positive number.');
+  }
+  if (!currency || typeof currency !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'currency is required.');
+  }
+  if (!bankCode || typeof bankCode !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'bankCode is required.');
+  }
+  if (!accountNumber || typeof accountNumber !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'accountNumber is required.');
+  }
+  if (!accountName || typeof accountName !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'accountName is required.');
+  }
+  if (!purpose || typeof purpose !== 'string' || purpose.trim().length < 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'purpose is required and must be at least 5 characters.');
+  }
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'Emergency reason is required and must be at least 50 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit (3/hour for emergency)
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminEmergencyTransfer');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminEmergencyTransfer.message);
+  }
+
+  try {
+    // Compute USD equivalent
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+    const exchangeRate = rates[currency] || 1;
+    const usdEquivalent = amount / exchangeRate;
+
+    // Emergency daily cap check
+    const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+    const emergencyDailyUSD = limitsDoc.exists ? (limitsDoc.data().emergencyDailyUSD || 250000) : 250000;
+
+    const startOfTodayUTC = new Date();
+    startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+    const startOfTodayTimestamp = admin.firestore.Timestamp.fromDate(startOfTodayUTC);
+
+    const todayEmergencySnap = await db.collection('platform_transfer_proposals')
+      .where('emergencyInvokedBy.uid', '==', caller.uid)
+      .where('proposedAt', '>=', startOfTodayTimestamp)
+      .get();
+
+    const dailyEmergencyUSD = todayEmergencySnap.docs.reduce((sum, doc) => {
+      return sum + (doc.data().usdEquivalent || 0);
+    }, 0);
+
+    if (dailyEmergencyUSD + usdEquivalent > emergencyDailyUSD) {
+      const headroom = emergencyDailyUSD - dailyEmergencyUSD;
+      throw new functions.https.HttpsError('resource-exhausted',
+        `Emergency transfer would exceed your daily emergency cap. ` +
+        `Used today: $${dailyEmergencyUSD.toFixed(2)} USD. ` +
+        `This transfer: $${usdEquivalent.toFixed(2)} USD. ` +
+        `Daily emergency cap: $${emergencyDailyUSD.toFixed(2)} USD. ` +
+        `Available headroom: $${headroom.toFixed(2)} USD.`);
+    }
+
+    // Generate proposal ID
+    const proposalId = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    const callerIdentity = {
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      displayName: callerDisplayName,
+    };
+
+    // Write proposal doc
+    await db.collection('platform_transfer_proposals').doc(proposalId).set({
+      proposalId,
+      status: 'proposed',
+      amount,
+      currency,
+      usdEquivalent,
+      exchangeRate,
+      bankCode,
+      accountNumber,
+      accountName,
+      purpose: purpose.trim(),
+      notes: notes || null,
+      priorityFlag: true,
+      proposedBy: callerIdentity,
+      proposedAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000),
+      idempotencyKey,
+      emergency: true,
+      emergencyReason: reason.trim(),
+      emergencyInvokedBy: callerIdentity,
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'transfer_emergency',
+      result: 'success',
+      amount,
+      currency,
+      metadata: { proposalId, emergency: true, reason: reason.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'transfer_emergency',
+      details: `Emergency transfer proposal ${proposalId} for ${amount} ${currency}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'proposed', emergency: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminEmergencyTransfer failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to create emergency transfer: ' + error.message);
+  }
+});
+
+/**
+ * Admin: List platform transfer proposals with optional filters and pagination.
+ * Auditor (level 3) and above can call.
+ * Finance role sees only their own proposals; admin_manager+ and auditor see all.
+ *
+ * Ref: Phase 2a agent commit 5/6
+ */
+exports.adminListTransferProposals = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+
+  const { status: filterStatus, limit: requestedLimit, startAfter } = data || {};
+
+  // Validate inputs
+  const validStatuses = ['proposed', 'approved', 'rejected', 'cancelled', 'expired', 'completed', 'pending_otp'];
+  if (filterStatus && !validStatuses.includes(filterStatus)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `Invalid status filter. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') {
+    limit = Math.min(Math.max(requestedLimit, 1), 200);
+  }
+
+  try {
+    let query = db.collection('platform_transfer_proposals')
+      .orderBy('proposedAt', 'desc')
+      .limit(limit);
+
+    if (filterStatus) {
+      query = query.where('status', '==', filterStatus);
+    }
+
+    // Role-based filtering: finance (level 6 exactly) sees only own proposals
+    const roleHierarchy = { viewer: 1, auditor: 2, support: 3, admin: 4, admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8 };
+    const callerLevel = roleHierarchy[caller.role] || 0;
+    if (caller.role === 'finance' && callerLevel === 6) {
+      query = query.where('proposedBy.uid', '==', caller.uid);
+    }
+
+    // Pagination cursor
+    if (startAfter && typeof startAfter === 'string') {
+      const cursorDoc = await db.collection('platform_transfer_proposals').doc(startAfter).get();
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    }
+
+    const snapshot = await query.get();
+    const proposals = snapshot.docs.map(doc => {
+      const d = doc.data();
+      const { idempotencyKey, approvalIdempotencyKey, ...safeData } = d;
+      return safeData;
+    });
+
+    return {
+      success: true,
+      proposals,
+      count: proposals.length,
+      hasMore: proposals.length === limit,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminListTransferProposals failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to list proposals: ' + error.message);
+  }
+});
+
+// ============================================================
 // TRANSACTION MONITORING
 // ============================================================
 
@@ -11419,3 +11971,131 @@ exports.businessWalletRefundTransaction = functions.https.onCall(async (data, co
     amount: amount,
   };
 });
+
+// ============================================================
+// SCHEDULED: PLATFORM TRANSFER PROPOSAL AUTO-EXPIRY (Phase 2a)
+// ============================================================
+
+/**
+ * Scheduled: Auto-expire proposals that have passed their expiresAt window.
+ * Runs every 1 minute. Transitions status from 'proposed' to 'expired'.
+ *
+ * Ref: Phase 2a agent commit 6/6
+ */
+exports.autoExpireProposals = functions.pubsub
+  .schedule('every 1 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    const expiredSnap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'proposed')
+      .where('expiresAt', '<', now)
+      .limit(100)
+      .get();
+
+    if (expiredSnap.empty) {
+      return null;
+    }
+
+    let expiredCount = 0;
+    const batch = db.batch();
+
+    for (const doc of expiredSnap.docs) {
+      try {
+        batch.update(doc.ref, {
+          status: 'expired',
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelReason: 'expired',
+        });
+        expiredCount++;
+      } catch (error) {
+        logError('autoExpireProposals: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    if (expiredCount > 0) {
+      await batch.commit();
+
+      // Write audit log entries for each expiration
+      const auditBatch = db.batch();
+      for (const doc of expiredSnap.docs) {
+        const auditRef = db.collection('audit_logs').doc();
+        auditBatch.set(auditRef, {
+          userId: 'system',
+          operation: 'proposal_expired',
+          result: 'success',
+          metadata: { proposalId: doc.id, amount: doc.data().amount, currency: doc.data().currency },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      await auditBatch.commit();
+    }
+
+    logInfo('autoExpireProposals completed', { expiredCount });
+    return null;
+  });
+
+/**
+ * Scheduled: Auto-cancel proposals stuck in pending_otp past their otpExpiresAt.
+ * Runs every 1 minute. Transitions status from 'pending_otp' to 'cancelled'.
+ *
+ * NOTE: This commit only handles the doc-state update. It does NOT do Paystack
+ * balance refunds — those happen in the human-pair commit that modifies
+ * adminFinalizeTransfer.
+ *
+ * Ref: Phase 2a agent commit 6/6
+ */
+exports.autoExpireOtpTransfers = functions.pubsub
+  .schedule('every 1 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+
+    const expiredOtpSnap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'pending_otp')
+      .where('otpExpiresAt', '<', now)
+      .limit(100)
+      .get();
+
+    if (expiredOtpSnap.empty) {
+      return null;
+    }
+
+    let cancelledCount = 0;
+
+    for (const doc of expiredOtpSnap.docs) {
+      try {
+        await doc.ref.update({
+          status: 'cancelled',
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          cancelReason: 'auto_cancelled_otp_timeout',
+        });
+
+        // TODO(Phase 2a human-pair commit 7): refund platform balance here.
+        // For now, balance remains deducted. Manual reconciliation required.
+
+        // Audit log
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'otp_transfer_expired',
+          result: 'success',
+          metadata: { proposalId: doc.id, reason: 'auto_cancelled_otp_timeout' },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        cancelledCount++;
+      } catch (error) {
+        logError('autoExpireOtpTransfers: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('autoExpireOtpTransfers completed', { cancelledCount });
+    return null;
+  });
