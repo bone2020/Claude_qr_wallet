@@ -1127,7 +1127,7 @@ exports.updateExchangeRatesNow = functions
 
 // Verify Paystack payment and credit wallet
 exports.verifyPayment = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   // Check authentication
   if (!context.auth) {
@@ -1602,7 +1602,7 @@ async function handleFailedTransfer(data) {
 
 // Initiate withdrawal to bank or mobile money
 exports.initiateWithdrawal = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -1839,7 +1839,7 @@ exports.initiateWithdrawal = functions
 
 // Finalize transfer with OTP
 exports.finalizeTransfer = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -1913,7 +1913,7 @@ exports.finalizeTransfer = functions
 
 // Get list of banks
 exports.getBanks = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -1944,7 +1944,7 @@ exports.getBanks = functions
 
 // Verify bank account
 exports.verifyBankAccount = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -1981,7 +1981,7 @@ exports.verifyBankAccount = functions
 // MOBILE MONEY CHARGE (For adding funds via Mobile Money)
 // ============================================================
 exports.chargeMobileMoney = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -2131,7 +2131,7 @@ exports.chargeMobileMoney = functions
 // VIRTUAL ACCOUNT (For Bank Transfer deposits)
 // ============================================================
 exports.getOrCreateVirtualAccount = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -2232,7 +2232,7 @@ exports.getOrCreateVirtualAccount = functions
 // INITIALIZE TRANSACTION (For Card Payment via Browser)
 // ============================================================
 exports.initializeTransaction = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -2867,7 +2867,7 @@ async function enforceKyc(userId) {
 // Set KYC status (called after successful Smile ID verification)
 // NOTE: The client now sets kycStatus directly in Firestore for reliability.
 // This function is retained for backward compatibility and admin use cases.
-exports.updateKycStatus = functions.https.onCall(async (data, context) => {
+exports.updateKycStatus = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // SECURITY: Restricted to admin only. Client KYC uses completeKycVerification.
   const caller = await verifyAdmin(context, 'admin');
 
@@ -2909,7 +2909,7 @@ exports.updateKycStatus = functions.https.onCall(async (data, context) => {
  * The kycStatus field is protected by Firestore rules and can only be
  * written by Cloud Functions using Admin SDK.
  */
-exports.completeKycVerification = functions.https.onCall(async (data, context) => {
+exports.completeKycVerification = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -2988,7 +2988,7 @@ exports.completeKycVerification = functions.https.onCall(async (data, context) =
  * Idempotent — if wallet already exists, returns existing walletId.
  * Called automatically after KYC or phone verification.
  */
-exports.createWalletForUser = functions.https.onCall(async (data, context) => {
+exports.createWalletForUser = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3078,7 +3078,7 @@ exports.createWalletForUser = functions.https.onCall(async (data, context) => {
 // UPDATE WALLET CURRENCY
 // ============================================================
 
-exports.updateWalletCurrency = functions.https.onCall(async (data, context) => {
+exports.updateWalletCurrency = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3126,7 +3126,7 @@ exports.updateWalletCurrency = functions.https.onCall(async (data, context) => {
  * Export all user data (GDPR Article 20 — Data Portability).
  * Returns a JSON object containing all data associated with the user.
  */
-exports.exportUserData = functions.https.onCall(async (data, context) => {
+exports.exportUserData = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3199,7 +3199,7 @@ exports.exportUserData = functions.https.onCall(async (data, context) => {
  * Delete user account and all associated data (GDPR Article 17 — Right to Erasure).
  * Requires re-authentication confirmation.
  */
-exports.deleteUserData = functions.https.onCall(async (data, context) => {
+exports.deleteUserData = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3815,7 +3815,7 @@ async function updateTransactionState(docRef, newState, additionalData = {}) {
 
 // Sign QR payload for payment requests (with nonce for replay protection)
 exports.signQrPayload = functions
-  .runWith({ secrets: [QR_SECRET_PARAM] })
+  .runWith({ secrets: [QR_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -3891,7 +3891,7 @@ exports.signQrPayload = functions
 
 // Verify QR signature before processing payment (with nonce replay protection)
 exports.verifyQrSignature = functions
-  .runWith({ secrets: [QR_SECRET_PARAM] })
+  .runWith({ secrets: [QR_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4055,7 +4055,7 @@ function maskName(name) {
 }
 
 // Lookup wallet with rate limiting
-exports.lookupWallet = functions.https.onCall(async (data, context) => {
+exports.lookupWallet = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -4128,7 +4128,7 @@ exports.lookupWallet = functions.https.onCall(async (data, context) => {
  * then call this function with the new PIN hash.
  */
 exports.resetPin = functions
-  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .runWith({ secrets: [PIN_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4242,7 +4242,7 @@ function verifyPinServer(clientHash, storedHash, salt) {
 // ============================================================
 
 exports.changePin = functions
-  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .runWith({ secrets: [PIN_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4307,7 +4307,7 @@ exports.changePin = functions
 
 
 exports.blockAccount = functions
-  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .runWith({ secrets: [PIN_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4362,7 +4362,7 @@ const userData = userDoc.data();
  * Only allows unblock if the account was blocked by the user (not admin).
  */
 exports.unblockAccount = functions
-  .runWith({ secrets: [PIN_SECRET_PARAM] })
+  .runWith({ secrets: [PIN_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -4479,7 +4479,7 @@ async function verifyAdmin(context, requiredRole = 'support') {
  * One-time setup to assign super_admin role to the initial admin user.
  * Hardcoded UID for security — can only be called once.
  */
-exports.setupSuperAdmin = functions.https.onCall(async (data, context) => {
+exports.setupSuperAdmin = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // L-05: Allowlist is stored in Firestore at admin_bootstrap_config/allowed_emails.
   // Managed via updateSuperAdminAllowlist CF (super_admin only). See commit 10.
   // H-03: This function is ONE-TIME-ONLY. After the initial super_admin exists
@@ -4621,7 +4621,7 @@ async function resolveTargetUid(data) {
     'Either targetEmail or targetUid is required.');
 }
 
-exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
+exports.adminPromoteUser = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const { role: newRole } = data;
 
   if (!newRole) {
@@ -4721,7 +4721,7 @@ exports.adminPromoteUser = functions.https.onCall(async (data, context) => {
  * Demote a user by removing their admin role.
  * Only super_admin can demote admins; admin+ can demote support.
  */
-exports.adminDemoteUser = functions.https.onCall(async (data, context) => {
+exports.adminDemoteUser = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const { newRole } = data;
 
   const targetUid = await resolveTargetUid(data);
@@ -4908,7 +4908,7 @@ async function performDemotion(targetUid, targetEmail, previousRole, newRole, ca
  *  - Intended to be invoked via a dedicated high-risk UI with confirmation
  *    (dashboard side shipped in master plan Commit 19)
  */
-exports.promoteSuperAdmin = functions.https.onCall(async (data, context) => {
+exports.promoteSuperAdmin = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const targetUid = await resolveTargetUid(data);
 
   // Only super_admin can promote another super_admin
@@ -5075,7 +5075,7 @@ async function _createStaffAccount(email, displayName) {
  * Supervisor: submit a request to onboard a new staff member.
  * Manager/super_admin will approve or reject.
  */
-exports.staffOnboardingRequest = functions.https.onCall(async (data, context) => {
+exports.staffOnboardingRequest = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const email = data.email ? String(data.email).trim().toLowerCase() : null;
@@ -5146,7 +5146,7 @@ exports.staffOnboardingRequest = functions.https.onCall(async (data, context) =>
  * Creates the Firebase Auth user and returns the password reset link
  * (manager copies it to email to the new employee).
  */
-exports.staffOnboardingApprove = functions.https.onCall(async (data, context) => {
+exports.staffOnboardingApprove = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
   const requestId = data.requestId ? String(data.requestId).trim() : null;
@@ -5195,7 +5195,7 @@ exports.staffOnboardingApprove = functions.https.onCall(async (data, context) =>
 /**
  * Manager/super_admin: reject a pending onboarding request.
  */
-exports.staffOnboardingReject = functions.https.onCall(async (data, context) => {
+exports.staffOnboardingReject = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
   const requestId = data.requestId ? String(data.requestId).trim() : null;
@@ -5241,7 +5241,7 @@ exports.staffOnboardingReject = functions.https.onCall(async (data, context) => 
  * Manager/super_admin: directly onboard a staff member without approval queue.
  * Skips the supervisor request step entirely.
  */
-exports.staffOnboardingDirect = functions.https.onCall(async (data, context) => {
+exports.staffOnboardingDirect = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
   const email = data.email ? String(data.email).trim().toLowerCase() : null;
@@ -5305,7 +5305,7 @@ exports.staffOnboardingDirect = functions.https.onCall(async (data, context) => 
  * Read-only: list onboarding requests by status.
  * supervisor sees only their own requests; admin_manager+ sees all.
  */
-exports.staffOnboardingListPending = functions.https.onCall(async (data, context) => {
+exports.staffOnboardingListPending = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const status = data.status ? String(data.status) : 'pending';
@@ -5446,7 +5446,7 @@ exports.onUserAuthVerified = functions.auth.user().onCreate(async (user) => {
  *
  * Ref: L-05
  */
-exports.updateSuperAdminAllowlist = functions.https.onCall(async (data, context) => {
+exports.updateSuperAdminAllowlist = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
   const { action, email } = data;
@@ -5541,7 +5541,7 @@ exports.updateSuperAdminAllowlist = functions.https.onCall(async (data, context)
  *
  * Ref: L-05
  */
-exports.adminGetAllowlist = functions.https.onCall(async (data, context) => {
+exports.adminGetAllowlist = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'super_admin');
 
   const allowlistDoc = await db.collection('admin_bootstrap_config').doc('allowed_emails').get();
@@ -5561,7 +5561,7 @@ exports.adminGetAllowlist = functions.https.onCall(async (data, context) => {
 /**
  * Search for users by email, phone, or name.
  */
-exports.adminSearchUser = functions.https.onCall(async (data, context) => {
+exports.adminSearchUser = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'support');
 
   const { query, searchType = 'email' } = data;
@@ -5636,7 +5636,7 @@ exports.adminSearchUser = functions.https.onCall(async (data, context) => {
 /**
  * Get detailed user information including wallet and recent transactions.
  */
-exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
+exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'support');
 
   const { targetUid } = data;
@@ -5725,7 +5725,7 @@ exports.adminGetUserDetails = functions.https.onCall(async (data, context) => {
 /**
  * Admin block account — blocks a user's account with admin authority.
  */
-exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
+exports.adminBlockAccount = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid, reason } = data;
@@ -5780,7 +5780,7 @@ exports.adminBlockAccount = functions.https.onCall(async (data, context) => {
 /**
  * Admin unblock account — unblocks a user's account.
  */
-exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
+exports.adminUnblockAccount = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid } = data;
@@ -5835,7 +5835,7 @@ exports.adminUnblockAccount = functions.https.onCall(async (data, context) => {
 /**
  * Admin update user email.
  */
-exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
+exports.adminUpdateUserEmail = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { targetUid, newEmail } = data;
@@ -5880,7 +5880,7 @@ exports.adminUpdateUserEmail = functions.https.onCall(async (data, context) => {
  * Admin send recovery OTP to a user's phone number.
  */
 exports.adminSendRecoveryOTP = functions
-  .runWith({ secrets: [AT_API_KEY] })
+  .runWith({ secrets: [AT_API_KEY], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
@@ -5986,7 +5986,7 @@ exports.adminSendRecoveryOTP = functions
 /**
  * Admin verify recovery OTP.
  */
-exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) => {
+exports.adminVerifyRecoveryOTP = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
   const { targetUid, otp } = data;
@@ -6060,7 +6060,7 @@ exports.adminVerifyRecoveryOTP = functions.https.onCall(async (data, context) =>
 /**
  * List all admin/support users.
  */
-exports.adminListAdmins = functions.https.onCall(async (data, context) => {
+exports.adminListAdmins = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin_manager');
 
   // Read from admin_users (the registry of admins), not users (the registry of
@@ -6105,7 +6105,7 @@ exports.adminListAdmins = functions.https.onCall(async (data, context) => {
  *
  * Ref: bundle commit 23b
  */
-exports.adminLookupUserRole = functions.https.onCall(async (data, context) => {
+exports.adminLookupUserRole = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
   const email = data.targetEmail ? String(data.targetEmail).trim().toLowerCase() : null;
@@ -6148,7 +6148,7 @@ exports.adminLookupUserRole = functions.https.onCall(async (data, context) => {
 /**
  * Get platform stats for admin dashboard.
  */
-exports.adminGetStats = functions.https.onCall(async (data, context) => {
+exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'auditor');
 
   // Total users
@@ -6203,7 +6203,7 @@ exports.adminGetStats = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Export all users for CSV download.
  */
-exports.adminExportUsers = functions.https.onCall(async (data, context) => {
+exports.adminExportUsers = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
   try {
@@ -6256,7 +6256,7 @@ exports.adminExportUsers = functions.https.onCall(async (data, context) => {
  * Admin: Log a login or logout event.
  * Called by the dashboard when an admin signs in or out.
  */
-exports.adminLogActivity = functions.https.onCall(async (data, context) => {
+exports.adminLogActivity = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // Modernized from manual 3-role check to verifyAdmin helper in Commit 13.
   // Previously hardcoded ['support', 'admin', 'super_admin'] — which locked
   // out admin_manager, admin_supervisor, finance, auditor, viewer roles.
@@ -6303,7 +6303,7 @@ exports.adminLogActivity = functions.https.onCall(async (data, context) => {
  * Admin: Get activity logs with filtering.
  * Support can only see their own logs. Admin/super_admin can see all.
  */
-exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
+exports.adminGetActivityLogs = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, filterUid, filterAction } = data || {};
@@ -6333,7 +6333,7 @@ exports.adminGetActivityLogs = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Get audit logs (admin and super_admin only).
  */
-exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
+exports.adminGetAuditLogs = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, filterUserId, filterOperation } = data || {};
@@ -6364,7 +6364,7 @@ exports.adminGetAuditLogs = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Get platform wallet overview — total revenue, per-currency balances.
  */
-exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) => {
+exports.adminGetPlatformWallet = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   try {
@@ -6416,7 +6416,7 @@ exports.adminGetPlatformWallet = functions.https.onCall(async (data, context) =>
  *
  * Ref: D-08, L-35
  */
-exports.adminGetPlatformLimits = functions.https.onCall(async (data, context) => {
+exports.adminGetPlatformLimits = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'finance');
   const doc = await db.collection('app_config').doc('platform_limits').get();
   if (!doc.exists) {
@@ -6432,7 +6432,7 @@ exports.adminGetPlatformLimits = functions.https.onCall(async (data, context) =>
 /**
  * Admin: Get platform fee history with pagination.
  */
-exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
+exports.adminGetFeeHistory = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   const { limit: queryLimit, currency: filterCurrency } = data || {};
@@ -6466,7 +6466,7 @@ exports.adminGetFeeHistory = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Get platform withdrawal history.
  */
-exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, context) => {
+exports.adminGetPlatformWithdrawals = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   const { limit: queryLimit } = data || {};
@@ -6500,7 +6500,7 @@ exports.adminGetPlatformWithdrawals = functions.https.onCall(async (data, contex
  * Admin: Get list of banks for a country (reuses Paystack API).
  */
 exports.adminGetBanks = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
@@ -6531,7 +6531,7 @@ exports.adminGetBanks = functions
  * Admin: Verify a bank account via Paystack.
  */
 exports.adminVerifyBankAccount = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   await verifyAdmin(context, 'admin');
 
@@ -6562,7 +6562,7 @@ exports.adminVerifyBankAccount = functions
  * Only super_admin can initiate transfers.
  */
 exports.adminInitiateTransfer = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
@@ -6857,7 +6857,7 @@ exports.adminInitiateTransfer = functions
  *
  * Ref: Phase 2a commit 2 (human-pair)
  */
-exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
+exports.adminProposeTransfer = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   // Check if caller is in blocked_finance_users (has overdue evidence)
@@ -7093,7 +7093,7 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
  * Ref: L-35, Q-05, D-06, D-07
  */
 exports.adminFinalizeTransfer = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
@@ -7367,7 +7367,7 @@ async function cancelTransfer(withdrawalRef, wd, reference, caller, callerEmail,
  * Ref: Phase 2a agent commit 2/6
  */
 exports.adminApproveTransfer = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
@@ -7745,7 +7745,7 @@ exports.adminApproveTransfer = functions
  *
  * Ref: Phase 2a agent commit 3/6
  */
-exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
+exports.adminRejectTransfer = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
   const { proposalId, reason, idempotencyKey } = data || {};
@@ -7855,7 +7855,7 @@ exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
  *
  * Ref: Phase 2a agent commit 3/6
  */
-exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
+exports.adminCancelProposal = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   const { proposalId, idempotencyKey } = data || {};
@@ -7983,7 +7983,7 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
  *
  * Ref: Phase 2b agent commit 5/10
  */
-exports.adminEditProposal = functions.https.onCall(async (data, context) => {
+exports.adminEditProposal = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   const { proposalId, fields, idempotencyKey } = data || {};
@@ -8114,7 +8114,7 @@ exports.adminEditProposal = functions.https.onCall(async (data, context) => {
  *
  * Ref: Phase 2b agent commit 8/10
  */
-exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
+exports.adminCloseProposal = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
   const { proposalId, idempotencyKey } = data || {};
@@ -8238,7 +8238,7 @@ exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
  * Ref: Phase 2b commit 4 (human-pair)
  */
 exports.adminUploadProposalDocument = functions
-  .runWith({ memory: '512MB' })
+  .runWith({ memory: '512MB', enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
@@ -8415,7 +8415,7 @@ exports.adminUploadProposalDocument = functions
  *
  * Ref: Phase 2b commit 4 (human-pair)
  */
-exports.adminGetProposalDocumentUrl = functions.https.onCall(async (data, context) => {
+exports.adminGetProposalDocumentUrl = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { proposalId, documentType, index } = data || {};
@@ -8494,7 +8494,7 @@ exports.adminGetProposalDocumentUrl = functions.https.onCall(async (data, contex
   }
 });
 
-exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
+exports.adminEmergencyTransfer = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
   const { amount, currency, bankCode, accountNumber, accountName, purpose, reason, notes, idempotencyKey } = data || {};
@@ -8659,7 +8659,7 @@ exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) =>
  *
  * Ref: Phase 2a agent commit 5/6
  */
-exports.adminListTransferProposals = functions.https.onCall(async (data, context) => {
+exports.adminListTransferProposals = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { status: filterStatus, limit: requestedLimit, startAfter } = data || {};
@@ -8728,7 +8728,7 @@ exports.adminListTransferProposals = functions.https.onCall(async (data, context
  * Admin: Get all transactions across the platform using collectionGroup query.
  * Supports filtering by type, status, currency, and date range.
  */
-exports.adminGetAllTransactions = functions.https.onCall(async (data, context) => {
+exports.adminGetAllTransactions = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const {
@@ -8809,7 +8809,7 @@ exports.adminGetAllTransactions = functions.https.onCall(async (data, context) =
 /**
  * Admin: Get transaction volume statistics.
  */
-exports.adminGetTransactionStats = functions.https.onCall(async (data, context) => {
+exports.adminGetTransactionStats = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { days } = data || {};
@@ -8904,7 +8904,7 @@ exports.adminGetTransactionStats = functions.https.onCall(async (data, context) 
 /**
  * Admin: Flag a transaction for review.
  */
-exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
+exports.adminFlagTransaction = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { userId, transactionId, reason } = data;
@@ -8985,7 +8985,7 @@ exports.adminFlagTransaction = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Get flagged transactions.
  */
-exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, context) => {
+exports.adminGetFlaggedTransactions = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, resolved } = data || {};
@@ -9017,7 +9017,7 @@ exports.adminGetFlaggedTransactions = functions.https.onCall(async (data, contex
 /**
  * Admin: Resolve a flagged transaction.
  */
-exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, context) => {
+exports.adminResolveFlaggedTransaction = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { transactionId, resolution } = data;
@@ -9065,7 +9065,7 @@ exports.adminResolveFlaggedTransaction = functions.https.onCall(async (data, con
 /**
  * Admin: Get fraud alerts.
  */
-exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
+exports.adminGetFraudAlerts = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'auditor');
 
   const { limit: queryLimit, status: filterStatus, severity: filterSeverity } = data || {};
@@ -9102,7 +9102,7 @@ exports.adminGetFraudAlerts = functions.https.onCall(async (data, context) => {
 /**
  * Admin: Resolve a fraud alert.
  */
-exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) => {
+exports.adminResolveFraudAlert = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { alertId, resolution, action } = data;
@@ -9169,7 +9169,7 @@ exports.adminResolveFraudAlert = functions.https.onCall(async (data, context) =>
 /**
  * Admin: Get fraud alert statistics.
  */
-exports.adminGetFraudStats = functions.https.onCall(async (data, context) => {
+exports.adminGetFraudStats = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'auditor');
 
   try {
@@ -9287,7 +9287,7 @@ function smileIdRequest(method, path, data = null) {
 
 // Verify phone number belongs to ID holder
 exports.verifyPhoneNumber = functions
-  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -9421,7 +9421,7 @@ exports.verifyPhoneNumber = functions
 });
 
 // Check if phone verification is supported for a country
-exports.checkPhoneVerificationSupport = functions.https.onCall(async (data, context) => {
+exports.checkPhoneVerificationSupport = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -9514,7 +9514,7 @@ function calculateFee(amount, isCrossCountry) {
 // PREVIEW TRANSFER (Get exact fee before sending)
 // ============================================================
 
-exports.previewTransfer = functions.https.onCall(async (data, context) => {
+exports.previewTransfer = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -9598,7 +9598,7 @@ exports.previewTransfer = functions.https.onCall(async (data, context) => {
   }
 });
 
-exports.sendMoney = functions.https.onCall(async (data, context) => {
+exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // 1. Check authentication
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -10072,7 +10072,7 @@ async function momoRequest(product, method, path, data, referenceId) {
 // ============================================================
 
 exports.momoRequestToPay = functions
-  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -10179,7 +10179,7 @@ exports.momoRequestToPay = functions
 // ============================================================
 
 exports.momoCheckStatus = functions
-  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -10356,7 +10356,7 @@ exports.momoCheckStatus = functions
 // ============================================================
 
 exports.momoTransfer = functions
-  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -10551,7 +10551,7 @@ exports.momoTransfer = functions
 // ============================================================
 
 exports.momoGetBalance = functions
-  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM] })
+  .runWith({ secrets: [MOMO_COLLECTIONS_SUBSCRIPTION_KEY_PARAM, MOMO_COLLECTIONS_API_USER_PARAM, MOMO_COLLECTIONS_API_KEY_PARAM, MOMO_DISBURSEMENTS_SUBSCRIPTION_KEY_PARAM, MOMO_DISBURSEMENTS_API_USER_PARAM, MOMO_DISBURSEMENTS_API_KEY_PARAM, MOMO_WEBHOOK_SECRET_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   // Restricted to admin — exposes platform MoMo balance
   await verifyAdmin(context, 'finance');
@@ -11122,7 +11122,7 @@ exports.smileIdWebhook = functions
 // SmileID Job Status Polling
 // ============================================================
 exports.checkSmileIdJobStatus = functions
-  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -11334,7 +11334,7 @@ exports.checkSmileIdJobStatus = functions
 // to submit ID number verification against government database
 // ============================================================
 exports.submitBiometricKycVerification = functions
-  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM] })
+  .runWith({ secrets: [SMILE_ID_API_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   // Lazy requires — keeps all changes localized to this function
   const SmileIdentityCore = require('smile-identity-core');
@@ -11521,7 +11521,7 @@ exports.submitBiometricKycVerification = functions
  *
  * Auth: Caller must be the wallet owner OR have the 'walletHoldsWrite' custom claim.
  */
-exports.createHold = functions.https.onCall(async (data, context) => {
+exports.createHold = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -11665,7 +11665,7 @@ exports.createHold = functions.https.onCall(async (data, context) => {
  * Auth: Caller must be the wallet owner, the service that created the
  * hold (matched by createdByService), or a super_admin.
  */
-exports.releaseHold = functions.https.onCall(async (data, context) => {
+exports.releaseHold = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -11809,7 +11809,7 @@ exports.releaseHold = functions.https.onCall(async (data, context) => {
  *
  * Auth: Caller must be the wallet owner, the creating service, or an admin.
  */
-exports.getHoldStatus = functions.https.onCall(async (data, context) => {
+exports.getHoldStatus = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -11877,7 +11877,7 @@ exports.getHoldStatus = functions.https.onCall(async (data, context) => {
  *
  * Auth: Caller must be the wallet owner.
  */
-exports.listHoldsForWallet = functions.https.onCall(async (data, context) => {
+exports.listHoldsForWallet = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -11949,7 +11949,7 @@ exports.listHoldsForWallet = functions.https.onCall(async (data, context) => {
  * Auth: Caller must be the service that created the hold (walletHoldsWrite
  * claim) or a super_admin. The wallet owner CANNOT convert their own hold.
  */
-exports.convertHoldToTransfer = functions.https.onCall(async (data, context) => {
+exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -12452,7 +12452,7 @@ function verifyBusinessWalletAccess(callerId, businessWalletData, requiredRole =
  *
  * Auth: QR Wallet super_admin only (not business wallet role — this is a platform-level action).
  */
-exports.createBusinessWallet = functions.https.onCall(async (data, context) => {
+exports.createBusinessWallet = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // Only QR Wallet super_admin can create business wallets
   const caller = await verifyAdmin(context, 'super_admin');
 
@@ -12592,7 +12592,7 @@ exports.createBusinessWallet = functions.https.onCall(async (data, context) => {
  * Returns balance, currency, and summary stats for a business wallet.
  * Auth: Any role in ownerUsers.
  */
-exports.businessWalletGetOverview = functions.https.onCall(async (data, context) => {
+exports.businessWalletGetOverview = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -12663,7 +12663,7 @@ exports.businessWalletGetOverview = functions.https.onCall(async (data, context)
  * Returns paginated transactions for a business wallet.
  * Auth: Any role in ownerUsers.
  */
-exports.businessWalletGetTransactions = functions.https.onCall(async (data, context) => {
+exports.businessWalletGetTransactions = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -12745,7 +12745,7 @@ exports.businessWalletGetTransactions = functions.https.onCall(async (data, cont
  * Since currency ≈ country in v1, this gives a country breakdown.
  * Auth: Any role in ownerUsers.
  */
-exports.businessWalletGetCountryBreakdown = functions.https.onCall(async (data, context) => {
+exports.businessWalletGetCountryBreakdown = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -12795,7 +12795,7 @@ exports.businessWalletGetCountryBreakdown = functions.https.onCall(async (data, 
  * Auth: super_admin on the business wallet only.
  */
 exports.businessWalletWithdraw = functions
-  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM] })
+  .runWith({ secrets: [PAYSTACK_SECRET_KEY_PARAM], enforceAppCheck: true })
   .https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
@@ -12956,7 +12956,7 @@ exports.businessWalletWithdraw = functions
  * Auth: admin+ on the business wallet (with escalation rules enforced).
  * Idempotent: calling twice with the same refundId is a no-op.
  */
-exports.businessWalletRefundTransaction = functions.https.onCall(async (data, context) => {
+exports.businessWalletRefundTransaction = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -13638,7 +13638,7 @@ exports.coldArchiveScheduled = functions.pubsub
  *
  * Ref: Phase 2b agent commit 10/10
  */
-exports.adminRestoreFromArchive = functions.https.onCall(async (data, context) => {
+exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
   const { collection, docId } = data || {};
