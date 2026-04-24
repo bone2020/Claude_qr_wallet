@@ -7338,7 +7338,7 @@ exports.adminApproveTransfer = functions
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
-  const { proposalId, idempotencyKey, approvalNote } = data || {};
+  const { proposalId, idempotencyKey, approvalNote, checklistConfirmations } = data || {};
 
   // Input validation
   if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
@@ -7346,6 +7346,23 @@ exports.adminApproveTransfer = functions
   }
   if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
     throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+  if (!Array.isArray(checklistConfirmations) || checklistConfirmations.length !== 4) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'checklistConfirmations is required — must be an array of exactly 4 confirmation objects.');
+  }
+  const REQUIRED_CHECKLIST_ITEMS = [
+    'amount_verified',
+    'recipient_verified',
+    'purpose_approved',
+    'funds_available',
+  ];
+  for (const required of REQUIRED_CHECKLIST_ITEMS) {
+    const match = checklistConfirmations.find(c => c && c.item === required && c.confirmed === true);
+    if (!match) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `Missing checklist confirmation for '${required}'. All 4 items must be confirmed.`);
+    }
   }
 
   // Rate limit
@@ -7426,6 +7443,12 @@ exports.adminApproveTransfer = functions
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         approvalIdempotencyKey: idempotencyKey,
         approvalNote: approvalNote || null,
+        checklistConfirmations: checklistConfirmations.map(c => ({
+          item: c.item,
+          confirmed: c.confirmed === true,
+          confirmedBy: { uid: caller.uid, email: callerEmail, role: caller.role },
+          confirmedAt: admin.firestore.Timestamp.now(),
+        })),
       });
     });
 
