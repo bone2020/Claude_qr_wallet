@@ -271,5 +271,23 @@ service cloud.firestore {
     match /blocked_finance_users/{uid} {
       allow read, write: if false;
     }
+
+    // disputes — Cloud Functions only (with exception for filer+recipient to READ their own)
+    match /disputes/{disputeId} {
+      allow read: if request.auth != null
+        && (resource.data.filedBy.uid == request.auth.uid
+            || resource.data.recipientUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // wallet_blocks — Cloud Functions only
+    match /wallet_blocks/{blockId} {
+      allow read, write: if false;
+    }
+
+    // dispute_history — Cloud Functions only
+    match /dispute_history/{userUid} {
+      allow read, write: if false;
+    }
   }
 }

@@ -185,6 +185,42 @@ class TransactionDetailsScreen extends ConsumerWidget {
               currencySymbol,
             ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
+            // Report Issue button — visible only for outgoing txns < 7 days old
+            if (!isCredit && transaction.type == TransactionType.send) ...[
+              Builder(builder: (context) {
+                final txAge = DateTime.now().difference(transaction.createdAt);
+                if (txAge.inDays >= 7) return const SizedBox.shrink();
+                return Column(
+                  children: [
+                    const SizedBox(height: AppDimensions.spaceXL),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          context.push('/file-dispute', extra: {
+                            'transactionId': transaction.id,
+                            'transactionAmount': transaction.amount,
+                            'transactionCurrency': transaction.currency,
+                            'recipientName': transaction.receiverName,
+                          });
+                        },
+                        icon: const Icon(Icons.flag_outlined, color: AppColors.error),
+                        label: Text(
+                          'Report Issue',
+                          style: AppTextStyles.bodyMedium(color: AppColors.error),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ],
+
             const SizedBox(height: AppDimensions.spaceLG),
           ],
         ),
