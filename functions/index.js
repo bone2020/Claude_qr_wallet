@@ -14559,3 +14559,110 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
     throw new functions.https.HttpsError('internal', 'Failed to submit manager decision: ' + error.message);
   }
 });
+
+/**
+ * Admin: List disputes with optional filters and pagination.
+ * Auditor+ can access for compliance.
+ */
+exports.adminListDisputes = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+  const { status: filterStatus, assignedToMe, limit: requestedLimit, startAfter } = data || {};
+
+  const VALID_STATUSES = ['filed', 'investigating', 'supervisor_review', 'manager_review', 'super_admin_escalation', 'resolved', 'closed_stuck'];
+  if (filterStatus && !VALID_STATUSES.includes(filterStatus)) {
+    throw new functions.https.HttpsError('invalid-argument', `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminListDisputes');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminListDisputes.message);
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') {
+    limit = Math.min(Math.max(requestedLimit, 1), 200);
+  }
+
+  try {
+    let query = db.collection('disputes').orderBy('filedAt', 'desc').limit(limit);
+
+    if (filterStatus) query = query.where('status', '==', filterStatus);
+    if (assignedToMe === true) query = query.where('assignedAdmin.uid', '==', caller.uid);
+
+    // Admin role (level 5 exactly) sees only their assigned disputes
+    const roleHierarchy = { viewer: 1, auditor: 2, support: 3, admin: 4, admin_supervisor: 5, finance: 6, admin_manager: 7, super_admin: 8 };
+    if (caller.role === 'admin' && (roleHierarchy[caller.role] || 0) === 4) {
+      query = query.where('assignedAdmin.uid', '==', caller.uid);
+    }
+
+    if (startAfter && typeof startAfter === 'string') {
+      const cursorDoc = await db.collection('disputes').doc(startAfter).get();
+      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+    }
+
+    const snap = await query.get();
+    const isAuditor = caller.role === 'auditor';
+    const disputes = snap.docs.map(doc => {
+      const d = doc.data();
+      return { ...d, _readOnly: isAuditor || undefined };
+    });
+
+    return { success: true, disputes, count: disputes.length, hasMore: disputes.length === limit };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminListDisputes failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to list disputes: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Get a signed URL for dispute evidence file.
+ * Auditor+ can access. Logs every access for compliance.
+ */
+exports.adminGetDisputeEvidenceUrl = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+  const { disputeId, evidenceIndex, fromRecipient } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (evidenceIndex === undefined || typeof evidenceIndex !== 'number' || evidenceIndex < 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'evidenceIndex is required and must be a non-negative number.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminGetDisputeEvidenceUrl');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminGetDisputeEvidenceUrl.message);
+
+  try {
+    const disputeSnap = await db.collection('disputes').doc(disputeId).get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    const evidenceArray = fromRecipient ? (dispute.recipientEvidence || []) : (dispute.evidence || []);
+    if (evidenceIndex >= evidenceArray.length) {
+      throw new functions.https.HttpsError('not-found', 'Evidence item not found at the specified index.');
+    }
+
+    const evidenceItem = evidenceArray[evidenceIndex];
+    if (!evidenceItem || !evidenceItem.path) {
+      throw new functions.https.HttpsError('not-found', 'Evidence file path not available.');
+    }
+
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(evidenceItem.path);
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 5 * 60 * 1000,
+    });
+
+    // Compliance audit log
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminGetDisputeEvidenceUrl', result: 'success',
+      metadata: { disputeId, evidenceIndex, fromRecipient: !!fromRecipient, accessedBy: callerEmail },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, url, expiresInSeconds: 300 };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminGetDisputeEvidenceUrl failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to get evidence URL: ' + error.message);
+  }
+});
