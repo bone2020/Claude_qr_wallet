@@ -6723,6 +6723,211 @@ exports.adminInitiateTransfer = functions
 });
 
 /**
+ * Admin: Propose a platform bank transfer (finance entry point for dual-sig).
+ *
+ * Creates a proposal doc in platform_transfer_proposals with status='proposed'.
+ * Does NOT move money. Money movement happens when admin_manager approves
+ * via adminApproveTransfer (which handles the Paystack flow in a future commit).
+ *
+ * Dual-signature flow:
+ *   1. finance -> adminProposeTransfer (creates proposal)
+ *   2. admin_manager -> adminApproveTransfer (approves + executes Paystack transfer)
+ *   3. super_admin -> adminFinalizeTransfer (enters Paystack OTP if required)
+ *
+ * Security:
+ *   - finance role or higher (verifyAdmin)
+ *   - Rate limited (10 proposals/hour per caller)
+ *   - Idempotency required
+ *   - Finance daily cap check (financeDailyUSD from app_config/platform_limits)
+ *   - Per-transfer cap (perTransferUSD from app_config/platform_limits)
+ *
+ * Ref: Phase 2a commit 2 (human-pair)
+ */
+exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
+
+  // Idempotency key required
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'idempotencyKey is required (min 16 chars). Generate a UUID v4 client-side and pass it.');
+  }
+
+  // Rate limit
+  const rateLimitOk = await checkRateLimitPersistent(caller.uid, 'adminProposeTransfer');
+  if (!rateLimitOk) {
+    throw new functions.https.HttpsError('resource-exhausted',
+      RATE_LIMITS.adminProposeTransfer.message);
+  }
+
+  // Input validation
+  if (!amount || amount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Valid amount is required.');
+  }
+  if (!currency) {
+    throw new functions.https.HttpsError('invalid-argument', 'Currency is required.');
+  }
+  if (!bankCode || !accountNumber || !accountName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Bank details are required.');
+  }
+  if (!purpose || typeof purpose !== 'string' || purpose.length < 5) {
+    throw new functions.https.HttpsError('invalid-argument', 'Purpose is required (min 5 chars).');
+  }
+
+  // Read caps from app_config/platform_limits
+  const limitsDoc = await db.collection('app_config').doc('platform_limits').get();
+  const DEFAULT_PER_TRANSFER_USD = 50000;
+  const DEFAULT_FINANCE_DAILY_USD = 100000;
+  const perTransferUSD = limitsDoc.exists ? (limitsDoc.data().perTransferUSD || DEFAULT_PER_TRANSFER_USD) : DEFAULT_PER_TRANSFER_USD;
+  const financeDailyUSD = limitsDoc.exists ? (limitsDoc.data().financeDailyUSD || DEFAULT_FINANCE_DAILY_USD) : DEFAULT_FINANCE_DAILY_USD;
+
+  // Compute USD equivalent
+  const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+  const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+  const exchangeRate = rates[currency] || 1;
+  const amountInUSD = amount / exchangeRate;
+
+  // Per-transfer cap
+  if (amountInUSD > perTransferUSD) {
+    throw new functions.https.HttpsError('failed-precondition',
+      `Transfer amount $${amountInUSD.toFixed(2)} USD exceeds per-transfer cap of $${perTransferUSD.toFixed(2)} USD.`);
+  }
+
+  // Finance daily cap (per finance user, rolling 24h, based on proposals created)
+  const twentyFourHoursAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+  const recentProposalsSnap = await db.collection('platform_transfer_proposals')
+    .where('proposedBy.uid', '==', caller.uid)
+    .where('proposedAt', '>=', twentyFourHoursAgo)
+    .get();
+
+  const TERMINAL_NON_CONSUMING = new Set(['rejected', 'cancelled', 'expired']);
+  const dailyTotalUSD = recentProposalsSnap.docs.reduce((sum, doc) => {
+    const d = doc.data();
+    if (TERMINAL_NON_CONSUMING.has(d.status)) return sum;
+    return sum + (d.usdEquivalent || 0);
+  }, 0);
+
+  if (dailyTotalUSD + amountInUSD > financeDailyUSD) {
+    throw new functions.https.HttpsError('resource-exhausted',
+      `Transfer would exceed your daily proposal cap. ` +
+      `Used today: $${dailyTotalUSD.toFixed(2)} USD. ` +
+      `Requested: $${amountInUSD.toFixed(2)} USD. ` +
+      `Daily cap: $${financeDailyUSD.toFixed(2)} USD. ` +
+      `Available headroom: $${(financeDailyUSD - dailyTotalUSD).toFixed(2)} USD.`);
+  }
+
+  // Wrap main body in idempotency
+  return withIdempotency(idempotencyKey, 'adminProposeTransfer', caller.uid, async () => {
+    try {
+      // Get caller identity
+      const callerUser = await admin.auth().getUser(caller.uid);
+      const callerEmail = callerUser.email || 'unknown';
+      const callerDisplayName = callerUser.displayName || callerEmail;
+
+      // Generate proposal ID
+      const proposalId = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+      const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+
+      // expiresAt = now + 15 min
+      const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000);
+
+      // Write proposal doc
+      await proposalRef.set({
+        proposalId,
+        status: 'proposed',
+
+        // Money
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+        exchangeRate,
+
+        // Recipient
+        bankCode,
+        accountNumber,
+        accountName,
+
+        // Description
+        purpose,
+        notes: notes || null,
+        priorityFlag: false,
+
+        // Stage: proposed
+        proposedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        proposedAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt,
+        idempotencyKey,
+
+        // Future stages — null until transitions happen
+        approvedBy: null,
+        approvedAt: null,
+        approvalIdempotencyKey: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectionReason: null,
+        cancelledBy: null,
+        cancelledAt: null,
+        cancelReason: null,
+        recipientCode: null,
+        transferCode: null,
+        paystackStatus: null,
+        otpFailedAttempts: null,
+        otpExpiresAt: null,
+        completedBy: null,
+        completedAt: null,
+
+        // Emergency flag (false for standard proposals)
+        emergency: false,
+        emergencyReason: null,
+        emergencyInvokedBy: null,
+      });
+
+      // Audit log
+      await auditLog({
+        userId: caller.uid,
+        operation: 'adminProposeTransfer',
+        result: 'success',
+        amount,
+        currency,
+        metadata: { proposalId, purpose, bankCode, accountNumber, accountName, usdEquivalent: amountInUSD },
+        ipHash: hashIp(context),
+      });
+
+      // Admin activity log
+      await db.collection('admin_activity').add({
+        uid: caller.uid,
+        email: callerEmail,
+        role: caller.role,
+        action: 'propose_transfer',
+        details: `Proposed transfer ${proposalId}: ${currency} ${amount.toFixed(2)} ($${amountInUSD.toFixed(2)}) to ${accountName} at ${bankCode} for: ${purpose}`,
+        ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        success: true,
+        proposalId,
+        status: 'proposed',
+        expiresAt: expiresAt.toMillis(),
+        amount,
+        currency,
+        usdEquivalent: amountInUSD,
+      };
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) throw error;
+      logError('adminProposeTransfer failed', { uid: caller.uid, error: error.message });
+      throw new functions.https.HttpsError('internal', `Proposal failed: ${error.message}`);
+    }
+  });
+});
+
+/**
  * Admin: Finalize or cancel a pending_otp platform transfer.
  *
  * Two actions:
