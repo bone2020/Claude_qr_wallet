@@ -13709,3 +13709,246 @@ exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).h
     throw new functions.https.HttpsError('internal', 'Failed to restore from archive: ' + error.message);
   }
 });
+
+// ============================================================
+// DISPUTE RESOLUTION SYSTEM (Phase 2d)
+// ============================================================
+
+/**
+ * Stub for opportunistic hold placement. Returns 0 (no hold).
+ * Human-pair commit 7 replaces this with real implementation that moves
+ * funds from recipient's availableBalance to heldBalance.
+ */
+async function placeOpportunisticHoldStub({ recipientUid, currency, requestedAmount, disputeId }) {
+  logInfo('placeOpportunisticHoldStub called (no-op)', { recipientUid, currency, requestedAmount, disputeId });
+  return 0;
+}
+
+/**
+ * User: File a dispute against a transaction.
+ * Validates 7-day window, max 3 active disputes, computes tiered fee.
+ * Places opportunistic hold on recipient's wallet (stub for now).
+ */
+exports.userFileDispute = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  }
+  const callerUid = context.auth.uid;
+
+  const { originalTransactionId, disputedAmount, issueType, description, idempotencyKey } = data || {};
+
+  // Input validation
+  const VALID_ISSUE_TYPES = ['money_sent_not_received', 'service_not_delivered', 'item_not_delivered', 'other'];
+  if (!originalTransactionId || typeof originalTransactionId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'originalTransactionId is required.');
+  }
+  if (!issueType || !VALID_ISSUE_TYPES.includes(issueType)) {
+    throw new functions.https.HttpsError('invalid-argument', `issueType must be one of: ${VALID_ISSUE_TYPES.join(', ')}`);
+  }
+  if (!description || typeof description !== 'string' || description.trim().length < 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'description must be at least 10 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+  if (!disputedAmount || typeof disputedAmount !== 'number' || disputedAmount <= 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'disputedAmount must be a positive number.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(callerUid, 'userFileDispute');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userFileDispute.message);
+  }
+
+  try {
+    // Look up original transaction (user's subcollection)
+    const txDoc = await db.collection('users').doc(callerUid)
+      .collection('transactions').doc(originalTransactionId).get();
+    if (!txDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Transaction not found.');
+    }
+    const tx = txDoc.data();
+
+    // Verify caller is sender
+    if (tx.senderWalletId !== callerUid && tx.senderWalletId !== tx.senderWalletId) {
+      // Check by looking up caller's wallet
+      const callerWalletDoc = await db.collection('wallets').doc(callerUid).get();
+      const callerWalletId = callerWalletDoc.exists ? callerWalletDoc.data().walletId : null;
+      if (tx.senderWalletId !== callerWalletId && tx.senderWalletId !== callerUid) {
+        throw new functions.https.HttpsError('permission-denied', 'You can only dispute transactions you sent.');
+      }
+    }
+
+    // 7-day window check
+    const txCreatedAt = tx.createdAt && tx.createdAt.toMillis ? tx.createdAt.toMillis() : Date.parse(tx.createdAt);
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    if (Date.now() - txCreatedAt > SEVEN_DAYS_MS) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'Dispute filing window expired. Disputes must be filed within 7 days of the transaction.');
+    }
+
+    // Disputed amount check
+    const originalAmount = tx.amount || 0;
+    if (disputedAmount > originalAmount) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `Disputed amount (${disputedAmount}) cannot exceed transaction amount (${originalAmount}).`);
+    }
+
+    // Max 3 active disputes
+    const activeDisputesSnap = await db.collection('disputes')
+      .where('filedBy.uid', '==', callerUid)
+      .where('status', 'not-in', ['resolved', 'closed_stuck'])
+      .limit(4)
+      .get();
+    if (activeDisputesSnap.size >= 3) {
+      throw new functions.https.HttpsError('resource-exhausted',
+        'You already have 3 active disputes. Please wait for existing disputes to resolve.');
+    }
+
+    // Compute fee
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+    const txCurrency = tx.currency || 'NGN';
+    const exchangeRate = rates[txCurrency] || 1;
+    const usdEquivalent = disputedAmount / exchangeRate;
+    const fee = calculateDisputeFee(usdEquivalent);
+
+    // Check caller wallet for fee deduction
+    const callerWallet = await db.collection('wallets').doc(callerUid).get();
+    let feeDeductedFrom = 'recovery';
+    const feeInMinorUnits = Math.round(fee * exchangeRate * 100);
+    if (callerWallet.exists) {
+      const walletData = callerWallet.data();
+      const available = walletData.availableBalance || walletData.balance || 0;
+      if (available >= feeInMinorUnits && feeInMinorUnits > 0) {
+        await db.collection('wallets').doc(callerUid).update({
+          balance: admin.firestore.FieldValue.increment(-feeInMinorUnits),
+          availableBalance: admin.firestore.FieldValue.increment(-feeInMinorUnits),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        feeDeductedFrom = 'wallet_at_filing';
+      }
+    }
+
+    // Generate dispute ID
+    const disputeId = `DSP-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(callerUid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const callerUserDoc = await db.collection('users').doc(callerUid).get();
+    const callerPhone = callerUserDoc.exists ? callerUserDoc.data().phoneNumber || '' : '';
+
+    // Get recipient info
+    const recipientUid = tx.receiverWalletId || '';
+    let recipientEmail = '', recipientDisplayName = '', recipientPhone = '';
+    if (recipientUid) {
+      try {
+        const recipientUserDoc = await db.collection('users').doc(recipientUid).get();
+        if (recipientUserDoc.exists) {
+          const rd = recipientUserDoc.data();
+          recipientEmail = rd.email || '';
+          recipientDisplayName = rd.fullName || rd.legalName || '';
+          recipientPhone = rd.phoneNumber || '';
+        }
+      } catch (e) { /* recipient lookup failure non-blocking */ }
+    }
+
+    // Place opportunistic hold (stub returns 0)
+    const holdAmount = await placeOpportunisticHoldStub({
+      recipientUid,
+      currency: txCurrency,
+      requestedAmount: disputedAmount,
+      disputeId,
+    });
+
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+    // Write dispute doc
+    await db.collection('disputes').doc(disputeId).set({
+      disputeId,
+      status: 'filed',
+      originalTransactionId,
+      disputedAmount,
+      disputedCurrency: txCurrency,
+      usdEquivalent,
+      filedBy: { uid: callerUid, email: callerEmail, displayName: callerDisplayName, phoneNumber: callerPhone },
+      filedAt: admin.firestore.FieldValue.serverTimestamp(),
+      recipientUid,
+      recipientEmail,
+      recipientDisplayName,
+      recipientPhoneNumber: recipientPhone,
+      issueType,
+      description: description.trim(),
+      evidence: [],
+      recipientResponse: null,
+      recipientResponseAt: null,
+      recipientEvidence: null,
+      assignedAdmin: null,
+      investigationFindings: null,
+      investigationSubmittedAt: null,
+      reviewingSupervisor: null,
+      supervisorDecision: null,
+      supervisorNotes: null,
+      supervisorDecidedAt: null,
+      reviewingManager: null,
+      managerDecision: null,
+      managerDecisionAmount: null,
+      managerNotes: null,
+      managerDecidedAt: null,
+      resolvedAt: null,
+      resolutionType: null,
+      amountRecovered: null,
+      amountUnrecovered: null,
+      currentHoldAmount: holdAmount,
+      holdHistory: [],
+      feeCharged: fee,
+      feeRefunded: false,
+      feeDeductedFrom,
+      escalatedToSuperAdmin: false,
+      superAdminDecision: null,
+      superAdminDecidedAt: null,
+      stuckCaseFlag: false,
+      notificationsSent: {},
+      graceTriggered: false,
+      graceTriggeredAt: null,
+      expectedResolutionBy: admin.firestore.Timestamp.fromMillis(Date.now() + THREE_DAYS_MS),
+    });
+
+    // Update dispute_history
+    const historyRef = db.collection('dispute_history').doc(callerUid);
+    await historyRef.set({
+      userUid: callerUid,
+      totalFiled: admin.firestore.FieldValue.increment(1),
+      totalActiveCount: admin.firestore.FieldValue.increment(1),
+      lastFiledAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: callerUid,
+      operation: 'userFileDispute',
+      result: 'success',
+      amount: disputedAmount,
+      currency: txCurrency,
+      metadata: { disputeId, originalTransactionId, issueType, fee, feeDeductedFrom },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      disputeId,
+      currentHoldAmount: holdAmount,
+      feeCharged: fee,
+      expectedResolutionBy: Date.now() + THREE_DAYS_MS,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('userFileDispute failed', { caller: callerUid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to file dispute: ' + error.message);
+  }
+});
