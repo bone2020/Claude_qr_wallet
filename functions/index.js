@@ -14666,3 +14666,180 @@ exports.adminGetDisputeEvidenceUrl = functions.runWith({ enforceAppCheck: true }
     throw new functions.https.HttpsError('internal', 'Failed to get evidence URL: ' + error.message);
   }
 });
+
+// ============================================================
+// DISPUTE SCHEDULERS (Phase 2d)
+// ============================================================
+
+/**
+ * Scheduled: Escalation check for disputes.
+ * Runs every 1 hour. Sends notifications at 12h marks, escalates at day 5, marks stuck at day 6.
+ */
+exports.disputeEscalationCheckScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const TERMINAL = ['resolved', 'closed_stuck'];
+    const now = Date.now();
+    const HOUR = 60 * 60 * 1000;
+    const DAY = 24 * HOUR;
+
+    const snap = await db.collection('disputes')
+      .where('status', 'not-in', TERMINAL)
+      .limit(200)
+      .get();
+
+    let processedCount = 0;
+
+    for (const doc of snap.docs) {
+      try {
+        const d = doc.data();
+        const filedAtMs = d.filedAt && d.filedAt.toMillis ? d.filedAt.toMillis() : 0;
+        if (!filedAtMs) continue;
+
+        const elapsed = now - filedAtMs;
+        const sent = d.notificationsSent || {};
+        const updates = {};
+
+        // Day 1 + 12h (36h): if investigating, nudge supervisor
+        if (elapsed >= 36 * HOUR && d.status === 'investigating' && !sent.day1_12h) {
+          const supervisorsSnap = await db.collection('admin_users').where('role', '==', 'admin_supervisor').get();
+          for (const sv of supervisorsSnap.docs) {
+            await sendProposalEmail({
+              to: sv.id, toName: sv.data().displayName || null,
+              subject: `Dispute ${doc.id} — investigation past 12h mark`,
+              htmlBody: `<p>Dispute <strong>${doc.id}</strong> has been in investigation for over 36 hours. Please check on progress.</p>`,
+              textBody: `Dispute ${doc.id} investigation past 12h mark. Check progress.`,
+              relatedTo: `dispute:${doc.id}`,
+            });
+          }
+          updates['notificationsSent.day1_12h'] = admin.firestore.FieldValue.serverTimestamp();
+        }
+
+        // Day 2 + 12h (60h): if supervisor_review, nudge manager
+        if (elapsed >= 60 * HOUR && d.status === 'supervisor_review' && !sent.day2_12h) {
+          const managersSnap = await db.collection('admin_users').where('role', '==', 'admin_manager').get();
+          for (const mgr of managersSnap.docs) {
+            await sendProposalEmail({
+              to: mgr.id, toName: mgr.data().displayName || null,
+              subject: `Dispute ${doc.id} — supervisor review past 12h mark`,
+              htmlBody: `<p>Dispute <strong>${doc.id}</strong> is in supervisor review past the 60-hour mark. Please escalate if needed.</p>`,
+              textBody: `Dispute ${doc.id} supervisor review past 60h. Escalate if needed.`,
+              relatedTo: `dispute:${doc.id}`,
+            });
+          }
+          updates['notificationsSent.day2_12h'] = admin.firestore.FieldValue.serverTimestamp();
+        }
+
+        // Day 3 + 12h (84h): if manager_review, nudge super_admin
+        if (elapsed >= 84 * HOUR && d.status === 'manager_review' && !sent.day3_12h) {
+          const superAdminsSnap = await db.collection('admin_users').where('role', '==', 'super_admin').get();
+          for (const sa of superAdminsSnap.docs) {
+            await sendProposalEmail({
+              to: sa.id, toName: sa.data().displayName || null,
+              subject: `Dispute ${doc.id} — manager decision overdue`,
+              htmlBody: `<p>Dispute <strong>${doc.id}</strong> has been waiting for manager decision past 84 hours. Consider intervening.</p>`,
+              textBody: `Dispute ${doc.id} manager decision overdue at 84h.`,
+              relatedTo: `dispute:${doc.id}`,
+            });
+          }
+          updates['notificationsSent.day3_12h'] = admin.firestore.FieldValue.serverTimestamp();
+        }
+
+        // Day 5: auto-escalate to super_admin
+        if (elapsed >= 5 * DAY && !d.escalatedToSuperAdmin && d.status !== 'super_admin_escalation') {
+          updates.status = 'super_admin_escalation';
+          updates.escalatedToSuperAdmin = true;
+          updates['notificationsSent.escalation'] = admin.firestore.FieldValue.serverTimestamp();
+
+          const superAdminsSnap = await db.collection('admin_users').where('role', '==', 'super_admin').get();
+          for (const sa of superAdminsSnap.docs) {
+            await sendProposalEmail({
+              to: sa.id, toName: sa.data().displayName || null,
+              subject: `ESCALATION: Dispute ${doc.id} auto-escalated to super_admin`,
+              htmlBody: `<p>Dispute <strong>${doc.id}</strong> has been open for 5 days without resolution. It has been auto-escalated for your decision.</p>`,
+              textBody: `ESCALATION: Dispute ${doc.id} auto-escalated after 5 days.`,
+              relatedTo: `dispute:${doc.id}`,
+            });
+          }
+        }
+
+        // Day 6: stuck case
+        if (elapsed >= 6 * DAY && d.escalatedToSuperAdmin && !d.superAdminDecidedAt && !d.stuckCaseFlag) {
+          updates.stuckCaseFlag = true;
+          updates.status = 'closed_stuck';
+          updates['notificationsSent.stuck'] = admin.firestore.FieldValue.serverTimestamp();
+
+          await db.collection('audit_logs').add({
+            userId: 'system', operation: 'dispute_closed_stuck', result: 'auto',
+            metadata: { disputeId: doc.id, elapsedDays: Math.round(elapsed / DAY) },
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await doc.ref.update(updates);
+          processedCount++;
+        }
+      } catch (error) {
+        logError('disputeEscalationCheckScheduled: failed to process dispute', {
+          disputeId: doc.id, error: error.message,
+        });
+      }
+    }
+
+    logInfo('disputeEscalationCheckScheduled completed', { processedCount });
+    return null;
+  });
+
+/**
+ * Scheduled: Top up dispute holds when recipient's wallet has new funds.
+ * Runs every 1 hour. Calls placeOpportunisticHoldStub (returns 0 until human-pair commit).
+ */
+exports.topUpDisputeHoldsScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const ACTIVE_STATUSES = ['filed', 'investigating', 'supervisor_review', 'manager_review'];
+
+    const snap = await db.collection('disputes')
+      .where('status', 'in', ACTIVE_STATUSES)
+      .limit(200)
+      .get();
+
+    let toppedUp = 0;
+
+    for (const doc of snap.docs) {
+      try {
+        const d = doc.data();
+        if ((d.currentHoldAmount || 0) >= d.disputedAmount) continue;
+
+        const shortfall = d.disputedAmount - (d.currentHoldAmount || 0);
+        const holdPlaced = await placeOpportunisticHoldStub({
+          recipientUid: d.recipientUid,
+          currency: d.disputedCurrency,
+          requestedAmount: shortfall,
+          disputeId: doc.id,
+        });
+
+        if (holdPlaced > 0) {
+          await doc.ref.update({
+            currentHoldAmount: admin.firestore.FieldValue.increment(holdPlaced),
+            holdHistory: admin.firestore.FieldValue.arrayUnion({
+              amount: holdPlaced,
+              placedAt: admin.firestore.Timestamp.now(),
+              source: 'topUpDisputeHoldsScheduled',
+            }),
+          });
+          toppedUp++;
+        }
+      } catch (error) {
+        logError('topUpDisputeHoldsScheduled: failed to process dispute', {
+          disputeId: doc.id, error: error.message,
+        });
+      }
+    }
+
+    logInfo('topUpDisputeHoldsScheduled completed', { toppedUp });
+    return null;
+  });
