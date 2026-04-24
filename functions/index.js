@@ -14400,3 +14400,162 @@ exports.adminSupervisorDecision = functions.runWith({ enforceAppCheck: true }).h
     throw new functions.https.HttpsError('internal', 'Failed to submit supervisor decision: ' + error.message);
   }
 });
+
+/**
+ * Admin: Manager final decision on a dispute.
+ * STUB: updates doc state only — money movement in human-pair commit 8.
+ */
+exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+  const { disputeId, decision, amount, notes, idempotencyKey } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  const VALID_DECISIONS = ['refund_full', 'refund_partial', 'release', 'kickback'];
+  if (!decision || !VALID_DECISIONS.includes(decision)) {
+    throw new functions.https.HttpsError('invalid-argument', `decision must be one of: ${VALID_DECISIONS.join(', ')}`);
+  }
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 20) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 20 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminManagerDecision');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminManagerDecision.message);
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    if (dispute.status !== 'manager_review') {
+      throw new functions.https.HttpsError('failed-precondition', `Dispute status is '${dispute.status}', expected 'manager_review'.`);
+    }
+
+    if (decision === 'refund_partial') {
+      if (!amount || typeof amount !== 'number' || amount <= 0 || amount >= dispute.disputedAmount) {
+        throw new functions.https.HttpsError('invalid-argument',
+          `Partial refund amount must be between 0 and ${dispute.disputedAmount} (exclusive).`);
+      }
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const managerInfo = { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName };
+
+    let newStatus;
+
+    if (decision === 'kickback') {
+      if (dispute.graceTriggered) {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot kick back twice. Must make a final decision or escalate.');
+      }
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+      const currentExpiry = dispute.expectedResolutionBy && dispute.expectedResolutionBy.toMillis
+        ? dispute.expectedResolutionBy.toMillis() : Date.now() + TWO_DAYS_MS;
+
+      newStatus = 'investigating';
+      await disputeRef.update({
+        status: 'investigating',
+        graceTriggered: true,
+        graceTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+        expectedResolutionBy: admin.firestore.Timestamp.fromMillis(currentExpiry + TWO_DAYS_MS),
+        reviewingManager: managerInfo,
+        managerDecision: 'kickback',
+        managerNotes: notes.trim(),
+      });
+
+      if (dispute.assignedAdmin && dispute.assignedAdmin.email) {
+        await sendProposalEmail({
+          to: dispute.assignedAdmin.email, toName: dispute.assignedAdmin.displayName || null,
+          subject: `Manager kicked back investigation on dispute ${disputeId}`,
+          htmlBody: `<p>Manager ${callerDisplayName} kicked back dispute <strong>${disputeId}</strong>.</p><p><strong>Notes:</strong> ${notes.trim()}</p>`,
+          textBody: `Manager kicked back dispute ${disputeId}. Notes: ${notes.trim()}`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    } else if (decision === 'release') {
+      newStatus = 'resolved';
+      await disputeRef.update({
+        status: 'resolved',
+        resolutionType: 'released',
+        amountRecovered: 0,
+        amountUnrecovered: 0,
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewingManager: managerInfo,
+        managerDecision: 'release',
+        managerNotes: notes.trim(),
+      });
+
+      await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
+        totalRejected: admin.firestore.FieldValue.increment(1),
+        totalActiveCount: admin.firestore.FieldValue.increment(-1),
+      }, { merge: true });
+
+      await sendCustomerSms({
+        phoneNumber: dispute.filedBy.phoneNumber,
+        message: `Dispute ${disputeId} closed in favor of recipient. No funds returned.`,
+        relatedTo: `dispute:${disputeId}`,
+      });
+      if (dispute.recipientPhoneNumber) {
+        await sendCustomerSms({
+          phoneNumber: dispute.recipientPhoneNumber,
+          message: `Dispute ${disputeId} resolved in your favor. Hold lifted.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    } else {
+      // refund_full or refund_partial — STUB: doc state only, no money movement
+      const decisionAmount = decision === 'refund_partial' ? amount : dispute.disputedAmount;
+      newStatus = 'resolved';
+      await disputeRef.update({
+        status: 'resolved',
+        resolutionType: decision,
+        amountRecovered: 0,
+        amountUnrecovered: dispute.disputedAmount,
+        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewingManager: managerInfo,
+        managerDecision: decision,
+        managerDecisionAmount: decisionAmount,
+        managerNotes: notes.trim(),
+        _awaitingMoneyMovement: true,
+      });
+
+      // TODO(Phase 2d human-pair commit 8): actually move money from recipient's
+      // heldBalance to filer's availableBalance. Update amountRecovered/amountUnrecovered
+      // based on what was actually in hold. Refund fee if feeDeductedFrom='wallet_at_filing'.
+      // Clear _awaitingMoneyMovement flag.
+
+      await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
+        totalUpheld: admin.firestore.FieldValue.increment(1),
+        totalActiveCount: admin.firestore.FieldValue.increment(-1),
+      }, { merge: true });
+
+      await sendCustomerSms({
+        phoneNumber: dispute.filedBy.phoneNumber,
+        message: `Dispute ${disputeId} resolved. Our team is processing the refund.`,
+        relatedTo: `dispute:${disputeId}`,
+      });
+    }
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminManagerDecision', result: 'success',
+      metadata: { disputeId, decision, notes: notes.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'manager_decision', details: `${decision} on dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId, status: newStatus, decision };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminManagerDecision failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to submit manager decision: ' + error.message);
+  }
+});
