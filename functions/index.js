@@ -947,6 +947,21 @@ async function sendCustomerSms({ phoneNumber, message, relatedTo }) {
   }
 }
 
+/**
+ * Calculate tiered dispute fee based on disputed amount (in USD).
+ * Refunded to filer if dispute is upheld. Kept by platform if rejected.
+ *
+ * Tiers: ≤$100: 1.5% | $100-$1k: 1% | $1k-$10k: 0.75% | >$10k: 0.5%
+ */
+function calculateDisputeFee(amountInUSD) {
+  let rate;
+  if (amountInUSD <= 100) rate = 0.015;
+  else if (amountInUSD <= 1000) rate = 0.010;
+  else if (amountInUSD <= 10000) rate = 0.0075;
+  else rate = 0.005;
+  return Math.round(amountInUSD * rate * 100) / 100;
+}
+
 // ============================================================
 // EXCHANGE RATE CONFIGURATION
 // ============================================================
@@ -2450,6 +2465,16 @@ const RATE_LIMITS = {
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
   initializeTransaction: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many payment initializations. Please try again later.' },
   checkSmileIdJobStatus: { windowMs: 60 * 1000, maxRequests: 30, message: 'Too many status check requests.' },
+  userFileDispute:            { windowMs: 60 * 60 * 1000, maxRequests: 5,  message: 'Too many dispute filings. Please try again later.' },
+  userRespondToDispute:       { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many responses. Please try again later.' },
+  userViewDispute:            { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many view requests.' },
+  userGetMyDisputes:          { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
+  adminAssignDispute:         { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many assignment attempts.' },
+  adminSubmitInvestigation:   { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many investigation submissions.' },
+  adminSupervisorDecision:    { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many supervisor decisions.' },
+  adminManagerDecision:       { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many manager decisions.' },
+  adminListDisputes:          { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
+  adminGetDisputeEvidenceUrl: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many document access attempts.' },
 };
 
 /**
