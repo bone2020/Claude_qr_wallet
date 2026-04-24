@@ -249,5 +249,27 @@ service cloud.firestore {
     match /platform_transfer_proposals/{proposalId} {
       allow read, write: if false;
     }
+
+    // email_queue — Cloud Functions only.
+    // Holds emails that failed to send via Resend. Retried by processEmailQueue
+    // scheduled CF. After 3 failed attempts, marked failed_permanently.
+    match /email_queue/{queueId} {
+      allow read, write: if false;
+    }
+
+    // sms_queue — Cloud Functions only.
+    // Holds SMS messages that failed to send via Africa's Talking.
+    // Retried by processSmsQueue scheduled CF.
+    match /sms_queue/{queueId} {
+      allow read, write: if false;
+    }
+
+    // blocked_finance_users — Cloud Functions only.
+    // Tracks finance users blocked from new proposals due to overdue evidence.
+    // Populated by markFinanceBlockedScheduled after 21 days of overdue evidence.
+    // Cleared by adminCloseProposal when all overdue proposals are resolved.
+    match /blocked_finance_users/{uid} {
+      allow read, write: if false;
+    }
   }
 }

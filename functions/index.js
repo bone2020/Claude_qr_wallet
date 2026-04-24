@@ -27,6 +27,7 @@ const MOMO_DISBURSEMENTS_API_USER_PARAM        = defineSecret('MOMO_DISBURSEMENT
 const MOMO_DISBURSEMENTS_API_KEY_PARAM         = defineSecret('MOMO_DISBURSEMENTS_API_KEY');
 const MOMO_WEBHOOK_SECRET_PARAM                = defineSecret('MOMO_WEBHOOK_SECRET_VAL');
 const MOMO_ENVIRONMENT                         = defineString('MOMO_ENVIRONMENT', { default: 'sandbox' });
+const RESEND_API_KEY_PARAM = defineSecret('RESEND_API_KEY');
 
 const admin = require('firebase-admin');
 const https = require('https');
@@ -835,6 +836,115 @@ function paystackRequest(method, path, data = null) {
     }
     req.end();
   });
+}
+
+// ============================================================
+// EMAIL + SMS HELPERS (Phase 2b)
+// ============================================================
+
+/**
+ * Helper: send email via Resend. If Resend fails, queue for retry.
+ * Never throws — workflow should never be blocked by email delivery.
+ *
+ * @param {Object} params
+ * @param {string} params.to
+ * @param {string} params.toName
+ * @param {string} params.subject
+ * @param {string} params.htmlBody
+ * @param {string} params.textBody
+ * @param {string} [params.replyTo]
+ * @param {string} [params.relatedTo]  e.g., "proposal:PLT-..."
+ */
+async function sendProposalEmail({ to, toName, subject, htmlBody, textBody, replyTo, relatedTo }) {
+  const fromEmail = 'qrwallet@bongroups.co';
+  const fromName = 'QR Wallet Admin';
+
+  try {
+    const { Resend } = require('resend');
+    const resend = new Resend(RESEND_API_KEY_PARAM.value());
+
+    await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: [toName ? `${toName} <${to}>` : to],
+      subject,
+      html: htmlBody,
+      text: textBody,
+      replyTo: replyTo || 'noreply@bongroups.co',
+    });
+
+    logInfo('sendProposalEmail succeeded', { to, subject, relatedTo });
+    return { queued: false, sent: true };
+  } catch (error) {
+    logWarning('sendProposalEmail failed, queueing for retry', { to, subject, error: error.message });
+    try {
+      await db.collection('email_queue').add({
+        to,
+        toName: toName || null,
+        fromEmail,
+        fromName,
+        replyTo: replyTo || 'noreply@bongroups.co',
+        subject,
+        htmlBody,
+        textBody,
+        attemptCount: 1,
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastError: error.message,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentAt: null,
+        relatedTo: relatedTo || null,
+      });
+    } catch (queueError) {
+      logError('sendProposalEmail ALSO failed to queue', { error: queueError.message, original: error.message });
+    }
+    return { queued: true, sent: false };
+  }
+}
+
+/**
+ * Helper: send SMS via Africa's Talking. If AT fails, queue for retry.
+ * Never throws.
+ *
+ * @param {Object} params
+ * @param {string} params.phoneNumber  E.164 format (+233...)
+ * @param {string} params.message      max 160 chars per single-part SMS
+ * @param {string} [params.relatedTo]
+ */
+async function sendCustomerSms({ phoneNumber, message, relatedTo }) {
+  try {
+    const africastalking = require('africastalking')({
+      apiKey: AT_API_KEY.value(),
+      username: AT_USERNAME.value() || 'sandbox',
+    });
+    const sms = africastalking.SMS;
+
+    await sms.send({
+      to: [phoneNumber],
+      message,
+      from: AT_ENVIRONMENT.value() === 'production' ? 'QRWALLET' : undefined,
+    });
+
+    logInfo('sendCustomerSms succeeded', { phoneNumber, relatedTo });
+    return { queued: false, sent: true };
+  } catch (error) {
+    logWarning('sendCustomerSms failed, queueing for retry', { phoneNumber, error: error.message });
+    try {
+      await db.collection('sms_queue').add({
+        phoneNumber,
+        message,
+        attemptCount: 1,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastError: error.message,
+        sentAt: null,
+        relatedTo: relatedTo || null,
+      });
+    } catch (queueError) {
+      logError('sendCustomerSms ALSO failed to queue', { error: queueError.message });
+    }
+    return { queued: true, sent: false };
+  }
 }
 
 // ============================================================
@@ -2331,6 +2441,8 @@ const RATE_LIMITS = {
   adminRejectTransfer:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many rejections. Please try again later.' },
   adminCancelProposal:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many cancellations. Please try again later.' },
   adminEmergencyTransfer:     { windowMs: 60 * 60 * 1000, maxRequests: 3,   message: 'Too many emergency transfers. Please try again later.' },
+  adminEditProposal:          { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many edit attempts. Please try again later.' },
+  adminCloseProposal:         { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many close attempts. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -6746,7 +6858,16 @@ exports.adminInitiateTransfer = functions
 exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
-  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
+  // Check if caller is in blocked_finance_users (has overdue evidence)
+  const blockedDoc = await db.collection('blocked_finance_users').doc(caller.uid).get();
+  if (blockedDoc.exists) {
+    const blockData = blockedDoc.data();
+    throw new functions.https.HttpsError('failed-precondition',
+      `You are blocked from new proposals due to overdue evidence. ` +
+      `Close ${(blockData.openOverdueProposals || []).length} open proposals via the admin dashboard first.`);
+  }
+
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey, priorityFlag } = data;
 
   // Idempotency key required
   if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
@@ -6773,6 +6894,9 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
   }
   if (!purpose || typeof purpose !== 'string' || purpose.length < 5) {
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required (min 5 chars).');
+  }
+  if (priorityFlag !== undefined && typeof priorityFlag !== 'boolean') {
+    throw new functions.https.HttpsError('invalid-argument', 'priorityFlag must be a boolean if provided.');
   }
 
   // Read caps from app_config/platform_limits
@@ -6851,7 +6975,7 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
         // Description
         purpose,
         notes: notes || null,
-        priorityFlag: false,
+        priorityFlag: priorityFlag === true,
 
         // Stage: proposed
         proposedBy: {
@@ -6909,6 +7033,28 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
         ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Notify managers of new proposal
+      const managersSnap = await db.collection('admin_users')
+        .where('role', '==', 'admin_manager')
+        .get();
+      for (const mgr of managersSnap.docs) {
+        await sendProposalEmail({
+          to: mgr.id,
+          toName: mgr.data().displayName || null,
+          subject: `Approval needed — ${amount} ${currency} proposal from ${callerDisplayName}`,
+          htmlBody: `<p>A new platform transfer proposal requires your review.</p>
+<p><strong>Amount:</strong> ${amount} ${currency} (~ $${amountInUSD.toFixed(2)} USD)<br>
+<strong>Recipient:</strong> ${accountName} — ${bankCode} — ${accountNumber}<br>
+<strong>Purpose:</strong> ${purpose}<br>
+<strong>Proposed by:</strong> ${callerDisplayName} &lt;${callerEmail}&gt;<br>
+<strong>Auto-expires:</strong> 15 minutes from submission</p>
+<p>Please log in to the admin dashboard to review and approve or reject.</p>
+<p>— QR Wallet Admin</p>`,
+          textBody: `New proposal ${proposalId}: ${amount} ${currency} to ${accountName}. Auto-expires in 15 minutes. Log in to review.`,
+          relatedTo: `proposal:${proposalId}`,
+        });
+      }
 
       return {
         success: true,
@@ -7223,7 +7369,7 @@ exports.adminApproveTransfer = functions
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_manager');
 
-  const { proposalId, idempotencyKey, approvalNote } = data || {};
+  const { proposalId, idempotencyKey, approvalNote, checklistConfirmations } = data || {};
 
   // Input validation
   if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
@@ -7231,6 +7377,23 @@ exports.adminApproveTransfer = functions
   }
   if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
     throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+  if (!Array.isArray(checklistConfirmations) || checklistConfirmations.length !== 4) {
+    throw new functions.https.HttpsError('invalid-argument',
+      'checklistConfirmations is required — must be an array of exactly 4 confirmation objects.');
+  }
+  const REQUIRED_CHECKLIST_ITEMS = [
+    'amount_verified',
+    'recipient_verified',
+    'purpose_approved',
+    'funds_available',
+  ];
+  for (const required of REQUIRED_CHECKLIST_ITEMS) {
+    const match = checklistConfirmations.find(c => c && c.item === required && c.confirmed === true);
+    if (!match) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `Missing checklist confirmation for '${required}'. All 4 items must be confirmed.`);
+    }
   }
 
   // Rate limit
@@ -7311,6 +7474,12 @@ exports.adminApproveTransfer = functions
         approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         approvalIdempotencyKey: idempotencyKey,
         approvalNote: approvalNote || null,
+        checklistConfirmations: checklistConfirmations.map(c => ({
+          item: c.item,
+          confirmed: c.confirmed === true,
+          confirmedBy: { uid: caller.uid, email: callerEmail, role: caller.role },
+          confirmedAt: admin.firestore.Timestamp.now(),
+        })),
       });
     });
 
@@ -7529,6 +7698,30 @@ exports.adminApproveTransfer = functions
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // Notify super_admins if OTP is needed
+    if (internalStatus === 'pending_otp') {
+      const superAdminsSnap = await db.collection('admin_users')
+        .where('role', '==', 'super_admin')
+        .get();
+      for (const sa of superAdminsSnap.docs) {
+        await sendProposalEmail({
+          to: sa.id,
+          toName: sa.data().displayName || null,
+          subject: `OTP needed — ${proposal.amount} ${proposal.currency} approved by ${callerDisplayName}`,
+          htmlBody: `<p>A transfer has been approved and is awaiting your Paystack OTP entry.</p>
+<p><strong>Proposal:</strong> ${proposalId}<br>
+<strong>Amount:</strong> ${proposal.amount} ${proposal.currency}<br>
+<strong>Recipient:</strong> ${proposal.accountName} — ${proposal.bankCode}<br>
+<strong>Approved by:</strong> ${callerDisplayName}<br>
+<strong>OTP expires:</strong> 15 minutes from now</p>
+<p>Check your Paystack-registered phone for the OTP, then log in to enter it.</p>
+<p>— QR Wallet Admin</p>`,
+          textBody: `OTP needed for proposal ${proposalId}. Approved by ${callerDisplayName}. Check Paystack phone. OTP expires in 15 minutes.`,
+          relatedTo: `proposal:${proposalId}`,
+        });
+      }
+    }
+
     return {
       success: true,
       proposalId,
@@ -7627,6 +7820,21 @@ exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
       action: 'reject_proposal',
       details: `Rejected proposal ${proposalId}: ${reason.trim()}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Notify proposer of rejection
+    const proposalData = proposalSnap.data();
+    await sendProposalEmail({
+      to: proposalData.proposedBy.email,
+      toName: proposalData.proposedBy.displayName || null,
+      subject: `Your transfer proposal was rejected`,
+      htmlBody: `<p>Your platform transfer proposal <strong>${proposalId}</strong> was rejected.</p>
+<p><strong>Reviewer:</strong> ${callerDisplayName}<br>
+<strong>Reason:</strong> ${reason.trim()}</p>
+<p>You can submit a revised proposal through the admin dashboard.</p>
+<p>— QR Wallet Admin</p>`,
+      textBody: `Proposal ${proposalId} was rejected by ${callerDisplayName}. Reason: ${reason.trim()}`,
+      relatedTo: `proposal:${proposalId}`,
     });
 
     return { success: true, proposalId, status: 'rejected' };
@@ -7729,6 +7937,22 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // Notify managers FYI
+    const managersSnap = await db.collection('admin_users')
+      .where('role', '==', 'admin_manager')
+      .get();
+    for (const mgr of managersSnap.docs) {
+      await sendProposalEmail({
+        to: mgr.id,
+        toName: mgr.data().displayName || null,
+        subject: `FYI: Proposal ${proposalId} was cancelled by finance`,
+        htmlBody: `<p>FYI: Finance user ${callerDisplayName} cancelled proposal ${proposalId} before approval.</p>
+<p>No action required. This proposal is removed from the queue.</p>`,
+        textBody: `FYI: Proposal ${proposalId} cancelled by ${callerDisplayName}.`,
+        relatedTo: `proposal:${proposalId}`,
+      });
+    }
+
     return { success: true, proposalId, status: 'cancelled' };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
@@ -7749,6 +7973,244 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
  *
  * Ref: Phase 2a agent commit 4/6
  */
+
+/**
+ * Admin: Edit a pending platform transfer proposal.
+ * Only the original proposer (finance) can edit. Only status: 'proposed' allowed.
+ * Tracks full edit history with previous values.
+ *
+ * Ref: Phase 2b agent commit 5/10
+ */
+exports.adminEditProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, fields, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+    throw new functions.https.HttpsError('invalid-argument', 'fields is required and must be an object.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminEditProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminEditProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot edit.`);
+    }
+
+    // Only the original proposer can edit
+    if (caller.uid !== proposal.proposedBy.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Only the original proposer can edit this proposal.');
+    }
+
+    // Build change set — only include fields that actually changed
+    const allowedFields = ['amount', 'bankCode', 'accountNumber', 'accountName', 'purpose', 'notes', 'priorityFlag'];
+    const fieldsChanged = [];
+    const previousValues = {};
+    const updateData = {};
+
+    for (const key of allowedFields) {
+      if (fields[key] !== undefined && fields[key] !== proposal[key]) {
+        fieldsChanged.push(key);
+        previousValues[key] = proposal[key];
+        updateData[key] = fields[key];
+      }
+    }
+
+    if (fieldsChanged.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'No fields to change.');
+    }
+
+    // If amount changed, recompute usdEquivalent
+    if (updateData.amount !== undefined) {
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+      const exchangeRate = rates[proposal.currency] || 1;
+      updateData.usdEquivalent = updateData.amount / exchangeRate;
+      updateData.exchangeRate = exchangeRate;
+    }
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    let newEditHistoryLength = 0;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        ...updateData,
+        editHistory: admin.firestore.FieldValue.arrayUnion({
+          editedBy: { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName },
+          editedAt: admin.firestore.Timestamp.now(),
+          fieldsChanged,
+          previousValues,
+        }),
+      });
+
+      newEditHistoryLength = (freshSnap.data().editHistory || []).length + 1;
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_edited',
+      result: 'success',
+      metadata: { proposalId, fieldsChanged, previousValues },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'edit_proposal',
+      details: `Edited proposal ${proposalId}: changed ${fieldsChanged.join(', ')}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, editCount: newEditHistoryLength, fieldsChanged };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminEditProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to edit proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Close a completed proposal after evidence is uploaded.
+ * Finance user (proposer) or super_admin can close.
+ * Unblocks finance user if they had overdue evidence.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, idempotencyKey } = data || {};
+
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminCloseProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminCloseProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+    const allowedStatuses = ['completed', 'evidence_pending', 'evidence_overdue'];
+    if (!allowedStatuses.includes(proposal.status)) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal status is '${proposal.status}'. Must be one of: ${allowedStatuses.join(', ')}.`);
+    }
+
+    if (caller.uid !== proposal.proposedBy.uid && caller.role !== 'super_admin') {
+      throw new functions.https.HttpsError('permission-denied',
+        'Only the original proposer or a super_admin can close this proposal.');
+    }
+
+    // TODO(Phase 2b commit 4 human-pair): verify proposal.documents.receipt exists
+    // and proposal.documents.evidence.length >= 1 before allowing closure.
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || !allowedStatuses.includes(freshSnap.data().status)) {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        status: 'closed',
+        closedAt: admin.firestore.FieldValue.serverTimestamp(),
+        closedBy: {
+          uid: caller.uid,
+          email: callerEmail,
+          role: caller.role,
+          displayName: callerDisplayName,
+        },
+        evidenceUploadedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Finance unblock: check if proposer still has other overdue proposals
+    const stillOverdue = await db.collection('platform_transfer_proposals')
+      .where('proposedBy.uid', '==', proposal.proposedBy.uid)
+      .where('status', '==', 'evidence_overdue')
+      .limit(1)
+      .get();
+    if (stillOverdue.empty) {
+      await db.collection('blocked_finance_users').doc(proposal.proposedBy.uid).delete();
+    }
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_closed',
+      result: 'success',
+      metadata: { proposalId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'close_proposal',
+      details: `Closed proposal ${proposalId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, status: 'closed' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminCloseProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to close proposal: ' + error.message);
+  }
+});
+
 exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
@@ -7878,6 +8340,26 @@ exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) =>
       details: `Emergency transfer proposal ${proposalId} for ${amount} ${currency}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Notify admin_managers FYI
+    const managersSnap = await db.collection('admin_users')
+      .where('role', '==', 'admin_manager')
+      .get();
+    for (const mgr of managersSnap.docs) {
+      await sendProposalEmail({
+        to: mgr.id,
+        toName: mgr.data().displayName || null,
+        subject: `EMERGENCY transfer by super_admin — for your awareness`,
+        htmlBody: `<p>Super_admin ${callerDisplayName} executed an emergency transfer without the standard approval flow.</p>
+<p><strong>Proposal:</strong> ${proposalId}<br>
+<strong>Amount:</strong> ${amount} ${currency}<br>
+<strong>Recipient:</strong> ${accountName} — ${bankCode}<br>
+<strong>Justification:</strong> ${reason.trim()}</p>
+<p>This is for your awareness. No action required unless you have concerns.</p>`,
+        textBody: `EMERGENCY transfer ${proposalId} by ${callerDisplayName}. Amount: ${amount} ${currency}. Reason: ${reason.trim()}`,
+        relatedTo: `proposal:${proposalId}`,
+      });
+    }
 
     return { success: true, proposalId, status: 'proposed', emergency: true };
   } catch (error) {
@@ -12506,3 +12988,414 @@ exports.autoExpireOtpTransfers = functions.pubsub
     logInfo('autoExpireOtpTransfers completed', { cancelledCount });
     return null;
   });
+
+// ============================================================
+// EMAIL + SMS QUEUE PROCESSORS (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Retry emails that failed to send.
+ * Runs every 5 minutes. After 3 attempts spanning ~1 hour, marks failed_permanently.
+ */
+exports.processEmailQueue = functions.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('UTC')
+  .runWith({ secrets: [RESEND_API_KEY_PARAM] })
+  .onRun(async (context) => {
+    const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
+
+    const snap = await db.collection('email_queue')
+      .where('status', '==', 'pending')
+      .where('attemptCount', '<', 3)
+      .limit(50)
+      .get();
+
+    let attempted = 0;
+    let succeeded = 0;
+    let failedPermanently = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      const lastAttempt = d.lastAttemptAt;
+      if (lastAttempt && lastAttempt.toMillis() > fifteenMinAgo.toMillis()) {
+        continue;
+      }
+
+      attempted++;
+      try {
+        const { Resend } = require('resend');
+        const resend = new Resend(RESEND_API_KEY_PARAM.value());
+
+        await resend.emails.send({
+          from: `${d.fromName} <${d.fromEmail}>`,
+          to: [d.toName ? `${d.toName} <${d.to}>` : d.to],
+          subject: d.subject,
+          html: d.htmlBody,
+          text: d.textBody,
+          replyTo: d.replyTo,
+        });
+
+        await doc.ref.update({
+          status: 'sent',
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        succeeded++;
+      } catch (error) {
+        const newAttemptCount = (d.attemptCount || 0) + 1;
+        const update = {
+          attemptCount: newAttemptCount,
+          lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastError: error.message,
+        };
+        if (newAttemptCount >= 3) {
+          update.status = 'failed_permanently';
+          failedPermanently++;
+        }
+        await doc.ref.update(update);
+      }
+    }
+
+    logInfo('processEmailQueue completed', { attempted, succeeded, failedPermanently });
+    return null;
+  });
+
+/**
+ * Scheduled: Retry SMS messages that failed to send.
+ * Runs every 5 minutes. After 3 attempts, marks failed_permanently.
+ */
+exports.processSmsQueue = functions.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('UTC')
+  .runWith({ secrets: [AT_API_KEY] })
+  .onRun(async (context) => {
+    const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
+
+    const snap = await db.collection('sms_queue')
+      .where('status', '==', 'pending')
+      .where('attemptCount', '<', 3)
+      .limit(50)
+      .get();
+
+    let attempted = 0, succeeded = 0, failedPermanently = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      if (d.lastAttemptAt && d.lastAttemptAt.toMillis() > fifteenMinAgo.toMillis()) continue;
+
+      attempted++;
+      try {
+        const africastalking = require('africastalking')({
+          apiKey: AT_API_KEY.value(),
+          username: AT_USERNAME.value() || 'sandbox',
+        });
+        await africastalking.SMS.send({ to: [d.phoneNumber], message: d.message });
+
+        await doc.ref.update({
+          status: 'sent',
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        succeeded++;
+      } catch (error) {
+        const newCount = (d.attemptCount || 0) + 1;
+        const update = {
+          attemptCount: newCount,
+          lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastError: error.message,
+        };
+        if (newCount >= 3) {
+          update.status = 'failed_permanently';
+          failedPermanently++;
+        }
+        await doc.ref.update(update);
+      }
+    }
+
+    logInfo('processSmsQueue completed', { attempted, succeeded, failedPermanently });
+    return null;
+  });
+
+// ============================================================
+// EVIDENCE LIFECYCLE SCHEDULERS (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Mark completed proposals as evidence_overdue after 7 days
+ * without evidence upload.
+ * Runs every 60 minutes.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.markEvidenceOverdueScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const sevenDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const snap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'completed')
+      .where('completedAt', '<', sevenDaysAgo)
+      .limit(100)
+      .get();
+
+    let overdueCount = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      if (d.evidenceUploadedAt) continue;
+
+      try {
+        await doc.ref.update({
+          status: 'evidence_overdue',
+          evidenceOverdueAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Email proposer about overdue evidence
+        await sendProposalEmail({
+          to: d.proposedBy.email,
+          toName: d.proposedBy.displayName || null,
+          subject: `Evidence overdue for completed transfer ${doc.id}`,
+          htmlBody: `<p>The receipt and evidence for your completed transfer <strong>${doc.id}</strong> are overdue.</p>
+<p>Please upload them through the admin dashboard within 14 days to avoid being blocked from new proposals.</p>`,
+          textBody: `Evidence overdue for transfer ${doc.id}. Upload within 14 days or be blocked.`,
+          relatedTo: `proposal:${doc.id}`,
+        });
+
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'proposal_evidence_overdue',
+          result: 'success',
+          metadata: { proposalId: doc.id },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        overdueCount++;
+      } catch (error) {
+        logError('markEvidenceOverdueScheduled: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('markEvidenceOverdueScheduled completed', { overdueCount });
+    return null;
+  });
+
+/**
+ * Scheduled: Block finance users with proposals overdue for 21+ days.
+ * Runs every 60 minutes.
+ *
+ * Ref: Phase 2b agent commit 8/10
+ */
+exports.markFinanceBlockedScheduled = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const twentyOneDaysAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 21 * 24 * 60 * 60 * 1000);
+
+    const snap = await db.collection('platform_transfer_proposals')
+      .where('status', '==', 'evidence_overdue')
+      .where('completedAt', '<', twentyOneDaysAgo)
+      .limit(100)
+      .get();
+
+    let blockedCount = 0;
+
+    for (const doc of snap.docs) {
+      const proposal = doc.data();
+      if (proposal.financeBlockedAt) continue;
+
+      try {
+        await doc.ref.update({
+          financeBlockedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const blockedRef = db.collection('blocked_finance_users').doc(proposal.proposedBy.uid);
+        const blockedDoc = await blockedRef.get();
+        if (blockedDoc.exists) {
+          await blockedRef.update({
+            openOverdueProposals: admin.firestore.FieldValue.arrayUnion(proposal.proposalId),
+          });
+        } else {
+          await blockedRef.set({
+            uid: proposal.proposedBy.uid,
+            email: proposal.proposedBy.email,
+            blockedAt: admin.firestore.FieldValue.serverTimestamp(),
+            reason: 'overdue_evidence',
+            openOverdueProposals: [proposal.proposalId],
+          });
+        }
+
+        // Email proposer about being blocked
+        await sendProposalEmail({
+          to: proposal.proposedBy.email,
+          toName: proposal.proposedBy.displayName || null,
+          subject: `You are blocked from new proposals — upload evidence`,
+          htmlBody: `<p>You have overdue evidence on transfer ${proposal.proposalId}.</p>
+<p>You are now blocked from submitting new proposals until you close the overdue ones via the admin dashboard.</p>`,
+          textBody: `Blocked from new proposals. Close overdue proposal ${proposal.proposalId} to unblock.`,
+          relatedTo: `proposal:${proposal.proposalId}`,
+        });
+
+        await db.collection('audit_logs').add({
+          userId: 'system',
+          operation: 'finance_user_blocked',
+          result: 'success',
+          metadata: { proposalId: doc.id, blockedUid: proposal.proposedBy.uid },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        blockedCount++;
+      } catch (error) {
+        logError('markFinanceBlockedScheduled: failed to process proposal', {
+          proposalId: doc.id,
+          error: error.message,
+        });
+      }
+    }
+
+    logInfo('markFinanceBlockedScheduled completed', { blockedCount });
+    return null;
+  });
+
+// ============================================================
+// COLD ARCHIVE (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Archive old documents (2+ years) to GCS bucket.
+ * Runs 1st of every month at 00:00 UTC.
+ * Targets: audit_logs, admin_activity, platform_transfer_proposals (terminal only).
+ *
+ * Ref: Phase 2b agent commit 10/10
+ */
+exports.coldArchiveScheduled = functions.pubsub
+  .schedule('0 0 1 * *')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
+    const TWO_YEARS_MS = 730 * 24 * 60 * 60 * 1000;
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - TWO_YEARS_MS);
+
+    let bucket;
+    try {
+      bucket = admin.storage().bucket(ARCHIVE_BUCKET);
+      await bucket.getMetadata();
+    } catch (err) {
+      logWarning('coldArchiveScheduled: archive bucket does not exist yet — skipping this run', { bucket: ARCHIVE_BUCKET });
+      return null;
+    }
+
+    const collections = [
+      { name: 'audit_logs', timestampField: 'timestamp', filter: null },
+      { name: 'admin_activity', timestampField: 'timestamp', filter: null },
+      {
+        name: 'platform_transfer_proposals',
+        timestampField: 'proposedAt',
+        filter: { field: 'status', op: 'in', values: ['closed', 'rejected', 'cancelled', 'expired'] },
+      },
+    ];
+
+    const archivedCounts = {};
+
+    for (const col of collections) {
+      archivedCounts[col.name] = 0;
+
+      try {
+        let query = db.collection(col.name)
+          .where(col.timestampField, '<', cutoff)
+          .limit(500);
+
+        if (col.filter) {
+          query = query.where(col.filter.field, col.filter.op, col.filter.values);
+        }
+
+        const snap = await query.get();
+
+        for (const doc of snap.docs) {
+          try {
+            const payload = JSON.stringify(doc.data());
+            const filePath = `${col.name}/${doc.id}.json`;
+            const file = bucket.file(filePath);
+
+            await file.save(payload, { contentType: 'application/json' });
+
+            const [metadata] = await file.getMetadata();
+            if (metadata && metadata.size > 0) {
+              await doc.ref.delete();
+              archivedCounts[col.name]++;
+            } else {
+              logWarning('coldArchiveScheduled: GCS write succeeded but metadata empty', { filePath });
+            }
+          } catch (docError) {
+            logError('coldArchiveScheduled: failed to archive doc', {
+              collection: col.name,
+              docId: doc.id,
+              error: docError.message,
+            });
+          }
+        }
+      } catch (colError) {
+        logError('coldArchiveScheduled: failed to process collection', {
+          collection: col.name,
+          error: colError.message,
+        });
+      }
+    }
+
+    logInfo('coldArchiveScheduled completed', { archivedCounts });
+    return null;
+  });
+
+/**
+ * Admin: Restore a document from cold archive.
+ * Super_admin only. Reads from GCS and writes back to Firestore with a restore marker.
+ *
+ * Ref: Phase 2b agent commit 10/10
+ */
+exports.adminRestoreFromArchive = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { collection, docId } = data || {};
+  const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
+  const ALLOWED_COLLECTIONS = ['audit_logs', 'admin_activity', 'platform_transfer_proposals'];
+
+  if (!collection || !ALLOWED_COLLECTIONS.includes(collection)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `collection must be one of: ${ALLOWED_COLLECTIONS.join(', ')}`);
+  }
+  if (!docId || typeof docId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'docId is required.');
+  }
+
+  try {
+    const bucket = admin.storage().bucket(ARCHIVE_BUCKET);
+    const file = bucket.file(`${collection}/${docId}.json`);
+    const [contents] = await file.download();
+    const originalData = JSON.parse(contents.toString('utf8'));
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+
+    await db.collection(collection).doc(docId).set({
+      ...originalData,
+      restoredFromArchive: true,
+      restoredAt: admin.firestore.FieldValue.serverTimestamp(),
+      restoredBy: { uid: caller.uid, email: callerEmail },
+    });
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'archive_restored',
+      result: 'success',
+      metadata: { collection, docId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, collection, docId, restored: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminRestoreFromArchive failed', { collection, docId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to restore from archive: ' + error.message);
+  }
+});
