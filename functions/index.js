@@ -6858,6 +6858,15 @@ exports.adminInitiateTransfer = functions
 exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
+  // Check if caller is in blocked_finance_users (has overdue evidence)
+  const blockedDoc = await db.collection('blocked_finance_users').doc(caller.uid).get();
+  if (blockedDoc.exists) {
+    const blockData = blockedDoc.data();
+    throw new functions.https.HttpsError('failed-precondition',
+      `You are blocked from new proposals due to overdue evidence. ` +
+      `Close ${(blockData.openOverdueProposals || []).length} open proposals via the admin dashboard first.`);
+  }
+
   const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey, priorityFlag } = data;
 
   // Idempotency key required
