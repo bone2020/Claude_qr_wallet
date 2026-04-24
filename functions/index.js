@@ -27,6 +27,7 @@ const MOMO_DISBURSEMENTS_API_USER_PARAM        = defineSecret('MOMO_DISBURSEMENT
 const MOMO_DISBURSEMENTS_API_KEY_PARAM         = defineSecret('MOMO_DISBURSEMENTS_API_KEY');
 const MOMO_WEBHOOK_SECRET_PARAM                = defineSecret('MOMO_WEBHOOK_SECRET_VAL');
 const MOMO_ENVIRONMENT                         = defineString('MOMO_ENVIRONMENT', { default: 'sandbox' });
+const RESEND_API_KEY_PARAM = defineSecret('RESEND_API_KEY');
 
 const admin = require('firebase-admin');
 const https = require('https');
@@ -835,6 +836,69 @@ function paystackRequest(method, path, data = null) {
     }
     req.end();
   });
+}
+
+// ============================================================
+// EMAIL + SMS HELPERS (Phase 2b)
+// ============================================================
+
+/**
+ * Helper: send email via Resend. If Resend fails, queue for retry.
+ * Never throws — workflow should never be blocked by email delivery.
+ *
+ * @param {Object} params
+ * @param {string} params.to
+ * @param {string} params.toName
+ * @param {string} params.subject
+ * @param {string} params.htmlBody
+ * @param {string} params.textBody
+ * @param {string} [params.replyTo]
+ * @param {string} [params.relatedTo]  e.g., "proposal:PLT-..."
+ */
+async function sendProposalEmail({ to, toName, subject, htmlBody, textBody, replyTo, relatedTo }) {
+  const fromEmail = 'qrwallet@bongroups.co';
+  const fromName = 'QR Wallet Admin';
+
+  try {
+    const { Resend } = require('resend');
+    const resend = new Resend(RESEND_API_KEY_PARAM.value());
+
+    await resend.emails.send({
+      from: `${fromName} <${fromEmail}>`,
+      to: [toName ? `${toName} <${to}>` : to],
+      subject,
+      html: htmlBody,
+      text: textBody,
+      replyTo: replyTo || 'noreply@bongroups.co',
+    });
+
+    logInfo('sendProposalEmail succeeded', { to, subject, relatedTo });
+    return { queued: false, sent: true };
+  } catch (error) {
+    logWarning('sendProposalEmail failed, queueing for retry', { to, subject, error: error.message });
+    try {
+      await db.collection('email_queue').add({
+        to,
+        toName: toName || null,
+        fromEmail,
+        fromName,
+        replyTo: replyTo || 'noreply@bongroups.co',
+        subject,
+        htmlBody,
+        textBody,
+        attemptCount: 1,
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastError: error.message,
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        sentAt: null,
+        relatedTo: relatedTo || null,
+      });
+    } catch (queueError) {
+      logError('sendProposalEmail ALSO failed to queue', { error: queueError.message, original: error.message });
+    }
+    return { queued: true, sent: false };
+  }
 }
 
 // ============================================================
@@ -12504,5 +12568,75 @@ exports.autoExpireOtpTransfers = functions.pubsub
     }
 
     logInfo('autoExpireOtpTransfers completed', { cancelledCount });
+    return null;
+  });
+
+// ============================================================
+// EMAIL + SMS QUEUE PROCESSORS (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Retry emails that failed to send.
+ * Runs every 5 minutes. After 3 attempts spanning ~1 hour, marks failed_permanently.
+ */
+exports.processEmailQueue = functions.pubsub
+  .schedule('every 5 minutes')
+  .timeZone('UTC')
+  .runWith({ secrets: [RESEND_API_KEY_PARAM] })
+  .onRun(async (context) => {
+    const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
+
+    const snap = await db.collection('email_queue')
+      .where('status', '==', 'pending')
+      .where('attemptCount', '<', 3)
+      .limit(50)
+      .get();
+
+    let attempted = 0;
+    let succeeded = 0;
+    let failedPermanently = 0;
+
+    for (const doc of snap.docs) {
+      const d = doc.data();
+      const lastAttempt = d.lastAttemptAt;
+      if (lastAttempt && lastAttempt.toMillis() > fifteenMinAgo.toMillis()) {
+        continue;
+      }
+
+      attempted++;
+      try {
+        const { Resend } = require('resend');
+        const resend = new Resend(RESEND_API_KEY_PARAM.value());
+
+        await resend.emails.send({
+          from: `${d.fromName} <${d.fromEmail}>`,
+          to: [d.toName ? `${d.toName} <${d.to}>` : d.to],
+          subject: d.subject,
+          html: d.htmlBody,
+          text: d.textBody,
+          replyTo: d.replyTo,
+        });
+
+        await doc.ref.update({
+          status: 'sent',
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        succeeded++;
+      } catch (error) {
+        const newAttemptCount = (d.attemptCount || 0) + 1;
+        const update = {
+          attemptCount: newAttemptCount,
+          lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastError: error.message,
+        };
+        if (newAttemptCount >= 3) {
+          update.status = 'failed_permanently';
+          failedPermanently++;
+        }
+        await doc.ref.update(update);
+      }
+    }
+
+    logInfo('processEmailQueue completed', { attempted, succeeded, failedPermanently });
     return null;
   });
