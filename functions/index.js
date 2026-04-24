@@ -14284,3 +14284,119 @@ exports.adminSubmitInvestigation = functions.runWith({ enforceAppCheck: true }).
     throw new functions.https.HttpsError('internal', 'Failed to submit investigation: ' + error.message);
   }
 });
+
+/**
+ * Admin: Supervisor decision on a dispute investigation.
+ * 'agree' moves to manager_review. 'disagree_kickback' sends back to investigating (once).
+ */
+exports.adminSupervisorDecision = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+  const { disputeId, decision, notes, idempotencyKey } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!decision || !['agree', 'disagree_kickback'].includes(decision)) {
+    throw new functions.https.HttpsError('invalid-argument', 'decision must be "agree" or "disagree_kickback".');
+  }
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 20) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 20 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminSupervisorDecision');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminSupervisorDecision.message);
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    if (dispute.status !== 'supervisor_review') {
+      throw new functions.https.HttpsError('failed-precondition', `Dispute status is '${dispute.status}', expected 'supervisor_review'.`);
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const supervisorInfo = { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName };
+
+    let newStatus;
+    if (decision === 'agree') {
+      newStatus = 'manager_review';
+      await disputeRef.update({
+        status: 'manager_review',
+        reviewingSupervisor: supervisorInfo,
+        supervisorDecision: 'agree',
+        supervisorNotes: notes.trim(),
+        supervisorDecidedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Email admin_managers
+      const managersSnap = await db.collection('admin_users').where('role', '==', 'admin_manager').get();
+      for (const mgr of managersSnap.docs) {
+        await sendProposalEmail({
+          to: mgr.id, toName: mgr.data().displayName || null,
+          subject: `Dispute ${disputeId} ready for manager decision`,
+          htmlBody: `<p>Supervisor ${callerDisplayName} has agreed with the investigation findings for dispute <strong>${disputeId}</strong>.</p>
+<p>The dispute is now awaiting your decision (refund, partial refund, or release).</p>`,
+          textBody: `Dispute ${disputeId} ready for manager decision. Review in dashboard.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    } else {
+      // disagree_kickback
+      if (dispute.graceTriggered) {
+        throw new functions.https.HttpsError('failed-precondition', 'Cannot kick back twice. Must agree or escalate.');
+      }
+
+      const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+      const currentExpiry = dispute.expectedResolutionBy && dispute.expectedResolutionBy.toMillis
+        ? dispute.expectedResolutionBy.toMillis() : Date.now() + TWO_DAYS_MS;
+      const newExpiry = currentExpiry + TWO_DAYS_MS;
+
+      newStatus = 'investigating';
+      await disputeRef.update({
+        status: 'investigating',
+        graceTriggered: true,
+        graceTriggeredAt: admin.firestore.FieldValue.serverTimestamp(),
+        expectedResolutionBy: admin.firestore.Timestamp.fromMillis(newExpiry),
+        reviewingSupervisor: supervisorInfo,
+        supervisorDecision: 'disagree_kickback',
+        supervisorNotes: notes.trim(),
+      });
+
+      // Email assigned admin
+      if (dispute.assignedAdmin && dispute.assignedAdmin.email) {
+        await sendProposalEmail({
+          to: dispute.assignedAdmin.email, toName: dispute.assignedAdmin.displayName || null,
+          subject: `Investigation kicked back on dispute ${disputeId}`,
+          htmlBody: `<p>Supervisor ${callerDisplayName} has kicked back the investigation on dispute <strong>${disputeId}</strong>.</p>
+<p><strong>Feedback:</strong> ${notes.trim()}</p>
+<p>Please add depth to your findings and resubmit.</p>`,
+          textBody: `Investigation kicked back on ${disputeId}. Feedback: ${notes.trim()}`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    }
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminSupervisorDecision', result: 'success',
+      metadata: { disputeId, decision, notes: notes.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'supervisor_decision', details: `${decision} on dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId, status: newStatus };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminSupervisorDecision failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to submit supervisor decision: ' + error.message);
+  }
+});
