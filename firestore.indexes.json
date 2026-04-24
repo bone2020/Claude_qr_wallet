@@ -351,6 +351,57 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "filedBy.uid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "recipientUid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "assignedAdmin.uid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "expectedResolutionBy", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "wallet_blocks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "userUid", "order": "ASCENDING"},
+        {"fieldPath": "liftedAt", "order": "ASCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []
