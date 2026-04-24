@@ -56,7 +56,7 @@ void main() async {
   } else {
     await FirebaseAppCheck.instance.activate(
       androidProvider: AndroidProvider.playIntegrity,
-      appleProvider: AppleProvider.appAttest,
+      appleProvider: AppleProvider.deviceCheck,
     );
   }
 
