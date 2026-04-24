@@ -6858,7 +6858,7 @@ exports.adminInitiateTransfer = functions
 exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'finance');
 
-  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey } = data;
+  const { amount, currency, bankCode, accountNumber, accountName, purpose, notes, idempotencyKey, priorityFlag } = data;
 
   // Idempotency key required
   if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
@@ -6885,6 +6885,9 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
   }
   if (!purpose || typeof purpose !== 'string' || purpose.length < 5) {
     throw new functions.https.HttpsError('invalid-argument', 'Purpose is required (min 5 chars).');
+  }
+  if (priorityFlag !== undefined && typeof priorityFlag !== 'boolean') {
+    throw new functions.https.HttpsError('invalid-argument', 'priorityFlag must be a boolean if provided.');
   }
 
   // Read caps from app_config/platform_limits
@@ -6963,7 +6966,7 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
         // Description
         purpose,
         notes: notes || null,
-        priorityFlag: false,
+        priorityFlag: priorityFlag === true,
 
         // Stage: proposed
         proposedBy: {
