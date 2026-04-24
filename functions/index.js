@@ -12997,10 +12997,11 @@ exports.autoExpireOtpTransfers = functions.pubsub
  * Scheduled: Retry emails that failed to send.
  * Runs every 5 minutes. After 3 attempts spanning ~1 hour, marks failed_permanently.
  */
-exports.processEmailQueue = functions.pubsub
+exports.processEmailQueue = functions
+  .runWith({ secrets: [RESEND_API_KEY_PARAM] })
+  .pubsub
   .schedule('every 5 minutes')
   .timeZone('UTC')
-  .runWith({ secrets: [RESEND_API_KEY_PARAM] })
   .onRun(async (context) => {
     const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
 
@@ -13063,10 +13064,11 @@ exports.processEmailQueue = functions.pubsub
  * Scheduled: Retry SMS messages that failed to send.
  * Runs every 5 minutes. After 3 attempts, marks failed_permanently.
  */
-exports.processSmsQueue = functions.pubsub
+exports.processSmsQueue = functions
+  .runWith({ secrets: [AT_API_KEY] })
+  .pubsub
   .schedule('every 5 minutes')
   .timeZone('UTC')
-  .runWith({ secrets: [AT_API_KEY] })
   .onRun(async (context) => {
     const fifteenMinAgo = admin.firestore.Timestamp.fromMillis(Date.now() - 15 * 60 * 1000);
 
