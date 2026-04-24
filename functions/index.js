@@ -7025,6 +7025,28 @@ exports.adminProposeTransfer = functions.https.onCall(async (data, context) => {
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
 
+      // Notify managers of new proposal
+      const managersSnap = await db.collection('admin_users')
+        .where('role', '==', 'admin_manager')
+        .get();
+      for (const mgr of managersSnap.docs) {
+        await sendProposalEmail({
+          to: mgr.id,
+          toName: mgr.data().displayName || null,
+          subject: `Approval needed — ${amount} ${currency} proposal from ${callerDisplayName}`,
+          htmlBody: `<p>A new platform transfer proposal requires your review.</p>
+<p><strong>Amount:</strong> ${amount} ${currency} (~ $${amountInUSD.toFixed(2)} USD)<br>
+<strong>Recipient:</strong> ${accountName} — ${bankCode} — ${accountNumber}<br>
+<strong>Purpose:</strong> ${purpose}<br>
+<strong>Proposed by:</strong> ${callerDisplayName} &lt;${callerEmail}&gt;<br>
+<strong>Auto-expires:</strong> 15 minutes from submission</p>
+<p>Please log in to the admin dashboard to review and approve or reject.</p>
+<p>— QR Wallet Admin</p>`,
+          textBody: `New proposal ${proposalId}: ${amount} ${currency} to ${accountName}. Auto-expires in 15 minutes. Log in to review.`,
+          relatedTo: `proposal:${proposalId}`,
+        });
+      }
+
       return {
         success: true,
         proposalId,
@@ -7667,6 +7689,30 @@ exports.adminApproveTransfer = functions
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // Notify super_admins if OTP is needed
+    if (internalStatus === 'pending_otp') {
+      const superAdminsSnap = await db.collection('admin_users')
+        .where('role', '==', 'super_admin')
+        .get();
+      for (const sa of superAdminsSnap.docs) {
+        await sendProposalEmail({
+          to: sa.id,
+          toName: sa.data().displayName || null,
+          subject: `OTP needed — ${proposal.amount} ${proposal.currency} approved by ${callerDisplayName}`,
+          htmlBody: `<p>A transfer has been approved and is awaiting your Paystack OTP entry.</p>
+<p><strong>Proposal:</strong> ${proposalId}<br>
+<strong>Amount:</strong> ${proposal.amount} ${proposal.currency}<br>
+<strong>Recipient:</strong> ${proposal.accountName} — ${proposal.bankCode}<br>
+<strong>Approved by:</strong> ${callerDisplayName}<br>
+<strong>OTP expires:</strong> 15 minutes from now</p>
+<p>Check your Paystack-registered phone for the OTP, then log in to enter it.</p>
+<p>— QR Wallet Admin</p>`,
+          textBody: `OTP needed for proposal ${proposalId}. Approved by ${callerDisplayName}. Check Paystack phone. OTP expires in 15 minutes.`,
+          relatedTo: `proposal:${proposalId}`,
+        });
+      }
+    }
+
     return {
       success: true,
       proposalId,
@@ -7765,6 +7811,21 @@ exports.adminRejectTransfer = functions.https.onCall(async (data, context) => {
       action: 'reject_proposal',
       details: `Rejected proposal ${proposalId}: ${reason.trim()}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Notify proposer of rejection
+    const proposalData = proposalSnap.data();
+    await sendProposalEmail({
+      to: proposalData.proposedBy.email,
+      toName: proposalData.proposedBy.displayName || null,
+      subject: `Your transfer proposal was rejected`,
+      htmlBody: `<p>Your platform transfer proposal <strong>${proposalId}</strong> was rejected.</p>
+<p><strong>Reviewer:</strong> ${callerDisplayName}<br>
+<strong>Reason:</strong> ${reason.trim()}</p>
+<p>You can submit a revised proposal through the admin dashboard.</p>
+<p>— QR Wallet Admin</p>`,
+      textBody: `Proposal ${proposalId} was rejected by ${callerDisplayName}. Reason: ${reason.trim()}`,
+      relatedTo: `proposal:${proposalId}`,
     });
 
     return { success: true, proposalId, status: 'rejected' };
@@ -7866,6 +7927,22 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
       details: `Cancelled proposal ${proposalId}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Notify managers FYI
+    const managersSnap = await db.collection('admin_users')
+      .where('role', '==', 'admin_manager')
+      .get();
+    for (const mgr of managersSnap.docs) {
+      await sendProposalEmail({
+        to: mgr.id,
+        toName: mgr.data().displayName || null,
+        subject: `FYI: Proposal ${proposalId} was cancelled by finance`,
+        htmlBody: `<p>FYI: Finance user ${callerDisplayName} cancelled proposal ${proposalId} before approval.</p>
+<p>No action required. This proposal is removed from the queue.</p>`,
+        textBody: `FYI: Proposal ${proposalId} cancelled by ${callerDisplayName}.`,
+        relatedTo: `proposal:${proposalId}`,
+      });
+    }
 
     return { success: true, proposalId, status: 'cancelled' };
   } catch (error) {
@@ -8254,6 +8331,26 @@ exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) =>
       details: `Emergency transfer proposal ${proposalId} for ${amount} ${currency}`,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Notify admin_managers FYI
+    const managersSnap = await db.collection('admin_users')
+      .where('role', '==', 'admin_manager')
+      .get();
+    for (const mgr of managersSnap.docs) {
+      await sendProposalEmail({
+        to: mgr.id,
+        toName: mgr.data().displayName || null,
+        subject: `EMERGENCY transfer by super_admin — for your awareness`,
+        htmlBody: `<p>Super_admin ${callerDisplayName} executed an emergency transfer without the standard approval flow.</p>
+<p><strong>Proposal:</strong> ${proposalId}<br>
+<strong>Amount:</strong> ${amount} ${currency}<br>
+<strong>Recipient:</strong> ${accountName} — ${bankCode}<br>
+<strong>Justification:</strong> ${reason.trim()}</p>
+<p>This is for your awareness. No action required unless you have concerns.</p>`,
+        textBody: `EMERGENCY transfer ${proposalId} by ${callerDisplayName}. Amount: ${amount} ${currency}. Reason: ${reason.trim()}`,
+        relatedTo: `proposal:${proposalId}`,
+      });
+    }
 
     return { success: true, proposalId, status: 'proposed', emergency: true };
   } catch (error) {
@@ -13043,7 +13140,16 @@ exports.markEvidenceOverdueScheduled = functions.pubsub
           evidenceOverdueAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // TODO(commit 9): email proposer + manager when proposal is marked overdue.
+        // Email proposer about overdue evidence
+        await sendProposalEmail({
+          to: d.proposedBy.email,
+          toName: d.proposedBy.displayName || null,
+          subject: `Evidence overdue for completed transfer ${doc.id}`,
+          htmlBody: `<p>The receipt and evidence for your completed transfer <strong>${doc.id}</strong> are overdue.</p>
+<p>Please upload them through the admin dashboard within 14 days to avoid being blocked from new proposals.</p>`,
+          textBody: `Evidence overdue for transfer ${doc.id}. Upload within 14 days or be blocked.`,
+          relatedTo: `proposal:${doc.id}`,
+        });
 
         await db.collection('audit_logs').add({
           userId: 'system',
@@ -13111,7 +13217,16 @@ exports.markFinanceBlockedScheduled = functions.pubsub
           });
         }
 
-        // TODO(commit 9): email proposer about being blocked.
+        // Email proposer about being blocked
+        await sendProposalEmail({
+          to: proposal.proposedBy.email,
+          toName: proposal.proposedBy.displayName || null,
+          subject: `You are blocked from new proposals — upload evidence`,
+          htmlBody: `<p>You have overdue evidence on transfer ${proposal.proposalId}.</p>
+<p>You are now blocked from submitting new proposals until you close the overdue ones via the admin dashboard.</p>`,
+          textBody: `Blocked from new proposals. Close overdue proposal ${proposal.proposalId} to unblock.`,
+          relatedTo: `proposal:${proposal.proposalId}`,
+        });
 
         await db.collection('audit_logs').add({
           userId: 'system',
