@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzOEZhpQXG-HQUCx0qOD_sRk9Lenpnlp0",
@@ -12,5 +13,11 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('6LcoqccsAAAAANk0aa2rO9UOqfJXwW0PmBtz0JyC'),
+  isTokenAutoRefreshEnabled: true,
+});
+
 export const auth = getAuth(app);
 export const functions = getFunctions(app, 'us-central1');
