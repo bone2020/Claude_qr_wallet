@@ -66,5 +66,13 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+
+    // Platform transfer proposals — Cloud Functions only.
+    // Uploads (invoice, quotes, receipt, evidence) go through
+    // adminUploadProposalDocument. Downloads via signed URLs from
+    // adminGetProposalDocumentUrl.
+    match /platform_transfer_proposals/{proposalId}/{allPaths=**} {
+      allow read, write: if false;
+    }
   }
 }

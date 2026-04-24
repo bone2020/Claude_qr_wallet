@@ -2443,6 +2443,8 @@ const RATE_LIMITS = {
   adminEmergencyTransfer:     { windowMs: 60 * 60 * 1000, maxRequests: 3,   message: 'Too many emergency transfers. Please try again later.' },
   adminEditProposal:          { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many edit attempts. Please try again later.' },
   adminCloseProposal:         { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many close attempts. Please try again later.' },
+  adminUploadProposalDocument: { windowMs: 60 * 60 * 1000, maxRequests: 30, message: 'Too many upload attempts. Please try again later.' },
+  adminGetProposalDocumentUrl: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many document access attempts. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -8149,8 +8151,16 @@ exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
         'Only the original proposer or a super_admin can close this proposal.');
     }
 
-    // TODO(Phase 2b commit 4 human-pair): verify proposal.documents.receipt exists
-    // and proposal.documents.evidence.length >= 1 before allowing closure.
+    // Verify evidence is uploaded before allowing closure
+    const docs = proposal.documents || {};
+    if (!docs.receipt || !docs.receipt.path) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'Receipt must be uploaded before closing. Use adminUploadProposalDocument with documentType="receipt".');
+    }
+    if (!Array.isArray(docs.evidence) || docs.evidence.length < 1) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'At least 1 evidence file must be uploaded before closing. Use adminUploadProposalDocument with documentType="evidence".');
+    }
 
     const callerRecord = await admin.auth().getUser(caller.uid);
     const callerEmail = callerRecord.email || 'unknown';
@@ -8208,6 +8218,279 @@ exports.adminCloseProposal = functions.https.onCall(async (data, context) => {
     if (error instanceof functions.https.HttpsError) throw error;
     logError('adminCloseProposal failed', { proposalId, caller: caller.uid, error: error.message });
     throw new functions.https.HttpsError('internal', 'Failed to close proposal: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Upload a document associated with a platform transfer proposal.
+ * Files are sent as base64 in the payload, decoded in CF, written to Storage.
+ *
+ * documentType: 'invoice' | 'quote' | 'receipt' | 'evidence'
+ *
+ * Limits:
+ *   - 10 MB per file
+ *   - invoice + up to 4 quotes at proposal stage (status='proposed')
+ *   - receipt + up to 4 evidence at post-completion (status in completed/evidence_pending/evidence_overdue)
+ *   - Allowed types: application/pdf, image/jpeg, image/png
+ *
+ * Storage path: platform_transfer_proposals/{proposalId}/<...>
+ *
+ * Ref: Phase 2b commit 4 (human-pair)
+ */
+exports.adminUploadProposalDocument = functions
+  .runWith({ memory: '512MB' })
+  .https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, documentType, fileBase64, contentType, fileName, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  const ALLOWED_TYPES = ['invoice', 'quote', 'receipt', 'evidence'];
+  if (!ALLOWED_TYPES.includes(documentType)) {
+    throw new functions.https.HttpsError('invalid-argument', `documentType must be one of: ${ALLOWED_TYPES.join(', ')}`);
+  }
+  if (!fileBase64 || typeof fileBase64 !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'fileBase64 is required (base64-encoded file).');
+  }
+  const ALLOWED_CONTENT = ['application/pdf', 'image/jpeg', 'image/png'];
+  if (!ALLOWED_CONTENT.includes(contentType)) {
+    throw new functions.https.HttpsError('invalid-argument', `contentType must be one of: ${ALLOWED_CONTENT.join(', ')}`);
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminUploadProposalDocument');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminUploadProposalDocument.message);
+  }
+
+  // Decode base64 and check size
+  let fileBuffer;
+  try {
+    fileBuffer = Buffer.from(fileBase64, 'base64');
+  } catch (err) {
+    throw new functions.https.HttpsError('invalid-argument', 'fileBase64 could not be decoded.');
+  }
+  const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+  if (fileBuffer.length === 0) {
+    throw new functions.https.HttpsError('invalid-argument', 'Decoded file is empty.');
+  }
+  if (fileBuffer.length > MAX_SIZE) {
+    throw new functions.https.HttpsError('invalid-argument', `File too large. Max ${MAX_SIZE / (1024 * 1024)} MB.`);
+  }
+
+  try {
+    // Read proposal
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+    const proposal = proposalSnap.data();
+
+    // Authorization: caller must be the proposer (or super_admin)
+    if (caller.uid !== proposal.proposedBy.uid && caller.role !== 'super_admin') {
+      throw new functions.https.HttpsError('permission-denied',
+        'Only the original proposer or a super_admin can upload documents.');
+    }
+
+    // State validation — which documents allowed at which stage
+    const PROPOSAL_STAGE_STATUSES = ['proposed'];
+    const EVIDENCE_STAGE_STATUSES = ['completed', 'evidence_pending', 'evidence_overdue'];
+    if (['invoice', 'quote'].includes(documentType)) {
+      if (!PROPOSAL_STAGE_STATUSES.includes(proposal.status)) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Cannot upload ${documentType} when proposal status is '${proposal.status}'. Only allowed in: ${PROPOSAL_STAGE_STATUSES.join(', ')}.`);
+      }
+    } else {
+      // receipt or evidence
+      if (!EVIDENCE_STAGE_STATUSES.includes(proposal.status)) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Cannot upload ${documentType} when proposal status is '${proposal.status}'. Only allowed in: ${EVIDENCE_STAGE_STATUSES.join(', ')}.`);
+      }
+    }
+
+    // Quote/evidence array limits (max 4 each)
+    const existingDocs = proposal.documents || {};
+    const MAX_ARRAY_ITEMS = 4;
+    if (documentType === 'quote') {
+      const currentQuotes = Array.isArray(existingDocs.quotes) ? existingDocs.quotes : [];
+      if (currentQuotes.length >= MAX_ARRAY_ITEMS) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Maximum ${MAX_ARRAY_ITEMS} quotes already uploaded for this proposal.`);
+      }
+    }
+    if (documentType === 'evidence') {
+      const currentEvidence = Array.isArray(existingDocs.evidence) ? existingDocs.evidence : [];
+      if (currentEvidence.length >= MAX_ARRAY_ITEMS) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Maximum ${MAX_ARRAY_ITEMS} evidence files already uploaded for this proposal.`);
+      }
+    }
+
+    // Determine extension from content type
+    const EXT_MAP = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+    };
+    const ext = EXT_MAP[contentType];
+
+    // Build Storage path
+    let storagePath;
+    if (documentType === 'invoice' || documentType === 'receipt') {
+      storagePath = `platform_transfer_proposals/${proposalId}/${documentType}.${ext}`;
+    } else {
+      // quote or evidence — indexed file
+      const currentArray = documentType === 'quote'
+        ? (Array.isArray(existingDocs.quotes) ? existingDocs.quotes : [])
+        : (Array.isArray(existingDocs.evidence) ? existingDocs.evidence : []);
+      const nextIndex = currentArray.length;
+      const folder = documentType === 'quote' ? 'quotes' : 'evidence';
+      storagePath = `platform_transfer_proposals/${proposalId}/${folder}/${nextIndex}.${ext}`;
+    }
+
+    // Upload to Firebase Storage
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(storagePath);
+    await file.save(fileBuffer, {
+      contentType,
+      metadata: {
+        uploadedBy: caller.uid,
+        proposalId,
+        documentType,
+        originalFileName: fileName || null,
+      },
+    });
+
+    // Update proposal doc with the new document record
+    const documentRecord = {
+      path: storagePath,
+      uploadedAt: admin.firestore.Timestamp.now(),
+      sizeBytes: fileBuffer.length,
+      contentType,
+      uploadedBy: { uid: caller.uid, email: caller.email || null },
+      originalFileName: fileName || null,
+    };
+
+    if (documentType === 'invoice' || documentType === 'receipt') {
+      await proposalRef.update({
+        [`documents.${documentType}`]: documentRecord,
+      });
+    } else {
+      // quote or evidence — append to array
+      const fieldName = documentType === 'quote' ? 'quotes' : 'evidence';
+      await proposalRef.update({
+        [`documents.${fieldName}`]: admin.firestore.FieldValue.arrayUnion(documentRecord),
+      });
+    }
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_document_uploaded',
+      result: 'success',
+      metadata: { proposalId, documentType, storagePath, sizeBytes: fileBuffer.length },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, documentType, storagePath, sizeBytes: fileBuffer.length };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminUploadProposalDocument failed', { proposalId, documentType, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to upload document: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Generate a short-lived signed URL for downloading a proposal document.
+ * Auditor and above can access — compliance & review need visibility.
+ *
+ * URL valid for 5 minutes. Each access is audit-logged (compliance requirement).
+ *
+ * Ref: Phase 2b commit 4 (human-pair)
+ */
+exports.adminGetProposalDocumentUrl = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+
+  const { proposalId, documentType, index } = data || {};
+
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  const ALLOWED_TYPES = ['invoice', 'quote', 'receipt', 'evidence'];
+  if (!ALLOWED_TYPES.includes(documentType)) {
+    throw new functions.https.HttpsError('invalid-argument', `documentType must be one of: ${ALLOWED_TYPES.join(', ')}`);
+  }
+  if (['quote', 'evidence'].includes(documentType)) {
+    if (index === undefined || typeof index !== 'number' || index < 0 || index > 3) {
+      throw new functions.https.HttpsError('invalid-argument', `index (0-3) is required for ${documentType}.`);
+    }
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminGetProposalDocumentUrl');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminGetProposalDocumentUrl.message);
+  }
+
+  try {
+    // Read proposal to get the stored document path
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+    const proposal = proposalSnap.data();
+    const docs = proposal.documents || {};
+
+    let docRecord;
+    if (documentType === 'invoice' || documentType === 'receipt') {
+      docRecord = docs[documentType];
+    } else {
+      const fieldName = documentType === 'quote' ? 'quotes' : 'evidence';
+      const arr = Array.isArray(docs[fieldName]) ? docs[fieldName] : [];
+      docRecord = arr[index];
+    }
+
+    if (!docRecord || !docRecord.path) {
+      throw new functions.https.HttpsError('not-found',
+        `No ${documentType} document found for this proposal${['quote', 'evidence'].includes(documentType) ? ` at index ${index}` : ''}.`);
+    }
+
+    // Generate signed URL (5-min expiry)
+    const bucket = admin.storage().bucket();
+    const file = bucket.file(docRecord.path);
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 5 * 60 * 1000,
+    });
+
+    // Audit log (compliance — record every document access)
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_document_accessed',
+      result: 'success',
+      metadata: { proposalId, documentType, index: index || null, path: docRecord.path },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      url,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      contentType: docRecord.contentType,
+      sizeBytes: docRecord.sizeBytes,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminGetProposalDocumentUrl failed', { proposalId, documentType, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to generate document URL: ' + error.message);
   }
 });
 
