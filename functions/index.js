@@ -13952,3 +13952,179 @@ exports.userFileDispute = functions
     throw new functions.https.HttpsError('internal', 'Failed to file dispute: ' + error.message);
   }
 });
+
+/**
+ * User: View a single dispute. Filer and recipient only.
+ * Internal admin fields are hidden from user view.
+ */
+exports.userViewDispute = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  const callerUid = context.auth.uid;
+  const { disputeId } = data || {};
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+
+  const withinLimit = await checkRateLimitPersistent(callerUid, 'userViewDispute');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userViewDispute.message);
+
+  const doc = await db.collection('disputes').doc(disputeId).get();
+  if (!doc.exists) throw new functions.https.HttpsError('not-found', 'Dispute not found.');
+  const d = doc.data();
+
+  const isFiler = d.filedBy.uid === callerUid;
+  const isRecipient = d.recipientUid === callerUid;
+  if (!isFiler && !isRecipient) throw new functions.https.HttpsError('permission-denied', 'Access denied.');
+
+  const sanitized = {
+    disputeId: d.disputeId,
+    status: d.status,
+    originalTransactionId: d.originalTransactionId,
+    disputedAmount: d.disputedAmount,
+    disputedCurrency: d.disputedCurrency,
+    issueType: d.issueType,
+    description: d.description,
+    filedAt: d.filedAt,
+    expectedResolutionBy: d.expectedResolutionBy,
+    currentHoldAmount: d.currentHoldAmount,
+    feeCharged: d.feeCharged,
+    resolvedAt: d.resolvedAt,
+    resolutionType: d.resolutionType,
+    amountRecovered: d.amountRecovered,
+    recipientResponse: d.recipientResponse,
+    recipientResponseAt: d.recipientResponseAt,
+  };
+  if (isFiler) {
+    sanitized.filedBy = d.filedBy;
+    sanitized.recipientDisplayName = d.recipientDisplayName;
+    sanitized.evidence = d.evidence;
+  } else {
+    sanitized.recipientUid = d.recipientUid;
+    sanitized.recipientEvidence = d.recipientEvidence;
+  }
+
+  return { success: true, dispute: sanitized };
+});
+
+/**
+ * User: List user's disputes as filer or recipient.
+ */
+exports.userGetMyDisputes = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  const callerUid = context.auth.uid;
+  const { role: queryRole, limit: requestedLimit } = data || {};
+
+  const withinLimit = await checkRateLimitPersistent(callerUid, 'userGetMyDisputes');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userGetMyDisputes.message);
+
+  if (queryRole && queryRole !== 'filer' && queryRole !== 'recipient') {
+    throw new functions.https.HttpsError('invalid-argument', 'role must be "filer" or "recipient".');
+  }
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') {
+    limit = Math.min(Math.max(requestedLimit, 1), 50);
+  }
+
+  let query;
+  if (queryRole === 'recipient') {
+    query = db.collection('disputes')
+      .where('recipientUid', '==', callerUid)
+      .orderBy('filedAt', 'desc')
+      .limit(limit);
+  } else {
+    query = db.collection('disputes')
+      .where('filedBy.uid', '==', callerUid)
+      .orderBy('filedAt', 'desc')
+      .limit(limit);
+  }
+
+  const snap = await query.get();
+  const disputes = snap.docs.map(doc => {
+    const d = doc.data();
+    return {
+      disputeId: d.disputeId,
+      status: d.status,
+      disputedAmount: d.disputedAmount,
+      disputedCurrency: d.disputedCurrency,
+      issueType: d.issueType,
+      filedAt: d.filedAt,
+      expectedResolutionBy: d.expectedResolutionBy,
+      resolutionType: d.resolutionType,
+      resolvedAt: d.resolvedAt,
+    };
+  });
+
+  return { success: true, disputes };
+});
+
+/**
+ * User: Recipient responds to a dispute filed against them.
+ */
+exports.userRespondToDispute = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  const callerUid = context.auth.uid;
+  const { disputeId, response, idempotencyKey } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!response || typeof response !== 'string' || response.trim().length < 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'response must be at least 10 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(callerUid, 'userRespondToDispute');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userRespondToDispute.message);
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', 'Dispute not found.');
+    const dispute = disputeSnap.data();
+
+    if (dispute.recipientUid !== callerUid) {
+      throw new functions.https.HttpsError('permission-denied', 'Only the recipient can respond.');
+    }
+
+    const TERMINAL = ['resolved', 'closed_stuck'];
+    if (TERMINAL.includes(dispute.status)) {
+      throw new functions.https.HttpsError('failed-precondition', 'Dispute is already resolved.');
+    }
+
+    await disputeRef.update({
+      recipientResponse: response.trim(),
+      recipientResponseAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Notify assigned admin if one exists
+    if (dispute.assignedAdmin && dispute.assignedAdmin.email) {
+      await sendProposalEmail({
+        to: dispute.assignedAdmin.email,
+        toName: dispute.assignedAdmin.displayName || null,
+        subject: `Recipient submitted response on ${disputeId}`,
+        htmlBody: `<p>The recipient has submitted a response on dispute <strong>${disputeId}</strong>.</p><p>Please review in the admin dashboard.</p>`,
+        textBody: `Recipient responded on dispute ${disputeId}. Review in dashboard.`,
+        relatedTo: `dispute:${disputeId}`,
+      });
+    }
+
+    await db.collection('audit_logs').add({
+      userId: callerUid,
+      operation: 'userRespondToDispute',
+      result: 'success',
+      metadata: { disputeId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('userRespondToDispute failed', { disputeId, caller: callerUid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to respond: ' + error.message);
+  }
+});
