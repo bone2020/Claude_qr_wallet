@@ -2441,6 +2441,8 @@ const RATE_LIMITS = {
   adminRejectTransfer:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many rejections. Please try again later.' },
   adminCancelProposal:        { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many cancellations. Please try again later.' },
   adminEmergencyTransfer:     { windowMs: 60 * 60 * 1000, maxRequests: 3,   message: 'Too many emergency transfers. Please try again later.' },
+  adminEditProposal:          { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many edit attempts. Please try again later.' },
+  adminCloseProposal:         { windowMs: 60 * 60 * 1000, maxRequests: 20,  message: 'Too many close attempts. Please try again later.' },
   previewTransfer:    { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many preview requests. Please wait before trying again.' },
   getOrCreateVirtualAccount: { windowMs: 60 * 60 * 1000, maxRequests: 5, message: 'Too many virtual account requests. Please try again later.' },
   chargeMobileMoney:   { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many mobile money charge attempts. Please try again later.' },
@@ -7859,6 +7861,138 @@ exports.adminCancelProposal = functions.https.onCall(async (data, context) => {
  *
  * Ref: Phase 2a agent commit 4/6
  */
+
+/**
+ * Admin: Edit a pending platform transfer proposal.
+ * Only the original proposer (finance) can edit. Only status: 'proposed' allowed.
+ * Tracks full edit history with previous values.
+ *
+ * Ref: Phase 2b agent commit 5/10
+ */
+exports.adminEditProposal = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'finance');
+
+  const { proposalId, fields, idempotencyKey } = data || {};
+
+  // Input validation
+  if (!proposalId || typeof proposalId !== 'string' || !proposalId.startsWith('PLT-')) {
+    throw new functions.https.HttpsError('invalid-argument', 'proposalId is required and must start with "PLT-".');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey is required and must be at least 16 characters.');
+  }
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+    throw new functions.https.HttpsError('invalid-argument', 'fields is required and must be an object.');
+  }
+
+  // Rate limit
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminEditProposal');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminEditProposal.message);
+  }
+
+  try {
+    const proposalRef = db.collection('platform_transfer_proposals').doc(proposalId);
+    const proposalSnap = await proposalRef.get();
+
+    if (!proposalSnap.exists) {
+      throw new functions.https.HttpsError('not-found', `Proposal ${proposalId} not found.`);
+    }
+
+    const proposal = proposalSnap.data();
+
+    if (proposal.status !== 'proposed') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Proposal is not in 'proposed' state (current: ${proposal.status}). Cannot edit.`);
+    }
+
+    // Only the original proposer can edit
+    if (caller.uid !== proposal.proposedBy.uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Only the original proposer can edit this proposal.');
+    }
+
+    // Build change set — only include fields that actually changed
+    const allowedFields = ['amount', 'bankCode', 'accountNumber', 'accountName', 'purpose', 'notes', 'priorityFlag'];
+    const fieldsChanged = [];
+    const previousValues = {};
+    const updateData = {};
+
+    for (const key of allowedFields) {
+      if (fields[key] !== undefined && fields[key] !== proposal[key]) {
+        fieldsChanged.push(key);
+        previousValues[key] = proposal[key];
+        updateData[key] = fields[key];
+      }
+    }
+
+    if (fieldsChanged.length === 0) {
+      throw new functions.https.HttpsError('invalid-argument', 'No fields to change.');
+    }
+
+    // If amount changed, recompute usdEquivalent
+    if (updateData.amount !== undefined) {
+      const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+      const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+      const exchangeRate = rates[proposal.currency] || 1;
+      updateData.usdEquivalent = updateData.amount / exchangeRate;
+      updateData.exchangeRate = exchangeRate;
+    }
+
+    // Get caller info
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    let newEditHistoryLength = 0;
+
+    // Update in transaction (re-verify status inside)
+    await db.runTransaction(async (transaction) => {
+      const freshSnap = await transaction.get(proposalRef);
+      if (!freshSnap.exists || freshSnap.data().status !== 'proposed') {
+        throw new functions.https.HttpsError('failed-precondition',
+          'Proposal was modified concurrently. Please refresh and try again.');
+      }
+
+      transaction.update(proposalRef, {
+        ...updateData,
+        editHistory: admin.firestore.FieldValue.arrayUnion({
+          editedBy: { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName },
+          editedAt: admin.firestore.Timestamp.now(),
+          fieldsChanged,
+          previousValues,
+        }),
+      });
+
+      newEditHistoryLength = (freshSnap.data().editHistory || []).length + 1;
+    });
+
+    // Audit log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'proposal_edited',
+      result: 'success',
+      metadata: { proposalId, fieldsChanged, previousValues },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Admin activity log
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'edit_proposal',
+      details: `Edited proposal ${proposalId}: changed ${fieldsChanged.join(', ')}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, proposalId, editCount: newEditHistoryLength, fieldsChanged };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminEditProposal failed', { proposalId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to edit proposal: ' + error.message);
+  }
+});
+
 exports.adminEmergencyTransfer = functions.https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
