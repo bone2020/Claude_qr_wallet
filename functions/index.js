@@ -13248,3 +13248,145 @@ exports.markFinanceBlockedScheduled = functions.pubsub
     logInfo('markFinanceBlockedScheduled completed', { blockedCount });
     return null;
   });
+
+// ============================================================
+// COLD ARCHIVE (Phase 2b)
+// ============================================================
+
+/**
+ * Scheduled: Archive old documents (2+ years) to GCS bucket.
+ * Runs 1st of every month at 00:00 UTC.
+ * Targets: audit_logs, admin_activity, platform_transfer_proposals (terminal only).
+ *
+ * Ref: Phase 2b agent commit 10/10
+ */
+exports.coldArchiveScheduled = functions.pubsub
+  .schedule('0 0 1 * *')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
+    const TWO_YEARS_MS = 730 * 24 * 60 * 60 * 1000;
+    const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - TWO_YEARS_MS);
+
+    let bucket;
+    try {
+      bucket = admin.storage().bucket(ARCHIVE_BUCKET);
+      await bucket.getMetadata();
+    } catch (err) {
+      logWarning('coldArchiveScheduled: archive bucket does not exist yet — skipping this run', { bucket: ARCHIVE_BUCKET });
+      return null;
+    }
+
+    const collections = [
+      { name: 'audit_logs', timestampField: 'timestamp', filter: null },
+      { name: 'admin_activity', timestampField: 'timestamp', filter: null },
+      {
+        name: 'platform_transfer_proposals',
+        timestampField: 'proposedAt',
+        filter: { field: 'status', op: 'in', values: ['closed', 'rejected', 'cancelled', 'expired'] },
+      },
+    ];
+
+    const archivedCounts = {};
+
+    for (const col of collections) {
+      archivedCounts[col.name] = 0;
+
+      try {
+        let query = db.collection(col.name)
+          .where(col.timestampField, '<', cutoff)
+          .limit(500);
+
+        if (col.filter) {
+          query = query.where(col.filter.field, col.filter.op, col.filter.values);
+        }
+
+        const snap = await query.get();
+
+        for (const doc of snap.docs) {
+          try {
+            const payload = JSON.stringify(doc.data());
+            const filePath = `${col.name}/${doc.id}.json`;
+            const file = bucket.file(filePath);
+
+            await file.save(payload, { contentType: 'application/json' });
+
+            const [metadata] = await file.getMetadata();
+            if (metadata && metadata.size > 0) {
+              await doc.ref.delete();
+              archivedCounts[col.name]++;
+            } else {
+              logWarning('coldArchiveScheduled: GCS write succeeded but metadata empty', { filePath });
+            }
+          } catch (docError) {
+            logError('coldArchiveScheduled: failed to archive doc', {
+              collection: col.name,
+              docId: doc.id,
+              error: docError.message,
+            });
+          }
+        }
+      } catch (colError) {
+        logError('coldArchiveScheduled: failed to process collection', {
+          collection: col.name,
+          error: colError.message,
+        });
+      }
+    }
+
+    logInfo('coldArchiveScheduled completed', { archivedCounts });
+    return null;
+  });
+
+/**
+ * Admin: Restore a document from cold archive.
+ * Super_admin only. Reads from GCS and writes back to Firestore with a restore marker.
+ *
+ * Ref: Phase 2b agent commit 10/10
+ */
+exports.adminRestoreFromArchive = functions.https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'super_admin');
+
+  const { collection, docId } = data || {};
+  const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
+  const ALLOWED_COLLECTIONS = ['audit_logs', 'admin_activity', 'platform_transfer_proposals'];
+
+  if (!collection || !ALLOWED_COLLECTIONS.includes(collection)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `collection must be one of: ${ALLOWED_COLLECTIONS.join(', ')}`);
+  }
+  if (!docId || typeof docId !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'docId is required.');
+  }
+
+  try {
+    const bucket = admin.storage().bucket(ARCHIVE_BUCKET);
+    const file = bucket.file(`${collection}/${docId}.json`);
+    const [contents] = await file.download();
+    const originalData = JSON.parse(contents.toString('utf8'));
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+
+    await db.collection(collection).doc(docId).set({
+      ...originalData,
+      restoredFromArchive: true,
+      restoredAt: admin.firestore.FieldValue.serverTimestamp(),
+      restoredBy: { uid: caller.uid, email: callerEmail },
+    });
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'archive_restored',
+      result: 'success',
+      metadata: { collection, docId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, collection, docId, restored: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminRestoreFromArchive failed', { collection, docId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to restore from archive: ' + error.message);
+  }
+});
