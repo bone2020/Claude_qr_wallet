@@ -15794,3 +15794,114 @@ exports.adminReleaseRecovery = functions.runWith({ enforceAppCheck: true }).http
     throw new functions.https.HttpsError('internal', 'Failed to release recovery: ' + error.message);
   }
 });
+
+/**
+ * Admin: Cancel a held recovery — returns money to recipient's availableBalance, restores debt.
+ * admin_supervisor or higher.
+ */
+exports.adminCancelRecovery = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+  const { recoveryId, cancelReason, notes, idempotencyKey } = data || {};
+
+  const VALID_REASONS = ['recipient_disputes_debt', 'admin_cancelled', 'investigation_required', 'other'];
+  if (!recoveryId) throw new functions.https.HttpsError('invalid-argument', 'recoveryId is required.');
+  if (!cancelReason || !VALID_REASONS.includes(cancelReason)) {
+    throw new functions.https.HttpsError('invalid-argument', `cancelReason must be one of: ${VALID_REASONS.join(', ')}`);
+  }
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 20) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 20 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminCancelRecovery');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminCancelRecovery.message);
+
+  try {
+    const recoveryRef = db.collection('debt_recoveries').doc(recoveryId);
+    const recoverySnap = await recoveryRef.get();
+    if (!recoverySnap.exists) throw new functions.https.HttpsError('not-found', 'Recovery not found.');
+    const recovery = recoverySnap.data();
+
+    if (recovery.status !== 'held_pending_confirmation') {
+      throw new functions.https.HttpsError('failed-precondition', `Recovery status is '${recovery.status}', expected 'held_pending_confirmation'.`);
+    }
+
+    await db.runTransaction(async (transaction) => {
+      const walletRef = db.collection('wallets').doc(recovery.recipientUid);
+      const walletSnap = await transaction.get(walletRef);
+      const debtRef = db.collection('wallet_debts').doc(recovery.debtId);
+      const debtSnap = await transaction.get(debtRef);
+      const freshRecovery = await transaction.get(recoveryRef);
+
+      if (!freshRecovery.exists || freshRecovery.data().status !== 'held_pending_confirmation') {
+        throw new functions.https.HttpsError('failed-precondition', 'Recovery was modified concurrently.');
+      }
+
+      if (walletSnap.exists) {
+        transaction.update(walletRef, {
+          heldBalance: admin.firestore.FieldValue.increment(-recovery.amount),
+          availableBalance: admin.firestore.FieldValue.increment(recovery.amount),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (debtSnap.exists) {
+        const freshDebt = debtSnap.data();
+        const restoredOwed = (freshDebt.amountOwed || 0) + recovery.amount;
+        const newStatus = restoredOwed > 0 ? (freshDebt.amountRecovered > recovery.amount ? 'partially_paid' : 'active') : freshDebt.status;
+        transaction.update(debtRef, {
+          amountOwed: admin.firestore.FieldValue.increment(recovery.amount),
+          amountRecovered: admin.firestore.FieldValue.increment(-recovery.amount),
+          status: newStatus,
+        });
+      }
+
+      transaction.update(recoveryRef, {
+        status: 'cancelled',
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancelReason,
+        notes: notes.trim(),
+      });
+    });
+
+    const recipDoc = await db.collection('users').doc(recovery.recipientUid).get();
+    const recipPhone = recipDoc.exists ? recipDoc.data().phoneNumber : null;
+    if (recipPhone) {
+      await sendCustomerSms({
+        phoneNumber: recipPhone,
+        message: `QR Wallet: Recovery deduction cancelled. ${recovery.amount} ${recovery.currency} returned to your wallet.`,
+        relatedTo: `recovery:${recoveryId}`,
+      });
+    }
+    const filerDoc = await db.collection('users').doc(recovery.filerUid).get();
+    const filerPhone = filerDoc.exists ? filerDoc.data().phoneNumber : null;
+    if (filerPhone) {
+      await sendCustomerSms({
+        phoneNumber: filerPhone,
+        message: `QR Wallet: Recovery for dispute ${recovery.disputeId} was cancelled. We'll reach out with details.`,
+        relatedTo: `recovery:${recoveryId}`,
+      });
+    }
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminCancelRecovery', result: 'success',
+      amount: recovery.amount, currency: recovery.currency,
+      metadata: { recoveryId, debtId: recovery.debtId, cancelReason },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'cancel_recovery', details: `Cancelled recovery ${recoveryId}: ${cancelReason}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, recoveryId, status: 'cancelled' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminCancelRecovery failed', { recoveryId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to cancel recovery: ' + error.message);
+  }
+});
