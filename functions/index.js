@@ -15683,3 +15683,114 @@ exports.adminConfirmRecipientForRecovery = functions.runWith({ enforceAppCheck: 
     throw new functions.https.HttpsError('internal', 'Failed to confirm recipient: ' + error.message);
   }
 });
+
+/**
+ * Admin: Release a confirmed recovery — moves money from recipient's heldBalance to filer's wallet.
+ * Requires BOTH filerConfirmed AND recipientConfirmed. admin_manager or super_admin only.
+ */
+exports.adminReleaseRecovery = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+  const { recoveryId, idempotencyKey, notes } = data || {};
+
+  if (!recoveryId) throw new functions.https.HttpsError('invalid-argument', 'recoveryId is required.');
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminReleaseRecovery');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminReleaseRecovery.message);
+
+  try {
+    const recoveryRef = db.collection('debt_recoveries').doc(recoveryId);
+    const recoverySnap = await recoveryRef.get();
+    if (!recoverySnap.exists) throw new functions.https.HttpsError('not-found', 'Recovery not found.');
+    const recovery = recoverySnap.data();
+
+    if (recovery.status !== 'held_pending_confirmation') {
+      throw new functions.https.HttpsError('failed-precondition', `Recovery status is '${recovery.status}', expected 'held_pending_confirmation'.`);
+    }
+    if (!recovery.filerConfirmed || !recovery.recipientConfirmed) {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Both parties must be confirmed before release. Filer: ${recovery.filerConfirmed}, Recipient: ${recovery.recipientConfirmed}`);
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+
+    await db.runTransaction(async (transaction) => {
+      const recipientWalletRef = db.collection('wallets').doc(recovery.recipientUid);
+      const filerWalletRef = db.collection('wallets').doc(recovery.filerUid);
+      const rSnap = await transaction.get(recipientWalletRef);
+      const fSnap = await transaction.get(filerWalletRef);
+      const freshRecovery = await transaction.get(recoveryRef);
+
+      if (!freshRecovery.exists || freshRecovery.data().status !== 'held_pending_confirmation') {
+        throw new functions.https.HttpsError('failed-precondition', 'Recovery was modified concurrently.');
+      }
+
+      if (rSnap.exists) {
+        transaction.update(recipientWalletRef, {
+          heldBalance: admin.firestore.FieldValue.increment(-recovery.amount),
+          balance: admin.firestore.FieldValue.increment(-recovery.amount),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      if (fSnap.exists) {
+        transaction.update(filerWalletRef, {
+          balance: admin.firestore.FieldValue.increment(recovery.amount),
+          availableBalance: admin.firestore.FieldValue.increment(recovery.amount),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      transaction.update(recoveryRef, {
+        status: 'released_to_filer',
+        releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+        releasedBy: { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName },
+      });
+    });
+
+    if (recovery.filerUid) {
+      const filerDoc = await db.collection('users').doc(recovery.filerUid).get();
+      const filerPhone = filerDoc.exists ? filerDoc.data().phoneNumber : null;
+      if (filerPhone) {
+        await sendCustomerSms({
+          phoneNumber: filerPhone,
+          message: `QR Wallet: ${recovery.amount} ${recovery.currency} released to your wallet from dispute ${recovery.disputeId}.`,
+          relatedTo: `recovery:${recoveryId}`,
+        });
+      }
+    }
+    if (recovery.recipientUid) {
+      const recipDoc = await db.collection('users').doc(recovery.recipientUid).get();
+      const recipPhone = recipDoc.exists ? recipDoc.data().phoneNumber : null;
+      if (recipPhone) {
+        await sendCustomerSms({
+          phoneNumber: recipPhone,
+          message: `QR Wallet: ${recovery.amount} ${recovery.currency} recovery for dispute ${recovery.disputeId} completed.`,
+          relatedTo: `recovery:${recoveryId}`,
+        });
+      }
+    }
+
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminReleaseRecovery', result: 'success',
+      amount: recovery.amount, currency: recovery.currency,
+      metadata: { recoveryId, debtId: recovery.debtId, disputeId: recovery.disputeId },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'release_recovery', details: `Released ${recovery.amount} ${recovery.currency} for recovery ${recoveryId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, recoveryId, status: 'released_to_filer' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminReleaseRecovery failed', { recoveryId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to release recovery: ' + error.message);
+  }
+});
