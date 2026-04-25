@@ -289,5 +289,21 @@ service cloud.firestore {
     match /dispute_history/{userUid} {
       allow read, write: if false;
     }
+
+    // wallet_debts — Cloud Functions only (filer + recipient can READ their own debts)
+    match /wallet_debts/{debtId} {
+      allow read: if request.auth != null
+        && (resource.data.recipientUid == request.auth.uid
+            || resource.data.filerUid == request.auth.uid);
+      allow write: if false;
+    }
+
+    // debt_recoveries — Cloud Functions only (filer + recipient can READ their own)
+    match /debt_recoveries/{recoveryId} {
+      allow read: if request.auth != null
+        && (resource.data.recipientUid == request.auth.uid
+            || resource.data.filerUid == request.auth.uid);
+      allow write: if false;
+    }
   }
 }
