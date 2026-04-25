@@ -13715,13 +13715,103 @@ exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).h
 // ============================================================
 
 /**
- * Stub for opportunistic hold placement. Returns 0 (no hold).
- * Human-pair commit 7 replaces this with real implementation that moves
- * funds from recipient's availableBalance to heldBalance.
+ * Place an opportunistic hold on the recipient's wallet for a dispute.
+ *
+ * Holds whatever amount is currently available, up to requestedAmount.
+ * If recipient has no funds, returns 0 (no hold placed).
+ *
+ * Mirrors the codebase's existing wallet hold pattern:
+ *   - Atomic transaction
+ *   - Increments heldBalance, decrements availableBalance
+ *   - Writes wallet_blocks doc tracking this dispute hold
+ *
+ * Called by:
+ *   - userFileDispute (initial hold attempt at filing time)
+ *   - topUpDisputeHoldsScheduled (recurring top-up if recipient receives funds during investigation)
+ *
+ * @param {Object} params
+ * @param {string} params.recipientUid - the user whose wallet gets the hold
+ * @param {string} params.currency - currency code (e.g., 'NGN', 'USD')
+ * @param {number} params.requestedAmount - max amount to hold (in source currency, major units)
+ * @param {string} params.disputeId - the dispute this hold is for (back-reference)
+ * @returns {Promise<number>} - actual amount held (0 to requestedAmount)
+ *
+ * Ref: Phase 2d human-pair commit (placeholder name was placeOpportunisticHoldStub)
  */
 async function placeOpportunisticHoldStub({ recipientUid, currency, requestedAmount, disputeId }) {
-  logInfo('placeOpportunisticHoldStub called (no-op)', { recipientUid, currency, requestedAmount, disputeId });
-  return 0;
+  // Validate inputs defensively
+  if (!recipientUid || typeof recipientUid !== 'string') {
+    logWarning('placeOpportunisticHold: missing recipientUid', { disputeId });
+    return 0;
+  }
+  if (typeof requestedAmount !== 'number' || requestedAmount <= 0) {
+    logWarning('placeOpportunisticHold: invalid requestedAmount', { recipientUid, requestedAmount, disputeId });
+    return 0;
+  }
+
+  let actualHeld = 0;
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const walletRef = db.collection('wallets').doc(recipientUid);
+      const walletSnap = await transaction.get(walletRef);
+
+      if (!walletSnap.exists) {
+        logInfo('placeOpportunisticHold: recipient wallet does not exist', { recipientUid, disputeId });
+        return;
+      }
+
+      const walletData = walletSnap.data();
+      const available = walletData.availableBalance != null
+        ? walletData.availableBalance
+        : ((walletData.balance || 0) - (walletData.heldBalance || 0));
+
+      if (available <= 0) {
+        // Recipient has no funds available. No hold placed.
+        return;
+      }
+
+      // Hold whatever's available, up to the requested amount
+      actualHeld = Math.min(available, requestedAmount);
+
+      // Atomically: increase heldBalance, decrease availableBalance, write block doc
+      transaction.update(walletRef, {
+        heldBalance: admin.firestore.FieldValue.increment(actualHeld),
+        availableBalance: admin.firestore.FieldValue.increment(-actualHeld),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      const blockRef = db.collection('wallet_blocks').doc();
+      transaction.set(blockRef, {
+        blockId: blockRef.id,
+        userUid: recipientUid,
+        disputeId,
+        blockType: 'dispute_hold',
+        amount: actualHeld,
+        currency: (currency || '').toUpperCase(),
+        placedAt: admin.firestore.FieldValue.serverTimestamp(),
+        liftedAt: null,
+        liftReason: null,
+      });
+    });
+
+    if (actualHeld > 0) {
+      logInfo('placeOpportunisticHold: hold placed successfully', {
+        recipientUid, currency, requestedAmount, actualHeld, disputeId,
+      });
+    } else {
+      logInfo('placeOpportunisticHold: no funds available to hold', {
+        recipientUid, currency, requestedAmount, disputeId,
+      });
+    }
+  } catch (error) {
+    logError('placeOpportunisticHold: transaction failed', {
+      recipientUid, currency, requestedAmount, disputeId, error: error.message,
+    });
+    return 0;
+  }
+
+  return actualHeld;
 }
 
 /**
