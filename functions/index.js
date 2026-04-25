@@ -2476,6 +2476,12 @@ const RATE_LIMITS = {
   adminSuperAdminDisputeDecision: { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many super_admin dispute decisions.' },
   adminListDisputes:          { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
   adminGetDisputeEvidenceUrl: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many document access attempts.' },
+  adminConfirmFilerForRecovery:    { windowMs: 60 * 60 * 1000, maxRequests: 30, message: 'Too many filer confirmations.' },
+  adminConfirmRecipientForRecovery: { windowMs: 60 * 60 * 1000, maxRequests: 30, message: 'Too many recipient confirmations.' },
+  adminReleaseRecovery: { windowMs: 60 * 60 * 1000, maxRequests: 30, message: 'Too many release attempts.' },
+  adminCancelRecovery: { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many cancellation attempts.' },
+  adminListRecoveries: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
+  userGetMyRecoveries: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
 };
 
 /**
@@ -15573,3 +15579,107 @@ exports.processWalletDepositForDebts = functions.firestore
     });
     return null;
   });
+
+/**
+ * Admin: Confirm filer's side for a recovery event (customer care call completed).
+ */
+exports.adminConfirmFilerForRecovery = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+  const { recoveryId, notes, idempotencyKey } = data || {};
+
+  if (!recoveryId) throw new functions.https.HttpsError('invalid-argument', 'recoveryId is required.');
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 10 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminConfirmFilerForRecovery');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminConfirmFilerForRecovery.message);
+
+  try {
+    const recoveryRef = db.collection('debt_recoveries').doc(recoveryId);
+    const recoverySnap = await recoveryRef.get();
+    if (!recoverySnap.exists) throw new functions.https.HttpsError('not-found', 'Recovery not found.');
+    const recovery = recoverySnap.data();
+    if (recovery.status !== 'held_pending_confirmation') {
+      throw new functions.https.HttpsError('failed-precondition', `Recovery status is '${recovery.status}', expected 'held_pending_confirmation'.`);
+    }
+
+    await recoveryRef.update({
+      filerConfirmed: true,
+      filerConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      notes: notes.trim(),
+    });
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminConfirmFilerForRecovery', result: 'success',
+      metadata: { recoveryId }, timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'confirm_filer_recovery', details: `Confirmed filer for recovery ${recoveryId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, recoveryId, filerConfirmed: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminConfirmFilerForRecovery failed', { recoveryId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to confirm filer: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Confirm recipient's side for a recovery event (customer care call completed).
+ */
+exports.adminConfirmRecipientForRecovery = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_supervisor');
+  const { recoveryId, notes, idempotencyKey } = data || {};
+
+  if (!recoveryId) throw new functions.https.HttpsError('invalid-argument', 'recoveryId is required.');
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 10) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 10 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminConfirmRecipientForRecovery');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminConfirmRecipientForRecovery.message);
+
+  try {
+    const recoveryRef = db.collection('debt_recoveries').doc(recoveryId);
+    const recoverySnap = await recoveryRef.get();
+    if (!recoverySnap.exists) throw new functions.https.HttpsError('not-found', 'Recovery not found.');
+    const recovery = recoverySnap.data();
+    if (recovery.status !== 'held_pending_confirmation') {
+      throw new functions.https.HttpsError('failed-precondition', `Recovery status is '${recovery.status}', expected 'held_pending_confirmation'.`);
+    }
+
+    await recoveryRef.update({
+      recipientConfirmed: true,
+      recipientConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+      notes: (recovery.notes ? recovery.notes + ' | ' : '') + notes.trim(),
+    });
+
+    const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
+    await db.collection('audit_logs').add({
+      userId: caller.uid, operation: 'adminConfirmRecipientForRecovery', result: 'success',
+      metadata: { recoveryId }, timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid, email: callerEmail, role: caller.role,
+      action: 'confirm_recipient_recovery', details: `Confirmed recipient for recovery ${recoveryId}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, recoveryId, recipientConfirmed: true };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminConfirmRecipientForRecovery failed', { recoveryId, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to confirm recipient: ' + error.message);
+  }
+});
