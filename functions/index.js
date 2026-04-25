@@ -15411,3 +15411,165 @@ exports.topUpDisputeHoldsScheduled = functions.pubsub
     logInfo('topUpDisputeHoldsScheduled completed', { toppedUp });
     return null;
   });
+
+// ============================================================
+// RECOVERY WATCH SYSTEM (Phase 2e)
+// ============================================================
+
+/**
+ * Firestore trigger: when a wallet's balance increases, check if user has
+ * active wallet_debts and auto-deduct the increase (up to amount owed).
+ * Loop guard: returns early when availableBalance did not increase.
+ */
+exports.processWalletDepositForDebts = functions.firestore
+  .document('wallets/{userUid}')
+  .onUpdate(async (change, context) => {
+    const userUid = context.params.userUid;
+    const before = change.before.data() || {};
+    const after = change.after.data() || {};
+
+    const beforeBalance = before.balance || 0;
+    const afterBalance = after.balance || 0;
+    const beforeAvailable = before.availableBalance || 0;
+    const afterAvailable = after.availableBalance || 0;
+
+    const balanceIncrease = afterBalance - beforeBalance;
+    const availableIncrease = afterAvailable - beforeAvailable;
+    if (balanceIncrease <= 0 || availableIncrease <= 0) return null;
+
+    const depositAmount = availableIncrease;
+
+    const debtsSnap = await db.collection('wallet_debts')
+      .where('recipientUid', '==', userUid)
+      .where('status', 'in', ['active', 'partially_paid'])
+      .limit(10)
+      .get();
+
+    if (debtsSnap.empty) return null;
+
+    let remainingDeposit = depositAmount;
+    const recoveryEvents = [];
+
+    for (const debtDoc of debtsSnap.docs) {
+      if (remainingDeposit <= 0) break;
+      const debt = debtDoc.data();
+      const owed = debt.amountOwed || 0;
+      if (owed <= 0) continue;
+
+      const deductAmount = Math.min(remainingDeposit, owed);
+
+      try {
+        const result = await db.runTransaction(async (transaction) => {
+          const walletRef = db.collection('wallets').doc(userUid);
+          const walletSnap = await transaction.get(walletRef);
+          if (!walletSnap.exists) return null;
+          const walletData = walletSnap.data();
+          const currentAvailable = walletData.availableBalance || 0;
+          if (currentAvailable < deductAmount) return null;
+
+          const debtSnap = await transaction.get(debtDoc.ref);
+          if (!debtSnap.exists) return null;
+          const freshDebt = debtSnap.data();
+          if ((freshDebt.amountOwed || 0) < deductAmount) return null;
+
+          transaction.update(walletRef, {
+            availableBalance: admin.firestore.FieldValue.increment(-deductAmount),
+            heldBalance: admin.firestore.FieldValue.increment(deductAmount),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          const newOwed = (freshDebt.amountOwed || 0) - deductAmount;
+          const newStatus = newOwed <= 0 ? 'closed' : 'partially_paid';
+          transaction.update(debtDoc.ref, {
+            amountOwed: newOwed,
+            amountRecovered: admin.firestore.FieldValue.increment(deductAmount),
+            status: newStatus,
+            lastDeductionAt: admin.firestore.FieldValue.serverTimestamp(),
+            ...(newOwed <= 0 ? { closedAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
+          });
+
+          const recoveryRef = db.collection('debt_recoveries').doc();
+          transaction.set(recoveryRef, {
+            recoveryId: recoveryRef.id,
+            debtId: debt.debtId,
+            disputeId: debt.disputeId,
+            recipientUid: userUid,
+            filerUid: debt.filerUid,
+            amount: deductAmount,
+            currency: debt.currency,
+            status: 'held_pending_confirmation',
+            deductedAt: admin.firestore.FieldValue.serverTimestamp(),
+            releasedAt: null, releasedBy: null,
+            cancelledAt: null, cancelReason: null,
+            filerConfirmed: false, filerConfirmedAt: null,
+            recipientConfirmed: false, recipientConfirmedAt: null,
+            notes: null,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          return { recoveryId: recoveryRef.id, deductAmount, newOwed, debt };
+        });
+
+        if (result) {
+          recoveryEvents.push(result);
+          remainingDeposit -= result.deductAmount;
+        }
+      } catch (error) {
+        logError('processWalletDepositForDebts: transaction failed', {
+          userUid, debtId: debt.debtId, error: error.message,
+        });
+      }
+    }
+
+    for (const event of recoveryEvents) {
+      try {
+        const debt = event.debt;
+        const remainingDebt = event.newOwed;
+
+        if (debt.recipientPhoneNumber) {
+          await sendCustomerSms({
+            phoneNumber: debt.recipientPhoneNumber,
+            message: `QR Wallet: ${event.deductAmount} ${debt.currency} deducted to repay dispute debt. ${remainingDebt > 0 ? `${remainingDebt} ${debt.currency} remaining.` : 'Debt fully paid.'}`,
+            relatedTo: `recovery:${event.recoveryId}`,
+          });
+        }
+        if (debt.filerPhoneNumber) {
+          await sendCustomerSms({
+            phoneNumber: debt.filerPhoneNumber,
+            message: `QR Wallet: ${event.deductAmount} ${debt.currency} recovered for your dispute ${debt.disputeId}. Pending confirmation by our team.`,
+            relatedTo: `recovery:${event.recoveryId}`,
+          });
+        }
+
+        const staffSnap = await db.collection('admin_users')
+          .where('role', 'in', ['admin', 'admin_supervisor', 'admin_manager'])
+          .get();
+        for (const staff of staffSnap.docs) {
+          await sendProposalEmail({
+            to: staff.id, toName: staff.data().displayName || null,
+            subject: `Recovery deduction held — ${event.deductAmount} ${debt.currency} for dispute ${debt.disputeId}`,
+            htmlBody: `<p>An automatic deduction of <strong>${event.deductAmount} ${debt.currency}</strong> has been placed in hold for dispute <strong>${debt.disputeId}</strong>.</p>
+<p><strong>Recipient:</strong> ${debt.recipientEmail}<br><strong>Filer:</strong> ${debt.filerEmail}<br><strong>Remaining debt:</strong> ${remainingDebt} ${debt.currency}</p>
+<p>Customer care should now contact both parties to confirm before release. Recovery ID: ${event.recoveryId}</p>`,
+            textBody: `Recovery: ${event.deductAmount} ${debt.currency} held for dispute ${debt.disputeId}. ID: ${event.recoveryId}.`,
+            relatedTo: `recovery:${event.recoveryId}`,
+          });
+        }
+
+        await db.collection('audit_logs').add({
+          userId: 'system', operation: 'debt_recovery_deduction', result: 'success',
+          metadata: { recoveryId: event.recoveryId, debtId: debt.debtId, amount: event.deductAmount },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (notifyError) {
+        logError('processWalletDepositForDebts: notification failed', {
+          recoveryId: event.recoveryId, error: notifyError.message,
+        });
+      }
+    }
+
+    logInfo('processWalletDepositForDebts: completed', {
+      userUid, depositAmount, recoveriesCount: recoveryEvents.length,
+    });
+    return null;
+  });
