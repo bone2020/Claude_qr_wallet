@@ -15905,3 +15905,79 @@ exports.adminCancelRecovery = functions.runWith({ enforceAppCheck: true }).https
     throw new functions.https.HttpsError('internal', 'Failed to cancel recovery: ' + error.message);
   }
 });
+
+/**
+ * Admin: List recovery events with optional filters and pagination.
+ * Auditor+ can access.
+ */
+exports.adminListRecoveries = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'auditor');
+  const { status: filterStatus, recipientUid, filerUid, limit: requestedLimit, startAfter } = data || {};
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminListRecoveries');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminListRecoveries.message);
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') limit = Math.min(Math.max(requestedLimit, 1), 200);
+
+  try {
+    let query = db.collection('debt_recoveries').orderBy('deductedAt', 'desc').limit(limit);
+    if (filterStatus) query = query.where('status', '==', filterStatus);
+    if (recipientUid) query = query.where('recipientUid', '==', recipientUid);
+    if (filerUid) query = query.where('filerUid', '==', filerUid);
+
+    if (startAfter && typeof startAfter === 'string') {
+      const cursorDoc = await db.collection('debt_recoveries').doc(startAfter).get();
+      if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+    }
+
+    const snap = await query.get();
+    const recoveries = snap.docs.map(doc => doc.data());
+
+    return { success: true, recoveries, count: recoveries.length, hasMore: recoveries.length === limit };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminListRecoveries failed', { caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to list recoveries: ' + error.message);
+  }
+});
+
+/**
+ * User: List own recovery events as filer or recipient.
+ */
+exports.userGetMyRecoveries = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
+  const callerUid = context.auth.uid;
+  const { role: queryRole, limit: requestedLimit } = data || {};
+
+  const withinLimit = await checkRateLimitPersistent(callerUid, 'userGetMyRecoveries');
+  if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userGetMyRecoveries.message);
+
+  if (queryRole && queryRole !== 'filer' && queryRole !== 'recipient') {
+    throw new functions.https.HttpsError('invalid-argument', 'role must be "filer" or "recipient".');
+  }
+
+  let limit = 50;
+  if (requestedLimit && typeof requestedLimit === 'number') limit = Math.min(Math.max(requestedLimit, 1), 50);
+
+  try {
+    const field = queryRole === 'recipient' ? 'recipientUid' : 'filerUid';
+    const query = db.collection('debt_recoveries')
+      .where(field, '==', callerUid)
+      .orderBy('deductedAt', 'desc')
+      .limit(limit);
+
+    const snap = await query.get();
+    const recoveries = snap.docs.map(doc => {
+      const d = doc.data();
+      const { notes, cancelReason, ...safe } = d;
+      return safe;
+    });
+
+    return { success: true, recoveries };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('userGetMyRecoveries failed', { caller: callerUid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to list recoveries: ' + error.message);
+  }
+});
