@@ -2473,6 +2473,7 @@ const RATE_LIMITS = {
   adminSubmitInvestigation:   { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many investigation submissions.' },
   adminSupervisorDecision:    { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many supervisor decisions.' },
   adminManagerDecision:       { windowMs: 60 * 60 * 1000, maxRequests: 20, message: 'Too many manager decisions.' },
+  adminSuperAdminDisputeDecision: { windowMs: 60 * 60 * 1000, maxRequests: 10, message: 'Too many super_admin dispute decisions.' },
   adminListDisputes:          { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many list requests.' },
   adminGetDisputeEvidenceUrl: { windowMs: 60 * 60 * 1000, maxRequests: 60, message: 'Too many document access attempts.' },
 };
@@ -14829,6 +14830,301 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
     if (error instanceof functions.https.HttpsError) throw error;
     logError('adminManagerDecision failed', { disputeId, caller: caller.uid, error: error.message });
     throw new functions.https.HttpsError('internal', 'Failed to submit manager decision: ' + error.message);
+  }
+});
+
+/**
+ * Admin: Super_admin final decision on an escalated dispute.
+ *
+ * Only available when dispute auto-escalated after 5 days without manager decision
+ * (status === 'super_admin_escalation', set by disputeEscalationCheckScheduled).
+ *
+ * Same money-movement logic as adminManagerDecision (release / refund_full / refund_partial).
+ * No kickback option — super_admin is the final decider.
+ *
+ * For internal audit: records decidedByRole='super_admin' so we can distinguish
+ * escalated decisions from manager decisions.
+ *
+ * Ref: Phase 2d human-pair commit 3 (escalation path money-movement)
+ */
+exports.adminSuperAdminDisputeDecision = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+  // STRICT super_admin role check
+  const caller = await verifyAdmin(context, 'super_admin');
+  if (caller.role !== 'super_admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only super_admin can decide escalated disputes.');
+  }
+
+  const { disputeId, decision, amount, notes, idempotencyKey } = data || {};
+
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  const VALID_DECISIONS = ['refund_full', 'refund_partial', 'release'];
+  if (!decision || !VALID_DECISIONS.includes(decision)) {
+    throw new functions.https.HttpsError('invalid-argument', `decision must be one of: ${VALID_DECISIONS.join(', ')}`);
+  }
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 20) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 20 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminSuperAdminDisputeDecision');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.adminSuperAdminDisputeDecision.message);
+  }
+
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+
+    if (dispute.status !== 'super_admin_escalation') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Dispute status is '${dispute.status}', expected 'super_admin_escalation'.`);
+    }
+
+    if (decision === 'refund_partial') {
+      if (!amount || typeof amount !== 'number' || amount <= 0 || amount >= dispute.disputedAmount) {
+        throw new functions.https.HttpsError('invalid-argument',
+          `Partial refund amount must be between 0 and ${dispute.disputedAmount} (exclusive).`);
+      }
+    }
+
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const superAdminInfo = { uid: caller.uid, email: callerEmail, role: caller.role, displayName: callerDisplayName };
+
+    let newStatus = 'resolved';
+
+    if (decision === 'release') {
+      // Lift any wallet hold on recipient
+      const currentHold = dispute.currentHoldAmount || 0;
+      await db.runTransaction(async (transaction) => {
+        if (currentHold > 0 && dispute.recipientUid) {
+          const recipientWalletRef = db.collection('wallets').doc(dispute.recipientUid);
+          transaction.update(recipientWalletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-currentHold),
+            availableBalance: admin.firestore.FieldValue.increment(currentHold),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        transaction.update(disputeRef, {
+          status: 'resolved',
+          resolutionType: 'released',
+          amountRecovered: 0,
+          amountUnrecovered: 0,
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecision: 'release',
+          superAdminDecidedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecidedBy: superAdminInfo,
+          decidedByRole: 'super_admin',
+          managerNotes: notes.trim(),
+          _awaitingMoneyMovement: false,
+          _recoveryWatchActive: false,
+        });
+      });
+
+      // Lift wallet_blocks
+      const blocksSnap = await db.collection('wallet_blocks')
+        .where('disputeId', '==', disputeId)
+        .where('liftedAt', '==', null)
+        .get();
+      const blockBatch = db.batch();
+      blocksSnap.docs.forEach(blockDoc => {
+        blockBatch.update(blockDoc.ref, {
+          liftedAt: admin.firestore.FieldValue.serverTimestamp(),
+          liftReason: 'dispute_resolved_release',
+        });
+      });
+      if (!blocksSnap.empty) await blockBatch.commit();
+
+      await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
+        totalRejected: admin.firestore.FieldValue.increment(1),
+        totalActiveCount: admin.firestore.FieldValue.increment(-1),
+      }, { merge: true });
+
+      await sendCustomerSms({
+        phoneNumber: dispute.filedBy.phoneNumber,
+        message: `Dispute ${disputeId} closed in favor of recipient. No funds returned.`,
+        relatedTo: `dispute:${disputeId}`,
+      });
+      if (dispute.recipientPhoneNumber) {
+        await sendCustomerSms({
+          phoneNumber: dispute.recipientPhoneNumber,
+          message: `Dispute ${disputeId} resolved in your favor. Hold lifted.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    } else {
+      // refund_full or refund_partial — same money flow as adminManagerDecision
+      const requestedRefund = decision === 'refund_partial' ? amount : dispute.disputedAmount;
+      const currentHold = dispute.currentHoldAmount || 0;
+      const actualRefund = Math.min(requestedRefund, currentHold);
+      const unrecovered = Math.max(0, requestedRefund - actualRefund);
+
+      const feeCharged = dispute.feeCharged || 0;
+      const feeDeductedFrom = dispute.feeDeductedFrom || 'recovery';
+      let netToFiler = actualRefund;
+      let feeRefunded = false;
+      if (feeDeductedFrom === 'wallet_at_filing') {
+        feeRefunded = true;
+      } else if (feeDeductedFrom === 'recovery') {
+        const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+          ? dispute.disputedAmount / dispute.usdEquivalent
+          : 1);
+        netToFiler = Math.max(0, actualRefund - feeInSourceCurrency);
+      }
+
+      let finalResolutionType;
+      if (unrecovered === 0) {
+        finalResolutionType = 'refund_full';
+      } else if (actualRefund > 0) {
+        finalResolutionType = 'refund_partial_with_debt';
+      } else {
+        finalResolutionType = 'refund_pending_debt';
+      }
+
+      await db.runTransaction(async (transaction) => {
+        if (actualRefund > 0 && dispute.recipientUid) {
+          const recipientWalletRef = db.collection('wallets').doc(dispute.recipientUid);
+          transaction.update(recipientWalletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-actualRefund),
+            balance: admin.firestore.FieldValue.increment(-actualRefund),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        if (netToFiler > 0) {
+          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
+          transaction.update(filerWalletRef, {
+            balance: admin.firestore.FieldValue.increment(netToFiler),
+            availableBalance: admin.firestore.FieldValue.increment(netToFiler),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          if (feeRefunded && feeCharged > 0) {
+            const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+              ? dispute.disputedAmount / dispute.usdEquivalent
+              : 1);
+            transaction.update(filerWalletRef, {
+              balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+              availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            });
+          }
+        }
+
+        if (unrecovered > 0 && dispute.recipientUid) {
+          const debtRef = db.collection('wallet_debts').doc();
+          transaction.set(debtRef, {
+            debtId: debtRef.id,
+            disputeId,
+            recipientUid: dispute.recipientUid,
+            recipientEmail: dispute.recipientEmail || '',
+            recipientPhoneNumber: dispute.recipientPhoneNumber || '',
+            filerUid: dispute.filedBy.uid,
+            filerEmail: dispute.filedBy.email || '',
+            filerPhoneNumber: dispute.filedBy.phoneNumber || '',
+            amountOwed: unrecovered,
+            amountRecovered: 0,
+            currency: dispute.disputedCurrency,
+            status: 'active',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastDeductionAt: null,
+            closedAt: null,
+            createdBy: 'adminSuperAdminDisputeDecision',
+          });
+        }
+
+        transaction.update(disputeRef, {
+          status: 'resolved',
+          resolutionType: finalResolutionType,
+          amountRecovered: actualRefund,
+          amountUnrecovered: unrecovered,
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecision: decision,
+          superAdminDecidedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecidedBy: superAdminInfo,
+          decidedByRole: 'super_admin',
+          managerDecisionAmount: requestedRefund,
+          managerNotes: notes.trim(),
+          feeRefunded,
+          _awaitingMoneyMovement: false,
+          _recoveryWatchActive: unrecovered > 0,
+        });
+      });
+
+      // Lift wallet_blocks
+      const blocksSnap = await db.collection('wallet_blocks')
+        .where('disputeId', '==', disputeId)
+        .where('liftedAt', '==', null)
+        .get();
+      const blockBatch = db.batch();
+      blocksSnap.docs.forEach(blockDoc => {
+        blockBatch.update(blockDoc.ref, {
+          liftedAt: admin.firestore.FieldValue.serverTimestamp(),
+          liftReason: 'dispute_resolved_refund',
+        });
+      });
+      if (!blocksSnap.empty) await blockBatch.commit();
+
+      await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
+        totalUpheld: admin.firestore.FieldValue.increment(1),
+        totalActiveCount: admin.firestore.FieldValue.increment(-1),
+      }, { merge: true });
+
+      // SMS notifications (same as adminManagerDecision — customer doesn't see who decided)
+      if (unrecovered === 0) {
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} resolved. Refund of ${actualRefund} ${dispute.disputedCurrency} sent to your wallet.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      } else {
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} resolved. Refunded ${actualRefund} ${dispute.disputedCurrency}. Remaining ${unrecovered} ${dispute.disputedCurrency} will be deducted from recipient's wallet as funds become available, then released to you after our team confirms with both parties.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+      if (dispute.recipientPhoneNumber) {
+        await sendCustomerSms({
+          phoneNumber: dispute.recipientPhoneNumber,
+          message: unrecovered > 0
+            ? `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted. You owe ${unrecovered} ${dispute.disputedCurrency} which will be deducted from future deposits.`
+            : `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted from your wallet.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+    }
+
+    // Audit log + admin_activity log
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'adminSuperAdminDisputeDecision',
+      result: 'success',
+      metadata: { disputeId, decision, escalated: true, notes: notes.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'super_admin_dispute_decision',
+      details: `Escalation decision: ${decision} on dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, disputeId, status: newStatus, decision, decidedByRole: 'super_admin' };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminSuperAdminDisputeDecision failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to submit super_admin decision: ' + error.message);
   }
 });
 
