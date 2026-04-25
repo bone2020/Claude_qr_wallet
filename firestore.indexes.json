@@ -402,6 +402,38 @@
         {"fieldPath": "userUid", "order": "ASCENDING"},
         {"fieldPath": "liftedAt", "order": "ASCENDING"}
       ]
+    },
+    {
+      "collectionGroup": "wallet_debts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "recipientUid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "wallet_debts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "filerUid", "order": "ASCENDING"},
+        {"fieldPath": "status", "order": "ASCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "debt_recoveries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "debtId", "order": "ASCENDING"},
+        {"fieldPath": "deductedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "debt_recoveries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "status", "order": "ASCENDING"},
+        {"fieldPath": "deductedAt", "order": "DESCENDING"}
+      ]
     }
   ],
   "fieldOverrides": []
