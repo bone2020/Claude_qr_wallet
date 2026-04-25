@@ -14600,16 +14600,46 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
       }
     } else if (decision === 'release') {
       newStatus = 'resolved';
-      await disputeRef.update({
-        status: 'resolved',
-        resolutionType: 'released',
-        amountRecovered: 0,
-        amountUnrecovered: 0,
-        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        reviewingManager: managerInfo,
-        managerDecision: 'release',
-        managerNotes: notes.trim(),
+
+      // Lift any wallet hold on recipient atomically
+      const currentHold = dispute.currentHoldAmount || 0;
+      await db.runTransaction(async (transaction) => {
+        if (currentHold > 0 && dispute.recipientUid) {
+          const recipientWalletRef = db.collection('wallets').doc(dispute.recipientUid);
+          transaction.update(recipientWalletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-currentHold),
+            availableBalance: admin.firestore.FieldValue.increment(currentHold),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        transaction.update(disputeRef, {
+          status: 'resolved',
+          resolutionType: 'released',
+          amountRecovered: 0,
+          amountUnrecovered: 0,
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewingManager: managerInfo,
+          managerDecision: 'release',
+          managerNotes: notes.trim(),
+          _awaitingMoneyMovement: false,
+          _recoveryWatchActive: false,
+        });
       });
+
+      // Mark wallet_blocks for this dispute as lifted (outside transaction; idempotent)
+      const blocksSnap = await db.collection('wallet_blocks')
+        .where('disputeId', '==', disputeId)
+        .where('liftedAt', '==', null)
+        .get();
+      const blockBatch = db.batch();
+      blocksSnap.docs.forEach(blockDoc => {
+        blockBatch.update(blockDoc.ref, {
+          liftedAt: admin.firestore.FieldValue.serverTimestamp(),
+          liftReason: 'dispute_resolved_release',
+        });
+      });
+      if (!blocksSnap.empty) await blockBatch.commit();
 
       await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
         totalRejected: admin.firestore.FieldValue.increment(1),
@@ -14629,37 +14659,157 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
         });
       }
     } else {
-      // refund_full or refund_partial — STUB: doc state only, no money movement
-      const decisionAmount = decision === 'refund_partial' ? amount : dispute.disputedAmount;
-      newStatus = 'resolved';
-      await disputeRef.update({
-        status: 'resolved',
-        resolutionType: decision,
-        amountRecovered: 0,
-        amountUnrecovered: dispute.disputedAmount,
-        resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
-        reviewingManager: managerInfo,
-        managerDecision: decision,
-        managerDecisionAmount: decisionAmount,
-        managerNotes: notes.trim(),
-        _awaitingMoneyMovement: true,
+      // refund_full or refund_partial — REAL money movement
+      const requestedRefund = decision === 'refund_partial' ? amount : dispute.disputedAmount;
+      const currentHold = dispute.currentHoldAmount || 0;
+      const actualRefund = Math.min(requestedRefund, currentHold);
+      const unrecovered = Math.max(0, requestedRefund - actualRefund);
+
+      // Fee handling
+      const feeCharged = dispute.feeCharged || 0;
+      const feeDeductedFrom = dispute.feeDeductedFrom || 'recovery';
+      let netToFiler = actualRefund;
+      let feeRefunded = false;
+      if (feeDeductedFrom === 'wallet_at_filing') {
+        // Fee was already taken from filer's wallet at filing time. Refund it.
+        feeRefunded = true;
+      } else if (feeDeductedFrom === 'recovery') {
+        // Deduct fee from refund amount before crediting filer
+        const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+          ? dispute.disputedAmount / dispute.usdEquivalent
+          : 1);
+        netToFiler = Math.max(0, actualRefund - feeInSourceCurrency);
+      }
+
+      // Determine final resolution type
+      let finalResolutionType;
+      if (unrecovered === 0) {
+        finalResolutionType = 'refund_full';  // fully made whole
+      } else if (actualRefund > 0) {
+        finalResolutionType = 'refund_partial_with_debt';  // partial, debt watch active
+      } else {
+        finalResolutionType = 'refund_pending_debt';  // nothing held, full debt watch
+      }
+
+      // Atomic money movement
+      await db.runTransaction(async (transaction) => {
+        // Recipient: take from heldBalance + balance (money leaves recipient permanently)
+        if (actualRefund > 0 && dispute.recipientUid) {
+          const recipientWalletRef = db.collection('wallets').doc(dispute.recipientUid);
+          transaction.update(recipientWalletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-actualRefund),
+            balance: admin.firestore.FieldValue.increment(-actualRefund),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        // Filer: credit netToFiler (after fee adjustment)
+        if (netToFiler > 0) {
+          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
+          transaction.update(filerWalletRef, {
+            balance: admin.firestore.FieldValue.increment(netToFiler),
+            availableBalance: admin.firestore.FieldValue.increment(netToFiler),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // If fee was deducted from filer's wallet at filing, refund it now
+          if (feeRefunded && feeCharged > 0) {
+            const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+              ? dispute.disputedAmount / dispute.usdEquivalent
+              : 1);
+            transaction.update(filerWalletRef, {
+              balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+              availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            });
+          }
+        }
+
+        // Create wallet_debts doc if there's an unrecovered amount
+        if (unrecovered > 0 && dispute.recipientUid) {
+          const debtRef = db.collection('wallet_debts').doc();
+          transaction.set(debtRef, {
+            debtId: debtRef.id,
+            disputeId,
+            recipientUid: dispute.recipientUid,
+            recipientEmail: dispute.recipientEmail || '',
+            recipientPhoneNumber: dispute.recipientPhoneNumber || '',
+            filerUid: dispute.filedBy.uid,
+            filerEmail: dispute.filedBy.email || '',
+            filerPhoneNumber: dispute.filedBy.phoneNumber || '',
+            amountOwed: unrecovered,
+            amountRecovered: 0,
+            currency: dispute.disputedCurrency,
+            status: 'active',  // 'active' | 'partially_paid' | 'closed'
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastDeductionAt: null,
+            closedAt: null,
+            createdBy: 'adminManagerDecision',
+            // Recovery Watch (Phase 2e) reads this and auto-deducts as funds become available.
+          });
+        }
+
+        // Update dispute doc
+        transaction.update(disputeRef, {
+          status: 'resolved',
+          resolutionType: finalResolutionType,
+          amountRecovered: actualRefund,
+          amountUnrecovered: unrecovered,
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reviewingManager: managerInfo,
+          managerDecision: decision,
+          managerDecisionAmount: requestedRefund,
+          managerNotes: notes.trim(),
+          feeRefunded,
+          _awaitingMoneyMovement: false,
+          _recoveryWatchActive: unrecovered > 0,
+        });
       });
 
-      // TODO(Phase 2d human-pair commit 8): actually move money from recipient's
-      // heldBalance to filer's availableBalance. Update amountRecovered/amountUnrecovered
-      // based on what was actually in hold. Refund fee if feeDeductedFrom='wallet_at_filing'.
-      // Clear _awaitingMoneyMovement flag.
+      // Mark wallet_blocks for this dispute as lifted (outside transaction)
+      const blocksSnap = await db.collection('wallet_blocks')
+        .where('disputeId', '==', disputeId)
+        .where('liftedAt', '==', null)
+        .get();
+      const blockBatch = db.batch();
+      blocksSnap.docs.forEach(blockDoc => {
+        blockBatch.update(blockDoc.ref, {
+          liftedAt: admin.firestore.FieldValue.serverTimestamp(),
+          liftReason: 'dispute_resolved_refund',
+        });
+      });
+      if (!blocksSnap.empty) await blockBatch.commit();
 
+      // Update dispute_history
       await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
         totalUpheld: admin.firestore.FieldValue.increment(1),
         totalActiveCount: admin.firestore.FieldValue.increment(-1),
       }, { merge: true });
 
-      await sendCustomerSms({
-        phoneNumber: dispute.filedBy.phoneNumber,
-        message: `Dispute ${disputeId} resolved. Our team is processing the refund.`,
-        relatedTo: `dispute:${disputeId}`,
-      });
+      // SMS notifications
+      if (unrecovered === 0) {
+        // Fully recovered
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} resolved. Refund of ${actualRefund} ${dispute.disputedCurrency} sent to your wallet.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      } else {
+        // Partial recovery — debt watch active
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} resolved. Refunded ${actualRefund} ${dispute.disputedCurrency}. Remaining ${unrecovered} ${dispute.disputedCurrency} will be deducted from recipient's wallet as funds become available, then released to you after our team confirms with both parties.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+      if (dispute.recipientPhoneNumber) {
+        await sendCustomerSms({
+          phoneNumber: dispute.recipientPhoneNumber,
+          message: unrecovered > 0
+            ? `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted. You owe ${unrecovered} ${dispute.disputedCurrency} which will be deducted from future deposits.`
+            : `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted from your wallet.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
     }
 
     await db.collection('audit_logs').add({
