@@ -15,6 +15,7 @@ import RevenuePage from './pages/RevenuePage';
 import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
 import FraudAlertsPage from './pages/FraudAlertsPage';
+import DisputesPage from './pages/DisputesPage';
 
 const ComingSoon = ({ title }) => (
   <div className="p-8 text-center text-slate-500">
@@ -41,7 +42,7 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
-            <Route path="disputes" element={<ComingSoon title="Disputes" />} />
+            <Route path="disputes" element={<DisputesPage />} />
             <Route path="recovery-watch" element={<ComingSoon title="Recovery Watch" />} />
             <Route path="audit-export" element={<ComingSoon title="Audit Export" />} />
           </Route>
