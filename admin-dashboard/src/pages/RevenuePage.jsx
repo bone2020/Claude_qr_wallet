@@ -185,7 +185,7 @@ function ProposeTransferForm({ onProposed }) {
   }, [country]);
 
   const handleVerify = async () => {
-    if (!bankCode || accountNumber.length < 10) return;
+    if (!bankCode || accountNumber.length < 8) return;
     setVerifying(true);
     setVerified(false);
     setAccountName('');
@@ -195,8 +195,17 @@ function ProposeTransferForm({ onProposed }) {
         accountNumber,
         bankCode,
       });
-      setAccountName(result.data?.accountName || '');
-      setVerified(true);
+      // CF returns { success: false, error: '...' } on failure with HTTP 200,
+      // so we must inspect data.success rather than just checking for thrown errors.
+      const data = result.data || {};
+      if (data.success === false || !data.accountName) {
+        setError(data.error || 'Could not verify account. Check the account number and bank, then try again.');
+        setVerified(false);
+        setAccountName('');
+      } else {
+        setAccountName(data.accountName);
+        setVerified(true);
+      }
     } catch (err) {
       setError(err?.message || 'Account verification failed.');
     } finally {
@@ -222,7 +231,7 @@ function ProposeTransferForm({ onProposed }) {
     Number(amount) > 0 &&
     !!currency &&
     !!bankCode &&
-    accountNumber.length >= 10 &&
+    accountNumber.length >= 8 &&
     !!accountName &&
     purpose.trim().length >= 5;
 
@@ -353,7 +362,7 @@ function ProposeTransferForm({ onProposed }) {
               inputMode="numeric"
               value={accountNumber}
               onChange={(e) => {
-                setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10));
+                setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 16));
                 setVerified(false);
                 setAccountName('');
               }}
@@ -364,7 +373,7 @@ function ProposeTransferForm({ onProposed }) {
             <button
               type="button"
               onClick={handleVerify}
-              disabled={verifying || !bankCode || accountNumber.length < 10}
+              disabled={verifying || !bankCode || accountNumber.length < 8}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
             >
               {verifying ? 'Verifying...' : 'Verify Account'}
@@ -432,7 +441,7 @@ function ProposeTransferForm({ onProposed }) {
           {submitting ? 'Submitting...' : 'Submit Proposal'}
         </button>
 
-        {!verified && bankCode && accountNumber.length === 10 && (
+        {!verified && bankCode && accountNumber.length >= 8 && (
           <p className="text-xs text-amber-600 text-center">
             Verify the bank account before submitting.
           </p>
@@ -1336,7 +1345,7 @@ function EmergencyTransferForm({ onSubmitted }) {
   }, [country]);
 
   const handleVerify = async () => {
-    if (!bankCode || accountNumber.length < 10) return;
+    if (!bankCode || accountNumber.length < 8) return;
     setVerifying(true);
     setVerified(false);
     setAccountName('');
@@ -1346,8 +1355,17 @@ function EmergencyTransferForm({ onSubmitted }) {
         accountNumber,
         bankCode,
       });
-      setAccountName(result.data?.accountName || '');
-      setVerified(true);
+      // CF returns { success: false, error: '...' } on failure with HTTP 200,
+      // so we must inspect data.success rather than just checking for thrown errors.
+      const data = result.data || {};
+      if (data.success === false || !data.accountName) {
+        setError(data.error || 'Could not verify account. Check the account number and bank, then try again.');
+        setVerified(false);
+        setAccountName('');
+      } else {
+        setAccountName(data.accountName);
+        setVerified(true);
+      }
     } catch (err) {
       setError(err?.message || 'Account verification failed.');
     } finally {
@@ -1373,7 +1391,7 @@ function EmergencyTransferForm({ onSubmitted }) {
     Number(amount) > 0 &&
     !!currency &&
     !!bankCode &&
-    accountNumber.length >= 10 &&
+    accountNumber.length >= 8 &&
     !!accountName &&
     purpose.trim().length >= 5 &&
     reason.trim().length >= 50 &&
@@ -1509,7 +1527,7 @@ function EmergencyTransferForm({ onSubmitted }) {
               inputMode="numeric"
               value={accountNumber}
               onChange={(e) => {
-                setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 10));
+                setAccountNumber(e.target.value.replace(/\D/g, '').slice(0, 16));
                 setVerified(false);
                 setAccountName('');
               }}
@@ -1520,7 +1538,7 @@ function EmergencyTransferForm({ onSubmitted }) {
             <button
               type="button"
               onClick={handleVerify}
-              disabled={verifying || !bankCode || accountNumber.length < 10}
+              disabled={verifying || !bankCode || accountNumber.length < 8}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg text-sm disabled:opacity-50"
             >
               {verifying ? 'Verifying...' : 'Verify Account'}
