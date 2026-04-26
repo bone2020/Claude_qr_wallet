@@ -17,13 +17,7 @@ import ReportsPage from './pages/ReportsPage';
 import FraudAlertsPage from './pages/FraudAlertsPage';
 import DisputesPage from './pages/DisputesPage';
 import RecoveryWatchPage from './pages/RecoveryWatchPage';
-
-const ComingSoon = ({ title }) => (
-  <div className="p-8 text-center text-slate-500">
-    <h2 className="text-xl font-semibold text-slate-700 mb-2">{title}</h2>
-    <p>Coming in Phase 3b.</p>
-  </div>
-);
+import AuditExportPage from './pages/AuditExportPage';
 
 function App() {
   return (
@@ -45,7 +39,7 @@ function App() {
             <Route path="admins" element={<AdminManagementPage />} />
             <Route path="disputes" element={<DisputesPage />} />
             <Route path="recovery-watch" element={<RecoveryWatchPage />} />
-            <Route path="audit-export" element={<ComingSoon title="Audit Export" />} />
+            <Route path="audit-export" element={<AuditExportPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
