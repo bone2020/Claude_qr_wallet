@@ -323,7 +323,7 @@ function AuditExportPage() {
         <button
           onClick={handleGenerate}
           disabled={!canSubmit}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {generating ? 'Generating...' : 'Generate Export'}
         </button>

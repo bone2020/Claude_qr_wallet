@@ -60,8 +60,8 @@ function StatusBadge({ status }) {
 
 function ModalShell({ title, onClose, children, maxWidth = 'max-w-lg' }) {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full p-6 max-h-[90vh] overflow-y-auto`}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+      <div className={`bg-white rounded-xl shadow-2xl ${maxWidth} w-full p-4 md:p-6 max-h-[90vh] overflow-y-auto`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-900">{title}</h3>
           <button
@@ -181,7 +181,7 @@ function AssignDisputeModal({ dispute, onClose, onAssigned }) {
         <button
           onClick={handleSubmit}
           disabled={!adminUid.trim() || submitting}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {submitting ? 'Assigning...' : 'Assign'}
         </button>
@@ -281,7 +281,7 @@ function InvestigationModal({ dispute, onClose, onSubmitted }) {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {submitting ? 'Submitting...' : 'Submit Investigation'}
         </button>
@@ -655,7 +655,7 @@ function DecisionActionModal({
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {submitting ? 'Submitting...' : 'Submit'}
         </button>
