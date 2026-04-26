@@ -557,6 +557,474 @@ function MyAssignedCasesTab({ currentUid }) {
   );
 }
 
+function DecisionActionModal({
+  title,
+  cfName,
+  basePayload,
+  decision,
+  requireAmount = false,
+  amountMax,
+  amountCurrency,
+  onClose,
+  onSubmitted,
+}) {
+  const [notes, setNotes] = useState('');
+  const [amount, setAmount] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const amountValid =
+    !requireAmount ||
+    (amount !== '' &&
+      Number(amount) > 0 &&
+      (amountMax == null || Number(amount) < Number(amountMax)));
+  const canSubmit = !submitting && notes.trim().length >= 20 && amountValid;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload = {
+        ...basePayload,
+        decision,
+        notes: notes.trim(),
+        idempotencyKey: uuidv4(),
+      };
+      if (requireAmount) payload.amount = Number(amount);
+      await httpsCallable(functions, cfName)(payload);
+      if (onSubmitted) onSubmitted();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Submission failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title={title} onClose={onClose}>
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      {requireAmount && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm text-gray-700 font-medium">Refund Amount</label>
+            {amountMax != null && (
+              <span className="text-xs text-gray-500">
+                max recoverable: {symbol(amountCurrency)}{Number(amountMax).toFixed(2)} {amountCurrency}
+              </span>
+            )}
+          </div>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+          {amount !== '' && !amountValid && (
+            <p className="text-xs text-amber-600 mt-1">
+              Amount must be greater than 0 and less than the recoverable hold.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-sm text-gray-700 font-medium">Notes</label>
+        <span className={`text-xs ${notes.trim().length >= 20 ? 'text-gray-500' : 'text-amber-600'}`}>
+          {notes.length} / 20 minimum
+        </span>
+      </div>
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={4}
+        placeholder="Document the reason for this decision..."
+        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+      />
+
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {submitting ? 'Submitting...' : 'Submit'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function SupervisorReviewModal({ dispute, onClose, onDecided }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const [actionDecision, setActionDecision] = useState(null);
+
+  return (
+    <>
+      <ModalShell title={`Supervisor Review — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+        <div className="space-y-1 mb-4">
+          <DetailsRow label="Status"><StatusBadge status={dispute.status} /></DetailsRow>
+          <DetailsRow label="Filer">
+            <div>{dispute.filer?.name || dispute.filerName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.filer?.email || dispute.filerEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Recipient">
+            <div>{dispute.recipient?.name || dispute.recipientName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Disputed Amount">
+            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+          </DetailsRow>
+          <DetailsRow label="Description">{dispute.description}</DetailsRow>
+          <DetailsRow label="Assigned Admin">
+            {dispute.assignedAdmin?.name || dispute.assignedAdminName || '—'}
+          </DetailsRow>
+          <DetailsRow label="Investigation Findings">
+            <div className="whitespace-pre-wrap">{dispute.findings || dispute.investigationFindings || '—'}</div>
+          </DetailsRow>
+        </div>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={() => setActionDecision('agree')}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Agree
+          </button>
+          <button
+            onClick={() => setActionDecision('disagree_kickback')}
+            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Disagree (Kickback)
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+          >
+            Close
+          </button>
+        </div>
+      </ModalShell>
+
+      {actionDecision && (
+        <DecisionActionModal
+          title={
+            actionDecision === 'agree'
+              ? 'Agree with Investigation'
+              : 'Disagree — Kickback to Admin'
+          }
+          cfName="adminSupervisorDecision"
+          basePayload={{ disputeId }}
+          decision={actionDecision}
+          onClose={() => setActionDecision(null)}
+          onSubmitted={() => {
+            if (onDecided) onDecided();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function ManagerDecisionModal({ dispute, onClose, onDecided }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const [actionDecision, setActionDecision] = useState(null);
+  const recoverable = dispute.currentHoldAmount ?? dispute.amount ?? dispute.disputedAmount;
+
+  return (
+    <>
+      <ModalShell title={`Manager Decision — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+        <div className="space-y-1 mb-4">
+          <DetailsRow label="Status"><StatusBadge status={dispute.status} /></DetailsRow>
+          <DetailsRow label="Filer">
+            <div>{dispute.filer?.name || dispute.filerName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.filer?.email || dispute.filerEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Recipient">
+            <div>{dispute.recipient?.name || dispute.recipientName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Disputed Amount">
+            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+          </DetailsRow>
+          <DetailsRow label="Currently Held">
+            {symbol(dispute.currency)}{Number(recoverable || 0).toFixed(2)} {dispute.currency}
+          </DetailsRow>
+          <DetailsRow label="Description">{dispute.description}</DetailsRow>
+          <DetailsRow label="Investigation Findings">
+            <div className="whitespace-pre-wrap">{dispute.findings || dispute.investigationFindings || '—'}</div>
+          </DetailsRow>
+          <DetailsRow label="Supervisor Decision">
+            <div>{dispute.supervisorDecision?.decision || '—'}</div>
+            {dispute.supervisorDecision?.notes && (
+              <div className="text-xs text-gray-500 whitespace-pre-wrap mt-1">
+                {dispute.supervisorDecision.notes}
+              </div>
+            )}
+          </DetailsRow>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 mt-5">
+          <button
+            onClick={() => setActionDecision('refund_full')}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Refund Full
+          </button>
+          <button
+            onClick={() => setActionDecision('refund_partial')}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Refund Partial
+          </button>
+          <button
+            onClick={() => setActionDecision('release')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Release
+          </button>
+          <button
+            onClick={() => setActionDecision('kickback')}
+            className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Kickback
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full mt-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Close
+        </button>
+      </ModalShell>
+
+      {actionDecision && (
+        <DecisionActionModal
+          title={
+            actionDecision === 'refund_full'
+              ? 'Refund Full to Filer'
+              : actionDecision === 'refund_partial'
+              ? 'Refund Partial Amount'
+              : actionDecision === 'release'
+              ? 'Release Funds to Recipient'
+              : 'Kickback to Supervisor'
+          }
+          cfName="adminManagerDecision"
+          basePayload={{ disputeId }}
+          decision={actionDecision}
+          requireAmount={actionDecision === 'refund_partial'}
+          amountMax={actionDecision === 'refund_partial' ? recoverable : undefined}
+          amountCurrency={dispute.currency}
+          onClose={() => setActionDecision(null)}
+          onSubmitted={() => {
+            if (onDecided) onDecided();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function SupervisorReviewTab() {
+  const { disputes, loading, error, refresh } = useDisputes('supervisor_review');
+  const [target, setTarget] = useState(null);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Disputes awaiting supervisor decision after admin investigation.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Investigated By</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expected By</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {disputes.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No disputes awaiting supervisor review.'}
+                </td>
+              </tr>
+            ) : (
+              disputes.map((d) => {
+                const id = d.disputeId || d.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setTarget(d)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.filer?.email || d.filerEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.recipient?.name || d.recipientName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      <div className="text-xs text-gray-400">{d.currency}</div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      {d.assignedAdmin?.name || d.assignedAdminName || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(d.expectedResolutionBy)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {target && (
+        <SupervisorReviewModal
+          dispute={target}
+          onClose={() => setTarget(null)}
+          onDecided={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManagerDecisionTab() {
+  const { disputes, loading, error, refresh } = useDisputes('manager_review');
+  const [target, setTarget] = useState(null);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Disputes awaiting your final decision after supervisor review.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Disputed</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Held</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supervisor</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expected By</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {disputes.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No disputes awaiting manager decision.'}
+                </td>
+              </tr>
+            ) : (
+              disputes.map((d) => {
+                const id = d.disputeId || d.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setTarget(d)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.filer?.email || d.filerEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.recipient?.name || d.recipientName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      <div className="text-xs text-gray-400">{d.currency}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-gray-700">
+                      {symbol(d.currency)}{Number(d.currentHoldAmount ?? 0).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      {d.supervisorDecision?.decision || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(d.expectedResolutionBy)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {target && (
+        <ManagerDecisionModal
+          dispute={target}
+          onClose={() => setTarget(null)}
+          onDecided={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
 function DisputesPage() {
   const { user, isAdmin, isAdminSupervisor, isAdminManager, isSuperAdmin } = useAuth();
 
@@ -603,12 +1071,8 @@ function DisputesPage() {
         <div className="p-6">
           {activeTab === 'all' && <AllDisputesTab canAssign={isAdminSupervisor} />}
           {activeTab === 'assigned' && <MyAssignedCasesTab currentUid={user?.uid} />}
-          {activeTab === 'supervisor' && (
-            <div className="text-sm text-gray-500">Supervisor Review — coming in commit 3</div>
-          )}
-          {activeTab === 'manager' && (
-            <div className="text-sm text-gray-500">Manager Decision — coming in commit 3</div>
-          )}
+          {activeTab === 'supervisor' && <SupervisorReviewTab />}
+          {activeTab === 'manager' && <ManagerDecisionTab />}
           {activeTab === 'escalated' && (
             <div className="text-sm text-gray-500">Escalated — coming in commit 4</div>
           )}
