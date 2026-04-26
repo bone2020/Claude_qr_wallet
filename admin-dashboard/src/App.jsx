@@ -16,6 +16,13 @@ import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
 import FraudAlertsPage from './pages/FraudAlertsPage';
 
+const ComingSoon = ({ title }) => (
+  <div className="p-8 text-center text-slate-500">
+    <h2 className="text-xl font-semibold text-slate-700 mb-2">{title}</h2>
+    <p>Coming in Phase 3b.</p>
+  </div>
+);
+
 function App() {
   return (
     <BrowserRouter>
@@ -34,6 +41,9 @@ function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
+            <Route path="disputes" element={<ComingSoon title="Disputes" />} />
+            <Route path="recovery-watch" element={<ComingSoon title="Recovery Watch" />} />
+            <Route path="audit-export" element={<ComingSoon title="Audit Export" />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

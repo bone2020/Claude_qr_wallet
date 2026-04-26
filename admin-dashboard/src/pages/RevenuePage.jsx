@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToCSV } from '../utils/csvExport';
+import DocumentUploadWidget from '../components/DocumentUploadWidget';
 
 const currencySymbols = {
   NGN: '₦', GHS: 'GH₵', KES: 'KSh', ZAR: 'R', UGX: 'USh',
@@ -564,15 +565,25 @@ function EditProposalModal({ proposal, onClose, onSaved }) {
 }
 
 function CloseProposalModal({ proposal, onClose, onClosed }) {
+  const proposalId = proposal.proposalId || proposal.id;
+  const [receiptFiles, setReceiptFiles] = useState(
+    Array.isArray(proposal.documents?.receipt) ? proposal.documents.receipt : []
+  );
+  const [evidenceFiles, setEvidenceFiles] = useState(
+    Array.isArray(proposal.documents?.evidence) ? proposal.documents.evidence : []
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const canClose = receiptFiles.length >= 1 && evidenceFiles.length >= 1;
+
   const handleClose = async () => {
+    if (!canClose) return;
     setSubmitting(true);
     setError('');
     try {
       await httpsCallable(functions, 'adminCloseProposal')({
-        proposalId: proposal.proposalId || proposal.id,
+        proposalId,
         idempotencyKey: uuidv4(),
       });
       if (onClosed) onClosed();
@@ -585,26 +596,36 @@ function CloseProposalModal({ proposal, onClose, onClosed }) {
   };
 
   return (
-    <ModalShell title="Close Proposal" onClose={onClose}>
+    <ModalShell title="Close Proposal" onClose={onClose} maxWidth="max-w-2xl">
       {error && (
         <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
         </div>
       )}
-      <div className="space-y-3 text-sm text-gray-700">
-        <p>
-          Closing will mark the proposal as fully resolved with evidence on file.
-        </p>
-        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-xs">
-          Receipt + evidence files must be uploaded via the document upload widget
-          (coming in commit 5). For now, this button assumes documents are already
-          uploaded — the server will reject the close if required documents are missing.
-        </div>
+      <p className="text-sm text-gray-700 mb-3">
+        Upload the receipt and at least one piece of evidence. Once both are on file,
+        you can confirm the close.
+      </p>
+      <div className="space-y-3">
+        <DocumentUploadWidget
+          proposalId={proposalId}
+          documentType="receipt"
+          existingFiles={receiptFiles}
+          maxFiles={1}
+          onUploadSuccess={(uploaded) => setReceiptFiles((prev) => [...prev, uploaded])}
+        />
+        <DocumentUploadWidget
+          proposalId={proposalId}
+          documentType="evidence"
+          existingFiles={evidenceFiles}
+          maxFiles={4}
+          onUploadSuccess={(uploaded) => setEvidenceFiles((prev) => [...prev, uploaded])}
+        />
       </div>
       <div className="flex gap-2 mt-5">
         <button
           onClick={handleClose}
-          disabled={submitting}
+          disabled={submitting || !canClose}
           className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
         >
           {submitting ? 'Closing...' : 'Confirm Close'}
@@ -617,6 +638,11 @@ function CloseProposalModal({ proposal, onClose, onClosed }) {
           Cancel
         </button>
       </div>
+      {!canClose && (
+        <p className="text-xs text-amber-600 mt-2 text-center">
+          Receipt (1) and at least one evidence file are required to close.
+        </p>
+      )}
     </ModalShell>
   );
 }
@@ -919,8 +945,21 @@ function ApprovalModal({ proposal, onClose, onApproved, onRejected }) {
           )}
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-3 mb-4 text-xs text-gray-500">
-          Documents (invoice + quotes) — full review widget lands in commit 5.
+        <div className="space-y-3 mb-4">
+          <DocumentUploadWidget
+            proposalId={proposal.proposalId || proposal.id}
+            documentType="invoice"
+            existingFiles={proposal.documents?.invoice}
+            readOnly
+            maxFiles={1}
+          />
+          <DocumentUploadWidget
+            proposalId={proposal.proposalId || proposal.id}
+            documentType="quote"
+            existingFiles={proposal.documents?.quote}
+            readOnly
+            maxFiles={4}
+          />
         </div>
 
         <div className="space-y-2 mb-4">
