@@ -1025,6 +1025,307 @@ function ManagerDecisionTab() {
   );
 }
 
+function EscalatedReviewModal({ dispute, onClose, onDecided }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const [actionDecision, setActionDecision] = useState(null);
+  const recoverable = dispute.currentHoldAmount ?? dispute.amount ?? dispute.disputedAmount;
+
+  return (
+    <>
+      <ModalShell title={`Super Admin Review — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+        <div className="space-y-1 mb-4">
+          <DetailsRow label="Status"><StatusBadge status={dispute.status} /></DetailsRow>
+          <DetailsRow label="Filed">{formatDate(dispute.filedAt || dispute.createdAt)}</DetailsRow>
+          <DetailsRow label="Filer">
+            <div>{dispute.filer?.name || dispute.filerName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.filer?.email || dispute.filerEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Recipient">
+            <div>{dispute.recipient?.name || dispute.recipientName || '—'}</div>
+            <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
+          </DetailsRow>
+          <DetailsRow label="Disputed Amount">
+            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+          </DetailsRow>
+          <DetailsRow label="Currently Held">
+            {symbol(dispute.currency)}{Number(recoverable || 0).toFixed(2)} {dispute.currency}
+          </DetailsRow>
+          <DetailsRow label="Description">{dispute.description}</DetailsRow>
+          <DetailsRow label="Investigation Findings">
+            <div className="whitespace-pre-wrap">{dispute.findings || dispute.investigationFindings || '—'}</div>
+          </DetailsRow>
+          <DetailsRow label="Supervisor Decision">
+            <div>{dispute.supervisorDecision?.decision || '—'}</div>
+            {dispute.supervisorDecision?.notes && (
+              <div className="text-xs text-gray-500 whitespace-pre-wrap mt-1">
+                {dispute.supervisorDecision.notes}
+              </div>
+            )}
+          </DetailsRow>
+          <DetailsRow label="Manager Decision">
+            <div>{dispute.managerDecision?.decision || '—'}</div>
+            {dispute.managerDecision?.notes && (
+              <div className="text-xs text-gray-500 whitespace-pre-wrap mt-1">
+                {dispute.managerDecision.notes}
+              </div>
+            )}
+          </DetailsRow>
+        </div>
+
+        <div className="rounded-lg bg-red-50 border border-red-200 p-3 mb-4 text-xs text-red-800">
+          You are the final decider. There is no further escalation path.
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            onClick={() => setActionDecision('refund_full')}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Refund Full
+          </button>
+          <button
+            onClick={() => setActionDecision('refund_partial')}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Refund Partial
+          </button>
+          <button
+            onClick={() => setActionDecision('release')}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            Release
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full mt-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Close
+        </button>
+      </ModalShell>
+
+      {actionDecision && (
+        <DecisionActionModal
+          title={
+            actionDecision === 'refund_full'
+              ? 'Refund Full to Filer'
+              : actionDecision === 'refund_partial'
+              ? 'Refund Partial Amount'
+              : 'Release Funds to Recipient'
+          }
+          cfName="adminSuperAdminDisputeDecision"
+          basePayload={{ disputeId }}
+          decision={actionDecision}
+          requireAmount={actionDecision === 'refund_partial'}
+          amountMax={actionDecision === 'refund_partial' ? recoverable : undefined}
+          amountCurrency={dispute.currency}
+          onClose={() => setActionDecision(null)}
+          onSubmitted={() => {
+            if (onDecided) onDecided();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function EscalatedTab() {
+  const { disputes, loading, error, refresh } = useDisputes('super_admin_escalation');
+  const [target, setTarget] = useState(null);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Disputes escalated to super admin for final adjudication.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Disputed</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Held</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Manager</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filed</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {disputes.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No disputes escalated to super admin.'}
+                </td>
+              </tr>
+            ) : (
+              disputes.map((d) => {
+                const id = d.disputeId || d.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setTarget(d)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.filer?.email || d.filerEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.recipient?.name || d.recipientName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      <div className="text-xs text-gray-400">{d.currency}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm text-gray-700">
+                      {symbol(d.currency)}{Number(d.currentHoldAmount ?? 0).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      {d.managerDecision?.decision || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(d.filedAt || d.createdAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {target && (
+        <EscalatedReviewModal
+          dispute={target}
+          onClose={() => setTarget(null)}
+          onDecided={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
+function StuckTab() {
+  const { disputes, loading, error, refresh } = useDisputes('all');
+
+  const stuck = useMemo(
+    () =>
+      disputes.filter(
+        (d) => d.stuckCaseFlag === true || d.status === 'closed_stuck'
+      ),
+    [disputes]
+  );
+
+  const lastActionOf = (d) =>
+    d.lastActionAt ||
+    d.lastUpdatedAt ||
+    d.managerDecision?.decidedAt ||
+    d.supervisorDecision?.decidedAt ||
+    d.investigatedAt ||
+    d.filedAt ||
+    d.createdAt;
+
+  const ageDays = (iso) => {
+    if (!iso) return null;
+    const ms = Date.now() - new Date(iso).getTime();
+    return Math.floor(ms / 86400000);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          These cases have exceeded the 6-day resolution window and need manual review.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Age</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Last Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {stuck.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No stuck cases.'}
+                </td>
+              </tr>
+            ) : (
+              stuck.map((d) => {
+                const id = d.disputeId || d.id;
+                const last = lastActionOf(d);
+                const days = ageDays(d.filedAt || d.createdAt);
+                return (
+                  <tr key={id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.filer?.email || d.filerEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.recipient?.name || d.recipientName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      <div className="text-xs text-gray-400">{d.currency}</div>
+                    </td>
+                    <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
+                    <td className="px-3 py-2 text-sm text-red-700 font-medium">
+                      {days != null ? `${days}d` : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(last)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function DisputesPage() {
   const { user, isAdmin, isAdminSupervisor, isAdminManager, isSuperAdmin } = useAuth();
 
@@ -1073,12 +1374,8 @@ function DisputesPage() {
           {activeTab === 'assigned' && <MyAssignedCasesTab currentUid={user?.uid} />}
           {activeTab === 'supervisor' && <SupervisorReviewTab />}
           {activeTab === 'manager' && <ManagerDecisionTab />}
-          {activeTab === 'escalated' && (
-            <div className="text-sm text-gray-500">Escalated — coming in commit 4</div>
-          )}
-          {activeTab === 'stuck' && (
-            <div className="text-sm text-gray-500">Stuck Cases — coming in commit 4</div>
-          )}
+          {activeTab === 'escalated' && <EscalatedTab />}
+          {activeTab === 'stuck' && <StuckTab />}
         </div>
       </div>
     </div>
