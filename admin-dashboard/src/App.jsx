@@ -16,6 +16,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import ReportsPage from './pages/ReportsPage';
 import FraudAlertsPage from './pages/FraudAlertsPage';
 import DisputesPage from './pages/DisputesPage';
+import RecoveryWatchPage from './pages/RecoveryWatchPage';
 
 const ComingSoon = ({ title }) => (
   <div className="p-8 text-center text-slate-500">
@@ -43,7 +44,7 @@ function App() {
             <Route path="audit" element={<AuditLogPage />} />
             <Route path="admins" element={<AdminManagementPage />} />
             <Route path="disputes" element={<DisputesPage />} />
-            <Route path="recovery-watch" element={<ComingSoon title="Recovery Watch" />} />
+            <Route path="recovery-watch" element={<RecoveryWatchPage />} />
             <Route path="audit-export" element={<ComingSoon title="Audit Export" />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
