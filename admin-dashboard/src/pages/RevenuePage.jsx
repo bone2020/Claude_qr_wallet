@@ -22,6 +22,51 @@ const PROPOSAL_COUNTRIES = [
 const formatDate = (dateStr) => (dateStr ? new Date(dateStr).toLocaleString() : 'N/A');
 const symbol = (currency) => currencySymbols[currency] || currency;
 
+const STATUS_STYLES = {
+  proposed: 'bg-blue-100 text-blue-700',
+  approved: 'bg-indigo-100 text-indigo-700',
+  pending_otp: 'bg-amber-100 text-amber-700',
+  completed: 'bg-green-100 text-green-700',
+  evidence_pending: 'bg-yellow-100 text-yellow-700',
+  evidence_overdue: 'bg-red-100 text-red-700',
+  rejected: 'bg-gray-200 text-gray-700',
+  cancelled: 'bg-gray-200 text-gray-700',
+  closed: 'bg-gray-100 text-gray-600',
+  failed: 'bg-red-100 text-red-700',
+};
+
+const StatusBadge = ({ status }) => (
+  <span
+    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+      STATUS_STYLES[status] || 'bg-gray-100 text-gray-700'
+    }`}
+  >
+    {status || 'unknown'}
+  </span>
+);
+
+const countdownLabel = (targetIso) => {
+  if (!targetIso) return '—';
+  const ms = new Date(targetIso).getTime() - Date.now();
+  if (ms <= 0) return 'expired';
+  const mins = Math.floor(ms / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+  if (days >= 1) return `${days}d ${hrs % 24}h`;
+  if (hrs >= 1) return `${hrs}h ${mins % 60}m`;
+  return `${mins}m`;
+};
+
+const ageInDays = (iso) => {
+  if (!iso) return 0;
+  return (Date.now() - new Date(iso).getTime()) / 86400000;
+};
+
+const ageInHours = (iso) => {
+  if (!iso) return 0;
+  return (Date.now() - new Date(iso).getTime()) / 3600000;
+};
+
 function PlatformWalletCard({ wallet, balances }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -397,6 +442,660 @@ function ProposeTransferForm({ onProposed }) {
   );
 }
 
+function ModalShell({ title, onClose, children, maxWidth = 'max-w-lg' }) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className={`bg-white rounded-xl shadow-2xl w-full ${maxWidth} max-h-[90vh] overflow-y-auto`}>
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
+          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="p-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function EditProposalModal({ proposal, onClose, onSaved }) {
+  const [amount, setAmount] = useState(proposal.amount?.toString() || '');
+  const [purpose, setPurpose] = useState(proposal.purpose || '');
+  const [notes, setNotes] = useState(proposal.notes || '');
+  const [priorityFlag, setPriorityFlag] = useState(!!proposal.priorityFlag);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    if (purpose.trim().length < 5) {
+      setError('Purpose must be at least 5 characters.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminEditProposal')({
+        proposalId: proposal.proposalId || proposal.id,
+        fields: {
+          amount: Number(amount),
+          purpose: purpose.trim(),
+          notes: notes.trim() || null,
+          priorityFlag,
+        },
+        idempotencyKey: uuidv4(),
+      });
+      if (onSaved) onSaved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Edit failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Edit Proposal" onClose={onClose}>
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+      <div className="space-y-3">
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Amount ({proposal.currency})</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Purpose</label>
+          <textarea
+            value={purpose}
+            onChange={(e) => setPurpose(e.target.value)}
+            rows={2}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-sm text-gray-600 block mb-1">Notes</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={priorityFlag}
+            onChange={(e) => setPriorityFlag(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+          />
+          Priority flag
+        </label>
+      </div>
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleSave}
+          disabled={submitting}
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+        >
+          {submitting ? 'Saving...' : 'Save Changes'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function CloseProposalModal({ proposal, onClose, onClosed }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleClose = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminCloseProposal')({
+        proposalId: proposal.proposalId || proposal.id,
+        idempotencyKey: uuidv4(),
+      });
+      if (onClosed) onClosed();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Close failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Close Proposal" onClose={onClose}>
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+      <div className="space-y-3 text-sm text-gray-700">
+        <p>
+          Closing will mark the proposal as fully resolved with evidence on file.
+        </p>
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-xs">
+          Receipt + evidence files must be uploaded via the document upload widget
+          (coming in commit 5). For now, this button assumes documents are already
+          uploaded — the server will reject the close if required documents are missing.
+        </div>
+      </div>
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleClose}
+          disabled={submitting}
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+        >
+          {submitting ? 'Closing...' : 'Confirm Close'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function MyProposalsList({ proposals, currentUid, onChanged }) {
+  const [editTarget, setEditTarget] = useState(null);
+  const [closeTarget, setCloseTarget] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState('');
+
+  const mine = proposals.filter(
+    (p) => (p.proposedBy?.uid || p.proposedByUid) === currentUid
+  );
+
+  const handleCancel = async (p) => {
+    if (!window.confirm(`Cancel proposal ${p.proposalId || p.id}? This cannot be undone.`)) return;
+    setBusyId(p.proposalId || p.id);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminCancelProposal')({
+        proposalId: p.proposalId || p.id,
+        idempotencyKey: uuidv4(),
+      });
+      if (onChanged) onChanged();
+    } catch (err) {
+      setError(err?.message || 'Cancel failed.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-1">My Pending Proposals</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        Proposals you have submitted, in any status.
+      </p>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Currency</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Purpose</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposed</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {mine.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  No proposals yet
+                </td>
+              </tr>
+            ) : (
+              mine.map((p) => {
+                const id = p.proposalId || p.id;
+                const isProposed = p.status === 'proposed';
+                const canClose = ['completed', 'evidence_pending', 'evidence_overdue'].includes(p.status);
+                return (
+                  <tr key={id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(p.currency)}{p.amount?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">{p.currency}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{p.accountName || p.recipient?.accountName || '—'}</div>
+                      <div className="text-xs text-gray-400">{p.accountNumber || p.recipient?.accountNumber || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate" title={p.purpose}>
+                      {p.purpose}
+                    </td>
+                    <td className="px-3 py-2"><StatusBadge status={p.status} /></td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(p.proposedAt || p.createdAt)}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{countdownLabel(p.expiresAt)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-2">
+                        {isProposed && (
+                          <button
+                            onClick={() => setEditTarget(p)}
+                            disabled={busyId === id}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                        )}
+                        {isProposed && (
+                          <button
+                            onClick={() => handleCancel(p)}
+                            disabled={busyId === id}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        {canClose && (
+                          <button
+                            onClick={() => setCloseTarget(p)}
+                            disabled={busyId === id}
+                            className="text-xs text-green-600 hover:text-green-800 font-medium disabled:opacity-50"
+                          >
+                            Close
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {editTarget && (
+        <EditProposalModal
+          proposal={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={onChanged}
+        />
+      )}
+      {closeTarget && (
+        <CloseProposalModal
+          proposal={closeTarget}
+          onClose={() => setCloseTarget(null)}
+          onClosed={onChanged}
+        />
+      )}
+    </div>
+  );
+}
+
+function RejectModal({ proposal, onClose, onRejected }) {
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleReject = async () => {
+    if (reason.trim().length < 5) {
+      setError('Rejection reason must be at least 5 characters.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminRejectTransfer')({
+        proposalId: proposal.proposalId || proposal.id,
+        reason: reason.trim(),
+        idempotencyKey: uuidv4(),
+      });
+      if (onRejected) onRejected();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Reject failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title="Reject Proposal" onClose={onClose}>
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-gray-600">Reason</label>
+          <span className={`text-xs ${reason.trim().length >= 5 ? 'text-gray-400' : 'text-amber-600'}`}>
+            {reason.length} chars (min 5)
+          </span>
+        </div>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+          placeholder="Why is this being rejected?"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+        />
+      </div>
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleReject}
+          disabled={submitting || reason.trim().length < 5}
+          className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50"
+        >
+          {submitting ? 'Rejecting...' : 'Reject'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function ApprovalModal({ proposal, onClose, onApproved, onRejected }) {
+  const [checks, setChecks] = useState({
+    amount_verified: false,
+    recipient_verified: false,
+    purpose_approved: false,
+    funds_available: false,
+  });
+  const [approvalNote, setApprovalNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [showReject, setShowReject] = useState(false);
+
+  const allChecked = Object.values(checks).every(Boolean);
+
+  const handleApprove = async () => {
+    if (!allChecked) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminApproveTransfer')({
+        proposalId: proposal.proposalId || proposal.id,
+        idempotencyKey: uuidv4(),
+        approvalNote: approvalNote.trim() || null,
+        checklistConfirmations: [
+          { item: 'amount_verified', confirmed: true },
+          { item: 'recipient_verified', confirmed: true },
+          { item: 'purpose_approved', confirmed: true },
+          { item: 'funds_available', confirmed: true },
+        ],
+      });
+      if (onApproved) onApproved();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Approval failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggle = (key) => setChecks((c) => ({ ...c, [key]: !c[key] }));
+
+  return (
+    <>
+      <ModalShell title="Review Proposal" onClose={onClose} maxWidth="max-w-2xl">
+        {error && (
+          <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 text-sm">
+          <div>
+            <p className="text-gray-500 text-xs uppercase">Proposer</p>
+            <p className="font-medium text-gray-900">{proposal.proposedBy?.name || proposal.proposedByName || '—'}</p>
+            <p className="text-xs text-gray-500">{proposal.proposedBy?.email || proposal.proposedByEmail || ''}</p>
+          </div>
+          <div>
+            <p className="text-gray-500 text-xs uppercase">Amount</p>
+            <p className="font-medium text-gray-900">
+              {symbol(proposal.currency)}{proposal.amount?.toFixed(2)} {proposal.currency}
+            </p>
+            {proposal.usdEquivalent != null && (
+              <p className="text-xs text-gray-500">≈ ${proposal.usdEquivalent.toFixed(2)} USD</p>
+            )}
+          </div>
+          <div>
+            <p className="text-gray-500 text-xs uppercase">Recipient</p>
+            <p className="font-medium text-gray-900">{proposal.accountName || proposal.recipient?.accountName || '—'}</p>
+            <p className="text-xs text-gray-500">
+              {proposal.bankName || proposal.recipient?.bankName || proposal.bankCode}
+              {' · '}
+              {proposal.accountNumber || proposal.recipient?.accountNumber || ''}
+            </p>
+          </div>
+          <div>
+            <p className="text-gray-500 text-xs uppercase">Priority</p>
+            <p className="font-medium text-gray-900">{proposal.priorityFlag ? 'Yes' : 'Standard'}</p>
+          </div>
+          <div className="md:col-span-2">
+            <p className="text-gray-500 text-xs uppercase">Purpose</p>
+            <p className="text-gray-900">{proposal.purpose}</p>
+          </div>
+          {proposal.notes && (
+            <div className="md:col-span-2">
+              <p className="text-gray-500 text-xs uppercase">Notes</p>
+              <p className="text-gray-700 text-sm">{proposal.notes}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-gray-200 p-3 mb-4 text-xs text-gray-500">
+          Documents (invoice + quotes) — full review widget lands in commit 5.
+        </div>
+
+        <div className="space-y-2 mb-4">
+          <p className="text-sm font-medium text-gray-700">Approval checklist (all required)</p>
+          {[
+            ['amount_verified', 'Amount verified'],
+            ['recipient_verified', 'Recipient verified'],
+            ['purpose_approved', 'Purpose approved'],
+            ['funds_available', 'Funds available'],
+          ].map(([key, label]) => (
+            <label key={key} className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={checks[key]}
+                onChange={() => toggle(key)}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        <div className="mb-4">
+          <label className="text-sm text-gray-600 block mb-1">Approval Note (optional)</label>
+          <textarea
+            value={approvalNote}
+            onChange={(e) => setApprovalNote(e.target.value)}
+            rows={2}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleApprove}
+            disabled={!allChecked || submitting}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {submitting ? 'Approving...' : 'Approve'}
+          </button>
+          <button
+            onClick={() => setShowReject(true)}
+            disabled={submitting}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            Reject
+          </button>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+          >
+            Close
+          </button>
+        </div>
+      </ModalShell>
+
+      {showReject && (
+        <RejectModal
+          proposal={proposal}
+          onClose={() => setShowReject(false)}
+          onRejected={() => {
+            if (onRejected) onRejected();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function PendingApprovalsList({ proposals, onChanged }) {
+  const [reviewTarget, setReviewTarget] = useState(null);
+
+  const pending = proposals
+    .filter((p) => p.status === 'proposed')
+    .sort((a, b) => {
+      const pa = a.priorityFlag ? 1 : 0;
+      const pb = b.priorityFlag ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      const ta = new Date(a.proposedAt || a.createdAt || 0).getTime();
+      const tb = new Date(b.proposedAt || b.createdAt || 0).getTime();
+      return ta - tb;
+    });
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h3 className="text-lg font-bold text-gray-900 mb-1">Pending Approvals</h3>
+      <p className="text-sm text-gray-500 mb-4">
+        Proposals awaiting manager review. Priority items shown first.
+      </p>
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposer</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Purpose</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposed</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {pending.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  No proposals awaiting approval
+                </td>
+              </tr>
+            ) : (
+              pending.map((p) => {
+                const id = p.proposalId || p.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setReviewTarget(p)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-sm">
+                      {p.priorityFlag ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                          Priority
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Standard</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      {p.proposedBy?.name || p.proposedByName || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {symbol(p.currency)}{p.amount?.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      {p.accountName || p.recipient?.accountName || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700 max-w-xs truncate" title={p.purpose}>
+                      {p.purpose}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(p.proposedAt || p.createdAt)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReviewTarget(p);
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      >
+                        Review
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {reviewTarget && (
+        <ApprovalModal
+          proposal={reviewTarget}
+          onClose={() => setReviewTarget(null)}
+          onApproved={onChanged}
+          onRejected={onChanged}
+        />
+      )}
+    </div>
+  );
+}
+
 function RevenuePage() {
   const {
     user,
@@ -421,7 +1120,8 @@ function RevenuePage() {
   };
 
   const loadProposals = async () => {
-    /* commit 3 */
+    const result = await httpsCallable(functions, 'adminListTransferProposals')({ limit: 50 });
+    setProposals(result.data?.proposals || []);
   };
 
   const loadAll = async () => {
@@ -443,10 +1143,9 @@ function RevenuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
-  void user;
   void role;
-  void proposals;
-  void uuidv4;
+  void ageInDays;
+  void ageInHours;
 
   return (
     <div className="space-y-6 p-6">
@@ -478,19 +1177,13 @@ function RevenuePage() {
       {/* Section 2: Submit New Proposal — finance only */}
       {isFinance && <ProposeTransferForm onProposed={refresh} />}
 
-      {/* Section 3: My Pending Proposals — finance only (commit 3) */}
+      {/* Section 3: My Pending Proposals — finance only */}
       {isFinance && (
-        <div className={placeholderCard}>
-          Section 3: My Pending Proposals (coming in commit 3)
-        </div>
+        <MyProposalsList proposals={proposals} currentUid={user?.uid} onChanged={refresh} />
       )}
 
-      {/* Section 4: Pending Approvals — admin_manager only (commit 3) */}
-      {isAdminManager && (
-        <div className={placeholderCard}>
-          Section 4: Pending Approvals (coming in commit 3)
-        </div>
-      )}
+      {/* Section 4: Pending Approvals — admin_manager only */}
+      {isAdminManager && <PendingApprovalsList proposals={proposals} onChanged={refresh} />}
 
       {/* Section 5: Awaiting OTP — super_admin only (commit 4) */}
       {isSuperAdmin && (
