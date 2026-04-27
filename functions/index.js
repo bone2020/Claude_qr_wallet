@@ -15981,3 +15981,12 @@ exports.userGetMyRecoveries = functions.runWith({ enforceAppCheck: true }).https
     throw new functions.https.HttpsError('internal', 'Failed to list recoveries: ' + error.message);
   }
 });
+
+// ============================================================
+// CUSTOM AUTH EMAILS (Phase 4a) — Resend-based verification + password reset
+// Defined in ./customAuthEmails.js
+// ============================================================
+const customAuthEmails = require('./customAuthEmails');
+exports.sendCustomEmailVerification = customAuthEmails.sendCustomEmailVerification;
+exports.sendCustomPasswordReset = customAuthEmails.sendCustomPasswordReset;
+exports.isCustomAuthEmailsEnabled = customAuthEmails.isCustomAuthEmailsEnabled;

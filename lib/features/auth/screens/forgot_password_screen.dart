@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
@@ -32,9 +33,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
+      final authNotifier = ref.read(authNotifierProvider.notifier);
+      final result = await authNotifier.sendPasswordResetEmail(
+        _emailController.text.trim(),
       );
+      if (!result.success) {
+        throw Exception(result.error ?? 'Failed to send reset email');
+      }
 
       if (!mounted) return;
 

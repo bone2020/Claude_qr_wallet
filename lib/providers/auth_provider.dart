@@ -226,6 +226,11 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     return await _authService.sendEmailVerification();
   }
 
+  /// Send password reset email
+  Future<AuthResult> sendPasswordResetEmail(String email) async {
+    return await _authService.sendPasswordResetEmail(email);
+  }
+
   /// Check if email is verified
   Future<bool> checkEmailVerified() async {
     return await _authService.checkEmailVerified();

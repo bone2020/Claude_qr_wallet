@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -338,7 +339,14 @@ class AuthService {
   // EMAIL VERIFICATION
   // ============================================================
 
-  /// Send email verification link to current user
+  /// Send email verification link to current user.
+  ///
+  /// Phase 4a: Tries Resend-based custom flow first (lands in inbox).
+  /// Falls back to Firebase native (firebaseapp.com, often spam) if:
+  /// - Custom flow is disabled by feature flag, OR
+  /// - Cloud Function call fails for any reason.
+  ///
+  /// Either way, the link is a valid Firebase verification link.
   Future<AuthResult> sendEmailVerification() async {
     try {
       final user = currentUser;
@@ -350,8 +358,27 @@ class AuthService {
         return AuthResult.success(null); // Already verified
       }
 
-      await user.sendEmailVerification();
-      return AuthResult.success(null);
+      // Phase 4a: Try custom Resend-based flow first
+      try {
+        final callable = FirebaseFunctions.instance
+            .httpsCallable('sendCustomEmailVerification');
+        await callable.call();
+        return AuthResult.success(null);
+      } on FirebaseFunctionsException catch (e) {
+        // 'failed-precondition' = feature flag is off → fall back silently
+        // Other errors → log but still fall back to Firebase native
+        if (e.code != 'failed-precondition') {
+          // ignore: avoid_print
+          print('sendCustomEmailVerification failed (${e.code}): ${e.message}. Falling back to Firebase native.');
+        }
+        await user.sendEmailVerification();
+        return AuthResult.success(null);
+      } catch (e) {
+        // ignore: avoid_print
+        print('sendCustomEmailVerification unexpected error: $e. Falling back to Firebase native.');
+        await user.sendEmailVerification();
+        return AuthResult.success(null);
+      }
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
@@ -407,11 +434,34 @@ class AuthService {
   // PASSWORD MANAGEMENT
   // ============================================================
 
-  /// Send password reset email
+  /// Send password reset email to the given email address.
+  ///
+  /// Phase 4a: Tries Resend-based custom flow first (lands in inbox).
+  /// Falls back to Firebase native if custom flow is disabled or fails.
+  ///
+  /// Always returns success regardless of whether the email exists,
+  /// to prevent email enumeration attacks.
   Future<AuthResult> sendPasswordResetEmail(String email) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
-      return AuthResult.success(null);
+      // Phase 4a: Try custom Resend-based flow first
+      try {
+        final callable = FirebaseFunctions.instance
+            .httpsCallable('sendCustomPasswordReset');
+        await callable.call({'email': email});
+        return AuthResult.success(null);
+      } on FirebaseFunctionsException catch (e) {
+        if (e.code != 'failed-precondition') {
+          // ignore: avoid_print
+          print('sendCustomPasswordReset failed (${e.code}): ${e.message}. Falling back to Firebase native.');
+        }
+        await _auth.sendPasswordResetEmail(email: email);
+        return AuthResult.success(null);
+      } catch (e) {
+        // ignore: avoid_print
+        print('sendCustomPasswordReset unexpected error: $e. Falling back to Firebase native.');
+        await _auth.sendPasswordResetEmail(email: email);
+        return AuthResult.success(null);
+      }
     } on FirebaseAuthException catch (e) {
       return AuthResult.failure(_getAuthErrorMessage(e.code));
     } catch (e) {
