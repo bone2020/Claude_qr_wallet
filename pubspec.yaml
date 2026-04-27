@@ -71,6 +71,9 @@ dependencies:
   path_provider: ^2.1.1
   gal: ^2.3.0
 
+  # Device & Package info (for Help & Support email auto-fill)
+  device_info_plus: ^10.1.2
+
   # Connectivity
   connectivity_plus: ^5.0.2
 
