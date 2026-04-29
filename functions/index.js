@@ -9474,6 +9474,74 @@ exports.verifyPhoneNumber = functions
   }
 });
 
+// ============================================================
+// PHASE 4c: markPhoneVerified Cloud Function
+// ============================================================
+// Server-side write of users/{uid}.phoneVerified=true after Firebase Auth
+// phone OTP succeeds. This is for the Firebase Auth phone OTP flow used
+// by non-Smile countries (Sierra Leone, Liberia, Cameroon, etc.) and by
+// Smile countries during the post-KYC phone verification step.
+//
+// Distinct from the Smile ID phone verification CF (verifyPhoneNumber)
+// which handles Smile ID's database phone-to-ID matching for KYC.
+//
+// Security model:
+// - Caller must be authenticated (App Check enforced).
+// - Server reads the user's Firebase Auth record via Admin SDK and confirms
+//   that auth.user.phoneNumber is non-empty (i.e. Firebase Auth itself
+//   recorded a verified phone). Firebase Auth only populates this field
+//   after a successful PhoneAuthCredential signInWithCredential or
+//   linkWithCredential.
+// - If the auth user has no phoneNumber → reject (caller did not actually
+//   verify a phone via Firebase Auth).
+// - If verified → write phoneVerified: true + phoneVerifiedAt to users/{uid}.
+//
+// This bypasses Firestore rules (Admin SDK), so it works after Phase 4b
+// rule tightening blocks client writes to phoneVerified.
+// ============================================================
+exports.markPhoneVerified = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const uid = context.auth.uid;
+
+  // Read Firebase Auth user record to confirm phone is actually verified at
+  // the identity level (not just at the database flag level).
+  let userRecord;
+  try {
+    userRecord = await admin.auth().getUser(uid);
+  } catch (e) {
+    logError('markPhoneVerified: getUser failed', { uid, error: e.message });
+    throwAppError(ERROR_CODES.USER_NOT_FOUND, 'User not found.');
+  }
+
+  // Firebase Auth only populates phoneNumber after a successful
+  // signInWithCredential / linkWithCredential with a PhoneAuthCredential.
+  // If it's empty, the caller never actually completed phone OTP.
+  if (!userRecord.phoneNumber || userRecord.phoneNumber.length === 0) {
+    logWarning('markPhoneVerified rejected: no verified phone on Firebase Auth user', { uid });
+    throwAppError(
+      ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+      'No verified phone number on Firebase Auth account. Complete phone OTP first.'
+    );
+  }
+
+  // Write the database flag. This bypasses Firestore rules (Admin SDK).
+  try {
+    await db.collection('users').doc(uid).update({
+      phoneVerified: true,
+      phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) {
+    logError('markPhoneVerified: Firestore write failed', { uid, error: e.message });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Failed to record phone verification.');
+  }
+
+  logInfo('markPhoneVerified succeeded', { uid });
+  return { ok: true };
+});
+
 // Check if phone verification is supported for a country
 exports.checkPhoneVerificationSupport = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   if (!context.auth) {

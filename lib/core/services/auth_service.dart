@@ -335,6 +335,32 @@ class AuthService {
     }
   }
 
+  /// Phase 4c: Mark phone as verified server-side via markPhoneVerified CF.
+  ///
+  /// Called after Firebase Auth phone OTP has succeeded (signInWithCredential
+  /// or linkWithCredential with PhoneAuthCredential). The server CF will
+  /// verify that the Firebase Auth user record has a non-empty phoneNumber
+  /// (proving the OTP actually completed) and then write phoneVerified=true
+  /// to the user's Firestore document.
+  ///
+  /// Returns success on server confirmation. Returns failure with a friendly
+  /// message on rejection. Caller should treat failure as "user cannot
+  /// proceed past phone verification".
+  Future<AuthResult> markPhoneVerified() async {
+    try {
+      final callable = FirebaseFunctions.instance
+          .httpsCallable('markPhoneVerified');
+      await callable.call();
+      return AuthResult.success(null);
+    } on FirebaseFunctionsException catch (e) {
+      // ignore: avoid_print
+      print('markPhoneVerified failed (${e.code}): ${e.message}');
+      return AuthResult.failure(_getAuthErrorMessage(e.code));
+    } catch (e) {
+      return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+    }
+  }
+
   // ============================================================
   // EMAIL VERIFICATION
   // ============================================================

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../widgets/screenshot_protected_screen.dart';
+import '../services/smile_id_service.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/auth/screens/welcome_screen.dart';
 import '../../features/auth/screens/sign_up_screen.dart';
@@ -98,6 +99,25 @@ class AppRoutes {
 /// Global navigator key for accessing navigation outside of widget tree
 /// Used by PushNotificationService for notification tap navigation
 final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
+/// Phase 4c: Defensive guard — redirect away from a hidden KYC screen
+/// if the user's country doesn't have the expected ID type enabled in
+/// SmileIDService.getIdTypesForCountry(). Closes the deep-link bypass
+/// for screens whose Smile ID entitlement is pending activation
+/// (NIN, BVN, SSNIT, Uganda NIN).
+///
+/// Returns null if the route should proceed normally (ID type is enabled
+/// for the user's country), or AppRoutes.kyc to redirect to the picker.
+String? _hiddenKycRouteGuard(String requiredIdType, String? countryCode) {
+  if (countryCode == null || countryCode.isEmpty) {
+    return AppRoutes.kyc;
+  }
+  final idTypes = SmileIDService.instance.getIdTypesForCountry(countryCode);
+  final isEnabled = idTypes.any(
+    (t) => (t['value'] as String?)?.toUpperCase() == requiredIdType.toUpperCase(),
+  );
+  return isEnabled ? null : AppRoutes.kyc;
+}
 
 /// Router provider
 final routerProvider = Provider<GoRouter>((ref) {
@@ -349,6 +369,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.kycNin,
         name: 'kycNin',
+        redirect: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final countryCode = extras?['countryCode'] as String?;
+          return _hiddenKycRouteGuard('NIN', countryCode);
+        },
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return NinVerificationScreen(
@@ -361,6 +386,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.kycBvn,
         name: 'kycBvn',
+        redirect: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final countryCode = extras?['countryCode'] as String?;
+          return _hiddenKycRouteGuard('BVN', countryCode);
+        },
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return BvnVerificationScreen(
@@ -409,6 +439,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.kycSsnit,
         name: 'kycSsnit',
+        redirect: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final countryCode = extras?['countryCode'] as String?;
+          return _hiddenKycRouteGuard('SSNIT', countryCode);
+        },
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return SsnitVerificationScreen(
@@ -421,6 +456,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.kycUgandaNin,
         name: 'kycUgandaNin',
+        redirect: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          final countryCode = extras?['countryCode'] as String?;
+          return _hiddenKycRouteGuard('UGANDA_NIN', countryCode);
+        },
         builder: (context, state) {
           final extras = state.extra as Map<String, dynamic>?;
           return UgandaNinVerificationScreen(

@@ -174,10 +174,17 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
       if (!mounted) return;
 
       if (result.success) {
-        // Phase 4b: phoneVerified is now written server-side by the
-        // verifyPhoneNumber Cloud Function (see functions/index.js).
-        // Client no longer needs to persist this flag — Firestore rules
-        // block client writes to it.
+        // Phase 4c: Server writes phoneVerified=true via markPhoneVerified CF.
+        // CF verifies via Firebase Auth Admin SDK that the OTP actually
+        // succeeded (auth.user.phoneNumber non-empty) before writing.
+        final markResult = await authNotifier.markPhoneVerified();
+        if (!mounted) return;
+        if (!markResult.success) {
+          setState(() {
+            _errorMessage = markResult.error ?? 'Failed to record phone verification. Please try again.';
+          });
+          return;
+        }
 
         if (!mounted) return;
         setState(() => _isVerified = true);
