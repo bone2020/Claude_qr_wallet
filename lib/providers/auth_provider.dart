@@ -291,6 +291,12 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
     return result;
   }
 
+  /// Phase 4c: Mark phone as verified server-side after OTP success.
+  /// Wraps AuthService.markPhoneVerified for Riverpod-based call sites.
+  Future<AuthResult> markPhoneVerified() async {
+    return await _authService.markPhoneVerified();
+  }
+
 }
 
 /// Auth state data
