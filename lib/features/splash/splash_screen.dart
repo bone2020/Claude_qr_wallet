@@ -83,9 +83,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         // They use different formats, so we do NOT sync Firestore → SecureStorage.
         // Local PIN hash is set when user creates/changes PIN via change_pin_screen.
 
-        // Check if KYC is completed (defense in depth - server also enforces)
-        // Accept both canonical kycStatus and legacy kycCompleted
-        final kycVerified = userData.kycStatus == 'verified' || userData.kycCompleted;
+        // Check if KYC is completed (defense in depth - server also enforces).
+        // Phase 4b: kycStatus is the canonical, server-authoritative flag.
+        // Legacy kycCompleted/kycVerified flags are no longer trusted here —
+        // they are kept on user docs by the server for backward compatibility
+        // but must not gate access. See functions/index.js completeKycVerification
+        // for the atomic server-side write of all three flags.
+        final kycVerified = userData.kycStatus == 'verified';
         if (!kycVerified) {
           // User hasn't completed KYC
           context.go(AppRoutes.kyc);

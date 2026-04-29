@@ -218,11 +218,12 @@ class UserService {
         config: RetryConfig.network,
       );
 
-      // Update user's legacy KYC fields (kycStatus is set server-side via Cloud Function)
+      // Phase 4b: kycCompleted and kycVerified are now server-only; they are
+      // set atomically by completeKycVerification CF when kycStatus is set
+      // to 'verified' (see functions/index.js:2922). Client only persists
+      // dateOfBirth here.
       await NetworkRetry.execute(
         () => _firestore.collection('users').doc(_userId).update({
-          'kycCompleted': true,
-          'kycVerified': smileIdVerified,
           'dateOfBirth': dateOfBirth.toIso8601String(),
         }),
         config: RetryConfig.network,
@@ -329,10 +330,10 @@ class UserService {
         config: RetryConfig.network,
       );
 
-      // Update user's legacy KYC fields and country (kycStatus is set server-side)
+      // Phase 4b: kycCompleted and kycVerified are now server-only; they are
+      // set atomically by completeKycVerification CF when kycStatus is set
+      // to 'verified' (see functions/index.js:2922).
       final userUpdates = <String, dynamic>{
-        'kycCompleted': true,
-        'kycVerified': true,
         'dateOfBirth': dateOfBirth.toIso8601String(),
         'country': countryCode,
       };

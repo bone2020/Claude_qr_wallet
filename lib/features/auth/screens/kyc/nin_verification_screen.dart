@@ -198,11 +198,12 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       if (!mounted) return;
 
+      // Phase 4b: kycCompleted is server-only. completeKycVerification CF
+      // sets it atomically with kycStatus=verified.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(firebaseUser.uid)
           .update({
-        'kycCompleted': true,
         'dateOfBirth': _dateOfBirth!.toIso8601String(),
       });
 

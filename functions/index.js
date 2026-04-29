@@ -2897,8 +2897,10 @@ async function enforceKyc(userId) {
 }
 
 // Set KYC status (called after successful Smile ID verification)
-// NOTE: The client now sets kycStatus directly in Firestore for reliability.
-// This function is retained for backward compatibility and admin use cases.
+// NOTE: kycStatus is server-only (Firestore rules block client writes via
+// kycStatusUnchanged() helper). The canonical client KYC flow is the
+// completeKycVerification CF below. This updateKycStatus CF is retained
+// for admin use cases and backward compatibility.
 exports.updateKycStatus = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // SECURITY: Restricted to admin only. Client KYC uses completeKycVerification.
   const caller = await verifyAdmin(context, 'admin');
@@ -3043,6 +3045,16 @@ exports.createWalletForUser = functions.runWith({ enforceAppCheck: true }).https
     }
 
     const userData = userDoc.data();
+
+    // Phase 4b: KYC gate. Wallet creation is gated on canonical kycStatus.
+    // Legacy kycCompleted/kycVerified flags are not trusted (see audit
+    // finding #4). Users must complete server-side KYC before getting a wallet.
+    if (userData.kycStatus !== 'verified') {
+      throwAppError(
+        ERROR_CODES.KYC_REQUIRED,
+        'KYC verification must be completed before creating a wallet.'
+      );
+    }
 
     // Generate unique wallet ID
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -6200,7 +6212,7 @@ exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCal
 
   // KYC completed
   const kycSnapshot = await db.collection('users')
-    .where('kycStatus', '==', 'completed')
+    .where('kycStatus', '==', 'verified')  // Phase 4b: was 'completed' (stale value, audit finding #6)
     .count()
     .get();
   const kycCompleted = kycSnapshot.data().count;
@@ -9442,6 +9454,16 @@ exports.verifyPhoneNumber = functions
       resultText: result.resultText,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Phase 4b: server is now authoritative for the phoneVerified flag.
+    // Previously the client wrote this flag; tightened Firestore rules in
+    // commit 3 of Phase 4b will block client writes, so server must do it.
+    if (result.verified) {
+      await db.collection('users').doc(context.auth.uid).update({
+        phoneVerified: true,
+        phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
 
     return result;
 

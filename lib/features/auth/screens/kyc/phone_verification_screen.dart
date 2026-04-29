@@ -174,18 +174,10 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
       if (!mounted) return;
 
       if (result.success) {
-        // Persist phoneVerified=true to Firestore for the router/KYC checks
-        try {
-          final firebaseUser = FirebaseAuth.instance.currentUser;
-          if (firebaseUser != null) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(firebaseUser.uid)
-                .update({'phoneVerified': true});
-          }
-        } catch (e) {
-          debugPrint('Failed to write phoneVerified flag: $e');
-        }
+        // Phase 4b: phoneVerified is now written server-side by the
+        // verifyPhoneNumber Cloud Function (see functions/index.js).
+        // Client no longer needs to persist this flag — Firestore rules
+        // block client writes to it.
 
         if (!mounted) return;
         setState(() => _isVerified = true);
