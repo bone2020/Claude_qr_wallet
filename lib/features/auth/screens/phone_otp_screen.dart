@@ -188,21 +188,8 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
       if (!mounted) return;
 
       if (result.success) {
-        // Write phoneVerified flag to Firestore
-        try {
-          final firebaseUser = FirebaseAuth.instance.currentUser;
-          if (firebaseUser != null) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(firebaseUser.uid)
-                .update({
-                  'phoneVerified': true,
-                });
-
-          }
-        } catch (e) {
-          debugPrint('Failed to complete phone verification: $e');
-        }
+        // Phase 4b: phoneVerified is set server-side by verifyPhoneNumber CF
+        // (see functions/index.js). Firestore rules block client writes.
 
         if (!mounted) return;
 
