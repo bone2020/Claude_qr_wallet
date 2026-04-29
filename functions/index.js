@@ -9443,6 +9443,16 @@ exports.verifyPhoneNumber = functions
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    // Phase 4b: server is now authoritative for the phoneVerified flag.
+    // Previously the client wrote this flag; tightened Firestore rules in
+    // commit 3 of Phase 4b will block client writes, so server must do it.
+    if (result.verified) {
+      await db.collection('users').doc(context.auth.uid).update({
+        phoneVerified: true,
+        phoneVerifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
     return result;
 
   } catch (error) {
