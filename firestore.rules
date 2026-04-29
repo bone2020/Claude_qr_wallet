@@ -50,13 +50,51 @@ service cloud.firestore {
         : request.resource.data.role == resource.data.role;
     }
 
+    // Phase 4b: Verification flags are server-only.
+    // The server (Admin SDK) writes these atomically when KYC or phone
+    // verification completes. Client writes are blocked.
+
+    function kycCompletedUnchanged() {
+      return !('kycCompleted' in resource.data)
+        ? !request.resource.data.keys().hasAny(['kycCompleted'])
+        : request.resource.data.kycCompleted == resource.data.kycCompleted;
+    }
+
+    function kycVerifiedUnchanged() {
+      return !('kycVerified' in resource.data)
+        ? !request.resource.data.keys().hasAny(['kycVerified'])
+        : request.resource.data.kycVerified == resource.data.kycVerified;
+    }
+
+    function phoneVerifiedUnchanged() {
+      return !('phoneVerified' in resource.data)
+        ? !request.resource.data.keys().hasAny(['phoneVerified'])
+        : request.resource.data.phoneVerified == resource.data.phoneVerified;
+    }
+
+    function emailVerifiedUnchanged() {
+      return !('emailVerified' in resource.data)
+        ? !request.resource.data.keys().hasAny(['emailVerified'])
+        : request.resource.data.emailVerified == resource.data.emailVerified;
+    }
+
     // Users collection - own data only
     match /users/{userId} {
       allow read: if isOwner(userId);
       // Allow create without kycStatus (new user signup)
       allow create: if isOwner(userId) && !request.resource.data.keys().hasAny(['kycStatus', 'pinHash', 'pinSalt', 'role']);
-      // Allow update but kycStatus and accountBlocked must not be modified (server-only fields)
-      allow update: if isOwner(userId) && kycStatusUnchanged() && accountBlockedUnchanged() && pinHashUnchanged() && roleUnchanged();
+      // Phase 4b: verification flags (kycCompleted, kycVerified, phoneVerified,
+      // emailVerified) are server-only via Admin SDK. Client cannot create or
+      // modify them.
+      allow update: if isOwner(userId)
+                       && kycStatusUnchanged()
+                       && accountBlockedUnchanged()
+                       && pinHashUnchanged()
+                       && roleUnchanged()
+                       && kycCompletedUnchanged()
+                       && kycVerifiedUnchanged()
+                       && phoneVerifiedUnchanged()
+                       && emailVerifiedUnchanged();
       allow delete: if false;
 
  // Transactions - read only from client (all writes via Cloud Functions Admin SDK)
