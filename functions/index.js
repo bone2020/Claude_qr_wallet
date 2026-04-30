@@ -9357,10 +9357,13 @@ exports.verifyPhoneNumber = functions
   validatePhoneNumber(phoneNumber, dialCode);
 
   // Validate Smile ID is properly configured
-  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+  // Phase 4e: Truthiness check on the wrapper Object always passes (Objects truthy).
+  // Read .value to get the runtime string — empty string falls back via the lazy
+  // getter, so !.value correctly fires on missing config.
+  if (!SMILE_ID_API_KEY.value || !SMILE_ID_PARTNER_ID.value) {
     logError('Smile ID configuration missing', {
-      hasApiKey: !!SMILE_ID_API_KEY,
-      hasPartnerId: !!SMILE_ID_PARTNER_ID,
+      hasApiKey: !!SMILE_ID_API_KEY.value,
+      hasPartnerId: !!SMILE_ID_PARTNER_ID.value,
     });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'KYC service not properly configured');
   }
@@ -10941,7 +10944,8 @@ exports.smileIdWebhook = functions
       return;
     }
 
-    if (!SMILE_ID_API_KEY) {
+    // Phase 4e: SMILE_ID_API_KEY is a lazy-getter wrapper; check .value.
+    if (!SMILE_ID_API_KEY.value) {
       logError('SmileID webhook rejected: SMILE_ID_API_KEY not configured — refusing to process callbacks unauthenticated');
       res.status(500).send('Server misconfigured');
       return;
@@ -11486,7 +11490,9 @@ exports.submitBiometricKycVerification = functions
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'livenessStoragePaths must be a non-empty array');
   }
 
-  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+  // Phase 4e: SMILE_ID_API_KEY and SMILE_ID_PARTNER_ID are lazy-getter wrappers;
+  // check .value for accurate truthiness.
+  if (!SMILE_ID_API_KEY.value || !SMILE_ID_PARTNER_ID.value) {
     logError('SmileID configuration missing for biometric KYC submission');
     throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
   }
