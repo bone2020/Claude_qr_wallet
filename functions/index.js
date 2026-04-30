@@ -11273,51 +11273,36 @@ exports.checkSmileIdJobStatus = functions
     return { success: true, status: 'failed', message: 'Already failed' };
   }
 
-  // Generate SmileID signature
-  const partnerId = process.env.SMILE_PARTNER_ID || '8244';
-  const apiKey = process.env.SMILE_API_KEY;
+  // Phase 4d: Use the official Smile ID library + proper parameterized config.
+  // Replaces broken process.env reads (wrong names) and homemade fetch
+  // (no response signature validation). Library validates response signature.
+  const partnerId = SMILE_ID_PARTNER_ID.value;
+  const apiKey = SMILE_ID_API_KEY.value;
 
   if (!apiKey) {
-    logInfo('SMILE_API_KEY not configured');
+    logError('SmileID job status: API key not configured');
     throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
   }
 
-  const timestamp = new Date().toISOString();
+  // sid_server: 0 = sandbox/test, 1 = production. Match the rest of the file's
+  // server selection logic (computeSmileIdBaseUrl): production only if
+  // SMILE_ID_ENVIRONMENT is explicitly 'production'.
+  const sidServer = SMILE_ID_ENVIRONMENT.value() === 'production' ? 1 : 0;
 
-  // SmileID signature: hash of timestamp + partnerID + "sid_request" with API key
-  const hmac = crypto.createHmac('sha256', apiKey);
-  hmac.update(timestamp + partnerId + 'sid_request');
-  const signature = hmac.digest('base64');
-
-  // Determine API URL based on environment
-  const useSandbox = process.env.SMILE_USE_SANDBOX !== 'false';
-  const apiUrl = useSandbox
-    ? 'https://testapi.smileidentity.com/v1/job_status'
-    : 'https://api.smileidentity.com/v1/job_status';
+  let result;
+  try {
+    const SmileIdentityCore = require('smile-identity-core');
+    const utilities = new SmileIdentityCore.Utilities(partnerId, apiKey, sidServer);
+    result = await utilities.get_job_status(smileUserId, smileJobId, {
+      return_history: false,
+      return_images: false,
+    });
+  } catch (error) {
+    logError('SmileID job_status library call failed', { error: error.message, smileUserId, smileJobId });
+    throw new functions.https.HttpsError('internal', 'SmileID API error: ' + error.message);
+  }
 
   try {
-    const fetch = (await import('node-fetch')).default;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        timestamp: timestamp,
-        signature: signature,
-        user_id: smileUserId,
-        job_id: smileJobId,
-        partner_id: partnerId,
-        image_links: false,
-        history: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logInfo('SmileID job_status API error', { status: response.status, error: errorText });
-      throw new functions.https.HttpsError('internal', 'SmileID API error: ' + response.status);
-    }
-
-    const result = await response.json();
     logInfo('SmileID job status result', {
       userId,
       smileJobId,
