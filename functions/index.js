@@ -9299,7 +9299,7 @@ function smileIdRequest(method, path, data = null) {
       method: method,
       headers: {
         'Content-Type': 'application/json',
-        'smileid-partner-id': SMILE_ID_PARTNER_ID,
+        'smileid-partner-id': SMILE_ID_PARTNER_ID.value,
         'smileid-request-signature': signature,
         'smileid-timestamp': timestamp,
         'smileid-source-sdk': 'cloud_functions',
@@ -11499,7 +11499,7 @@ exports.submitBiometricKycVerification = functions
     livenessCount: livenessStoragePaths.length,
   });
 
-  const jobId = `job_${SMILE_ID_PARTNER_ID}_${crypto.randomUUID()}`;
+  const jobId = `job_${SMILE_ID_PARTNER_ID.value}_${crypto.randomUUID()}`;
   const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
   const sidServer = SMILE_ID_BASE_URL.value.includes('testapi') ? 0 : 1;
 
@@ -11561,10 +11561,13 @@ exports.submitBiometricKycVerification = functions
     };
 
     // Submit via SmileID library — handles signature, ZIP, info.json, prep upload, S3 upload
+    // Phase 4e: SMILE_ID_PARTNER_ID and SMILE_ID_API_KEY are lazy-getter wrappers
+    // (lines 9245-9246). SDK constructor expects strings (per smile-identity-core
+    // dist/src/web-api.d.ts). Must read .value.
     const webApi = new SmileWebApi(
-      SMILE_ID_PARTNER_ID,
+      SMILE_ID_PARTNER_ID.value,
       callbackUrl,
-      SMILE_ID_API_KEY,
+      SMILE_ID_API_KEY.value,
       sidServer
     );
 
