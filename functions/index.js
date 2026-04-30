@@ -9273,9 +9273,15 @@ function computeSmileIdBaseUrl() {
 const SMILE_ID_BASE_URL = { get value() { return computeSmileIdBaseUrl(); } };
 
 // Helper: Generate Smile ID signature
+// Phase 4e: SMILE_ID_API_KEY and SMILE_ID_PARTNER_ID are lazy-getter wrappers
+// (declared at lines 9245-9246). Must read .value to get the actual string —
+// otherwise crypto.createHmac throws "key must be string" and string concat
+// produces "[object Object]" literal text. See PAYSTACK_SECRET_KEY.value usage
+// at line 802, QR_SECRET_KEY.value at line 2346, PIN_SECRET.value at line 4274
+// for the proven correct pattern.
 function generateSmileIdSignature(timestamp) {
-  const message = timestamp + SMILE_ID_PARTNER_ID + 'sid_request';
-  return crypto.createHmac('sha256', SMILE_ID_API_KEY)
+  const message = timestamp + SMILE_ID_PARTNER_ID.value + 'sid_request';
+  return crypto.createHmac('sha256', SMILE_ID_API_KEY.value)
     .update(message)
     .digest('base64');
 }
