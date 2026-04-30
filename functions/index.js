@@ -9273,9 +9273,15 @@ function computeSmileIdBaseUrl() {
 const SMILE_ID_BASE_URL = { get value() { return computeSmileIdBaseUrl(); } };
 
 // Helper: Generate Smile ID signature
+// Phase 4e: SMILE_ID_API_KEY and SMILE_ID_PARTNER_ID are lazy-getter wrappers
+// (declared at lines 9245-9246). Must read .value to get the actual string —
+// otherwise crypto.createHmac throws "key must be string" and string concat
+// produces "[object Object]" literal text. See PAYSTACK_SECRET_KEY.value usage
+// at line 802, QR_SECRET_KEY.value at line 2346, PIN_SECRET.value at line 4274
+// for the proven correct pattern.
 function generateSmileIdSignature(timestamp) {
-  const message = timestamp + SMILE_ID_PARTNER_ID + 'sid_request';
-  return crypto.createHmac('sha256', SMILE_ID_API_KEY)
+  const message = timestamp + SMILE_ID_PARTNER_ID.value + 'sid_request';
+  return crypto.createHmac('sha256', SMILE_ID_API_KEY.value)
     .update(message)
     .digest('base64');
 }
@@ -9293,7 +9299,7 @@ function smileIdRequest(method, path, data = null) {
       method: method,
       headers: {
         'Content-Type': 'application/json',
-        'smileid-partner-id': SMILE_ID_PARTNER_ID,
+        'smileid-partner-id': SMILE_ID_PARTNER_ID.value,
         'smileid-request-signature': signature,
         'smileid-timestamp': timestamp,
         'smileid-source-sdk': 'cloud_functions',
@@ -9351,10 +9357,13 @@ exports.verifyPhoneNumber = functions
   validatePhoneNumber(phoneNumber, dialCode);
 
   // Validate Smile ID is properly configured
-  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+  // Phase 4e: Truthiness check on the wrapper Object always passes (Objects truthy).
+  // Read .value to get the runtime string — empty string falls back via the lazy
+  // getter, so !.value correctly fires on missing config.
+  if (!SMILE_ID_API_KEY.value || !SMILE_ID_PARTNER_ID.value) {
     logError('Smile ID configuration missing', {
-      hasApiKey: !!SMILE_ID_API_KEY,
-      hasPartnerId: !!SMILE_ID_PARTNER_ID,
+      hasApiKey: !!SMILE_ID_API_KEY.value,
+      hasPartnerId: !!SMILE_ID_PARTNER_ID.value,
     });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'KYC service not properly configured');
   }
@@ -10935,7 +10944,8 @@ exports.smileIdWebhook = functions
       return;
     }
 
-    if (!SMILE_ID_API_KEY) {
+    // Phase 4e: SMILE_ID_API_KEY is a lazy-getter wrapper; check .value.
+    if (!SMILE_ID_API_KEY.value) {
       logError('SmileID webhook rejected: SMILE_ID_API_KEY not configured — refusing to process callbacks unauthenticated');
       res.status(500).send('Server misconfigured');
       return;
@@ -11480,7 +11490,9 @@ exports.submitBiometricKycVerification = functions
     throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'livenessStoragePaths must be a non-empty array');
   }
 
-  if (!SMILE_ID_API_KEY || !SMILE_ID_PARTNER_ID) {
+  // Phase 4e: SMILE_ID_API_KEY and SMILE_ID_PARTNER_ID are lazy-getter wrappers;
+  // check .value for accurate truthiness.
+  if (!SMILE_ID_API_KEY.value || !SMILE_ID_PARTNER_ID.value) {
     logError('SmileID configuration missing for biometric KYC submission');
     throw new functions.https.HttpsError('internal', 'SmileID API key not configured');
   }
@@ -11493,7 +11505,7 @@ exports.submitBiometricKycVerification = functions
     livenessCount: livenessStoragePaths.length,
   });
 
-  const jobId = `job_${SMILE_ID_PARTNER_ID}_${crypto.randomUUID()}`;
+  const jobId = `job_${SMILE_ID_PARTNER_ID.value}_${crypto.randomUUID()}`;
   const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
   const sidServer = SMILE_ID_BASE_URL.value.includes('testapi') ? 0 : 1;
 
@@ -11555,10 +11567,13 @@ exports.submitBiometricKycVerification = functions
     };
 
     // Submit via SmileID library — handles signature, ZIP, info.json, prep upload, S3 upload
+    // Phase 4e: SMILE_ID_PARTNER_ID and SMILE_ID_API_KEY are lazy-getter wrappers
+    // (lines 9245-9246). SDK constructor expects strings (per smile-identity-core
+    // dist/src/web-api.d.ts). Must read .value.
     const webApi = new SmileWebApi(
-      SMILE_ID_PARTNER_ID,
+      SMILE_ID_PARTNER_ID.value,
       callbackUrl,
-      SMILE_ID_API_KEY,
+      SMILE_ID_API_KEY.value,
       sidServer
     );
 
