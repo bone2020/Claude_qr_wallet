@@ -15,10 +15,21 @@
         window.location.href = appUrl;
         
         setTimeout(function() {
-            document.getElementById('message').innerHTML = 
-                '<h2>Payment Complete!</h2>' +
-                '<p>If the app didn\'t open automatically, please open QR Wallet app manually.</p>' +
-                '<p>Reference: ' + (reference || 'N/A') + '</p>';
+            var messageEl = document.getElementById('message');
+            messageEl.textContent = '';
+
+            var h2 = document.createElement('h2');
+            h2.textContent = 'Payment Complete!';
+
+            var p1 = document.createElement('p');
+            p1.textContent = 'If the app didn\'t open automatically, please open QR Wallet app manually.';
+
+            var p2 = document.createElement('p');
+            p2.textContent = 'Reference: ' + (reference || 'N/A');
+
+            messageEl.appendChild(h2);
+            messageEl.appendChild(p1);
+            messageEl.appendChild(p2);
         }, 2000);
     </script>
 </head>
