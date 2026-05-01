@@ -25,7 +25,7 @@ class HelpSupportScreen extends StatelessWidget {
   //       WhatsApp Business is configured (see Phase 4a §11.3 in spec).
   // For Dubai temporary: e.g. '971501234567'
   // For Ghana later:    e.g. '233241234567'
-  static const String _whatsappNumber = '971000000000'; // <-- REPLACE BEFORE PRODUCTION
+  static const String _whatsappNumber = '971541693327'; // <-- REPLACE BEFORE PRODUCTION
 
   static const String _whatsappPrefilledMessage =
       'Hi QR Wallet Support, I need help with...';
