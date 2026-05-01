@@ -10089,9 +10089,20 @@ const MOMO_CONFIG = {
     logWarning('MoMo environment not set, defaulting to sandbox for development');
     return 'sandbox';
   })(),
-  callbackUrl: MOMO_WEBHOOK_SECRET
-    ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${MOMO_WEBHOOK_SECRET}`
-    : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook',
+  // Phase 4f: Resolve MOMO_WEBHOOK_SECRET.value lazily at request time (not module
+  // load time), and only embed the real string. Previously this stored the wrapper
+  // Object directly in the callback URL, producing "?token=[object Object]" — which
+  // server-side timingSafeCompare also stringified to "[object Object]" on its end,
+  // so authentication was effectively a comparison of two identical literal
+  // "[object Object]" strings (i.e. anyone could forge a webhook with that token).
+  // Read site at line ~10173 (`options.headers['X-Callback-Url'] = MOMO_CONFIG.callbackUrl`)
+  // executes inside a request handler, so the getter is safe.
+  get callbackUrl() {
+    const secret = MOMO_WEBHOOK_SECRET.value;
+    return secret
+      ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${secret}`
+      : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook';
+  },
 };
 
 // Set baseUrl based on resolved environment
@@ -10733,9 +10744,13 @@ exports.momoWebhook = functions
   // ── LAYER 2: Webhook Secret Token Verification ──
   // The token is appended to the callback URL registered with MoMo.
   // Only MoMo (which received the URL) should know the token.
-  if (MOMO_WEBHOOK_SECRET) {
+  // Phase 4f: MOMO_WEBHOOK_SECRET is a lazy-getter wrapper; both the truthiness
+  // check and the timingSafeCompare must read .value to get the actual secret
+  // string. Previously the truthiness was meaningless (Object always truthy)
+  // and timingSafeCompare was comparing against String(Object) = "[object Object]".
+  if (MOMO_WEBHOOK_SECRET.value) {
     const token = req.query.token;
-    if (!token || !timingSafeCompare(token, MOMO_WEBHOOK_SECRET, 'utf8')) {
+    if (!token || !timingSafeCompare(token, MOMO_WEBHOOK_SECRET.value, 'utf8')) {
       logSecurityEvent('momo_webhook_invalid_token', 'high', {
         correlationId: webhookCorrelationId,
         ip: req.ip,
