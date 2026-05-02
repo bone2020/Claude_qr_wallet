@@ -4520,6 +4520,37 @@ async function verifyAdmin(context, requiredRole = 'support') {
 }
 
 /**
+ * Roles that may view full PII (raw idNumber, selfie/liveness paths,
+ * Smile ID internal IDs) via adminGetUserDetails.
+ *
+ * Note: this is NOT a hierarchical check. `auditor` (level 2) is below
+ * `support` (level 3) in the verifyAdmin hierarchy but is included here
+ * because compliance/audit investigations require unredacted data.
+ *
+ * Used by: adminGetUserDetails (B.2).
+ */
+const FULL_KYC_ACCESS_ROLES = new Set([
+  'super_admin',
+  'admin_manager',
+  'finance',
+  'admin_supervisor',
+  'auditor',
+]);
+
+/**
+ * Returns the last 4 characters of an ID number, or null if the input
+ * is missing or shorter than 4 characters. Used for KBA support: a
+ * support agent can ask "what are the last 4 of your ID?" without
+ * seeing the full number.
+ */
+function idNumberLast4(idNumber) {
+  if (typeof idNumber !== 'string' || idNumber.length < 4) {
+    return null;
+  }
+  return idNumber.slice(-4);
+}
+
+/**
  * One-time setup to assign super_admin role to the initial admin user.
  * Hardcoded UID for security — can only be called once.
  */
@@ -5681,7 +5712,12 @@ exports.adminSearchUser = functions.runWith({ enforceAppCheck: true }).https.onC
  * Get detailed user information including wallet and recent transactions.
  */
 exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
-  await verifyAdmin(context, 'support');
+  // Phase 5b (B.2): Anyone level 3+ (support) OR auditor (level 2) can CALL this
+  // function. The DATA returned is gated by FULL_KYC_ACCESS_ROLES below.
+  // Auditor passes through verifyAdmin('auditor') — level 2+. We then narrow
+  // the response shape based on the caller's specific role.
+  const caller = await verifyAdmin(context, 'auditor');
+  const hasFullAccess = FULL_KYC_ACCESS_ROLES.has(caller.role);
 
   const { targetUid } = data;
   if (!targetUid) {
@@ -5706,6 +5742,7 @@ exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https
     const walletData = walletSnapshot.docs[0].data();
     wallet = {
       id: walletSnapshot.docs[0].id,
+      walletId: walletData.walletId || null,
       balance: walletData.balance || 0,
       currency: walletData.currency || 'GHS',
     };
@@ -5731,35 +5768,92 @@ exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https
     };
   });
 
-  // Get KYC documents
+  // Build user object — KBA fields included in both tiers; full idNumber
+  // gated to Full only.
+  const user = {
+    uid: targetUid,
+    email: userData.email || '',
+    fullName: userData.fullName || '',
+    phoneNumber: userData.phoneNumber || '',
+    kycStatus: userData.kycStatus || 'none',
+    accountBlocked: userData.accountBlocked || false,
+    accountBlockedBy: userData.accountBlockedBy || null,
+    role: userData.role || null,
+    createdAt: userData.createdAt,
+    lastLoginAt: userData.lastLoginAt || null,
+    countryCode: userData.countryCode || '',
+    currencyCode: userData.currencyCode || '',
+    profileImageUrl: userData.profileImageUrl || null,
+    emailVerified: userData.emailVerified || false,
+    phoneVerified: userData.phoneVerified || false,
+    legalName: userData.legalName || null,
+    dateOfBirth: userData.dateOfBirth || null,
+    idNumberLast4: idNumberLast4(userData.idNumber),
+  };
+  if (hasFullAccess) {
+    user.idNumber = userData.idNumber || null;
+  }
+
+  // Get KYC subcollection. Both tiers see verification outcome fields;
+  // Full tier additionally sees document number, selfie/liveness paths,
+  // and Smile ID internal IDs.
   const kycSnapshot = await db.collection('users').doc(targetUid)
     .collection('kyc')
     .get();
 
-  const kycDocuments = kycSnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  const kycDocuments = kycSnapshot.docs.map(doc => {
+    const kycData = doc.data();
+
+    // Basic-safe fields visible to everyone
+    const baseDoc = {
+      id: doc.id,
+      status: kycData.status || null,
+      smileIdVerified: kycData.smileIdVerified || false,
+      resultCode: kycData.resultCode || null,
+      resultText: kycData.resultText || null,
+      actions: kycData.actions || null,
+      verifiedAt: kycData.verifiedAt || null,
+      failedAt: kycData.failedAt || null,
+      verificationMethod: kycData.verificationMethod || null,
+      submittedAt: kycData.submittedAt || null,
+      country: kycData.country || null,
+      idType: kycData.idType || null,
+    };
+
+    if (!hasFullAccess) {
+      return baseDoc;
+    }
+
+    // Full tier — include sensitive fields
+    return {
+      ...baseDoc,
+      idNumber: kycData.idNumber || null,
+      selfieStoragePath: kycData.selfieStoragePath || null,
+      livenessStoragePaths: kycData.livenessStoragePaths || null,
+      jobId: kycData.jobId || null,
+      smileUserId: kycData.smileUserId || null,
+      smileServerJobId: kycData.smileServerJobId || null,
+    };
+  });
+
+  // Audit log: who fetched whose data with which access level.
+  // Sensitive PII access must be auditable per compliance norms.
+  await auditLog({
+    userId: caller.uid,
+    operation: 'adminGetUserDetails',
+    result: 'success',
+    metadata: {
+      targetUid,
+      callerRole: caller.role,
+      accessTier: hasFullAccess ? 'full' : 'basic',
+    },
+    ipHash: hashIp(context),
+  });
 
   return {
     success: true,
-    user: {
-      uid: targetUid,
-      email: userData.email || '',
-      fullName: userData.fullName || '',
-      phoneNumber: userData.phoneNumber || '',
-      kycStatus: userData.kycStatus || 'none',
-      accountBlocked: userData.accountBlocked || false,
-      accountBlockedBy: userData.accountBlockedBy || null,
-      role: userData.role || null,
-      createdAt: userData.createdAt,
-      lastLoginAt: userData.lastLoginAt || null,
-      countryCode: userData.countryCode || '',
-      currencyCode: userData.currencyCode || '',
-      profileImageUrl: userData.profileImageUrl || null,
-      emailVerified: userData.emailVerified || false,
-      phoneVerified: userData.phoneVerified || false,
-    },
+    accessTier: hasFullAccess ? 'full' : 'basic',
+    user,
     wallet,
     transactions,
     kycDocuments,
