@@ -396,6 +396,22 @@
       ]
     },
     {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "filedBy.uid", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
+      "collectionGroup": "disputes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {"fieldPath": "recipientUid", "order": "ASCENDING"},
+        {"fieldPath": "filedAt", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "wallet_blocks",
       "queryScope": "COLLECTION",
       "fields": [
