@@ -14342,13 +14342,33 @@ exports.userGetMyDisputes = functions
   .https.onCall(async (data, context) => {
   if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Authentication required.');
   const callerUid = context.auth.uid;
-  const { role: queryRole, limit: requestedLimit } = data || {};
+  const { role: queryRole, limit: requestedLimit, status: queryStatus } = data || {};
 
   const withinLimit = await checkRateLimitPersistent(callerUid, 'userGetMyDisputes');
   if (!withinLimit) throw new functions.https.HttpsError('resource-exhausted', RATE_LIMITS.userGetMyDisputes.message);
 
   if (queryRole && queryRole !== 'filer' && queryRole !== 'recipient') {
     throw new functions.https.HttpsError('invalid-argument', 'role must be "filer" or "recipient".');
+  }
+
+  // Phase 5c-A: optional status parameter for server-side filtering.
+  // When absent or null, returns disputes across all statuses (existing behavior).
+  // When provided, must be a single valid dispute status string.
+  // Phase 5c-B Flutter screen will use this for the Active vs Resolved tabs.
+  const VALID_DISPUTE_STATUSES = [
+    'filed',
+    'investigating',
+    'supervisor_review',
+    'manager_review',
+    'super_admin_escalation',
+    'resolved',
+    'closed_stuck',
+  ];
+  if (queryStatus !== undefined && queryStatus !== null) {
+    if (typeof queryStatus !== 'string' || !VALID_DISPUTE_STATUSES.includes(queryStatus)) {
+      throw new functions.https.HttpsError('invalid-argument',
+        `status must be one of: ${VALID_DISPUTE_STATUSES.join(', ')}`);
+    }
   }
 
   let limit = 50;
@@ -14359,15 +14379,21 @@ exports.userGetMyDisputes = functions
   let query;
   if (queryRole === 'recipient') {
     query = db.collection('disputes')
-      .where('recipientUid', '==', callerUid)
-      .orderBy('filedAt', 'desc')
-      .limit(limit);
+      .where('recipientUid', '==', callerUid);
   } else {
     query = db.collection('disputes')
-      .where('filedBy.uid', '==', callerUid)
-      .orderBy('filedAt', 'desc')
-      .limit(limit);
+      .where('filedBy.uid', '==', callerUid);
   }
+
+  // Apply status filter if provided. Index requirement:
+  //   - With status: composite (uid-field + status + filedAt)
+  //   - Without status: composite (uid-field + filedAt)
+  // All four indexes are deployed in this phase's firestore.indexes.json change.
+  if (queryStatus) {
+    query = query.where('status', '==', queryStatus);
+  }
+
+  query = query.orderBy('filedAt', 'desc').limit(limit);
 
   const snap = await query.get();
   const disputes = snap.docs.map(doc => {
