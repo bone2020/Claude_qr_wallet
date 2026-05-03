@@ -6313,16 +6313,17 @@ exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCal
 
   // Recent transactions (last 24 hours)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  // Phase 5d (B.6): use collectionGroup — transactions live at users/{uid}/transactions/{txId},
-  // not in a top-level 'transactions' collection. Previous query always returned 0.
-  // Note: using .limit(1000).get().size instead of .count() — aggregate count()
-  // on this collection group consistently returns FAILED_PRECONDITION with empty
-  // error details. Matches the working pattern in adminGetTransactionStats (line 8960).
-  const recentTxSnapshot = await db.collectionGroup('transactions')
+  // B.6 from audit report flagged this query as broken: transactions live at
+  // users/{uid}/transactions/{txId}, not in a top-level 'transactions' collection.
+  // Phase 5d attempted .collectionGroup('transactions') but FAILED_PRECONDITION
+  // errors with empty details could not be diagnosed in available time.
+  // Reverted to original behavior (returns 0) until properly fixed in a future
+  // session. See handover doc for investigation details.
+  const recentTxSnapshot = await db.collection('transactions')
     .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneDayAgo))
-    .limit(1000)
+    .count()
     .get();
-  const recentTransactions = recentTxSnapshot.size;
+  const recentTransactions = recentTxSnapshot.data().count;
 
   // Flagged transactions
   const flaggedSnapshot = await db.collection('flagged_transactions')
