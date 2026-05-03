@@ -34,6 +34,8 @@ import '../../features/receive/screens/receive_money_screen.dart';
 import '../../features/receive/screens/request_payment_screen.dart';
 import '../../features/transactions/screens/transactions_screen.dart';
 import '../../features/transactions/screens/transaction_details_screen.dart';
+import '../../features/disputes/screens/my_disputes_screen.dart';
+import '../../features/disputes/screens/dispute_detail_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/change_password_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
@@ -81,6 +83,8 @@ class AppRoutes {
   static const String currencySelector = '/currency-selector';
   static const String transactions = '/transactions';
   static const String transactionDetails = '/transaction-details';
+  static const String myDisputes = '/my-disputes';
+  static const String disputeDetail = '/dispute-detail';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
   static const String linkedAccounts = '/linked-accounts';
@@ -613,6 +617,26 @@ final routerProvider = Provider<GoRouter>((ref) {
           return ScreenshotProtectedScreen(
             child: TransactionDetailsScreen(transactionId: transactionId ?? ''),
           );
+        },
+      ),
+
+      // My Disputes (Phase 5c-B)
+      GoRoute(
+        path: AppRoutes.myDisputes,
+        name: 'myDisputes',
+        builder: (context, state) => const MyDisputesScreen(),
+      ),
+
+      // Dispute Detail (Phase 5c-B)
+      // Path: /dispute-detail/:disputeId — disputeId is a URL path parameter,
+      // enabling deep linking and cross-system references between the user
+      // app and admin dashboard.
+      GoRoute(
+        path: '${AppRoutes.disputeDetail}/:disputeId',
+        name: 'disputeDetail',
+        builder: (context, state) {
+          final disputeId = state.pathParameters['disputeId'] ?? '';
+          return DisputeDetailScreen(disputeId: disputeId);
         },
       ),
 
