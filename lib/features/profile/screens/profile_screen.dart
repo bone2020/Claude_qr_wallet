@@ -523,6 +523,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               title: 'Support',
               children: [
                 _buildMenuItem(
+                  icon: Iconsax.warning_2,
+                  title: AppStrings.myDisputes,
+                  onTap: () => context.push(AppRoutes.myDisputes),
+                ),
+                _buildMenuItem(
                   icon: Iconsax.message_question,
                   title: AppStrings.helpSupport,
                   onTap: () => context.push(AppRoutes.helpSupport),

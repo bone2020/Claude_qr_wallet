@@ -84,12 +84,40 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
   }
 
   Widget _statusBadge(String status) {
-    final color = status == 'resolved' ? AppColors.success : status == 'closed_stuck' ? Colors.grey : AppColors.primary;
+    Color color;
+    String label;
+    switch (status) {
+      case 'filed':
+        color = Colors.orange;
+        label = 'Submitted';
+        break;
+      case 'investigating':
+      case 'supervisor_review':
+      case 'manager_review':
+        color = AppColors.primary;
+        label = 'Under Review';
+        break;
+      case 'super_admin_escalation':
+        color = AppColors.error;
+        label = 'Escalated';
+        break;
+      case 'resolved':
+        color = AppColors.success;
+        label = 'Resolved';
+        break;
+      case 'closed_stuck':
+        color = Colors.grey;
+        label = 'Closed';
+        break;
+      default:
+        color = AppColors.primary;
+        label = status;
+    }
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
-        child: Text(status.toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+        child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
       ),
     );
   }

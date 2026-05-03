@@ -6,8 +6,6 @@ import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
-const RESOLVED_DISPUTE_STATUSES = new Set(['resolved', 'closed_stuck']);
-
 function Banner({ tone, onClick, children }) {
   const toneClass =
     tone === 'red'
@@ -69,15 +67,28 @@ function NotificationBanner() {
     };
 
     const loadPendingDisputes = async () => {
+      // Phase 5c-B: server-side status filtering — one call per active status.
+      const ACTIVE_STATUSES = [
+        'filed',
+        'investigating',
+        'supervisor_review',
+        'manager_review',
+        'super_admin_escalation',
+      ];
       try {
-        const result = await httpsCallable(functions, 'userGetMyDisputes')({
-          role: 'recipient',
-          limit: 10,
-        });
-        const active = (result.data?.disputes || []).filter(
-          (d) => !RESOLVED_DISPUTE_STATUSES.has(d.status)
+        const calls = ACTIVE_STATUSES.map((s) =>
+          httpsCallable(functions, 'userGetMyDisputes')({
+            role: 'recipient',
+            status: s,
+            limit: 10,
+          })
         );
-        if (!cancelled) setPendingDisputes(active.length);
+        const results = await Promise.all(calls);
+        const totalActive = results.reduce(
+          (sum, r) => sum + ((r.data?.disputes || []).length),
+          0
+        );
+        if (!cancelled) setPendingDisputes(totalActive);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('Failed to load my disputes:', err?.message);

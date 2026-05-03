@@ -146,6 +146,7 @@ class AppStrings {
   static const String notifications = 'Notifications';
   static const String linkedAccounts = 'Linked Accounts';
   static const String helpSupport = 'Help & Support';
+  static const String myDisputes = 'My Disputes';
   static const String about = 'About';
   static const String logOut = 'Log Out';
   static const String darkMode = 'Dark Mode';

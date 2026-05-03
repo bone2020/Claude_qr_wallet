@@ -22,9 +22,14 @@ class DisputeService {
     return Map<String, dynamic>.from(result.data as Map);
   }
 
-  Future<List<Map<String, dynamic>>> getMyDisputes({required String role}) async {
+  Future<List<Map<String, dynamic>>> getMyDisputes({
+    required String role,
+    String? status,
+  }) async {
     final callable = _functions.httpsCallable('userGetMyDisputes');
-    final result = await callable.call({'role': role});
+    final payload = <String, dynamic>{'role': role};
+    if (status != null) payload['status'] = status;
+    final result = await callable.call(payload);
     final data = Map<String, dynamic>.from(result.data as Map);
     final list = data['disputes'] as List? ?? [];
     return list.map((d) => Map<String, dynamic>.from(d as Map)).toList();
