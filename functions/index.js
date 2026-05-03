@@ -6313,7 +6313,9 @@ exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCal
 
   // Recent transactions (last 24 hours)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const recentTxSnapshot = await db.collection('transactions')
+  // Phase 5d (B.6): use collectionGroup — transactions live at users/{uid}/transactions/{txId},
+  // not in a top-level 'transactions' collection. Previous query always returned 0.
+  const recentTxSnapshot = await db.collectionGroup('transactions')
     .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneDayAgo))
     .count()
     .get();
