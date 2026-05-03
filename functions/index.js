@@ -6315,11 +6315,14 @@ exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCal
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   // Phase 5d (B.6): use collectionGroup — transactions live at users/{uid}/transactions/{txId},
   // not in a top-level 'transactions' collection. Previous query always returned 0.
+  // Note: using .limit(1000).get().size instead of .count() — aggregate count()
+  // on this collection group consistently returns FAILED_PRECONDITION with empty
+  // error details. Matches the working pattern in adminGetTransactionStats (line 8960).
   const recentTxSnapshot = await db.collectionGroup('transactions')
     .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneDayAgo))
-    .count()
+    .limit(1000)
     .get();
-  const recentTransactions = recentTxSnapshot.data().count;
+  const recentTransactions = recentTxSnapshot.size;
 
   // Flagged transactions
   const flaggedSnapshot = await db.collection('flagged_transactions')
