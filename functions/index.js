@@ -6313,17 +6313,23 @@ exports.adminGetStats = functions.runWith({ enforceAppCheck: true }).https.onCal
 
   // Recent transactions (last 24 hours)
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  // B.6 from audit report flagged this query as broken: transactions live at
-  // users/{uid}/transactions/{txId}, not in a top-level 'transactions' collection.
-  // Phase 5d attempted .collectionGroup('transactions') but FAILED_PRECONDITION
-  // errors with empty details could not be diagnosed in available time.
-  // Reverted to original behavior (returns 0) until properly fixed in a future
-  // session. See handover doc for investigation details.
-  const recentTxSnapshot = await db.collection('transactions')
+  // Phase 5e (B.6 retry): transactions live at users/{uid}/transactions/{txId},
+  // so we use a collection-group query. We MUST keep .orderBy('createdAt', 'desc')
+  // explicit — without it, Firestore's implicit ordering on the inequality field
+  // is ASCENDING, which requires a different (un-deployed) single-field index and
+  // produced FAILED_PRECONDITION in Phase 5d. The DESCENDING orderBy matches the
+  // deployed fieldOverride for transactions.createdAt at COLLECTION_GROUP scope.
+  // Pattern copied from adminGetTransactionStats (line ~8961).
+  // .limit(1000) caps the count at 1000/24h — acceptable for a dashboard
+  // "is the system busy" indicator. Aggregate .count() is intentionally avoided:
+  // it consistently returned FAILED_PRECONDITION with empty error details on
+  // this collection group during Phase 5d.
+  const recentTxSnapshot = await db.collectionGroup('transactions')
     .where('createdAt', '>=', admin.firestore.Timestamp.fromDate(oneDayAgo))
-    .count()
+    .orderBy('createdAt', 'desc')
+    .limit(1000)
     .get();
-  const recentTransactions = recentTxSnapshot.data().count;
+  const recentTransactions = recentTxSnapshot.size;
 
   // Flagged transactions
   const flaggedSnapshot = await db.collection('flagged_transactions')
