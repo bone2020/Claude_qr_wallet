@@ -5639,69 +5639,69 @@ exports.adminGetAllowlist = functions.runWith({ enforceAppCheck: true }).https.o
 exports.adminSearchUser = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   await verifyAdmin(context, 'support');
 
-  const { query, searchType = 'email' } = data;
+  const { query } = data || {};
 
-  if (!query) {
+  if (!query || typeof query !== 'string' || !query.trim()) {
     throw new functions.https.HttpsError('invalid-argument', 'Search query is required.');
   }
 
-  let results = [];
+  // Phase 5g+5h: unified partial-match search across name (fullName + legalName),
+  // email, and phone — case-insensitive, substring match. Approach B from design:
+  // fetch a recent slice of users and filter in memory. Safe at current scale
+  // (single-digit-thousands users); revisit with denormalized search fields if the
+  // user count exceeds ~30k. Phase 5h: staff users (anyone with a 'role' field
+  // set on their user doc) are excluded from results — admin lookup belongs on
+  // the Admin Management page, not here.
 
-  if (searchType === 'email') {
-    try {
-      const userRecord = await admin.auth().getUserByEmail(query);
-      const userDoc = await db.collection('users').doc(userRecord.uid).get();
-      if (userDoc.exists) {
-        const userData = userDoc.data();
-        results.push({
-          uid: userRecord.uid,
-          email: userRecord.email,
-          fullName: userData.fullName || '',
-          phoneNumber: userData.phoneNumber || '',
-          kycStatus: userData.kycStatus || 'none',
-          accountBlocked: userData.accountBlocked || false,
-          createdAt: userData.createdAt,
-        });
-      }
-    } catch (e) {
-      // User not found — return empty results
-    }
-  } else if (searchType === 'phone') {
-    const snapshot = await db.collection('users')
-      .where('phoneNumber', '==', query)
-      .limit(10)
-      .get();
+  const trimmed = query.trim();
+  const needle = trimmed.toLowerCase();
 
-    for (const doc of snapshot.docs) {
-      const userData = doc.data();
+  // Phone normalization: strip everything that isn't a digit, then strip a single
+  // leading country-code if present (e.g. Ghana "233" or US "1") and a leading
+  // zero, so support agents can type any common format and still match.
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  const phoneNeedle = digitsOnly.replace(/^0+/, '');
+
+  // Fetch a slice of users to scan. 500 is generous given current scale (<10
+  // users today) and well within Firestore's free-tier read budget for an
+  // admin-only callable. Sorted newest-first so support workflows surface
+  // recent signups quickly.
+  const snapshot = await db.collection('users')
+    .orderBy('createdAt', 'desc')
+    .limit(500)
+    .get();
+
+  const results = [];
+  for (const doc of snapshot.docs) {
+    const u = doc.data();
+
+    // Phase 5h: exclude staff (anyone with any role assigned).
+    if (u.role) continue;
+
+    const fullName = (u.fullName || '').toLowerCase();
+    const legalName = (u.legalName || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const phoneDigits = (u.phoneNumber || '').replace(/\D/g, '');
+
+    const nameHit = fullName.includes(needle) || legalName.includes(needle);
+    const emailHit = email.includes(needle);
+    // Phone matches if the stored digits contain the needle's digits — but only
+    // when the user actually typed something digit-y. Empty digitsOnly would
+    // match every phone, so guard against that.
+    const phoneHit = phoneDigits.length > 0 && digitsOnly.length > 0 &&
+      (phoneDigits.includes(phoneNeedle) || phoneDigits.includes(digitsOnly));
+
+    if (nameHit || emailHit || phoneHit) {
       results.push({
         uid: doc.id,
-        email: userData.email || '',
-        fullName: userData.fullName || '',
-        phoneNumber: userData.phoneNumber || '',
-        kycStatus: userData.kycStatus || 'none',
-        accountBlocked: userData.accountBlocked || false,
-        createdAt: userData.createdAt,
+        email: u.email || '',
+        fullName: u.fullName || '',
+        phoneNumber: u.phoneNumber || '',
+        kycStatus: u.kycStatus || 'none',
+        accountBlocked: u.accountBlocked || false,
+        createdAt: u.createdAt,
       });
-    }
-  } else if (searchType === 'name') {
-    const snapshot = await db.collection('users')
-      .where('fullName', '>=', query)
-      .where('fullName', '<=', query + '\uf8ff')
-      .limit(10)
-      .get();
-
-    for (const doc of snapshot.docs) {
-      const userData = doc.data();
-      results.push({
-        uid: doc.id,
-        email: userData.email || '',
-        fullName: userData.fullName || '',
-        phoneNumber: userData.phoneNumber || '',
-        kycStatus: userData.kycStatus || 'none',
-        accountBlocked: userData.accountBlocked || false,
-        createdAt: userData.createdAt,
-      });
+      if (results.length >= 50) break;
     }
   }
 
