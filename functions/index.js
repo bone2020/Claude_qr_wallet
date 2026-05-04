@@ -8815,7 +8815,19 @@ exports.adminListTransferProposals = functions.runWith({ enforceAppCheck: true }
   const { status: filterStatus, limit: requestedLimit, startAfter } = data || {};
 
   // Validate inputs
-  const validStatuses = ['proposed', 'approved', 'rejected', 'cancelled', 'expired', 'completed', 'pending_otp'];
+  // Phase 5f: complete whitelist — every status the codebase actually writes to
+  // platform_transfer_proposals docs. Previous list was missing the evidence-stage
+  // statuses (evidence_pending @ line 8454 EVIDENCE_STAGE_STATUSES,
+  // evidence_overdue @ line 13676 scheduled writer), the failure path
+  // (failed @ line 7797 Paystack failure), and the post-evidence terminal
+  // (closed @ line 8328 adminCloseProposal). NotificationBanner.jsx queries
+  // 'evidence_overdue' on every dashboard load and was getting HTTP 400.
+  const validStatuses = [
+    'proposed', 'approved', 'rejected', 'cancelled', 'expired',
+    'completed', 'pending_otp',
+    'evidence_pending', 'evidence_overdue',
+    'closed', 'failed',
+  ];
   if (filterStatus && !validStatuses.includes(filterStatus)) {
     throw new functions.https.HttpsError('invalid-argument',
       `Invalid status filter. Must be one of: ${validStatuses.join(', ')}`);
