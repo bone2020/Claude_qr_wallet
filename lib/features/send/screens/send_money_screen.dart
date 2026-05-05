@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
@@ -46,7 +47,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
 
   String? _validateWalletId(String? value) {
     if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
+      return AppLocalizations.of(context).errorFieldRequired;
     }
     // QRW-XXXX-XXXX-XXXX format (alphanumeric)
     final walletIdRegex = RegExp(r'^QRW-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$');
@@ -58,11 +59,11 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
 
   String? _validateAmount(String? value) {
     if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
+      return AppLocalizations.of(context).errorFieldRequired;
     }
     final amount = double.tryParse(value.replaceAll(',', ''));
     if (amount == null || amount <= 0) {
-      return AppStrings.errorInvalidAmount;
+      return AppLocalizations.of(context).errorInvalidAmount;
     }
     if (amount > 10000000) {
       return 'Maximum transfer amount is 10,000,000';
@@ -193,7 +194,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(AppStrings.sendMoney, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).sendMoney, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Column(
@@ -233,8 +234,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
 
                       // Wallet ID Input
                       CustomTextField(
-                        label: AppStrings.walletId,
-                        hintText: AppStrings.walletIdHint,
+                        label: AppLocalizations.of(context).walletId,
+                        hintText: AppLocalizations.of(context).walletIdHint,
                         controller: _walletIdController,
                         validator: _validateWalletId,
                         onChanged: (_) => _lookupRecipient(),
@@ -328,8 +329,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
 
                       // Amount Input
                       CustomTextField(
-                        label: AppStrings.amount,
-                        hintText: AppStrings.amountHint,
+                        label: AppLocalizations.of(context).amount,
+                        hintText: AppLocalizations.of(context).amountHint,
                         controller: _amountController,
                         keyboardType: TextInputType.number,
                         validator: _validateAmount,
@@ -350,8 +351,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
 
                       // Note Input
                       CustomTextField(
-                        label: AppStrings.note,
-                        hintText: AppStrings.noteHint,
+                        label: AppLocalizations.of(context).note,
+                        hintText: AppLocalizations.of(context).noteHint,
                         controller: _noteController,
                         maxLines: 3,
                         textInputAction: TextInputAction.done,
@@ -401,7 +402,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    AppStrings.scanQrCode,
+                    AppLocalizations.of(context).scanQrCode,
                     style: AppTextStyles.bodyLarge(),
                   ),
                   const SizedBox(height: 2),
@@ -447,7 +448,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                     ),
                   )
                 : Text(
-                    AppStrings.continueText,
+                    AppLocalizations.of(context).continueText,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),
