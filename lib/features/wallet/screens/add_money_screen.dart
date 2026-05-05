@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/services/payment_service.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../core/services/momo_service.dart';
@@ -471,7 +472,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           onPressed: () => context.pop(),
         ),
         title: Text(
-          AppStrings.addMoney,
+          AppLocalizations.of(context).addMoney,
           style: AppTextStyles.headlineSmall(),
         ),
         centerTitle: true,

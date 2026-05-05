@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/services/payment_service.dart';
 import '../../../core/services/momo_service.dart';
 import '../../../core/utils/error_handler.dart';
@@ -644,7 +645,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                     context.pop();
                   },
                   child: Text(
-                    AppStrings.done,
+                    AppLocalizations.of(context).done,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
                 ),
