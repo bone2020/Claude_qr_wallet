@@ -8,6 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/services/biometric_service.dart';
@@ -479,7 +480,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               ),
               const SizedBox(height: AppDimensions.spaceLG),
               Text(
-                AppStrings.successMoneySent,
+                AppLocalizations.of(context).successMoneySent,
                 style: AppTextStyles.headlineMedium(),
                 textAlign: TextAlign.center,
               ),
@@ -499,7 +500,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                     context.go(AppRoutes.main);
                   },
                   child: Text(
-                    AppStrings.done,
+                    AppLocalizations.of(context).done,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
                 ),
@@ -521,7 +522,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(AppStrings.confirmSend, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).confirmSend, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Column(
@@ -602,7 +603,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppStrings.sendingTo,
+                  AppLocalizations.of(context).sendingTo,
                   style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 ),
                 const SizedBox(height: 2),
@@ -691,7 +692,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         Row(
           children: [
             Text(
-              AppStrings.amount,
+              AppLocalizations.of(context).amount,
               style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
             ),
             if (widget.amountLocked) ...[
@@ -763,10 +764,10 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow(AppStrings.amount, '$_currency${_formatAmount(_amountMajor)}'),
+          _buildSummaryRow(AppLocalizations.of(context).amount, '$_currency${_formatAmount(_amountMajor)}'),
           const SizedBox(height: AppDimensions.spaceMD),
           _buildSummaryRow(
-            AppStrings.transactionFee,
+            AppLocalizations.of(context).transactionFee,
             _previewLoading
                 ? '...'
                 : '${_serverFee == null ? "~" : ""}$_currency${_formatAmount(_feeMajor)}',
@@ -783,7 +784,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             child: Divider(color: AppColors.inputBorderDark),
           ),
           _buildSummaryRow(
-            AppStrings.totalAmount,
+            AppLocalizations.of(context).totalAmount,
             _previewLoading
                 ? '...'
                 : '${_serverTotalDebit == null ? "~" : ""}$_currency${_formatAmount(_totalMajor)}',
@@ -940,7 +941,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                     ),
                   )
                 : Text(
-                    '${AppStrings.send} $_currency${_formatAmount(_totalMajor)}',
+                    '${AppLocalizations.of(context).send} $_currency${_formatAmount(_totalMajor)}',
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),
