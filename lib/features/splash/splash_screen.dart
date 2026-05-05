@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/constants.dart';
+import '../../generated/l10n/app_localizations.dart';
 import '../../core/router/app_router.dart';
 import '../../core/services/exchange_rate_service.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -173,7 +174,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
             // App Name
             Text(
-              AppStrings.appName,
+              AppLocalizations.of(context).appName,
               style: AppTextStyles.displaySmall(),
             )
                 .animate()
@@ -184,7 +185,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
             // Tagline
             Text(
-              AppStrings.appTagline,
+              AppLocalizations.of(context).appTagline,
               style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
             )
                 .animate()
