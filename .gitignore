@@ -55,3 +55,13 @@ android/build/
 # iOS build cache in android directory
 android/build/
 functions/.env.*
+
+# Admin dashboard build output (regenerated, not source)
+admin-dashboard/dist/
+admin-dashboard/node_modules/
+
+# Firebase hosting deploy cache
+.firebase/
+
+# Generated reports / audit docs (one-off artifacts)
+CURRENT_PROJECT_AUDIT_REPORT.md
