@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 
 /// Welcome screen with options to sign up or log in
@@ -21,7 +22,7 @@ class WelcomeScreen extends StatelessWidget {
               const Spacer(flex: 2),
 
               // Logo and App Name
-              _buildHeader(),
+              _buildHeader(context),
 
               const Spacer(flex: 3),
 
@@ -36,7 +37,7 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Column(
       children: [
         // App Icon
@@ -73,7 +74,7 @@ class WelcomeScreen extends StatelessWidget {
 
         // App Name
         Text(
-          AppStrings.appName,
+          AppLocalizations.of(context).appName,
           style: AppTextStyles.displayMedium(),
         ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
@@ -81,7 +82,7 @@ class WelcomeScreen extends StatelessWidget {
 
         // Tagline
         Text(
-          AppStrings.appTagline,
+          AppLocalizations.of(context).appTagline,
           style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
           textAlign: TextAlign.center,
         ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
@@ -99,7 +100,7 @@ class WelcomeScreen extends StatelessWidget {
           child: ElevatedButton(
             onPressed: () => context.push(AppRoutes.signUp),
             child: Text(
-              AppStrings.createAccount,
+              AppLocalizations.of(context).createAccount,
               style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
             ),
           ),
@@ -122,7 +123,7 @@ class WelcomeScreen extends StatelessWidget {
               side: const BorderSide(color: AppColors.primary),
             ),
             child: Text(
-              AppStrings.logIn,
+              AppLocalizations.of(context).logIn,
               style: AppTextStyles.labelLarge(color: AppColors.primary),
             ),
           ),
