@@ -1,0 +1,752 @@
+{
+  "@@locale": "en",
+
+  "appName": "QR Wallet",
+  "@appName": {
+    "description": "App name shown in title bars and splash"
+  },
+  "appTagline": "Seamless payments, anywhere",
+  "@appTagline": {
+    "description": "Tagline shown on splash screen"
+  },
+
+  "getStarted": "Get Started",
+  "@getStarted": {
+    "description": "Button on splash screen to begin onboarding"
+  },
+
+  "signUp": "Sign up",
+  "@signUp": {
+    "description": "Sign up button label and screen title"
+  },
+  "signUpSubtitle": "Sign up and begin your journey to the next level",
+  "@signUpSubtitle": {
+    "description": "Subtitle shown on the sign up screen"
+  },
+  "logIn": "Log in",
+  "@logIn": {
+    "description": "Log in button label and screen title"
+  },
+  "logInSubtitle": "Welcome back! Sign in to continue",
+  "@logInSubtitle": {
+    "description": "Subtitle shown on the log in screen"
+  },
+  "createAccount": "Create Account",
+  "@createAccount": {
+    "description": "Button on sign up screen to submit the form"
+  },
+  "alreadyHaveAccount": "Already have an account?",
+  "@alreadyHaveAccount": {
+    "description": "Prompt before the Log in link on the sign up screen"
+  },
+  "dontHaveAccount": "Don't have an account?",
+  "@dontHaveAccount": {
+    "description": "Prompt before the Sign up link on the log in screen"
+  },
+  "orSignUpWith": "Or sign up with",
+  "@orSignUpWith": {
+    "description": "Divider text above social sign up options"
+  },
+  "orLogInWith": "Or log in with",
+  "@orLogInWith": {
+    "description": "Divider text above social log in options"
+  },
+  "forgotPassword": "Forgot Password?",
+  "@forgotPassword": {
+    "description": "Link to password reset on the log in screen"
+  },
+  "resetPassword": "Reset Password",
+  "@resetPassword": {
+    "description": "Title on the password reset screen"
+  },
+  "sendResetLink": "Send Reset Link",
+  "@sendResetLink": {
+    "description": "Button to email the password reset link"
+  },
+  "backToLogin": "Back to Login",
+  "@backToLogin": {
+    "description": "Link returning the user to the log in screen"
+  },
+
+  "fullName": "Full name",
+  "@fullName": {
+    "description": "Label for the full name input field"
+  },
+  "fullNameHint": "Enter your full name",
+  "@fullNameHint": {
+    "description": "Placeholder text inside the full name field"
+  },
+  "email": "Email address",
+  "@email": {
+    "description": "Label for the email input field"
+  },
+  "emailHint": "Enter your email address",
+  "@emailHint": {
+    "description": "Placeholder text inside the email field"
+  },
+  "phoneNumber": "Phone Number",
+  "@phoneNumber": {
+    "description": "Label for the phone number input field"
+  },
+  "phoneNumberHint": "Enter your phone number",
+  "@phoneNumberHint": {
+    "description": "Placeholder text inside the phone number field"
+  },
+  "password": "Password",
+  "@password": {
+    "description": "Label for the password input field"
+  },
+  "passwordHint": "Enter your password",
+  "@passwordHint": {
+    "description": "Placeholder text inside the password field"
+  },
+  "confirmPassword": "Confirm Password",
+  "@confirmPassword": {
+    "description": "Label for the confirm password input field"
+  },
+  "confirmPasswordHint": "Confirm your password",
+  "@confirmPasswordHint": {
+    "description": "Placeholder inside the confirm password field"
+  },
+  "termsAgreement": "I agree with",
+  "@termsAgreement": {
+    "description": "Prefix before the Terms and Privacy link on sign up"
+  },
+  "termsAndPrivacy": "Terms and Privacy",
+  "@termsAndPrivacy": {
+    "description": "Link to the terms and privacy policy"
+  },
+
+  "verifyPhone": "Verify Phone",
+  "@verifyPhone": {
+    "description": "Title shown when verifying a phone number via OTP"
+  },
+  "verifyEmail": "Verify Email",
+  "@verifyEmail": {
+    "description": "Title shown when verifying an email address"
+  },
+  "enterOtp": "Enter OTP",
+  "@enterOtp": {
+    "description": "Prompt above the OTP input field"
+  },
+  "otpSentTo": "We sent a verification code to",
+  "@otpSentTo": {
+    "description": "Confirmation text above the masked email or phone"
+  },
+  "resendCode": "Resend Code",
+  "@resendCode": {
+    "description": "Button to request a new OTP"
+  },
+  "resendIn": "Resend in",
+  "@resendIn": {
+    "description": "Prefix shown next to the OTP resend countdown timer"
+  },
+  "verify": "Verify",
+  "@verify": {
+    "description": "Button to submit an OTP for verification"
+  },
+  "didntReceiveCode": "Didn't receive code?",
+  "@didntReceiveCode": {
+    "description": "Prompt before the resend code link"
+  },
+
+  "completeProfile": "Complete Profile",
+  "@completeProfile": {
+    "description": "Title on the KYC completion screen"
+  },
+  "completeProfileSubtitle": "We need a few more details to secure your account",
+  "@completeProfileSubtitle": {
+    "description": "Subtitle on the KYC completion screen"
+  },
+  "governmentId": "Government ID",
+  "@governmentId": {
+    "description": "Section header for government ID upload during KYC"
+  },
+  "selectIdType": "Select ID type",
+  "@selectIdType": {
+    "description": "Prompt to choose an ID document type during KYC"
+  },
+  "nationalId": "National ID",
+  "@nationalId": {
+    "description": "ID type option: national identity card"
+  },
+  "driversLicense": "Driver's License",
+  "@driversLicense": {
+    "description": "ID type option: driver's license"
+  },
+  "passport": "Passport",
+  "@passport": {
+    "description": "ID type option: passport"
+  },
+  "uploadFront": "Upload Front",
+  "@uploadFront": {
+    "description": "Button to upload the front of an ID card"
+  },
+  "uploadBack": "Upload Back",
+  "@uploadBack": {
+    "description": "Button to upload the back of an ID card"
+  },
+  "uploadMainPage": "Upload Main Page",
+  "@uploadMainPage": {
+    "description": "Button to upload the main page of a passport"
+  },
+  "dateOfBirth": "Date of Birth",
+  "@dateOfBirth": {
+    "description": "Label for the date of birth input field"
+  },
+  "selectDate": "Select date",
+  "@selectDate": {
+    "description": "Placeholder for an unselected date field"
+  },
+  "faceScan": "Face Scan",
+  "@faceScan": {
+    "description": "Title for the face scan KYC step"
+  },
+  "faceScanInstructions": "Position your face within the frame",
+  "@faceScanInstructions": {
+    "description": "Instructions shown during face scan"
+  },
+  "startScan": "Start Scan",
+  "@startScan": {
+    "description": "Button to begin the face scan"
+  },
+  "profilePhoto": "Profile Photo",
+  "@profilePhoto": {
+    "description": "Label for the profile photo upload section"
+  },
+  "uploadPhoto": "Upload Photo",
+  "@uploadPhoto": {
+    "description": "Button to choose an existing photo from gallery"
+  },
+  "takePhoto": "Take Photo",
+  "@takePhoto": {
+    "description": "Button to take a new photo with the camera"
+  },
+  "continueText": "Continue",
+  "@continueText": {
+    "description": "Generic continue/next button"
+  },
+  "skip": "Skip for now",
+  "@skip": {
+    "description": "Button to skip the current optional step"
+  },
+
+  "home": "Home",
+  "@home": {
+    "description": "Bottom navigation tab label for the home screen"
+  },
+  "totalBalance": "Total Balance",
+  "@totalBalance": {
+    "description": "Label above the total wallet balance figure"
+  },
+  "availableBalance": "Available Balance",
+  "@availableBalance": {
+    "description": "Label above the available (spendable) balance figure"
+  },
+  "hideBalance": "Hide Balance",
+  "@hideBalance": {
+    "description": "Action to obscure the displayed wallet balance"
+  },
+  "showBalance": "Show Balance",
+  "@showBalance": {
+    "description": "Action to reveal the obscured wallet balance"
+  },
+  "send": "Send",
+  "@send": {
+    "description": "Action: send money to another wallet"
+  },
+  "receive": "Receive",
+  "@receive": {
+    "description": "Action: receive money via QR or wallet ID"
+  },
+  "addMoney": "Add Money",
+  "@addMoney": {
+    "description": "Action: top up the wallet"
+  },
+  "withdraw": "Withdraw",
+  "@withdraw": {
+    "description": "Action: withdraw funds from the wallet"
+  },
+  "recentTransactions": "Recent Transactions",
+  "@recentTransactions": {
+    "description": "Section header on home screen above the latest transactions"
+  },
+  "viewAll": "View All",
+  "@viewAll": {
+    "description": "Link to navigate to the full transactions list"
+  },
+  "noTransactions": "No transactions yet",
+  "@noTransactions": {
+    "description": "Empty state message when no transactions exist"
+  },
+  "noTransactionsSubtitle": "Your transaction history will appear here",
+  "@noTransactionsSubtitle": {
+    "description": "Subtitle in the empty transactions state"
+  },
+
+  "sendMoney": "Send Money",
+  "@sendMoney": {
+    "description": "Title of the send money flow"
+  },
+  "scanQrCode": "Scan QR Code",
+  "@scanQrCode": {
+    "description": "Action to open the camera and scan a QR code"
+  },
+  "enterWalletId": "Enter Wallet ID",
+  "@enterWalletId": {
+    "description": "Action to manually type a recipient wallet ID"
+  },
+  "walletId": "Wallet ID",
+  "@walletId": {
+    "description": "Label for a wallet ID field or display"
+  },
+  "walletIdHint": "Enter recipient wallet ID",
+  "@walletIdHint": {
+    "description": "Placeholder text in the recipient wallet ID field"
+  },
+  "amount": "Amount",
+  "@amount": {
+    "description": "Label for an amount input field"
+  },
+  "amountHint": "Enter amount",
+  "@amountHint": {
+    "description": "Placeholder text inside the amount field"
+  },
+  "note": "Note (optional)",
+  "@note": {
+    "description": "Label for the optional transaction note field"
+  },
+  "noteHint": "Add a note",
+  "@noteHint": {
+    "description": "Placeholder inside the optional transaction note field"
+  },
+  "review": "Review",
+  "@review": {
+    "description": "Button to advance from amount to confirmation screen"
+  },
+  "confirmSend": "Confirm & Send",
+  "@confirmSend": {
+    "description": "Button on the confirmation screen to dispatch the send"
+  },
+  "sendingTo": "Sending to",
+  "@sendingTo": {
+    "description": "Label above the recipient name on the confirmation screen"
+  },
+  "transactionFee": "Transaction Fee",
+  "@transactionFee": {
+    "description": "Label for the displayed transaction fee"
+  },
+  "totalAmount": "Total Amount",
+  "@totalAmount": {
+    "description": "Label for the total to be sent including fees"
+  },
+
+  "receiveMoney": "Receive Money",
+  "@receiveMoney": {
+    "description": "Title of the receive money screen"
+  },
+  "myQrCode": "My QR Code",
+  "@myQrCode": {
+    "description": "Section header above the user's QR code"
+  },
+  "shareQrCode": "Share QR Code",
+  "@shareQrCode": {
+    "description": "Action to share the QR code via system share sheet"
+  },
+  "downloadQrCode": "Download QR Code",
+  "@downloadQrCode": {
+    "description": "Action to save the QR code as an image"
+  },
+  "walletIdCopied": "Wallet ID copied!",
+  "@walletIdCopied": {
+    "description": "Confirmation snackbar after copying the wallet ID"
+  },
+  "tapToCopy": "Tap to copy",
+  "@tapToCopy": {
+    "description": "Hint shown next to a copyable wallet ID"
+  },
+
+  "addMoneyTitle": "Add Money",
+  "@addMoneyTitle": {
+    "description": "Title of the add money screen (separate from action button)"
+  },
+  "selectBank": "Select Bank",
+  "@selectBank": {
+    "description": "Action to choose a linked bank for funding"
+  },
+  "linkedBanks": "Linked Banks",
+  "@linkedBanks": {
+    "description": "Section header listing the user's linked bank accounts"
+  },
+  "addNewBank": "Add New Bank",
+  "@addNewBank": {
+    "description": "Action to link a new bank account"
+  },
+  "bankName": "Bank Name",
+  "@bankName": {
+    "description": "Label for a bank name field"
+  },
+  "accountNumber": "Account Number",
+  "@accountNumber": {
+    "description": "Label for an account number field"
+  },
+  "accountName": "Account Name",
+  "@accountName": {
+    "description": "Label for the displayed account holder name"
+  },
+  "linkBank": "Link Bank",
+  "@linkBank": {
+    "description": "Button to confirm linking a bank account"
+  },
+  "transferFrom": "Transfer from",
+  "@transferFrom": {
+    "description": "Label preceding the chosen funding source"
+  },
+
+  "transactions": "Transactions",
+  "@transactions": {
+    "description": "Bottom navigation label and screen title for the transactions list"
+  },
+  "allTransactions": "All",
+  "@allTransactions": {
+    "description": "Filter chip showing all transactions"
+  },
+  "sent": "Sent",
+  "@sent": {
+    "description": "Filter chip and status label for sent transactions"
+  },
+  "received": "Received",
+  "@received": {
+    "description": "Filter chip and status label for received transactions"
+  },
+  "pending": "Pending",
+  "@pending": {
+    "description": "Status label for pending transactions"
+  },
+  "completed": "Completed",
+  "@completed": {
+    "description": "Status label for completed transactions"
+  },
+  "failed": "Failed",
+  "@failed": {
+    "description": "Status label for failed transactions"
+  },
+  "transactionDetails": "Transaction Details",
+  "@transactionDetails": {
+    "description": "Title of the single transaction detail screen"
+  },
+  "transactionId": "Transaction ID",
+  "@transactionId": {
+    "description": "Label for the transaction's unique identifier"
+  },
+  "date": "Date",
+  "@date": {
+    "description": "Label for a transaction date field"
+  },
+  "time": "Time",
+  "@time": {
+    "description": "Label for a transaction time field"
+  },
+  "status": "Status",
+  "@status": {
+    "description": "Label for a transaction status field"
+  },
+  "from": "From",
+  "@from": {
+    "description": "Label for the sender of a transaction"
+  },
+  "to": "To",
+  "@to": {
+    "description": "Label for the recipient of a transaction"
+  },
+
+  "profile": "Profile",
+  "@profile": {
+    "description": "Bottom navigation label and screen title for the user's profile"
+  },
+  "editProfile": "Edit Profile",
+  "@editProfile": {
+    "description": "Action to open the profile editor"
+  },
+  "accountSettings": "Account Settings",
+  "@accountSettings": {
+    "description": "Section header for account-related settings"
+  },
+  "security": "Security",
+  "@security": {
+    "description": "Section header for security-related settings"
+  },
+  "notifications": "Notifications",
+  "@notifications": {
+    "description": "Section header and screen title for notification settings"
+  },
+  "linkedAccounts": "Linked Accounts",
+  "@linkedAccounts": {
+    "description": "Profile row leading to linked accounts management"
+  },
+  "helpSupport": "Help & Support",
+  "@helpSupport": {
+    "description": "Profile row leading to help and support"
+  },
+  "myDisputes": "My Disputes",
+  "@myDisputes": {
+    "description": "Profile row leading to the user's dispute list"
+  },
+  "about": "About",
+  "@about": {
+    "description": "Profile row leading to the about screen"
+  },
+  "logOut": "Log Out",
+  "@logOut": {
+    "description": "Action to sign the user out"
+  },
+  "darkMode": "Dark Mode",
+  "@darkMode": {
+    "description": "Toggle label for dark theme"
+  },
+  "biometricLogin": "Biometric Login",
+  "@biometricLogin": {
+    "description": "Toggle label for biometric authentication"
+  },
+  "changePassword": "Change Password",
+  "@changePassword": {
+    "description": "Profile row to change the account password"
+  },
+  "changePin": "Change PIN",
+  "@changePin": {
+    "description": "Profile row to change the wallet PIN"
+  },
+
+  "errorGeneric": "Something went wrong. Please try again.",
+  "@errorGeneric": {
+    "description": "Fallback error message when the cause is unknown"
+  },
+  "errorNetwork": "No internet connection. Please check your network.",
+  "@errorNetwork": {
+    "description": "Error shown when offline or network is unreachable"
+  },
+  "errorInvalidEmail": "Please enter a valid email address",
+  "@errorInvalidEmail": {
+    "description": "Validation error when an email field's content is malformed"
+  },
+  "errorInvalidPhone": "Please enter a valid phone number",
+  "@errorInvalidPhone": {
+    "description": "Validation error when a phone field's content is malformed"
+  },
+  "errorPasswordMismatch": "Passwords do not match",
+  "@errorPasswordMismatch": {
+    "description": "Validation error when password and confirm password differ"
+  },
+  "errorPasswordWeak": "Password must be at least 8 characters",
+  "@errorPasswordWeak": {
+    "description": "Validation error when the password is too short"
+  },
+  "errorFieldRequired": "This field is required",
+  "@errorFieldRequired": {
+    "description": "Validation error for an empty required field"
+  },
+  "errorInsufficientBalance": "Insufficient balance",
+  "@errorInsufficientBalance": {
+    "description": "Error shown when wallet has too little to complete a send"
+  },
+  "errorInvalidAmount": "Please enter a valid amount",
+  "@errorInvalidAmount": {
+    "description": "Validation error when amount is missing or zero/negative"
+  },
+  "errorInvalidOtp": "Invalid OTP. Please try again.",
+  "@errorInvalidOtp": {
+    "description": "Error shown when the entered OTP code is wrong"
+  },
+  "errorUserNotFound": "User not found",
+  "@errorUserNotFound": {
+    "description": "Error shown when the entered email/phone has no account"
+  },
+  "errorWrongPassword": "Wrong password",
+  "@errorWrongPassword": {
+    "description": "Error shown when the password is incorrect on log in"
+  },
+
+  "successAccountCreated": "Account created successfully!",
+  "@successAccountCreated": {
+    "description": "Success message after sign up completes"
+  },
+  "successLoggedIn": "Welcome back!",
+  "@successLoggedIn": {
+    "description": "Success message after a successful log in"
+  },
+  "successMoneySent": "Money sent successfully!",
+  "@successMoneySent": {
+    "description": "Success message after a transaction is dispatched"
+  },
+  "successMoneyAdded": "Money added successfully!",
+  "@successMoneyAdded": {
+    "description": "Success message after a successful top up"
+  },
+  "successProfileUpdated": "Profile updated successfully!",
+  "@successProfileUpdated": {
+    "description": "Success message after editing the profile"
+  },
+  "successPasswordReset": "Password reset link sent!",
+  "@successPasswordReset": {
+    "description": "Success message after a password reset email is sent"
+  },
+
+  "ok": "OK",
+  "@ok": {
+    "description": "Confirmation button: acknowledge"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Action to abort the current flow"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Confirmation button: proceed"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Action to persist edits"
+  },
+  "done": "Done",
+  "@done": {
+    "description": "Action to close the current step as complete"
+  },
+  "next": "Next",
+  "@next": {
+    "description": "Action to advance to the next step"
+  },
+  "back": "Back",
+  "@back": {
+    "description": "Action to return to the previous step"
+  },
+  "retry": "Retry",
+  "@retry": {
+    "description": "Action to attempt the failed operation again"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "Action to dismiss a dialog or modal"
+  },
+
+  "selectVerificationMethod": "Select Verification Method",
+  "@selectVerificationMethod": {
+    "description": "Title of the KYC method selection screen"
+  },
+  "selectVerificationMethodSubtitle": "Choose your preferred ID type to verify your identity",
+  "@selectVerificationMethodSubtitle": {
+    "description": "Subtitle on the KYC method selection screen"
+  },
+  "verifyPassport": "Verify Passport",
+  "@verifyPassport": {
+    "description": "KYC option title for passport verification"
+  },
+  "verifyNin": "Verify NIN",
+  "@verifyNin": {
+    "description": "KYC option title for Nigerian National Identification Number verification"
+  },
+  "verifyBvn": "Verify BVN",
+  "@verifyBvn": {
+    "description": "KYC option title for Bank Verification Number verification"
+  },
+  "verifyDriversLicense": "Verify Driver's License",
+  "@verifyDriversLicense": {
+    "description": "KYC option title for driver's license verification"
+  },
+  "verifyVotersCard": "Verify Voter's Card",
+  "@verifyVotersCard": {
+    "description": "KYC option title for voter's card verification"
+  },
+  "verifyNationalId": "Verify National ID",
+  "@verifyNationalId": {
+    "description": "KYC option title for national ID verification"
+  },
+  "verifySsnit": "Verify SSNIT",
+  "@verifySsnit": {
+    "description": "KYC option title for Ghanaian SSNIT verification"
+  },
+  "passportDescription": "International passport verification",
+  "@passportDescription": {
+    "description": "Helper text under the passport KYC option"
+  },
+  "ninDescription": "National Identification Number (11 digits)",
+  "@ninDescription": {
+    "description": "Helper text under the NIN KYC option"
+  },
+  "bvnDescription": "Bank Verification Number (11 digits)",
+  "@bvnDescription": {
+    "description": "Helper text under the BVN KYC option"
+  },
+  "driversLicenseDescription": "Driver's license verification",
+  "@driversLicenseDescription": {
+    "description": "Helper text under the driver's license KYC option"
+  },
+  "votersCardDescription": "Voter's card verification",
+  "@votersCardDescription": {
+    "description": "Helper text under the voter's card KYC option"
+  },
+  "nationalIdDescription": "National ID card verification",
+  "@nationalIdDescription": {
+    "description": "Helper text under the national ID KYC option"
+  },
+  "ssnitDescription": "SSNIT number (1 letter + 12 digits)",
+  "@ssnitDescription": {
+    "description": "Helper text under the SSNIT KYC option"
+  },
+  "startVerification": "Start Verification",
+  "@startVerification": {
+    "description": "Button to begin the KYC verification flow"
+  },
+  "verificationDescription": "We will capture your document and take a selfie to verify your identity",
+  "@verificationDescription": {
+    "description": "Explanatory text shown before starting KYC verification"
+  },
+  "enterIdNumber": "Enter ID Number",
+  "@enterIdNumber": {
+    "description": "Prompt to enter an ID number during KYC"
+  },
+  "idNumberRequired": "ID number is required for verification",
+  "@idNumberRequired": {
+    "description": "Validation error for empty ID number field"
+  },
+  "verificationSuccessful": "Verification completed successfully!",
+  "@verificationSuccessful": {
+    "description": "Success message after KYC completes"
+  },
+  "verificationFailed": "Verification failed. Please try again.",
+  "@verificationFailed": {
+    "description": "Error message when KYC fails"
+  },
+
+  "language": "Language",
+  "@language": {
+    "description": "Profile row label leading to the language settings screen (Phase 6 NEW)"
+  },
+  "selectLanguage": "Select Language",
+  "@selectLanguage": {
+    "description": "Title shown at the top of the language settings screen (Phase 6 NEW)"
+  },
+  "languageDescription": "Choose the language you'd like to use throughout the app and in notifications.",
+  "@languageDescription": {
+    "description": "Subtitle shown on the language settings screen (Phase 6 NEW)"
+  },
+  "firstLaunchLanguagePrompt": "Choose your language",
+  "@firstLaunchLanguagePrompt": {
+    "description": "Prompt shown on the first-launch language picker (Phase 6 NEW). Note: this string is shown alongside the same prompt in French and Arabic since the user hasn't picked yet."
+  },
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "Label for the English language option (always in English regardless of locale)"
+  },
+  "languageFrench": "French",
+  "@languageFrench": {
+    "description": "Label for the French language option in English locale; in fr.arb this stays Français, in ar.arb stays Français"
+  },
+  "languageArabic": "Arabic",
+  "@languageArabic": {
+    "description": "Label for the Arabic language option in English locale; native form العربية shown in fr/ar"
+  },
+  "languageChanged": "Language changed",
+  "@languageChanged": {
+    "description": "Snackbar shown after a successful language change (Phase 6 NEW)"
+  }
+}
