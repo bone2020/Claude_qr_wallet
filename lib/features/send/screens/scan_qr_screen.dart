@@ -6,6 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/qr_signing_service.dart';
 import '../../../providers/wallet_provider.dart';
@@ -200,7 +201,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
           _buildOverlay(),
 
           // Top Bar
-          _buildTopBar(),
+          _buildTopBar(context),
 
           // Bottom Instructions
           _buildBottomInstructions(),
@@ -239,7 +240,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(BuildContext context) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
@@ -259,7 +260,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
               ),
             ),
             Text(
-              AppStrings.scanQrCode,
+              AppLocalizations.of(context).scanQrCode,
               style: AppTextStyles.headlineMedium(color: Colors.white),
             ),
             GestureDetector(
