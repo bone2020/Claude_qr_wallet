@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -17,6 +18,7 @@ import 'core/services/services.dart';
 import 'core/services/deep_link_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/widgets/responsive_wrapper.dart';
+import 'generated/l10n/app_localizations.dart';
 import 'providers/providers.dart';
 
 void main() async {
@@ -106,12 +108,17 @@ class QRWalletApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeNotifierProvider);
 
+    final locale = ref.watch(currentLocaleProvider);
+
     return MaterialApp.router(
       title: 'QR Wallet',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      locale: locale,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
       builder: (context, child) {
         // Cap text scale factor at 1.5x to prevent layout overflow at extreme sizes
