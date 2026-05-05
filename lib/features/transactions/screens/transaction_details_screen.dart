@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../models/transaction_model.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
@@ -111,7 +112,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
           title: Text(
-            AppStrings.transactionDetails,
+            AppLocalizations.of(context).transactionDetails,
             style: AppTextStyles.headlineMedium(),
           ),
         ),
@@ -152,7 +153,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
         title: Text(
-          AppStrings.transactionDetails,
+          AppLocalizations.of(context).transactionDetails,
           style: AppTextStyles.headlineMedium(),
         ),
       ),
@@ -161,7 +162,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         child: Column(
           children: [
             // Amount Card
-            _buildAmountCard(transaction, isCredit, currencySymbol)
+            _buildAmountCard(context, transaction, isCredit, currencySymbol)
                 .animate()
                 .fadeIn(duration: 400.ms)
                 .slideY(begin: -0.1, end: 0, duration: 400.ms),
@@ -229,7 +230,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildAmountCard(
-      TransactionModel transaction, bool isCredit, String currencySymbol) {
+      BuildContext context, TransactionModel transaction, bool isCredit, String currencySymbol) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceXL),
@@ -287,7 +288,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
 
           // Transaction type label
           Text(
-            isCredit ? AppStrings.received : AppStrings.sent,
+            isCredit ? AppLocalizations.of(context).received : AppLocalizations.of(context).sent,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -342,7 +343,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         children: [
           // From/To
           _buildDetailRow(
-            label: isCredit ? AppStrings.from : AppStrings.to,
+            label: isCredit ? AppLocalizations.of(context).from : AppLocalizations.of(context).to,
             value: counterpartyName,
             subtitle: counterpartyWalletId,
           ),
@@ -351,7 +352,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
 
           // Date & Time
           _buildDetailRow(
-            label: AppStrings.date,
+            label: AppLocalizations.of(context).date,
             value: DateFormat('MMM d, yyyy').format(transaction.createdAt),
             subtitle: DateFormat.jm().format(transaction.createdAt),
           ),
@@ -360,7 +361,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
 
           // Transaction ID
           _buildDetailRow(
-            label: AppStrings.transactionId,
+            label: AppLocalizations.of(context).transactionId,
             value: transaction.reference ?? transaction.id,
             onTap: () => _copyToClipboard(
               context,
@@ -378,7 +379,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           if (transaction.note != null && transaction.note!.isNotEmpty) ...[
             _buildDivider(),
             _buildDetailRow(
-              label: AppStrings.note,
+              label: AppLocalizations.of(context).note,
               value: transaction.note!,
             ),
           ],
@@ -393,7 +394,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           if (transaction.fee > 0) ...[
             _buildDivider(),
             _buildDetailRow(
-              label: AppStrings.transactionFee,
+              label: AppLocalizations.of(context).transactionFee,
               value: '$currencySymbol${_formatAmount(transaction.fee)}',
             ),
           ],

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../models/transaction_model.dart';
 import '../../../providers/currency_provider.dart';
@@ -99,7 +100,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
-        title: Text(AppStrings.transactions, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).transactions, style: AppTextStyles.headlineMedium()),
         automaticallyImplyLeading: true,
         bottom: TabBar(
           controller: _tabController,
@@ -108,11 +109,11 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
           indicatorColor: AppColors.primary,
           indicatorSize: TabBarIndicatorSize.label,
           labelStyle: AppTextStyles.labelMedium(),
-          tabs: const [
-            Tab(text: AppStrings.allTransactions),
-            Tab(text: AppStrings.sent),
-            Tab(text: AppStrings.received),
-            Tab(text: AppStrings.pending),
+          tabs: [
+            Tab(text: AppLocalizations.of(context).allTransactions),
+            Tab(text: AppLocalizations.of(context).sent),
+            Tab(text: AppLocalizations.of(context).received),
+            Tab(text: AppLocalizations.of(context).pending),
             Tab(text: 'Failed'),
           ],
         ),
@@ -231,7 +232,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
         message = 'No failed transactions';
         break;
       default:
-        message = AppStrings.noTransactions;
+        message = AppLocalizations.of(context).noTransactions;
     }
 
     return Center(
@@ -250,7 +251,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            AppStrings.noTransactionsSubtitle,
+            AppLocalizations.of(context).noTransactionsSubtitle,
             style: AppTextStyles.bodySmall(color: AppColors.textTertiaryDark),
             textAlign: TextAlign.center,
           ),
