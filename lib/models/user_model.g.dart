@@ -34,13 +34,14 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
       accountBlocked: fields[14] as bool,
       accountBlockedBy: fields[15] as String?,
       legalName: fields[16] as String?,
+      preferredLanguage: fields[17] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, UserModel obj) {
     writer
-      ..writeByte(17)
+      ..writeByte(18)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -74,7 +75,9 @@ class UserModelAdapter extends TypeAdapter<UserModel> {
       ..writeByte(15)
       ..write(obj.accountBlockedBy)
       ..writeByte(16)
-      ..write(obj.legalName);
+      ..write(obj.legalName)
+      ..writeByte(17)
+      ..write(obj.preferredLanguage);
   }
 
   @override
