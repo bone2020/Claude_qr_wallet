@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # State Management
   flutter_riverpod: ^2.4.9
@@ -50,7 +52,7 @@ dependencies:
   cached_network_image: ^3.3.1
   shimmer: ^3.0.0
   pinput: ^3.0.1
-  intl: ^0.18.1
+  intl: ^0.20.2
   timeago: ^3.6.1
   google_fonts: ^6.1.0
   flutter_animate: ^4.3.0
