@@ -14,6 +14,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
@@ -32,8 +33,8 @@ class _ReceiveMoneyScreenState extends ConsumerState<ReceiveMoneyScreen> {
   void _copyWalletId(String walletId) {
     Clipboard.setData(ClipboardData(text: walletId));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(AppStrings.walletIdCopied),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).walletIdCopied),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ),
@@ -138,7 +139,7 @@ Or scan my QR code in the app.
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(AppStrings.receiveMoney, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).receiveMoney, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Padding(
@@ -232,7 +233,7 @@ Or scan my QR code in the app.
           const SizedBox(height: AppDimensions.spaceXXS),
 
           Text(
-            AppStrings.myQrCode,
+            AppLocalizations.of(context).myQrCode,
             style: AppTextStyles.bodySmall(color: AppColors.textSecondaryLight),
           ),
         ],
@@ -260,7 +261,7 @@ Or scan my QR code in the app.
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppStrings.walletId,
+                  AppLocalizations.of(context).walletId,
                   style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                 ),
                 const SizedBox(height: 2),
@@ -296,7 +297,7 @@ Or scan my QR code in the app.
           child: OutlinedButton.icon(
             onPressed: () => _shareQrCode(walletId, userName),
             icon: const Icon(Iconsax.share, size: 20),
-            label: Text(AppStrings.shareQrCode),
+            label: Text(AppLocalizations.of(context).shareQrCode),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textPrimaryDark,
               side: const BorderSide(color: AppColors.inputBorderDark),
@@ -318,7 +319,7 @@ Or scan my QR code in the app.
                     ),
                   )
                 : const Icon(Iconsax.document_download, size: 20),
-            label: Text(_isDownloading ? 'Saving...' : AppStrings.downloadQrCode),
+            label: Text(_isDownloading ? 'Saving...' : AppLocalizations.of(context).downloadQrCode),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
             ),
