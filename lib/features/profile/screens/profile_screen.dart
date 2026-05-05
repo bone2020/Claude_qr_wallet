@@ -11,6 +11,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/secure_storage_service.dart';
 import '../../../core/services/biometric_service.dart';
@@ -276,7 +277,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
         ),
-        title: Text(AppStrings.logOut, style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).logOut, style: AppTextStyles.headlineSmall()),
         content: Text(
           'Are you sure you want to log out?',
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
@@ -285,7 +286,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              AppStrings.cancel,
+              AppLocalizations.of(context).cancel,
               style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
             ),
           ),
@@ -299,7 +300,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               }
             },
             child: Text(
-              AppStrings.logOut,
+              AppLocalizations.of(context).logOut,
               style: AppTextStyles.labelMedium(color: AppColors.error),
             ),
           ),
@@ -321,7 +322,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
-        title: Text(AppStrings.profile, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).profile, style: AppTextStyles.headlineMedium()),
         automaticallyImplyLeading: false,
       ),
       body: SingleChildScrollView(
@@ -343,16 +344,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // Account Section
             _buildSection(
-              title: AppStrings.accountSettings,
+              title: AppLocalizations.of(context).accountSettings,
               children: [
                 _buildMenuItem(
                   icon: Iconsax.user_edit,
-                  title: AppStrings.editProfile,
+                  title: AppLocalizations.of(context).editProfile,
                   onTap: () => context.push(AppRoutes.editProfile),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.bank,
-                  title: AppStrings.linkedAccounts,
+                  title: AppLocalizations.of(context).linkedAccounts,
                   onTap: () => context.push(AppRoutes.linkedAccounts),
                 ),
               ],
@@ -379,11 +380,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // Security Section
             _buildSection(
-              title: AppStrings.security,
+              title: AppLocalizations.of(context).security,
               children: [
                 _buildSwitchItem(
                   icon: Iconsax.finger_scan,
-                  title: AppStrings.biometricLogin,
+                  title: AppLocalizations.of(context).biometricLogin,
                   value: _biometricEnabled,
                   onChanged: (value) async {
                     if (value) {
@@ -408,12 +409,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 _buildMenuItem(
                   icon: Iconsax.lock,
-                  title: AppStrings.changePassword,
+                  title: AppLocalizations.of(context).changePassword,
                   onTap: () => context.push(AppRoutes.changePassword),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.key,
-                  title: AppStrings.changePin,
+                  title: AppLocalizations.of(context).changePin,
                   onTap: () => context.push(AppRoutes.changePin),
                 ),
               ],
@@ -433,7 +434,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 _buildMenuItem(
                   icon: Iconsax.notification,
-                  title: AppStrings.notifications,
+                  title: AppLocalizations.of(context).notifications,
                   onTap: () => context.push(AppRoutes.notificationSettings),
                 ),
               ],
@@ -524,17 +525,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 _buildMenuItem(
                   icon: Iconsax.warning_2,
-                  title: AppStrings.myDisputes,
+                  title: AppLocalizations.of(context).myDisputes,
                   onTap: () => context.push(AppRoutes.myDisputes),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.message_question,
-                  title: AppStrings.helpSupport,
+                  title: AppLocalizations.of(context).helpSupport,
                   onTap: () => context.push(AppRoutes.helpSupport),
                 ),
                 _buildMenuItem(
                   icon: Iconsax.info_circle,
-                  title: AppStrings.about,
+                  title: AppLocalizations.of(context).about,
                   onTap: () => context.push(AppRoutes.about),
                 ),
               ],
@@ -821,7 +822,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         onPressed: _handleLogout,
         icon: const Icon(Iconsax.logout, color: AppColors.error),
         label: Text(
-          AppStrings.logOut,
+          AppLocalizations.of(context).logOut,
           style: AppTextStyles.labelLarge(color: AppColors.error),
         ),
         style: OutlinedButton.styleFrom(

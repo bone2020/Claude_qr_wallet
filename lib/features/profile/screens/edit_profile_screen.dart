@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/constants/african_countries.dart';
 import '../../../providers/auth_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
@@ -88,7 +89,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: AppDimensions.spaceXL),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
-                title: Text(AppStrings.takePhoto, style: AppTextStyles.bodyLarge()),
+                title: Text(AppLocalizations.of(context).takePhoto, style: AppTextStyles.bodyLarge()),
                 onTap: () async {
                   Navigator.pop(context);
                   final image = await _imagePicker.pickImage(
@@ -104,7 +105,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
-                title: Text(AppStrings.uploadPhoto, style: AppTextStyles.bodyLarge()),
+                title: Text(AppLocalizations.of(context).uploadPhoto, style: AppTextStyles.bodyLarge()),
                 onTap: () async {
                   Navigator.pop(context);
                   final image = await _imagePicker.pickImage(
@@ -191,8 +192,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(AppStrings.successProfileUpdated),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).successProfileUpdated),
           backgroundColor: AppColors.success,
         ),
       );
@@ -228,7 +229,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           onPressed: () => context.pop(),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        title: Text(AppStrings.editProfile, style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).editProfile, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Column(
@@ -247,14 +248,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                       // Form Fields
                       CustomTextField(
-                        label: AppStrings.fullName,
-                        hintText: AppStrings.fullNameHint,
+                        label: AppLocalizations.of(context).fullName,
+                        hintText: AppLocalizations.of(context).fullNameHint,
                         controller: _fullNameController,
                         readOnly: ref.watch(currentUserProvider)?.isNameLocked ?? false,
                         textInputAction: TextInputAction.next,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return AppStrings.errorFieldRequired;
+                            return AppLocalizations.of(context).errorFieldRequired;
                           }
                           return null;
                         },
@@ -277,8 +278,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       const SizedBox(height: AppDimensions.spaceMD),
 
                       CustomTextField(
-                        label: AppStrings.email,
-                        hintText: AppStrings.emailHint,
+                        label: AppLocalizations.of(context).email,
+                        hintText: AppLocalizations.of(context).emailHint,
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
@@ -436,7 +437,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   )
                 : Text(
-                    AppStrings.save,
+                    AppLocalizations.of(context).save,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),
