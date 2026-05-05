@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/wallet_provider.dart';
@@ -241,17 +242,17 @@ class HomeScreen extends ConsumerWidget {
           children: [
             QuickActionButton(
               icon: Iconsax.send_2,
-              label: AppStrings.send,
+              label: AppLocalizations.of(context).send,
               onTap: () => context.push(AppRoutes.sendMoney),
             ),
             QuickActionButton(
               icon: Iconsax.receive_square_2,
-              label: AppStrings.receive,
+              label: AppLocalizations.of(context).receive,
               onTap: () => context.push(AppRoutes.receiveMoney),
             ),
             QuickActionButton(
               icon: Iconsax.add_circle,
-              label: AppStrings.addMoney,
+              label: AppLocalizations.of(context).addMoney,
               onTap: () => context.push(AppRoutes.addMoney),
             ),
             QuickActionButton(
@@ -290,13 +291,13 @@ class HomeScreen extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              AppStrings.recentTransactions,
+              AppLocalizations.of(context).recentTransactions,
               style: AppTextStyles.headlineSmall(),
             ),
             TextButton(
                 onPressed: () => context.push(AppRoutes.transactions),
               child: Text(
-                AppStrings.viewAll,
+                AppLocalizations.of(context).viewAll,
                 style: AppTextStyles.bodyMedium(color: AppColors.primary),
               ),
             ),
@@ -304,7 +305,7 @@ class HomeScreen extends ConsumerWidget {
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         if (transactions.isEmpty)
-          _buildEmptyTransactions()
+          _buildEmptyTransactions(context)
         else
           ListView.separated(
             shrinkWrap: true,
@@ -333,7 +334,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyTransactions() {
+  Widget _buildEmptyTransactions(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceXXL),
       decoration: BoxDecoration(
@@ -349,12 +350,12 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppDimensions.spaceMD),
           Text(
-            AppStrings.noTransactions,
+            AppLocalizations.of(context).noTransactions,
             style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            AppStrings.noTransactionsSubtitle,
+            AppLocalizations.of(context).noTransactionsSubtitle,
             style: AppTextStyles.bodySmall(color: AppColors.textTertiaryDark),
             textAlign: TextAlign.center,
           ),

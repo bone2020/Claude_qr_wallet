@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/secure_storage_service.dart';
 import 'home_screen.dart';
@@ -91,19 +92,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               _buildNavItem(
                 icon: Iconsax.home_2,
                 activeIcon: Iconsax.home_25,
-                label: AppStrings.home,
+                label: AppLocalizations.of(context).home,
                 index: 0,
               ),
               _buildNavItem(
                 icon: Iconsax.receipt_2,
                 activeIcon: Iconsax.receipt_25,
-                label: AppStrings.transactions,
+                label: AppLocalizations.of(context).transactions,
                 index: 1,
               ),
               _buildNavItem(
                 icon: Iconsax.user,
                 activeIcon: Iconsax.user,
-                label: AppStrings.profile,
+                label: AppLocalizations.of(context).profile,
                 index: 2,
               ),
             ],

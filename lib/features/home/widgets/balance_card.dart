@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Balance card widget displaying wallet balance
 class BalanceCard extends StatelessWidget {
@@ -40,8 +41,8 @@ class BalanceCard extends StatelessWidget {
   void _copyWalletId(BuildContext context) {
     Clipboard.setData(ClipboardData(text: walletId));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(AppStrings.walletIdCopied),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).walletIdCopied),
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ),
@@ -86,7 +87,7 @@ class BalanceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    AppStrings.totalBalance,
+                    AppLocalizations.of(context).totalBalance,
                     style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                   ),
                   const SizedBox(height: 2),
@@ -238,7 +239,7 @@ class BalanceCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    AppStrings.tapToCopy,
+                    AppLocalizations.of(context).tapToCopy,
                     style: AppTextStyles.caption(color: AppColors.primary),
                 ),
               ],
