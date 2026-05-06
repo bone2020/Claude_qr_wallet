@@ -1188,4 +1188,77 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goBackButton => 'Go Back';
+
+  @override
+  String get enterOtpTitle => 'Enter OTP';
+
+  @override
+  String enterOtpBody(String symbol, String amount) {
+    return 'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $symbol$amount';
+  }
+
+  @override
+  String get confirmWithdrawalTitle => 'Confirm Withdrawal';
+
+  @override
+  String get pleaseVerifyDetailsCorrect =>
+      'Please verify the details are correct';
+
+  @override
+  String get confirmButton => 'Confirm';
+
+  @override
+  String get withdrawalInitiatedTitle => 'Withdrawal Initiated';
+
+  @override
+  String withdrawalBeingProcessed(String symbol, String amount) {
+    return '$symbol$amount is being processed';
+  }
+
+  @override
+  String refLine(String reference) {
+    return 'Ref: $reference';
+  }
+
+  @override
+  String get withdrawAction => 'Withdraw';
+
+  @override
+  String get mobileMoneyNotAvailableWithdrawalsBody =>
+      'Mobile money withdrawals are not available in your region. Please use bank transfer.';
+
+  @override
+  String get availableBalanceFull => 'Available Balance';
+
+  @override
+  String get amountToWithdrawLabel => 'Amount to Withdraw';
+
+  @override
+  String get selectBankLabel => 'Select Bank';
+
+  @override
+  String get selectABankHint => 'Select a bank';
+
+  @override
+  String get enterAccountNumberHint => 'Enter account number';
+
+  @override
+  String enterAtLeastDigitsToVerify(int count) {
+    return 'Enter at least $count digits to verify';
+  }
+
+  @override
+  String get accountVerifiedLabel => 'Account Verified';
+
+  @override
+  String get enterAccountHolderNameHint => 'Enter account holder name';
+
+  @override
+  String get couldNotVerifyAccountError => 'Could not verify account';
+
+  @override
+  String get withdrawalFailedError => 'Withdrawal failed';
+
+  @override
+  String get otpVerificationFailedError => 'OTP verification failed';
 }

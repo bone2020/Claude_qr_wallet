@@ -1155,4 +1155,75 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get goBackButton => '';
+
+  @override
+  String get enterOtpTitle => '';
+
+  @override
+  String enterOtpBody(String symbol, String amount) {
+    return '';
+  }
+
+  @override
+  String get confirmWithdrawalTitle => '';
+
+  @override
+  String get pleaseVerifyDetailsCorrect => '';
+
+  @override
+  String get confirmButton => '';
+
+  @override
+  String get withdrawalInitiatedTitle => '';
+
+  @override
+  String withdrawalBeingProcessed(String symbol, String amount) {
+    return '';
+  }
+
+  @override
+  String refLine(String reference) {
+    return '';
+  }
+
+  @override
+  String get withdrawAction => '';
+
+  @override
+  String get mobileMoneyNotAvailableWithdrawalsBody => '';
+
+  @override
+  String get availableBalanceFull => '';
+
+  @override
+  String get amountToWithdrawLabel => '';
+
+  @override
+  String get selectBankLabel => '';
+
+  @override
+  String get selectABankHint => '';
+
+  @override
+  String get enterAccountNumberHint => '';
+
+  @override
+  String enterAtLeastDigitsToVerify(int count) {
+    return '';
+  }
+
+  @override
+  String get accountVerifiedLabel => '';
+
+  @override
+  String get enterAccountHolderNameHint => '';
+
+  @override
+  String get couldNotVerifyAccountError => '';
+
+  @override
+  String get withdrawalFailedError => '';
+
+  @override
+  String get otpVerificationFailedError => '';
 }

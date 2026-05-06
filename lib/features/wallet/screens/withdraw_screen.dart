@@ -231,7 +231,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           }
         });
         if (!result.success) {
-          _showError(result.error ?? 'Could not verify account');
+          _showError(result.error ?? AppLocalizations.of(context).couldNotVerifyAccountError);
         }
       }
     } catch (e) {
@@ -360,7 +360,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
         _showSuccessDialog(amount, result.reference ?? '');
       } else {
-        _showError(result.error ?? 'Withdrawal failed');
+        _showError(result.error ?? AppLocalizations.of(context).withdrawalFailedError);
       }
     } catch (e) {
       if (!mounted) return;
@@ -387,7 +387,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
               ),
               title: Text(
-                'Enter OTP',
+                AppLocalizations.of(context).enterOtpTitle,
                 style: AppTextStyles.headlineSmall(),
               ),
               content: Column(
@@ -395,7 +395,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $_currencySymbol${_formatAmount(amount)}',
+                    AppLocalizations.of(context).enterOtpBody(_currencySymbol, _formatAmount(amount)),
                     style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                   ),
                   const SizedBox(height: AppDimensions.spaceLG),
@@ -436,7 +436,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 TextButton(
                   onPressed: isVerifying ? null : () => Navigator.of(context).pop(false),
                   child: Text(
-                    'Cancel',
+                    AppLocalizations.of(context).cancel,
                     style: AppTextStyles.labelMedium(
                       color: isVerifying ? AppColors.textTertiaryDark : AppColors.textSecondaryDark,
                     ),
@@ -467,7 +467,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                               _showSuccessDialog(amount, result.reference ?? '');
                             } else {
                               setDialogState(() => isVerifying = false);
-                              _showError(result.error ?? 'OTP verification failed');
+                              _showError(result.error ?? AppLocalizations.of(context).otpVerificationFailedError);
                             }
                           } catch (e) {
                             setDialogState(() => isVerifying = false);
@@ -484,7 +484,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                           ),
                         )
                       : Text(
-                          'Verify',
+                          AppLocalizations.of(context).verifyButton,
                           style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
                         ),
                 ),
@@ -504,7 +504,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
             ),
             title: Text(
-              'Confirm Withdrawal',
+              AppLocalizations.of(context).confirmWithdrawalTitle,
               style: AppTextStyles.headlineSmall(),
             ),
             content: SingleChildScrollView(
@@ -540,7 +540,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                       const SizedBox(width: AppDimensions.spaceSM),
                       Expanded(
                         child: Text(
-                          'Please verify the details are correct',
+                          AppLocalizations.of(context).pleaseVerifyDetailsCorrect,
                           style: AppTextStyles.bodySmall(color: AppColors.warning),
                         ),
                       ),
@@ -554,14 +554,14 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: Text(
-                  'Cancel',
+                  AppLocalizations.of(context).cancel,
                   style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
                 ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(true),
                 child: Text(
-                  'Confirm',
+                  AppLocalizations.of(context).confirmButton,
                   style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
                 ),
               ),
@@ -619,19 +619,19 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               ),
               const SizedBox(height: AppDimensions.spaceLG),
               Text(
-                'Withdrawal Initiated',
+                AppLocalizations.of(context).withdrawalInitiatedTitle,
                 style: AppTextStyles.headlineMedium(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                '$_currencySymbol${_formatAmount(amount)} is being processed',
+                AppLocalizations.of(context).withdrawalBeingProcessed(_currencySymbol, _formatAmount(amount)),
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceSM),
               Text(
-                'Ref: $reference',
+                AppLocalizations.of(context).refLine(reference),
                 style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -684,7 +684,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Withdraw',
+          AppLocalizations.of(context).withdrawAction,
           style: AppTextStyles.headlineSmall(),
         ),
         centerTitle: true,
@@ -693,9 +693,9 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondaryDark,
-          tabs: const [
-            Tab(text: 'Bank Transfer'),
-            Tab(text: 'Mobile Money'),
+          tabs: [
+            Tab(text: AppLocalizations.of(context).bankTransferTabLabel),
+            Tab(text: AppLocalizations.of(context).mobileMoneyTabLabel),
           ],
         ),
       ),
@@ -785,13 +785,13 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               ),
               const SizedBox(height: AppDimensions.spaceLG),
               Text(
-                'Mobile Money Not Available',
+                AppLocalizations.of(context).mobileMoneyNotAvailableTitle,
                 style: AppTextStyles.headlineSmall(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceSM),
               Text(
-                'Mobile money withdrawals are not available in your region. Please use bank transfer.',
+                AppLocalizations.of(context).mobileMoneyNotAvailableWithdrawalsBody,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -874,12 +874,12 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Available Balance',
+            AppLocalizations.of(context).availableBalanceFull,
             style: AppTextStyles.bodyMedium(color: Colors.white70),
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            '${walletState.currencySymbol}${_formatAmount(walletState.balance)}',
+            AppLocalizations.of(context).symbolAmount(walletState.currencySymbol, _formatAmount(walletState.balance)),
             style: AppTextStyles.displaySmall(color: Colors.white),
           ),
         ],
@@ -892,7 +892,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Amount to Withdraw',
+          AppLocalizations.of(context).amountToWithdrawLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -941,7 +941,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Select Bank',
+          AppLocalizations.of(context).selectBankLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -975,7 +975,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   ),
                   dropdownColor: AppColors.surfaceDark,
                   hint: Text(
-                    'Select a bank',
+                    AppLocalizations.of(context).selectABankHint,
                     style: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
                   ),
                   items: _banks.map((bank) {
@@ -1011,7 +1011,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Account Number',
+          AppLocalizations.of(context).accountNumberLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -1028,7 +1028,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   LengthLimitingTextInputFormatter(_maxAccountDigits),
                 ],
                 decoration: InputDecoration(
-                  hintText: 'Enter account number',
+                  hintText: AppLocalizations.of(context).enterAccountNumberHint,
                   hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
                   filled: true,
                   fillColor: AppColors.surfaceDark,
@@ -1078,7 +1078,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                   ),
                 ),
                 child: Text(
-                  'Verify',
+                  AppLocalizations.of(context).verifyButton,
                   style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
                 ),
               ),
@@ -1089,7 +1089,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
         if (!canVerify && accountLength > 0) ...[
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            'Enter at least $_minDigitsToVerify digits to verify',
+            AppLocalizations.of(context).enterAtLeastDigitsToVerify(_minDigitsToVerify),
             style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
           ),
         ],
@@ -1115,7 +1115,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Account Verified',
+                  AppLocalizations.of(context).accountVerifiedLabel,
                   style: AppTextStyles.labelSmall(color: AppColors.success),
                 ),
                 Text(
@@ -1135,7 +1135,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Mobile Money Provider',
+          AppLocalizations.of(context).mobileMoneyProviderLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -1179,7 +1179,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Phone Number',
+          AppLocalizations.of(context).phoneNumberLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -1188,7 +1188,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           keyboardType: TextInputType.phone,
           style: AppTextStyles.bodyLarge(),
           decoration: InputDecoration(
-            hintText: 'Enter phone number',
+            hintText: AppLocalizations.of(context).enterPhoneNumberHint,
             hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
             filled: true,
             fillColor: AppColors.surfaceDark,
@@ -1217,14 +1217,14 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Account Name',
+          AppLocalizations.of(context).accountNameLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         TextFormField(
           style: AppTextStyles.bodyLarge(),
           decoration: InputDecoration(
-            hintText: 'Enter account holder name',
+            hintText: AppLocalizations.of(context).enterAccountHolderNameHint,
             hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
             filled: true,
             fillColor: AppColors.surfaceDark,
@@ -1270,7 +1270,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 ),
               )
             : Text(
-                'Withdraw',
+                AppLocalizations.of(context).withdrawAction,
                 style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
               ),
       ),

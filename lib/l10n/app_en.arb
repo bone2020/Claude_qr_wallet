@@ -1334,4 +1334,89 @@
 
   "goBackButton": "Go Back",
   "@goBackButton": {"description": "Button label on the failed payment result screen (returns to previous screen)."}
+,
+  "enterOtpTitle": "Enter OTP",
+  "@enterOtpTitle": {"description": "Title of the dialog asking the user to enter the OTP for completing a withdrawal."},
+
+  "enterOtpBody": "Please enter the OTP sent to your registered phone/email to complete the withdrawal of {symbol}{amount}",
+  "@enterOtpBody": {
+    "description": "Body of the OTP dialog showing the withdrawal amount, e.g. 'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $50.00'.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+
+  "confirmWithdrawalTitle": "Confirm Withdrawal",
+  "@confirmWithdrawalTitle": {"description": "Title of the dialog asking the user to confirm withdrawal details before submitting."},
+
+  "pleaseVerifyDetailsCorrect": "Please verify the details are correct",
+  "@pleaseVerifyDetailsCorrect": {"description": "Warning caption inside the confirm-withdrawal dialog asking the user to double-check the entered details."},
+
+  "confirmButton": "Confirm",
+  "@confirmButton": {"description": "Generic Confirm button label (paired with Cancel inside the confirm-withdrawal dialog)."},
+
+  "withdrawalInitiatedTitle": "Withdrawal Initiated",
+  "@withdrawalInitiatedTitle": {"description": "Success title shown after a withdrawal request is successfully submitted."},
+
+  "withdrawalBeingProcessed": "{symbol}{amount} is being processed",
+  "@withdrawalBeingProcessed": {
+    "description": "Caption beneath the withdrawal-initiated title showing the amount being processed.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+
+  "refLine": "Ref: {reference}",
+  "@refLine": {
+    "description": "Compact reference line shown after a withdrawal, e.g. 'Ref: ABC-123'. Distinct from referenceWithValue which uses the full word 'Reference'.",
+    "placeholders": {
+      "reference": {"type": "String"}
+    }
+  },
+
+  "withdrawAction": "Withdraw",
+  "@withdrawAction": {"description": "Withdraw label, used both as AppBar title and as the primary action button label on the withdraw screen."},
+
+  "mobileMoneyNotAvailableWithdrawalsBody": "Mobile money withdrawals are not available in your region. Please use bank transfer.",
+  "@mobileMoneyNotAvailableWithdrawalsBody": {"description": "Body text for the mobile-money-unavailable empty state on the withdraw screen. Distinct from mobileMoneyNotAvailablePaymentsBody."},
+
+  "availableBalanceFull": "Available Balance",
+  "@availableBalanceFull": {"description": "Full 'Available Balance' phrase used as a label above the user's withdrawable balance on the withdraw screen. Distinct from the existing availableBalanceLabel which is the shorter 'Available' used elsewhere."},
+
+  "amountToWithdrawLabel": "Amount to Withdraw",
+  "@amountToWithdrawLabel": {"description": "Label above the amount input on the withdraw screen."},
+
+  "selectBankLabel": "Select Bank",
+  "@selectBankLabel": {"description": "Label above the bank selection dropdown on the withdraw screen."},
+
+  "selectABankHint": "Select a bank",
+  "@selectABankHint": {"description": "Placeholder/hint shown inside the bank selection dropdown when no bank is selected."},
+
+  "enterAccountNumberHint": "Enter account number",
+  "@enterAccountNumberHint": {"description": "Placeholder text in the account number input field."},
+
+  "enterAtLeastDigitsToVerify": "Enter at least {count} digits to verify",
+  "@enterAtLeastDigitsToVerify": {
+    "description": "Validation caption shown when the user has typed too few digits to trigger account verification.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "accountVerifiedLabel": "Account Verified",
+  "@accountVerifiedLabel": {"description": "Success caption shown after a bank account number has been successfully verified."},
+
+  "enterAccountHolderNameHint": "Enter account holder name",
+  "@enterAccountHolderNameHint": {"description": "Placeholder text in the account holder name input field for mobile money withdrawals."},
+
+  "couldNotVerifyAccountError": "Could not verify account",
+  "@couldNotVerifyAccountError": {"description": "Fallback error snackbar when the bank account verification API call fails."},
+
+  "withdrawalFailedError": "Withdrawal failed",
+  "@withdrawalFailedError": {"description": "Fallback error snackbar when a withdrawal submission fails."},
+
+  "otpVerificationFailedError": "OTP verification failed",
+  "@otpVerificationFailedError": {"description": "Fallback error snackbar when OTP verification during a withdrawal fails."}
 }

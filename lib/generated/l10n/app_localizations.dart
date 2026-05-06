@@ -2271,6 +2271,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go Back'**
   String get goBackButton;
+
+  /// Title of the dialog asking the user to enter the OTP for completing a withdrawal.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter OTP'**
+  String get enterOtpTitle;
+
+  /// Body of the OTP dialog showing the withdrawal amount, e.g. 'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $50.00'.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the OTP sent to your registered phone/email to complete the withdrawal of {symbol}{amount}'**
+  String enterOtpBody(String symbol, String amount);
+
+  /// Title of the dialog asking the user to confirm withdrawal details before submitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Withdrawal'**
+  String get confirmWithdrawalTitle;
+
+  /// Warning caption inside the confirm-withdrawal dialog asking the user to double-check the entered details.
+  ///
+  /// In en, this message translates to:
+  /// **'Please verify the details are correct'**
+  String get pleaseVerifyDetailsCorrect;
+
+  /// Generic Confirm button label (paired with Cancel inside the confirm-withdrawal dialog).
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirmButton;
+
+  /// Success title shown after a withdrawal request is successfully submitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawal Initiated'**
+  String get withdrawalInitiatedTitle;
+
+  /// Caption beneath the withdrawal-initiated title showing the amount being processed.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol}{amount} is being processed'**
+  String withdrawalBeingProcessed(String symbol, String amount);
+
+  /// Compact reference line shown after a withdrawal, e.g. 'Ref: ABC-123'. Distinct from referenceWithValue which uses the full word 'Reference'.
+  ///
+  /// In en, this message translates to:
+  /// **'Ref: {reference}'**
+  String refLine(String reference);
+
+  /// Withdraw label, used both as AppBar title and as the primary action button label on the withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw'**
+  String get withdrawAction;
+
+  /// Body text for the mobile-money-unavailable empty state on the withdraw screen. Distinct from mobileMoneyNotAvailablePaymentsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money withdrawals are not available in your region. Please use bank transfer.'**
+  String get mobileMoneyNotAvailableWithdrawalsBody;
+
+  /// Full 'Available Balance' phrase used as a label above the user's withdrawable balance on the withdraw screen. Distinct from the existing availableBalanceLabel which is the shorter 'Available' used elsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Balance'**
+  String get availableBalanceFull;
+
+  /// Label above the amount input on the withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount to Withdraw'**
+  String get amountToWithdrawLabel;
+
+  /// Label above the bank selection dropdown on the withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Bank'**
+  String get selectBankLabel;
+
+  /// Placeholder/hint shown inside the bank selection dropdown when no bank is selected.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bank'**
+  String get selectABankHint;
+
+  /// Placeholder text in the account number input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter account number'**
+  String get enterAccountNumberHint;
+
+  /// Validation caption shown when the user has typed too few digits to trigger account verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter at least {count} digits to verify'**
+  String enterAtLeastDigitsToVerify(int count);
+
+  /// Success caption shown after a bank account number has been successfully verified.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Verified'**
+  String get accountVerifiedLabel;
+
+  /// Placeholder text in the account holder name input field for mobile money withdrawals.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter account holder name'**
+  String get enterAccountHolderNameHint;
+
+  /// Fallback error snackbar when the bank account verification API call fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not verify account'**
+  String get couldNotVerifyAccountError;
+
+  /// Fallback error snackbar when a withdrawal submission fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawal failed'**
+  String get withdrawalFailedError;
+
+  /// Fallback error snackbar when OTP verification during a withdrawal fails.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP verification failed'**
+  String get otpVerificationFailedError;
 }
 
 class _AppLocalizationsDelegate
