@@ -3417,6 +3417,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verify your identity'**
   String get verifyIdentityDefaultDescription;
+
+  /// User-visible name for the Zambian Taxpayer PIN document, returned by _countryName for ZM.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer PIN (TPIN)'**
+  String get taxpayerPinLabel;
+
+  /// Generic fallback shown when ID number validation fails and the validation result has no specific error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid ID number'**
+  String get invalidIdNumberFallback;
+
+  /// Generic fallback shown when the SmileID verification call returns no specific error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to complete verification'**
+  String get failedToCompleteVerification;
+
+  /// Form field label for the Zambian TPIN input (when countryCode == 'ZM').
+  ///
+  /// In en, this message translates to:
+  /// **'TPIN'**
+  String get tpinLabel;
+
+  /// Form field label for the ID number input (when countryCode != 'ZM').
+  ///
+  /// In en, this message translates to:
+  /// **'ID Number'**
+  String get idNumberLabel;
+
+  /// Form field hint for the Zambian TPIN input.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 10-digit TPIN'**
+  String get enterTpinHint;
+
+  /// Form field hint for the South African ID number input.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 13-digit ID number'**
+  String get enterIdNumberHint;
+
+  /// Helper text below the TPIN input field for Zambian users.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Zambian Taxpayer Identification Number'**
+  String get zambianTaxpayerHelperText;
+
+  /// Helper text below the ID number input field for South African users.
+  ///
+  /// In en, this message translates to:
+  /// **'Your South African ID number'**
+  String get southAfricanIdHelperText;
+
+  /// Title shown on the KYC verification card after the user has captured their ID document.
+  ///
+  /// In en, this message translates to:
+  /// **'Document Captured'**
+  String get documentCapturedTitle;
+
+  /// Title shown on the KYC verification card before document capture. {documentType} is the localized country-specific document name.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Your {documentType}'**
+  String verifyYourDocumentTitle(String documentType);
+
+  /// Body text shown on the KYC verification card after document capture, telling the user verification is about to start.
+  ///
+  /// In en, this message translates to:
+  /// **'Your {documentType} has been captured. Verification will begin when you continue.'**
+  String documentCapturedBody(String documentType);
+
+  /// Body text shown on the KYC verification card before capture, when verification mode is photo-only (ID number entry + selfie). Used when _isPhotoCapture is true.
+  ///
+  /// In en, this message translates to:
+  /// **'We will verify your ID number and take a selfie for confirmation'**
+  String get idAndSelfieVerificationDescription;
+
+  /// Body text shown on the KYC verification card before capture, when verification mode is full document capture. Used when _isPhotoCapture is false.
+  ///
+  /// In en, this message translates to:
+  /// **'We will capture both sides of your ID and take a selfie'**
+  String get documentBothSidesAndSelfieDescription;
 }
 
 class _AppLocalizationsDelegate

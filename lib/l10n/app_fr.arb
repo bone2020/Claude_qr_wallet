@@ -1109,5 +1109,19 @@
   "disputesCappedNotice": "",
   "ugandaNinDescription": "",
   "tpinDescription": "",
-  "verifyIdentityDefaultDescription": ""
+  "verifyIdentityDefaultDescription": "",
+  "taxpayerPinLabel": "",
+  "invalidIdNumberFallback": "",
+  "failedToCompleteVerification": "",
+  "tpinLabel": "",
+  "idNumberLabel": "",
+  "enterTpinHint": "",
+  "enterIdNumberHint": "",
+  "zambianTaxpayerHelperText": "",
+  "southAfricanIdHelperText": "",
+  "documentCapturedTitle": "",
+  "verifyYourDocumentTitle": "",
+  "documentCapturedBody": "",
+  "idAndSelfieVerificationDescription": "",
+  "documentBothSidesAndSelfieDescription": ""
 }

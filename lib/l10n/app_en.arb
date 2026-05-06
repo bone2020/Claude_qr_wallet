@@ -2049,5 +2049,71 @@
   "verifyIdentityDefaultDescription": "Verify your identity",
   "@verifyIdentityDefaultDescription": {
     "description": "Default description shown on the KYC ID-type selection screen when the ID type is not recognized. Returned by _getDescriptionForIdType switch default."
+  },
+  "taxpayerPinLabel": "Taxpayer PIN (TPIN)",
+  "@taxpayerPinLabel": {
+    "description": "User-visible name for the Zambian Taxpayer PIN document, returned by _countryName for ZM."
+  },
+  "invalidIdNumberFallback": "Invalid ID number",
+  "@invalidIdNumberFallback": {
+    "description": "Generic fallback shown when ID number validation fails and the validation result has no specific error message."
+  },
+  "failedToCompleteVerification": "Failed to complete verification",
+  "@failedToCompleteVerification": {
+    "description": "Generic fallback shown when the SmileID verification call returns no specific error message."
+  },
+  "tpinLabel": "TPIN",
+  "@tpinLabel": {
+    "description": "Form field label for the Zambian TPIN input (when countryCode == 'ZM')."
+  },
+  "idNumberLabel": "ID Number",
+  "@idNumberLabel": {
+    "description": "Form field label for the ID number input (when countryCode != 'ZM')."
+  },
+  "enterTpinHint": "Enter your 10-digit TPIN",
+  "@enterTpinHint": {
+    "description": "Form field hint for the Zambian TPIN input."
+  },
+  "enterIdNumberHint": "Enter your 13-digit ID number",
+  "@enterIdNumberHint": {
+    "description": "Form field hint for the South African ID number input."
+  },
+  "zambianTaxpayerHelperText": "Your Zambian Taxpayer Identification Number",
+  "@zambianTaxpayerHelperText": {
+    "description": "Helper text below the TPIN input field for Zambian users."
+  },
+  "southAfricanIdHelperText": "Your South African ID number",
+  "@southAfricanIdHelperText": {
+    "description": "Helper text below the ID number input field for South African users."
+  },
+  "documentCapturedTitle": "Document Captured",
+  "@documentCapturedTitle": {
+    "description": "Title shown on the KYC verification card after the user has captured their ID document."
+  },
+  "verifyYourDocumentTitle": "Verify Your {documentType}",
+  "@verifyYourDocumentTitle": {
+    "description": "Title shown on the KYC verification card before document capture. {documentType} is the localized country-specific document name.",
+    "placeholders": {
+      "documentType": {
+        "type": "String"
+      }
+    }
+  },
+  "documentCapturedBody": "Your {documentType} has been captured. Verification will begin when you continue.",
+  "@documentCapturedBody": {
+    "description": "Body text shown on the KYC verification card after document capture, telling the user verification is about to start.",
+    "placeholders": {
+      "documentType": {
+        "type": "String"
+      }
+    }
+  },
+  "idAndSelfieVerificationDescription": "We will verify your ID number and take a selfie for confirmation",
+  "@idAndSelfieVerificationDescription": {
+    "description": "Body text shown on the KYC verification card before capture, when verification mode is photo-only (ID number entry + selfie). Used when _isPhotoCapture is true."
+  },
+  "documentBothSidesAndSelfieDescription": "We will capture both sides of your ID and take a selfie",
+  "@documentBothSidesAndSelfieDescription": {
+    "description": "Body text shown on the KYC verification card before capture, when verification mode is full document capture. Used when _isPhotoCapture is false."
   }
 }

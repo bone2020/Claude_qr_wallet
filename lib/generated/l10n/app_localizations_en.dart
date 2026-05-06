@@ -1829,4 +1829,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get verifyIdentityDefaultDescription => 'Verify your identity';
+
+  @override
+  String get taxpayerPinLabel => 'Taxpayer PIN (TPIN)';
+
+  @override
+  String get invalidIdNumberFallback => 'Invalid ID number';
+
+  @override
+  String get failedToCompleteVerification => 'Failed to complete verification';
+
+  @override
+  String get tpinLabel => 'TPIN';
+
+  @override
+  String get idNumberLabel => 'ID Number';
+
+  @override
+  String get enterTpinHint => 'Enter your 10-digit TPIN';
+
+  @override
+  String get enterIdNumberHint => 'Enter your 13-digit ID number';
+
+  @override
+  String get zambianTaxpayerHelperText =>
+      'Your Zambian Taxpayer Identification Number';
+
+  @override
+  String get southAfricanIdHelperText => 'Your South African ID number';
+
+  @override
+  String get documentCapturedTitle => 'Document Captured';
+
+  @override
+  String verifyYourDocumentTitle(String documentType) {
+    return 'Verify Your $documentType';
+  }
+
+  @override
+  String documentCapturedBody(String documentType) {
+    return 'Your $documentType has been captured. Verification will begin when you continue.';
+  }
+
+  @override
+  String get idAndSelfieVerificationDescription =>
+      'We will verify your ID number and take a selfie for confirmation';
+
+  @override
+  String get documentBothSidesAndSelfieDescription =>
+      'We will capture both sides of your ID and take a selfie';
 }

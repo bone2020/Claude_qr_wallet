@@ -1756,4 +1756,50 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get verifyIdentityDefaultDescription => '';
+
+  @override
+  String get taxpayerPinLabel => '';
+
+  @override
+  String get invalidIdNumberFallback => '';
+
+  @override
+  String get failedToCompleteVerification => '';
+
+  @override
+  String get tpinLabel => '';
+
+  @override
+  String get idNumberLabel => '';
+
+  @override
+  String get enterTpinHint => '';
+
+  @override
+  String get enterIdNumberHint => '';
+
+  @override
+  String get zambianTaxpayerHelperText => '';
+
+  @override
+  String get southAfricanIdHelperText => '';
+
+  @override
+  String get documentCapturedTitle => '';
+
+  @override
+  String verifyYourDocumentTitle(String documentType) {
+    return '';
+  }
+
+  @override
+  String documentCapturedBody(String documentType) {
+    return '';
+  }
+
+  @override
+  String get idAndSelfieVerificationDescription => '';
+
+  @override
+  String get documentBothSidesAndSelfieDescription => '';
 }

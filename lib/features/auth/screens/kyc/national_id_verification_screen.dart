@@ -21,6 +21,7 @@ import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
 
@@ -75,19 +76,19 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   String get _countryName {
     switch (widget.countryCode) {
       case 'GH':
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
       case 'KE':
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
       case 'ZA':
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
       case 'CI':
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
       case 'ZM':
-        return 'Taxpayer PIN (TPIN)';
+        return AppLocalizations.of(context).taxpayerPinLabel;
       case 'ZW':
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
       default:
-        return 'National ID';
+        return AppLocalizations.of(context).nationalId;
     }
   }
 
@@ -114,7 +115,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
       final idNumber = _idNumberController.text.trim();
       final validation = _smileIdService.validateIdNumber(idNumber, 'NATIONAL_ID', widget.countryCode);
       if (!validation.isValid) {
-        _showError(validation.error ?? 'Invalid ID number');
+        _showError(validation.error ?? AppLocalizations.of(context).invalidIdNumberFallback);
         return;
       }
 
@@ -292,7 +293,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
         if (!mounted) return;
         context.go(AppRoutes.verificationPending);
       } else {
-        _showError(result.error ?? 'Failed to complete verification');
+        _showError(result.error ?? AppLocalizations.of(context).failedToCompleteVerification);
       }
     } catch (e) {
       if (!mounted) return;
@@ -353,24 +354,24 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
                     if (_requiresIdNumber) ...[
                       KycIdNumberInput(
                         controller: _idNumberController,
-                        label: widget.countryCode == 'ZM' ? 'TPIN' : 'ID Number',
+                        label: widget.countryCode == 'ZM' ? AppLocalizations.of(context).tpinLabel : AppLocalizations.of(context).idNumberLabel,
                         hint: widget.countryCode == 'ZM'
-                            ? 'Enter your 10-digit TPIN'
-                            : 'Enter your 13-digit ID number',
+                            ? AppLocalizations.of(context).enterTpinHint
+                            : AppLocalizations.of(context).enterIdNumberHint,
                         helperText: widget.countryCode == 'ZM'
-                            ? 'Your Zambian Taxpayer Identification Number'
-                            : 'Your South African ID number',
+                            ? AppLocalizations.of(context).zambianTaxpayerHelperText
+                            : AppLocalizations.of(context).southAfricanIdHelperText,
                       ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
                       const SizedBox(height: AppDimensions.spaceXL),
                     ],
 
                     KycVerificationCard(
-                      title: _isCaptured ? 'Document Captured' : 'Verify Your $_countryName',
+                      title: _isCaptured ? AppLocalizations.of(context).documentCapturedTitle : AppLocalizations.of(context).verifyYourDocumentTitle(_countryName),
                       description: _isCaptured
-                          ? 'Your $_countryName has been captured. Verification will begin when you continue.'
+                          ? AppLocalizations.of(context).documentCapturedBody(_countryName)
                           : _requiresIdNumber
-                              ? 'We will verify your ID number and take a selfie for confirmation'
-                              : 'We will capture both sides of your ID and take a selfie',
+                              ? AppLocalizations.of(context).idAndSelfieVerificationDescription
+                              : AppLocalizations.of(context).documentBothSidesAndSelfieDescription,
                       isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
