@@ -939,4 +939,103 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get verificationDoNotCloseApp =>
       'You will be automatically redirected once verification is complete. Do not close the app.';
+
+  @override
+  String get saving => 'Saving...';
+
+  @override
+  String get storagePermissionRequired =>
+      'Storage permission required to save QR code';
+
+  @override
+  String get qrCodeSavedToGallery => 'QR code saved to gallery!';
+
+  @override
+  String errorSavingQrCode(String error) {
+    return 'Error saving QR code: $error';
+  }
+
+  @override
+  String get maximum20ItemsAllowed => 'Maximum 20 items allowed';
+
+  @override
+  String get pleaseEnterValidAmount => 'Please enter a valid amount';
+
+  @override
+  String errorGeneratingQr(String error) {
+    return 'Error generating QR: $error';
+  }
+
+  @override
+  String errorSharingQr(String error) {
+    return 'Error sharing QR: $error';
+  }
+
+  @override
+  String get requestPaymentTitle => 'Request Payment';
+
+  @override
+  String get newRequestTooltip => 'New Request';
+
+  @override
+  String get createPaymentRequestTitle => 'Create Payment Request';
+
+  @override
+  String get createPaymentRequestDescription =>
+      'Enter the amount and add items. Customers can scan the QR code to pay you instantly.';
+
+  @override
+  String get amountLabel => 'Amount';
+
+  @override
+  String get itemsOptional => 'Items (optional)';
+
+  @override
+  String get itemsHint => 'e.g., Jollof Rice, Chicken, Drinks';
+
+  @override
+  String itemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get generateQrCode => 'Generate QR Code';
+
+  @override
+  String payToUser(String userName) {
+    return 'Pay to: $userName';
+  }
+
+  @override
+  String get shareButton => 'Share';
+
+  @override
+  String get qrCodeInfoForCustomer =>
+      'Show this QR code to the customer.\nThey scan it, confirm the amount, and pay instantly!';
+
+  @override
+  String get createNewRequest => 'Create New Request';
+
+  @override
+  String get downloadButton => 'Download';
+
+  @override
+  String get shareWalletIdSubject => 'My QR Wallet ID';
+
+  @override
+  String get defaultUserName => 'User';
+
+  @override
+  String get loadingPlaceholder => 'Loading...';
+
+  @override
+  String payRequestShareText(String symbol, String amount, String userName) {
+    return 'Pay $symbol$amount to $userName';
+  }
 }

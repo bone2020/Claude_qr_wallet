@@ -840,4 +840,33 @@
   "verificationInProgressMessage": "",
   "pleaseWait": "",
   "verificationDoNotCloseApp": ""
+,
+  "saving": "",
+  "storagePermissionRequired": "",
+  "qrCodeSavedToGallery": "",
+  "errorSavingQrCode": "",
+  "maximum20ItemsAllowed": "",
+  "pleaseEnterValidAmount": "",
+  "errorGeneratingQr": "",
+  "errorSharingQr": "",
+  "requestPaymentTitle": "",
+  "newRequestTooltip": "",
+  "createPaymentRequestTitle": "",
+  "createPaymentRequestDescription": "",
+  "amountLabel": "",
+  "itemsOptional": "",
+  "itemsHint": "",
+  "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "generateQrCode": "",
+  "payToUser": "",
+  "shareButton": "",
+  "qrCodeInfoForCustomer": "",
+  "createNewRequest": ""
+,
+  "downloadButton": ""
+,
+  "shareWalletIdSubject": "",
+  "defaultUserName": "",
+  "loadingPlaceholder": "",
+  "payRequestShareText": ""
 }

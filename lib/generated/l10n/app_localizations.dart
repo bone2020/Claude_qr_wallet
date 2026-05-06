@@ -1845,6 +1845,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You will be automatically redirected once verification is complete. Do not close the app.'**
   String get verificationDoNotCloseApp;
+
+  /// Loading caption shown while a download is in progress. Clears Step 8 deferral #1 (receive_money_screen.dart line ~322 ternary).
+  ///
+  /// In en, this message translates to:
+  /// **'Saving...'**
+  String get saving;
+
+  /// Snackbar when device storage permission is needed but not granted.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage permission required to save QR code'**
+  String get storagePermissionRequired;
+
+  /// Success snackbar after saving QR code image to device gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code saved to gallery!'**
+  String get qrCodeSavedToGallery;
+
+  /// Snackbar when saving QR code to gallery fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving QR code: {error}'**
+  String errorSavingQrCode(String error);
+
+  /// Snackbar when user tries to add more than 20 items to a payment request.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 20 items allowed'**
+  String get maximum20ItemsAllowed;
+
+  /// Validation snackbar when amount is non-numeric or zero. Distinct from pleaseEnterAmount which fires when the field is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid amount'**
+  String get pleaseEnterValidAmount;
+
+  /// Snackbar when QR code generation fails on payment request screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Error generating QR: {error}'**
+  String errorGeneratingQr(String error);
+
+  /// Snackbar when QR code sharing (system share sheet) fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error sharing QR: {error}'**
+  String errorSharingQr(String error);
+
+  /// AppBar title on the payment request screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Request Payment'**
+  String get requestPaymentTitle;
+
+  /// Tooltip on the refresh icon button that resets the payment request form.
+  ///
+  /// In en, this message translates to:
+  /// **'New Request'**
+  String get newRequestTooltip;
+
+  /// Heading on the payment request form's create view.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Payment Request'**
+  String get createPaymentRequestTitle;
+
+  /// Body description below the create heading on payment request screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the amount and add items. Customers can scan the QR code to pay you instantly.'**
+  String get createPaymentRequestDescription;
+
+  /// Label above the amount input field on payment request screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get amountLabel;
+
+  /// Label above the items list section, indicating items are optional.
+  ///
+  /// In en, this message translates to:
+  /// **'Items (optional)'**
+  String get itemsOptional;
+
+  /// Placeholder text in the items input field showing example item names.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., Jollof Rice, Chicken, Drinks'**
+  String get itemsHint;
+
+  /// Pluralized item count. Renders '1 item' for count=1 and '{count} items' otherwise.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String itemCount(int count);
+
+  /// Submit button on the payment request form.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate QR Code'**
+  String get generateQrCode;
+
+  /// Recipient label on the generated QR code preview, e.g. 'Pay to: Eric'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay to: {userName}'**
+  String payToUser(String userName);
+
+  /// Generic Share button label (used in payment request QR preview).
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareButton;
+
+  /// Info caption below the generated QR code on payment request screen. Two lines (line break in middle).
+  ///
+  /// In en, this message translates to:
+  /// **'Show this QR code to the customer.\nThey scan it, confirm the amount, and pay instantly!'**
+  String get qrCodeInfoForCustomer;
+
+  /// Outlined button to reset and create another payment request after a QR is generated.
+  ///
+  /// In en, this message translates to:
+  /// **'Create New Request'**
+  String get createNewRequest;
+
+  /// Generic Download button label (used in payment request QR preview, alongside Share).
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get downloadButton;
+
+  /// Subject line when sharing wallet ID via system share sheet (receive_money_screen Share.share call).
+  ///
+  /// In en, this message translates to:
+  /// **'My QR Wallet ID'**
+  String get shareWalletIdSubject;
+
+  /// Generic fallback display name shown when the authenticated user has no displayName set on their account.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get defaultUserName;
+
+  /// Generic loading caption shown while content is being fetched (e.g. wallet ID resolving).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading...'**
+  String get loadingPlaceholder;
+
+  /// Body text in system share sheet when sharing a payment request, e.g. 'Pay $5.00 to Eric'.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {symbol}{amount} to {userName}'**
+  String payRequestShareText(String symbol, String amount, String userName);
 }
 
 class _AppLocalizationsDelegate

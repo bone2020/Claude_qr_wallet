@@ -1067,4 +1067,114 @@
   "@pleaseWait": {"description": "Generic loading/wait caption."},
   "verificationDoNotCloseApp": "You will be automatically redirected once verification is complete. Do not close the app.",
   "@verificationDoNotCloseApp": {"description": "Reassurance message at bottom of verification pending screen."}
+,
+  "saving": "Saving...",
+  "@saving": {"description": "Loading caption shown while a download is in progress. Clears Step 8 deferral #1 (receive_money_screen.dart line ~322 ternary)."},
+
+  "storagePermissionRequired": "Storage permission required to save QR code",
+  "@storagePermissionRequired": {"description": "Snackbar when device storage permission is needed but not granted."},
+
+  "qrCodeSavedToGallery": "QR code saved to gallery!",
+  "@qrCodeSavedToGallery": {"description": "Success snackbar after saving QR code image to device gallery."},
+
+  "errorSavingQrCode": "Error saving QR code: {error}",
+  "@errorSavingQrCode": {
+    "description": "Snackbar when saving QR code to gallery fails.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "maximum20ItemsAllowed": "Maximum 20 items allowed",
+  "@maximum20ItemsAllowed": {"description": "Snackbar when user tries to add more than 20 items to a payment request."},
+
+  "pleaseEnterValidAmount": "Please enter a valid amount",
+  "@pleaseEnterValidAmount": {"description": "Validation snackbar when amount is non-numeric or zero. Distinct from pleaseEnterAmount which fires when the field is empty."},
+
+  "errorGeneratingQr": "Error generating QR: {error}",
+  "@errorGeneratingQr": {
+    "description": "Snackbar when QR code generation fails on payment request screen.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "errorSharingQr": "Error sharing QR: {error}",
+  "@errorSharingQr": {
+    "description": "Snackbar when QR code sharing (system share sheet) fails.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "requestPaymentTitle": "Request Payment",
+  "@requestPaymentTitle": {"description": "AppBar title on the payment request screen."},
+
+  "newRequestTooltip": "New Request",
+  "@newRequestTooltip": {"description": "Tooltip on the refresh icon button that resets the payment request form."},
+
+  "createPaymentRequestTitle": "Create Payment Request",
+  "@createPaymentRequestTitle": {"description": "Heading on the payment request form's create view."},
+
+  "createPaymentRequestDescription": "Enter the amount and add items. Customers can scan the QR code to pay you instantly.",
+  "@createPaymentRequestDescription": {"description": "Body description below the create heading on payment request screen."},
+
+  "amountLabel": "Amount",
+  "@amountLabel": {"description": "Label above the amount input field on payment request screen."},
+
+  "itemsOptional": "Items (optional)",
+  "@itemsOptional": {"description": "Label above the items list section, indicating items are optional."},
+
+  "itemsHint": "e.g., Jollof Rice, Chicken, Drinks",
+  "@itemsHint": {"description": "Placeholder text in the items input field showing example item names."},
+
+  "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "@itemCount": {
+    "description": "Pluralized item count. Renders '1 item' for count=1 and '{count} items' otherwise.",
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+
+  "generateQrCode": "Generate QR Code",
+  "@generateQrCode": {"description": "Submit button on the payment request form."},
+
+  "payToUser": "Pay to: {userName}",
+  "@payToUser": {
+    "description": "Recipient label on the generated QR code preview, e.g. 'Pay to: Eric'.",
+    "placeholders": {
+      "userName": {"type": "String"}
+    }
+  },
+
+  "shareButton": "Share",
+  "@shareButton": {"description": "Generic Share button label (used in payment request QR preview)."},
+
+  "qrCodeInfoForCustomer": "Show this QR code to the customer.\nThey scan it, confirm the amount, and pay instantly!",
+  "@qrCodeInfoForCustomer": {"description": "Info caption below the generated QR code on payment request screen. Two lines (line break in middle)."},
+
+  "createNewRequest": "Create New Request",
+  "@createNewRequest": {"description": "Outlined button to reset and create another payment request after a QR is generated."}
+,
+  "downloadButton": "Download",
+  "@downloadButton": {"description": "Generic Download button label (used in payment request QR preview, alongside Share)."}
+,
+  "shareWalletIdSubject": "My QR Wallet ID",
+  "@shareWalletIdSubject": {"description": "Subject line when sharing wallet ID via system share sheet (receive_money_screen Share.share call)."},
+
+  "defaultUserName": "User",
+  "@defaultUserName": {"description": "Generic fallback display name shown when the authenticated user has no displayName set on their account."},
+
+  "loadingPlaceholder": "Loading...",
+  "@loadingPlaceholder": {"description": "Generic loading caption shown while content is being fetched (e.g. wallet ID resolving)."},
+
+  "payRequestShareText": "Pay {symbol}{amount} to {userName}",
+  "@payRequestShareText": {
+    "description": "Body text in system share sheet when sharing a payment request, e.g. 'Pay $5.00 to Eric'.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"},
+      "userName": {"type": "String"}
+    }
+  }
 }

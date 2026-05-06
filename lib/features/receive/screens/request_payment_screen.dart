@@ -15,6 +15,7 @@ import '../../../core/services/qr_signing_service.dart';
 import '../../../providers/wallet_provider.dart';
 import '../../../providers/currency_provider.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class RequestPaymentScreen extends ConsumerStatefulWidget {
   const RequestPaymentScreen({super.key});
 
@@ -33,7 +34,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   bool _isDownloading = false;
 
   String get _walletId => ref.watch(walletNotifierProvider).wallet?.walletId ?? '';
-  String get _userName => ref.watch(currentUserProvider)?.displayName ?? 'User';
+  String get _userName => ref.watch(currentUserProvider)?.displayName ?? AppLocalizations.of(context).defaultUserName;
   String? get _businessLogoUrl => ref.watch(currentUserProvider)?.businessLogoUrl;
   String get _currencySymbol => ref.watch(currencyNotifierProvider).currency.symbol;
   String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
@@ -43,8 +44,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
     if (item.isEmpty) return;
     if (_items.length >= 20) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Maximum 20 items allowed'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).maximum20ItemsAllowed),
           backgroundColor: AppColors.warning,
         ),
       );
@@ -63,8 +64,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
   Future<void> _generateQR() async {
     if (_amountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter an amount'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).pleaseEnterAmount),
           backgroundColor: AppColors.error,
         ),
       );
@@ -74,8 +75,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid amount'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).pleaseEnterValidAmount),
           backgroundColor: AppColors.error,
         ),
       );
@@ -111,7 +112,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error generating QR: $e'),
+            content: Text(AppLocalizations.of(context).errorGeneratingQr(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -146,13 +147,13 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: 'Pay $_currencySymbol$amount to $_userName',
+        text: AppLocalizations.of(context).payRequestShareText(_currencySymbol, amount, _userName),
       );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error sharing QR: $e'),
+            content: Text(AppLocalizations.of(context).errorSharingQr(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -172,8 +173,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         if (!granted) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Storage permission required to save QR code'),
+              SnackBar(
+                content: Text(AppLocalizations.of(context).storagePermissionRequired),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -199,8 +200,8 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('QR code saved to gallery!'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).qrCodeSavedToGallery),
               backgroundColor: AppColors.success,
             ),
           );
@@ -210,7 +211,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving QR code: $e'),
+            content: Text(AppLocalizations.of(context).errorSavingQrCode(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -240,7 +241,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
         title: Text(
-          'Request Payment',
+          AppLocalizations.of(context).requestPaymentTitle,
           style: AppTextStyles.headlineMedium(),
         ),
         actions: [
@@ -248,7 +249,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _resetQR,
-              tooltip: 'New Request',
+              tooltip: AppLocalizations.of(context).newRequestTooltip,
             ),
         ],
       ),
@@ -281,13 +282,13 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               ),
               const SizedBox(height: AppDimensions.spaceMD),
               Text(
-                'Create Payment Request',
+                AppLocalizations.of(context).createPaymentRequestTitle,
                 style: AppTextStyles.headlineSmall(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Enter the amount and add items. Customers can scan the QR code to pay you instantly.',
+                AppLocalizations.of(context).createPaymentRequestDescription,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -298,7 +299,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
         // Amount Input
         Text(
-          'Amount',
+          AppLocalizations.of(context).amountLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
@@ -344,7 +345,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
         // Items Section
         Text(
-          'Items (optional)',
+          AppLocalizations.of(context).itemsOptional,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
@@ -366,7 +367,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _addItem(),
                   decoration: InputDecoration(
-                    hintText: 'e.g., Jollof Rice, Chicken, Drinks',
+                    hintText: AppLocalizations.of(context).itemsHint,
                     hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
                     prefixIcon: const Icon(Icons.add_shopping_cart, color: AppColors.textSecondaryDark),
                     border: InputBorder.none,
@@ -410,7 +411,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                     bottom: AppDimensions.spaceXS,
                   ),
                   child: Text(
-                    '${_items.length} item${_items.length == 1 ? '' : 's'}',
+                    AppLocalizations.of(context).itemCount(_items.length),
                     style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                   ),
                 ),
@@ -467,7 +468,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                     ),
                   )
                 : Text(
-                    'Generate QR Code',
+                    AppLocalizations.of(context).generateQrCode,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),
@@ -485,7 +486,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
         // Amount Display
         Text(
-          '$_currencySymbol$amount',
+          AppLocalizations.of(context).symbolAmount(_currencySymbol, amount),
           style: AppTextStyles.displayLarge(color: AppColors.primary),
         ),
 
@@ -493,7 +494,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         if (_items.isNotEmpty) ...[
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            '${_items.length} item${_items.length == 1 ? '' : 's'}',
+            AppLocalizations.of(context).itemCount(_items.length),
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -537,7 +538,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                   style: AppTextStyles.bodyLarge(color: AppColors.backgroundDark),
                 ),
                 Text(
-                  '$_currencySymbol$amount',
+                  AppLocalizations.of(context).symbolAmount(_currencySymbol, amount),
                   style: AppTextStyles.headlineMedium(color: AppColors.primary),
                 ),
                 // Show items in the QR card
@@ -564,7 +565,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
 
         // Receiver Info
         Text(
-          'Pay to: $_userName',
+          AppLocalizations.of(context).payToUser(_userName),
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXL),
@@ -576,7 +577,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               child: OutlinedButton.icon(
                 onPressed: _shareQRCode,
                 icon: const Icon(Icons.share, size: 20),
-                label: const Text('Share'),
+                label: Text(AppLocalizations.of(context).shareButton),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimaryDark,
                   side: const BorderSide(color: AppColors.inputBorderDark),
@@ -601,7 +602,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                         ),
                       )
                     : const Icon(Icons.download, size: 20),
-                label: Text(_isDownloading ? 'Saving...' : 'Download'),
+                label: Text(_isDownloading ? AppLocalizations.of(context).saving : AppLocalizations.of(context).downloadButton),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
@@ -626,7 +627,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               const Icon(Icons.info_outline, color: AppColors.primary),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Show this QR code to the customer.\nThey scan it, confirm the amount, and pay instantly!',
+                AppLocalizations.of(context).qrCodeInfoForCustomer,
                 style: AppTextStyles.bodySmall(color: AppColors.primary),
                 textAlign: TextAlign.center,
               ),
@@ -639,7 +640,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         TextButton.icon(
           onPressed: _resetQR,
           icon: const Icon(Icons.add),
-          label: const Text('Create New Request'),
+          label: Text(AppLocalizations.of(context).createNewRequest),
         ),
       ],
     );

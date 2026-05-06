@@ -51,7 +51,7 @@ Wallet ID: $walletId
 Or scan my QR code in the app.
 ''';
 
-    Share.share(shareText, subject: 'My QR Wallet ID');
+    Share.share(shareText, subject: AppLocalizations.of(context).shareWalletIdSubject);
   }
 
   Future<void> _downloadQrCode() async {
@@ -67,8 +67,8 @@ Or scan my QR code in the app.
         if (!granted) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Storage permission required to save QR code'),
+              SnackBar(
+                content: Text(AppLocalizations.of(context).storagePermissionRequired),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -98,8 +98,8 @@ Or scan my QR code in the app.
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('QR code saved to gallery!'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).qrCodeSavedToGallery),
               backgroundColor: AppColors.success,
             ),
           );
@@ -109,7 +109,7 @@ Or scan my QR code in the app.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving QR code: $e'),
+            content: Text(AppLocalizations.of(context).errorSavingQrCode(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -126,7 +126,7 @@ Or scan my QR code in the app.
     // Get real data from providers
     final walletId = ref.watch(walletNotifierProvider).walletId;
     final user = ref.watch(currentUserProvider);
-    final userName = user?.displayName ?? 'User';
+    final userName = user?.displayName ?? AppLocalizations.of(context).defaultUserName;
 
     // Generate QR data with real values
     final qrData = 'qrwallet://pay?id=$walletId&name=${Uri.encodeComponent(userName)}';
@@ -266,7 +266,7 @@ Or scan my QR code in the app.
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  walletId.isNotEmpty ? walletId : 'Loading...',
+                  walletId.isNotEmpty ? walletId : AppLocalizations.of(context).loadingPlaceholder,
                   style: AppTextStyles.bodyLarge(color: AppColors.primary),
                 ),
               ],
@@ -319,7 +319,7 @@ Or scan my QR code in the app.
                     ),
                   )
                 : const Icon(Iconsax.document_download, size: 20),
-            label: Text(_isDownloading ? 'Saving...' : AppLocalizations.of(context).downloadQrCode),
+            label: Text(_isDownloading ? AppLocalizations.of(context).saving : AppLocalizations.of(context).downloadQrCode),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceMD),
             ),

@@ -916,4 +916,100 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get verificationDoNotCloseApp => '';
+
+  @override
+  String get saving => '';
+
+  @override
+  String get storagePermissionRequired => '';
+
+  @override
+  String get qrCodeSavedToGallery => '';
+
+  @override
+  String errorSavingQrCode(String error) {
+    return '';
+  }
+
+  @override
+  String get maximum20ItemsAllowed => '';
+
+  @override
+  String get pleaseEnterValidAmount => '';
+
+  @override
+  String errorGeneratingQr(String error) {
+    return '';
+  }
+
+  @override
+  String errorSharingQr(String error) {
+    return '';
+  }
+
+  @override
+  String get requestPaymentTitle => '';
+
+  @override
+  String get newRequestTooltip => '';
+
+  @override
+  String get createPaymentRequestTitle => '';
+
+  @override
+  String get createPaymentRequestDescription => '';
+
+  @override
+  String get amountLabel => '';
+
+  @override
+  String get itemsOptional => '';
+
+  @override
+  String get itemsHint => '';
+
+  @override
+  String itemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get generateQrCode => '';
+
+  @override
+  String payToUser(String userName) {
+    return '';
+  }
+
+  @override
+  String get shareButton => '';
+
+  @override
+  String get qrCodeInfoForCustomer => '';
+
+  @override
+  String get createNewRequest => '';
+
+  @override
+  String get downloadButton => '';
+
+  @override
+  String get shareWalletIdSubject => '';
+
+  @override
+  String get defaultUserName => '';
+
+  @override
+  String get loadingPlaceholder => '';
+
+  @override
+  String payRequestShareText(String symbol, String amount, String userName) {
+    return '';
+  }
 }
