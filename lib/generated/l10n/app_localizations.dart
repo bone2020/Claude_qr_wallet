@@ -1683,6 +1683,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{dialCode} • {symbol} {code}'**
   String countryDisplayFormat(String dialCode, String symbol, String code);
+
+  /// Snackbar shown when an identity verification call fails. Used across all KYC verification screens.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification failed: {error}'**
+  String verificationFailedWithError(String error);
+
+  /// Display heading on BVN (Bank Verification Number) verification screen, Nigeria.
+  ///
+  /// In en, this message translates to:
+  /// **'BVN Verification'**
+  String get bvnVerificationTitle;
+
+  /// Display heading on driver's license verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Driver\'s License Verification'**
+  String get driversLicenseVerificationTitle;
+
+  /// Display heading on NIN (National Identification Number) verification screen, Nigeria.
+  ///
+  /// In en, this message translates to:
+  /// **'NIN Verification'**
+  String get ninVerificationTitle;
+
+  /// Display heading on passport verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Passport Verification'**
+  String get passportVerificationTitle;
+
+  /// Display heading on SSNIT verification screen, Ghana.
+  ///
+  /// In en, this message translates to:
+  /// **'SSNIT Verification'**
+  String get ssnitVerificationTitle;
+
+  /// Display heading on voter's card verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Voter\'s Card Verification'**
+  String get votersCardVerificationTitle;
+
+  /// Display heading on the generic national ID verification screen — countryName is dynamic.
+  ///
+  /// In en, this message translates to:
+  /// **'{countryName} Verification'**
+  String nationalIdVerificationTitleWithCountry(String countryName);
+
+  /// AppBar title on the Uganda NIN verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Uganda National ID'**
+  String get ugandaNationalIdAppBarTitle;
+
+  /// Body heading on the Uganda NIN verification screen, below the AppBar.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID Verification'**
+  String get ugandaNationalIdHeading;
+
+  /// Body description on the Uganda NIN verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your identity using your Uganda National Identification Number (NIN) and card number.'**
+  String get ugandaNationalIdDescription;
+
+  /// Helper text under the BVN input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Bank Verification Number linked to your bank accounts'**
+  String get bvnHelperText;
+
+  /// Helper text under the NIN input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Your National Identification Number as shown on your NIN slip'**
+  String get ninHelperText;
+
+  /// Helper text under the SSNIT input field explaining the format.
+  ///
+  /// In en, this message translates to:
+  /// **'Your SSNIT number: 1 letter followed by 12 digits'**
+  String get ssnitHelperText;
+
+  /// Helper text under the Uganda NIN input field explaining the format.
+  ///
+  /// In en, this message translates to:
+  /// **'Your NIN is 14 alphanumeric characters'**
+  String get ugandaNinHelperText;
+
+  /// Helper text under the Uganda card-number input field.
+  ///
+  /// In en, this message translates to:
+  /// **'The number printed on your physical ID card'**
+  String get ugandaNinCardNumberHelperText;
+
+  /// AppBar title on the KYC phone verification screen. Distinct from verifyPhoneTitle ('Verify Phone') used in standalone phone_otp_screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Verification'**
+  String get phoneVerificationAppBarTitle;
+
+  /// Submit button label on the OTP code entry view of phone verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Code'**
+  String get verifyCodeButton;
+
+  /// Countdown caption shown while resend is locked, e.g. 'Resend code in 30s'.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code in {seconds}s'**
+  String resendCodeIn(String seconds);
+
+  /// Tappable resend OTP button (active after countdown).
+  ///
+  /// In en, this message translates to:
+  /// **'Resend Code'**
+  String get resendCodeButton;
+
+  /// Initial send-OTP button before any code has been sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Verification Code'**
+  String get sendVerificationCodeButton;
+
+  /// Title of the failure dialog on the verification pending screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification Failed'**
+  String get verificationFailedTitle;
+
+  /// Body of the failure dialog on the verification pending screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your identity verification did not pass. This may be due to a face mismatch or document issue. Please try again.'**
+  String get verificationFailedMessage;
+
+  /// Heading shown while waiting for KYC verification to complete.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification In Progress'**
+  String get verificationInProgressTitle;
+
+  /// Body text below the verification in-progress heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.'**
+  String get verificationInProgressMessage;
+
+  /// Generic loading/wait caption.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait...'**
+  String get pleaseWait;
+
+  /// Reassurance message at bottom of verification pending screen.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be automatically redirected once verification is complete. Do not close the app.'**
+  String get verificationDoNotCloseApp;
 }
 
 class _AppLocalizationsDelegate

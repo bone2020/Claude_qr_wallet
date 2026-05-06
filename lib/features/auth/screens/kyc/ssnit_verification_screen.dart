@@ -264,7 +264,7 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'SSNIT Verification',
+                      AppLocalizations.of(context).ssnitVerificationTitle,
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
@@ -279,7 +279,7 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
                       controller: _idNumberController,
                       label: 'SSNIT Number',
                       hint: 'Enter your SSNIT number (e.g., A123456789012)',
-                      helperText: 'Your SSNIT number: 1 letter followed by 12 digits',
+                      helperText: AppLocalizations.of(context).ssnitHelperText,
                     ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
@@ -375,7 +375,7 @@ class _SmileIdSmartSelfieScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Verification failed: $error'),
+                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
                 backgroundColor: AppColors.error,
               ),
             );

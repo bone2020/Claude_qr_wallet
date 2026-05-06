@@ -268,7 +268,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        title: Text('Uganda National ID', style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).ugandaNationalIdAppBarTitle, style: AppTextStyles.headlineSmall()),
       ),
       body: SafeArea(
         child: Column(
@@ -280,12 +280,12 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'National ID Verification',
+                      AppLocalizations.of(context).ugandaNationalIdHeading,
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
                     Text(
-                      'Verify your identity using your Uganda National Identification Number (NIN) and card number.',
+                      AppLocalizations.of(context).ugandaNationalIdDescription,
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                     ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
@@ -296,7 +296,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
                       controller: _ninController,
                       label: 'National Identification Number (NIN)',
                       hint: 'Enter your 14-character NIN',
-                      helperText: 'Your NIN is 14 alphanumeric characters',
+                      helperText: AppLocalizations.of(context).ugandaNinHelperText,
                     ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceLG),
@@ -306,7 +306,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
                       controller: _cardNumberController,
                       label: 'Card Number',
                       hint: 'Enter the card number on your National ID',
-                      helperText: 'The number printed on your physical ID card',
+                      helperText: AppLocalizations.of(context).ugandaNinCardNumberHelperText,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
@@ -404,7 +404,7 @@ class _SmileIdSmartSelfieScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Verification failed: $error'),
+                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
                 backgroundColor: AppColors.error,
               ),
             );

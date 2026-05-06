@@ -829,4 +829,91 @@ class AppLocalizationsAr extends AppLocalizations {
   String countryDisplayFormat(String dialCode, String symbol, String code) {
     return '';
   }
+
+  @override
+  String verificationFailedWithError(String error) {
+    return '';
+  }
+
+  @override
+  String get bvnVerificationTitle => '';
+
+  @override
+  String get driversLicenseVerificationTitle => '';
+
+  @override
+  String get ninVerificationTitle => '';
+
+  @override
+  String get passportVerificationTitle => '';
+
+  @override
+  String get ssnitVerificationTitle => '';
+
+  @override
+  String get votersCardVerificationTitle => '';
+
+  @override
+  String nationalIdVerificationTitleWithCountry(String countryName) {
+    return '';
+  }
+
+  @override
+  String get ugandaNationalIdAppBarTitle => '';
+
+  @override
+  String get ugandaNationalIdHeading => '';
+
+  @override
+  String get ugandaNationalIdDescription => '';
+
+  @override
+  String get bvnHelperText => '';
+
+  @override
+  String get ninHelperText => '';
+
+  @override
+  String get ssnitHelperText => '';
+
+  @override
+  String get ugandaNinHelperText => '';
+
+  @override
+  String get ugandaNinCardNumberHelperText => '';
+
+  @override
+  String get phoneVerificationAppBarTitle => '';
+
+  @override
+  String get verifyCodeButton => '';
+
+  @override
+  String resendCodeIn(String seconds) {
+    return '';
+  }
+
+  @override
+  String get resendCodeButton => '';
+
+  @override
+  String get sendVerificationCodeButton => '';
+
+  @override
+  String get verificationFailedTitle => '';
+
+  @override
+  String get verificationFailedMessage => '';
+
+  @override
+  String get verificationInProgressTitle => '';
+
+  @override
+  String get verificationInProgressMessage => '';
+
+  @override
+  String get pleaseWait => '';
+
+  @override
+  String get verificationDoNotCloseApp => '';
 }

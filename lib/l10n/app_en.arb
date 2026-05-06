@@ -997,5 +997,74 @@
       "symbol": {"type": "String"},
       "code": {"type": "String"}
     }
-  }
+  },
+  "verificationFailedWithError": "Verification failed: {error}",
+  "@verificationFailedWithError": {
+    "description": "Snackbar shown when an identity verification call fails. Used across all KYC verification screens.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "bvnVerificationTitle": "BVN Verification",
+  "@bvnVerificationTitle": {"description": "Display heading on BVN (Bank Verification Number) verification screen, Nigeria."},
+  "driversLicenseVerificationTitle": "Driver's License Verification",
+  "@driversLicenseVerificationTitle": {"description": "Display heading on driver's license verification screen."},
+  "ninVerificationTitle": "NIN Verification",
+  "@ninVerificationTitle": {"description": "Display heading on NIN (National Identification Number) verification screen, Nigeria."},
+  "passportVerificationTitle": "Passport Verification",
+  "@passportVerificationTitle": {"description": "Display heading on passport verification screen."},
+  "ssnitVerificationTitle": "SSNIT Verification",
+  "@ssnitVerificationTitle": {"description": "Display heading on SSNIT verification screen, Ghana."},
+  "votersCardVerificationTitle": "Voter's Card Verification",
+  "@votersCardVerificationTitle": {"description": "Display heading on voter's card verification screen."},
+  "nationalIdVerificationTitleWithCountry": "{countryName} Verification",
+  "@nationalIdVerificationTitleWithCountry": {
+    "description": "Display heading on the generic national ID verification screen — countryName is dynamic.",
+    "placeholders": {
+      "countryName": {"type": "String"}
+    }
+  },
+  "ugandaNationalIdAppBarTitle": "Uganda National ID",
+  "@ugandaNationalIdAppBarTitle": {"description": "AppBar title on the Uganda NIN verification screen."},
+  "ugandaNationalIdHeading": "National ID Verification",
+  "@ugandaNationalIdHeading": {"description": "Body heading on the Uganda NIN verification screen, below the AppBar."},
+  "ugandaNationalIdDescription": "Verify your identity using your Uganda National Identification Number (NIN) and card number.",
+  "@ugandaNationalIdDescription": {"description": "Body description on the Uganda NIN verification screen."},
+  "bvnHelperText": "Your Bank Verification Number linked to your bank accounts",
+  "@bvnHelperText": {"description": "Helper text under the BVN input field."},
+  "ninHelperText": "Your National Identification Number as shown on your NIN slip",
+  "@ninHelperText": {"description": "Helper text under the NIN input field."},
+  "ssnitHelperText": "Your SSNIT number: 1 letter followed by 12 digits",
+  "@ssnitHelperText": {"description": "Helper text under the SSNIT input field explaining the format."},
+  "ugandaNinHelperText": "Your NIN is 14 alphanumeric characters",
+  "@ugandaNinHelperText": {"description": "Helper text under the Uganda NIN input field explaining the format."},
+  "ugandaNinCardNumberHelperText": "The number printed on your physical ID card",
+  "@ugandaNinCardNumberHelperText": {"description": "Helper text under the Uganda card-number input field."},
+  "phoneVerificationAppBarTitle": "Phone Verification",
+  "@phoneVerificationAppBarTitle": {"description": "AppBar title on the KYC phone verification screen. Distinct from verifyPhoneTitle ('Verify Phone') used in standalone phone_otp_screen."},
+  "verifyCodeButton": "Verify Code",
+  "@verifyCodeButton": {"description": "Submit button label on the OTP code entry view of phone verification."},
+  "resendCodeIn": "Resend code in {seconds}s",
+  "@resendCodeIn": {
+    "description": "Countdown caption shown while resend is locked, e.g. 'Resend code in 30s'.",
+    "placeholders": {
+      "seconds": {"type": "String"}
+    }
+  },
+  "resendCodeButton": "Resend Code",
+  "@resendCodeButton": {"description": "Tappable resend OTP button (active after countdown)."},
+  "sendVerificationCodeButton": "Send Verification Code",
+  "@sendVerificationCodeButton": {"description": "Initial send-OTP button before any code has been sent."},
+  "verificationFailedTitle": "Verification Failed",
+  "@verificationFailedTitle": {"description": "Title of the failure dialog on the verification pending screen."},
+  "verificationFailedMessage": "Your identity verification did not pass. This may be due to a face mismatch or document issue. Please try again.",
+  "@verificationFailedMessage": {"description": "Body of the failure dialog on the verification pending screen."},
+  "verificationInProgressTitle": "Verification In Progress",
+  "@verificationInProgressTitle": {"description": "Heading shown while waiting for KYC verification to complete."},
+  "verificationInProgressMessage": "Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.",
+  "@verificationInProgressMessage": {"description": "Body text below the verification in-progress heading."},
+  "pleaseWait": "Please wait...",
+  "@pleaseWait": {"description": "Generic loading/wait caption."},
+  "verificationDoNotCloseApp": "You will be automatically redirected once verification is complete. Do not close the app.",
+  "@verificationDoNotCloseApp": {"description": "Reassurance message at bottom of verification pending screen."}
 }

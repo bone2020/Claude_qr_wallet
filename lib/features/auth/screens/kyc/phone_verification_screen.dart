@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../generated/l10n/app_localizations.dart';
 
 /// Universal phone verification screen using Firebase SMS OTP.
 ///
@@ -146,8 +147,8 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
       if (success) {
         _startResendTimer();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP sent to your phone'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).otpSentToPhone),
             backgroundColor: AppColors.success,
           ),
         );
@@ -190,8 +191,8 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
         setState(() => _isVerified = true);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone verified successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).phoneVerifiedSuccessfully),
             backgroundColor: AppColors.success,
           ),
         );
@@ -232,7 +233,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Phone Verification'),
+        title: Text(AppLocalizations.of(context).phoneVerificationAppBarTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(false),
@@ -305,19 +306,19 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Verify Code'),
+                        : Text(AppLocalizations.of(context).verifyCodeButton),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Center(
                   child: _resendSeconds > 0
                       ? Text(
-                          'Resend code in ${_resendSeconds}s',
+                          AppLocalizations.of(context).resendCodeIn(_resendSeconds.toString()),
                           style: Theme.of(context).textTheme.bodySmall,
                         )
                       : TextButton(
                           onPressed: _isSendingOtp ? null : _sendOtp,
-                          child: const Text('Resend Code'),
+                          child: Text(AppLocalizations.of(context).resendCodeButton),
                         ),
                 ),
               ],
@@ -341,7 +342,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Send Verification Code'),
+                        : Text(AppLocalizations.of(context).sendVerificationCodeButton),
                   ),
                 ),
               ],

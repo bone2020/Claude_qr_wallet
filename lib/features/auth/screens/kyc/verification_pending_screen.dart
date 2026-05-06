@@ -13,6 +13,7 @@ import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../generated/l10n/app_localizations.dart';
  
 class VerificationPendingScreen extends ConsumerStatefulWidget {
   const VerificationPendingScreen({super.key});
@@ -170,12 +171,12 @@ class _VerificationPendingScreenState
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
         ),
         title: Text(
-          'Verification Failed',
+          AppLocalizations.of(context).verificationFailedTitle,
           style: AppTextStyles.headlineSmall(),
           textAlign: TextAlign.center,
         ),
         content: Text(
-          'Your identity verification did not pass. This may be due to a face mismatch or document issue. Please try again.',
+          AppLocalizations.of(context).verificationFailedMessage,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           textAlign: TextAlign.center,
         ),
@@ -188,7 +189,7 @@ class _VerificationPendingScreenState
                 context.go(AppRoutes.kyc);
               },
               child: Text(
-                'Try Again',
+                AppLocalizations.of(context).tryAgainButton,
                 style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
               ),
             ),
@@ -230,7 +231,7 @@ class _VerificationPendingScreenState
               const SizedBox(height: AppDimensions.spaceXXL),
  
               Text(
-                'Verification In Progress',
+                AppLocalizations.of(context).verificationInProgressTitle,
                 style: AppTextStyles.headlineMedium(),
                 textAlign: TextAlign.center,
               ),
@@ -238,7 +239,7 @@ class _VerificationPendingScreenState
               const SizedBox(height: AppDimensions.spaceMD),
  
               Text(
-                'Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.',
+                AppLocalizations.of(context).verificationInProgressMessage,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -258,7 +259,7 @@ class _VerificationPendingScreenState
               const SizedBox(height: AppDimensions.spaceMD),
  
               Text(
-                'Please wait...',
+                AppLocalizations.of(context).pleaseWait,
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
               ),
  
@@ -277,7 +278,7 @@ class _VerificationPendingScreenState
                     const SizedBox(width: AppDimensions.spaceMD),
                     Expanded(
                       child: Text(
-                        'You will be automatically redirected once verification is complete. Do not close the app.',
+                        AppLocalizations.of(context).verificationDoNotCloseApp,
                         style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                       ),
                     ),

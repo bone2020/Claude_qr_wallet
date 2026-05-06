@@ -237,7 +237,7 @@ class _DriversLicenseVerificationScreenState extends ConsumerState<DriversLicens
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Driver's License Verification",
+                      AppLocalizations.of(context).driversLicenseVerificationTitle,
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
@@ -347,7 +347,7 @@ class _SmileIdDocumentScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Verification failed: $error'),
+                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
                 backgroundColor: AppColors.error,
               ),
             );

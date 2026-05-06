@@ -843,4 +843,100 @@ class AppLocalizationsEn extends AppLocalizations {
   String countryDisplayFormat(String dialCode, String symbol, String code) {
     return '$dialCode • $symbol $code';
   }
+
+  @override
+  String verificationFailedWithError(String error) {
+    return 'Verification failed: $error';
+  }
+
+  @override
+  String get bvnVerificationTitle => 'BVN Verification';
+
+  @override
+  String get driversLicenseVerificationTitle =>
+      'Driver\'s License Verification';
+
+  @override
+  String get ninVerificationTitle => 'NIN Verification';
+
+  @override
+  String get passportVerificationTitle => 'Passport Verification';
+
+  @override
+  String get ssnitVerificationTitle => 'SSNIT Verification';
+
+  @override
+  String get votersCardVerificationTitle => 'Voter\'s Card Verification';
+
+  @override
+  String nationalIdVerificationTitleWithCountry(String countryName) {
+    return '$countryName Verification';
+  }
+
+  @override
+  String get ugandaNationalIdAppBarTitle => 'Uganda National ID';
+
+  @override
+  String get ugandaNationalIdHeading => 'National ID Verification';
+
+  @override
+  String get ugandaNationalIdDescription =>
+      'Verify your identity using your Uganda National Identification Number (NIN) and card number.';
+
+  @override
+  String get bvnHelperText =>
+      'Your Bank Verification Number linked to your bank accounts';
+
+  @override
+  String get ninHelperText =>
+      'Your National Identification Number as shown on your NIN slip';
+
+  @override
+  String get ssnitHelperText =>
+      'Your SSNIT number: 1 letter followed by 12 digits';
+
+  @override
+  String get ugandaNinHelperText => 'Your NIN is 14 alphanumeric characters';
+
+  @override
+  String get ugandaNinCardNumberHelperText =>
+      'The number printed on your physical ID card';
+
+  @override
+  String get phoneVerificationAppBarTitle => 'Phone Verification';
+
+  @override
+  String get verifyCodeButton => 'Verify Code';
+
+  @override
+  String resendCodeIn(String seconds) {
+    return 'Resend code in ${seconds}s';
+  }
+
+  @override
+  String get resendCodeButton => 'Resend Code';
+
+  @override
+  String get sendVerificationCodeButton => 'Send Verification Code';
+
+  @override
+  String get verificationFailedTitle => 'Verification Failed';
+
+  @override
+  String get verificationFailedMessage =>
+      'Your identity verification did not pass. This may be due to a face mismatch or document issue. Please try again.';
+
+  @override
+  String get verificationInProgressTitle => 'Verification In Progress';
+
+  @override
+  String get verificationInProgressMessage =>
+      'Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.';
+
+  @override
+  String get pleaseWait => 'Please wait...';
+
+  @override
+  String get verificationDoNotCloseApp =>
+      'You will be automatically redirected once verification is complete. Do not close the app.';
 }

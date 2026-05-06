@@ -263,7 +263,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'BVN Verification',
+                      AppLocalizations.of(context).bvnVerificationTitle,
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
@@ -278,7 +278,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
                       controller: _idNumberController,
                       label: 'BVN Number',
                       hint: 'Enter your 11-digit BVN',
-                      helperText: 'Your Bank Verification Number linked to your bank accounts',
+                      helperText: AppLocalizations.of(context).bvnHelperText,
                     ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
@@ -374,7 +374,7 @@ class _SmileIdSmartSelfieScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Verification failed: $error'),
+                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
                 backgroundColor: AppColors.error,
               ),
             );

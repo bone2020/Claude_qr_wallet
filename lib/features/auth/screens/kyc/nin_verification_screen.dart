@@ -273,7 +273,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'NIN Verification',
+                      AppLocalizations.of(context).ninVerificationTitle,
                       style: AppTextStyles.displaySmall(),
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
@@ -288,7 +288,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
                       controller: _idNumberController,
                       label: 'NIN Number',
                       hint: 'Enter your 11-digit NIN',
-                      helperText: 'Your National Identification Number as shown on your NIN slip',
+                      helperText: AppLocalizations.of(context).ninHelperText,
                     ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
@@ -401,7 +401,7 @@ class _SmileIdSmartSelfieEnrollmentScreen extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Verification failed: $error'),
+                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
                 backgroundColor: AppColors.error,
               ),
             );
