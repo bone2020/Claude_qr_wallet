@@ -14,6 +14,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/secure_storage_service.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class ChangePinScreen extends ConsumerStatefulWidget {
   const ChangePinScreen({super.key});
 
@@ -165,10 +166,10 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                 child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 48),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
-              Text('PIN Changed!', style: AppTextStyles.headlineSmall()),
+              Text(AppLocalizations.of(context).pinChangedTitle, style: AppTextStyles.headlineSmall()),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Your transaction PIN has been updated successfully.',
+                AppLocalizations.of(context).pinChangedBody,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -182,7 +183,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                   Navigator.pop(context);
                   context.pop();
                 },
-                child: Text('Done', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                child: Text(AppLocalizations.of(context).doneButton, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
               ),
             ),
           ],
@@ -287,7 +288,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Change PIN', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).changePinAction, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Padding(
@@ -341,7 +342,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                   child: TextButton(
                     onPressed: () => context.push(AppRoutes.resetPin),
                     child: Text(
-                      'Forgot your PIN?',
+                      AppLocalizations.of(context).forgotPinLink,
                       style: AppTextStyles.labelMedium(color: AppColors.primary),
                     ),
                   ),
@@ -361,7 +362,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
                     const SizedBox(width: AppDimensions.spaceMD),
                     Expanded(
                       child: Text(
-                        'Your PIN is securely encrypted and used to authorize transactions.',
+                        AppLocalizations.of(context).pinSecurityNote,
                         style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                       ),
                     ),

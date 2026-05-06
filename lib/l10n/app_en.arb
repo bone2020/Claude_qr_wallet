@@ -1624,4 +1624,129 @@
 
   "previewLabel": "Preview",
   "@previewLabel": {"description": "Heading above the theme preview section on the theme settings screen."}
+,
+  "passwordChangedTitle": "Password Changed!",
+  "@passwordChangedTitle": {"description": "Hero title shown on the password changed success screen."},
+
+  "passwordChangedBody": "Your password has been updated successfully.",
+  "@passwordChangedBody": {"description": "Body text shown beneath the password changed title."},
+
+  "changePasswordAction": "Change Password",
+  "@changePasswordAction": {"description": "Change Password label, used both as AppBar title and as the primary action button on the change password screen."},
+
+  "createNewPasswordSubtitle": "Create a new password",
+  "@createNewPasswordSubtitle": {"description": "Subtitle below the AppBar on the change password screen."},
+
+  "currentPasswordLabel": "Current Password",
+  "@currentPasswordLabel": {"description": "Floating label on the current password input field."},
+
+  "enterCurrentPasswordHint": "Enter current password",
+  "@enterCurrentPasswordHint": {"description": "Placeholder text in the current password input field."},
+
+  "newPasswordLabel": "New Password",
+  "@newPasswordLabel": {"description": "Floating label on the new password input field."},
+
+  "enterNewPasswordHint": "Enter new password",
+  "@enterNewPasswordHint": {"description": "Placeholder text in the new password input field."},
+
+  "confirmNewPasswordLabel": "Confirm New Password",
+  "@confirmNewPasswordLabel": {"description": "Floating label on the confirm-new-password input field."},
+
+  "reenterNewPasswordHint": "Re-enter new password",
+  "@reenterNewPasswordHint": {"description": "Placeholder text in the confirm-new-password input field."},
+
+  "passwordMustContainLabel": "Password must contain:",
+  "@passwordMustContainLabel": {"description": "Label above the password requirements checklist."},
+
+  "pinChangedTitle": "PIN Changed!",
+  "@pinChangedTitle": {"description": "Hero title shown on the PIN changed success screen."},
+
+  "pinChangedBody": "Your transaction PIN has been updated successfully.",
+  "@pinChangedBody": {"description": "Body text shown beneath the PIN changed title."},
+
+  "changePinAction": "Change PIN",
+  "@changePinAction": {"description": "AppBar title on the change PIN screen."},
+
+  "forgotPinLink": "Forgot your PIN?",
+  "@forgotPinLink": {"description": "Text button on the change PIN screen that navigates to the reset PIN flow."},
+
+  "pinSecurityNote": "Your PIN is securely encrypted and used to authorize transactions.",
+  "@pinSecurityNote": {"description": "Reassurance caption on the change PIN screen."},
+
+  "pinResetTitle": "PIN Reset!",
+  "@pinResetTitle": {"description": "Hero title shown on the PIN reset success screen."},
+
+  "pinResetBody": "Your transaction PIN has been reset successfully.",
+  "@pinResetBody": {"description": "Body text shown beneath the PIN reset title."},
+
+  "resetPinAction": "Reset PIN",
+  "@resetPinAction": {"description": "AppBar title on the reset PIN screen."},
+
+  "enterNewPinStepTitle": "Enter New PIN",
+  "@enterNewPinStepTitle": {"description": "Step title in the reset PIN flow when entering the new PIN."},
+
+  "createNewPinSubtitle": "Create a new 6-digit transaction PIN",
+  "@createNewPinSubtitle": {"description": "Subtitle below the Enter New PIN step heading."},
+
+  "confirmNewPinStepTitle": "Confirm New PIN",
+  "@confirmNewPinStepTitle": {"description": "Step title in the reset PIN flow when confirming the new PIN."},
+
+  "reenterNewPinSubtitle": "Re-enter your new PIN to confirm",
+  "@reenterNewPinSubtitle": {"description": "Subtitle below the Confirm New PIN step heading."},
+
+  "verifyYourIdentityTitle": "Verify Your Identity",
+  "@verifyYourIdentityTitle": {"description": "Heading on the reset PIN method selection step."},
+
+  "resetPinVerifyIdentityBody": "To reset your PIN, please verify your identity using one of the options below.",
+  "@resetPinVerifyIdentityBody": {"description": "Body text below the Verify Your Identity heading."},
+
+  "emailAndPasswordMethod": "Email & Password",
+  "@emailAndPasswordMethod": {"description": "Method card title for verifying identity via email and password."},
+
+  "emailAndPasswordSubtitle": "Verify using your login credentials",
+  "@emailAndPasswordSubtitle": {"description": "Method card subtitle for the email and password verification option."},
+
+  "resetPinSecurityAssurance": "This verification ensures only you can reset your PIN.",
+  "@resetPinSecurityAssurance": {"description": "Security reassurance caption on the reset PIN method selection step."},
+
+  "enterYourPasswordTitle": "Enter Your Password",
+  "@enterYourPasswordTitle": {"description": "Step title when verifying via email and password during PIN reset."},
+
+  "verifyByCredentialsBody": "Verify your identity by entering your login credentials.",
+  "@verifyByCredentialsBody": {"description": "Body text below the Enter Your Password step heading."},
+
+  "emailLabel": "Email",
+  "@emailLabel": {"description": "Floating label on the email input field. Generic label that may be reused."},
+
+  "passwordLabel": "Password",
+  "@passwordLabel": {"description": "Floating label on the password input field. Generic label that may be reused."},
+
+  "enterYourPasswordHint": "Enter your password",
+  "@enterYourPasswordHint": {"description": "Placeholder text in the password input field on the PIN reset email-verification step."},
+
+  "enter6DigitCodePhone": "Enter the 6-digit code sent to {phone}",
+  "@enter6DigitCodePhone": {
+    "description": "Body text on the OTP entry step during PIN reset.",
+    "placeholders": {
+      "phone": {"type": "String"}
+    }
+  },
+
+  "tooManyAttemptsError": "Too many attempts. Please try again later.",
+  "@tooManyAttemptsError": {"description": "Error message shown when OTP send attempts have been rate-limited."},
+
+  "failedToSendOtpError": "Failed to send OTP. Please try again.",
+  "@failedToSendOtpError": {"description": "Generic fallback error when OTP send fails."},
+
+  "incorrectCodeError": "Incorrect code. Please try again.",
+  "@incorrectCodeError": {"description": "Error message shown when the user enters an incorrect OTP."},
+
+  "verificationFailedAgainError": "Verification failed. Please try again.",
+  "@verificationFailedAgainError": {"description": "Generic fallback error when OTP verification fails."},
+
+  "verifyOtpToPhoneSubtitle": "Verify via OTP sent to your phone",
+  "@verifyOtpToPhoneSubtitle": {"description": "Method card subtitle for the phone OTP verification option."},
+
+  "noPhoneNumberLinkedSubtitle": "No phone number linked to your account",
+  "@noPhoneNumberLinkedSubtitle": {"description": "Method card subtitle when no phone number is on file."}
 }

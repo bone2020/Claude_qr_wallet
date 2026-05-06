@@ -1463,4 +1463,136 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get previewLabel => 'Preview';
+
+  @override
+  String get passwordChangedTitle => 'Password Changed!';
+
+  @override
+  String get passwordChangedBody =>
+      'Your password has been updated successfully.';
+
+  @override
+  String get changePasswordAction => 'Change Password';
+
+  @override
+  String get createNewPasswordSubtitle => 'Create a new password';
+
+  @override
+  String get currentPasswordLabel => 'Current Password';
+
+  @override
+  String get enterCurrentPasswordHint => 'Enter current password';
+
+  @override
+  String get newPasswordLabel => 'New Password';
+
+  @override
+  String get enterNewPasswordHint => 'Enter new password';
+
+  @override
+  String get confirmNewPasswordLabel => 'Confirm New Password';
+
+  @override
+  String get reenterNewPasswordHint => 'Re-enter new password';
+
+  @override
+  String get passwordMustContainLabel => 'Password must contain:';
+
+  @override
+  String get pinChangedTitle => 'PIN Changed!';
+
+  @override
+  String get pinChangedBody =>
+      'Your transaction PIN has been updated successfully.';
+
+  @override
+  String get changePinAction => 'Change PIN';
+
+  @override
+  String get forgotPinLink => 'Forgot your PIN?';
+
+  @override
+  String get pinSecurityNote =>
+      'Your PIN is securely encrypted and used to authorize transactions.';
+
+  @override
+  String get pinResetTitle => 'PIN Reset!';
+
+  @override
+  String get pinResetBody =>
+      'Your transaction PIN has been reset successfully.';
+
+  @override
+  String get resetPinAction => 'Reset PIN';
+
+  @override
+  String get enterNewPinStepTitle => 'Enter New PIN';
+
+  @override
+  String get createNewPinSubtitle => 'Create a new 6-digit transaction PIN';
+
+  @override
+  String get confirmNewPinStepTitle => 'Confirm New PIN';
+
+  @override
+  String get reenterNewPinSubtitle => 'Re-enter your new PIN to confirm';
+
+  @override
+  String get verifyYourIdentityTitle => 'Verify Your Identity';
+
+  @override
+  String get resetPinVerifyIdentityBody =>
+      'To reset your PIN, please verify your identity using one of the options below.';
+
+  @override
+  String get emailAndPasswordMethod => 'Email & Password';
+
+  @override
+  String get emailAndPasswordSubtitle => 'Verify using your login credentials';
+
+  @override
+  String get resetPinSecurityAssurance =>
+      'This verification ensures only you can reset your PIN.';
+
+  @override
+  String get enterYourPasswordTitle => 'Enter Your Password';
+
+  @override
+  String get verifyByCredentialsBody =>
+      'Verify your identity by entering your login credentials.';
+
+  @override
+  String get emailLabel => 'Email';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get enterYourPasswordHint => 'Enter your password';
+
+  @override
+  String enter6DigitCodePhone(String phone) {
+    return 'Enter the 6-digit code sent to $phone';
+  }
+
+  @override
+  String get tooManyAttemptsError =>
+      'Too many attempts. Please try again later.';
+
+  @override
+  String get failedToSendOtpError => 'Failed to send OTP. Please try again.';
+
+  @override
+  String get incorrectCodeError => 'Incorrect code. Please try again.';
+
+  @override
+  String get verificationFailedAgainError =>
+      'Verification failed. Please try again.';
+
+  @override
+  String get verifyOtpToPhoneSubtitle => 'Verify via OTP sent to your phone';
+
+  @override
+  String get noPhoneNumberLinkedSubtitle =>
+      'No phone number linked to your account';
 }

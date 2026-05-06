@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../auth/widgets/custom_text_field.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -75,10 +76,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 48),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
-              Text('Password Changed!', style: AppTextStyles.headlineSmall()),
+              Text(AppLocalizations.of(context).passwordChangedTitle, style: AppTextStyles.headlineSmall()),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                'Your password has been updated successfully.',
+                AppLocalizations.of(context).passwordChangedBody,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -92,7 +93,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                   Navigator.pop(context);
                   context.pop();
                 },
-                child: Text('Done', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                child: Text(AppLocalizations.of(context).doneButton, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
               ),
             ),
           ],
@@ -119,7 +120,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithMessage(e.toString())), backgroundColor: AppColors.error),
       );
     }
   }
@@ -134,7 +135,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Change Password', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).changePasswordAction, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -145,7 +146,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Create a new password',
+                  AppLocalizations.of(context).createNewPasswordSubtitle,
                   style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 ),
                 const SizedBox(height: AppDimensions.spaceLG),
@@ -153,8 +154,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 // Current Password
                 CustomTextField(
                   controller: _currentPasswordController,
-                  label: 'Current Password',
-                  hintText: 'Enter current password',
+                  label: AppLocalizations.of(context).currentPasswordLabel,
+                  hintText: AppLocalizations.of(context).enterCurrentPasswordHint,
                   obscureText: true,
                   prefixIcon: const Icon(Iconsax.lock, color: AppColors.textSecondaryDark),
                   validator: (value) {
@@ -169,8 +170,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 // New Password
                 CustomTextField(
                   controller: _newPasswordController,
-                  label: 'New Password',
-                  hintText: 'Enter new password',
+                  label: AppLocalizations.of(context).newPasswordLabel,
+                  hintText: AppLocalizations.of(context).enterNewPasswordHint,
                   obscureText: true,
                   prefixIcon: const Icon(Iconsax.lock_1, color: AppColors.textSecondaryDark),
                   validator: (value) {
@@ -194,8 +195,8 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 // Confirm Password
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  label: 'Confirm New Password',
-                  hintText: 'Re-enter new password',
+                  label: AppLocalizations.of(context).confirmNewPasswordLabel,
+                  hintText: AppLocalizations.of(context).reenterNewPasswordHint,
                   obscureText: true,
                   prefixIcon: const Icon(Iconsax.lock_1, color: AppColors.textSecondaryDark),
                   validator: (value) {
@@ -221,7 +222,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Password must contain:',
+                        AppLocalizations.of(context).passwordMustContainLabel,
                         style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                       ),
                       const SizedBox(height: AppDimensions.spaceXS),
@@ -250,7 +251,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                             ),
                           )
                         : Text(
-                            'Change Password',
+                            AppLocalizations.of(context).changePasswordAction,
                             style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                           ),
                   ),

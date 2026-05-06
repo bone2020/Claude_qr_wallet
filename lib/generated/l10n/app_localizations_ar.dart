@@ -1417,4 +1417,126 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get previewLabel => '';
+
+  @override
+  String get passwordChangedTitle => '';
+
+  @override
+  String get passwordChangedBody => '';
+
+  @override
+  String get changePasswordAction => '';
+
+  @override
+  String get createNewPasswordSubtitle => '';
+
+  @override
+  String get currentPasswordLabel => '';
+
+  @override
+  String get enterCurrentPasswordHint => '';
+
+  @override
+  String get newPasswordLabel => '';
+
+  @override
+  String get enterNewPasswordHint => '';
+
+  @override
+  String get confirmNewPasswordLabel => '';
+
+  @override
+  String get reenterNewPasswordHint => '';
+
+  @override
+  String get passwordMustContainLabel => '';
+
+  @override
+  String get pinChangedTitle => '';
+
+  @override
+  String get pinChangedBody => '';
+
+  @override
+  String get changePinAction => '';
+
+  @override
+  String get forgotPinLink => '';
+
+  @override
+  String get pinSecurityNote => '';
+
+  @override
+  String get pinResetTitle => '';
+
+  @override
+  String get pinResetBody => '';
+
+  @override
+  String get resetPinAction => '';
+
+  @override
+  String get enterNewPinStepTitle => '';
+
+  @override
+  String get createNewPinSubtitle => '';
+
+  @override
+  String get confirmNewPinStepTitle => '';
+
+  @override
+  String get reenterNewPinSubtitle => '';
+
+  @override
+  String get verifyYourIdentityTitle => '';
+
+  @override
+  String get resetPinVerifyIdentityBody => '';
+
+  @override
+  String get emailAndPasswordMethod => '';
+
+  @override
+  String get emailAndPasswordSubtitle => '';
+
+  @override
+  String get resetPinSecurityAssurance => '';
+
+  @override
+  String get enterYourPasswordTitle => '';
+
+  @override
+  String get verifyByCredentialsBody => '';
+
+  @override
+  String get emailLabel => '';
+
+  @override
+  String get passwordLabel => '';
+
+  @override
+  String get enterYourPasswordHint => '';
+
+  @override
+  String enter6DigitCodePhone(String phone) {
+    return '';
+  }
+
+  @override
+  String get tooManyAttemptsError => '';
+
+  @override
+  String get failedToSendOtpError => '';
+
+  @override
+  String get incorrectCodeError => '';
+
+  @override
+  String get verificationFailedAgainError => '';
+
+  @override
+  String get verifyOtpToPhoneSubtitle => '';
+
+  @override
+  String get noPhoneNumberLinkedSubtitle => '';
 }

@@ -2763,6 +2763,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preview'**
   String get previewLabel;
+
+  /// Hero title shown on the password changed success screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Password Changed!'**
+  String get passwordChangedTitle;
+
+  /// Body text shown beneath the password changed title.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password has been updated successfully.'**
+  String get passwordChangedBody;
+
+  /// Change Password label, used both as AppBar title and as the primary action button on the change password screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Password'**
+  String get changePasswordAction;
+
+  /// Subtitle below the AppBar on the change password screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new password'**
+  String get createNewPasswordSubtitle;
+
+  /// Floating label on the current password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Password'**
+  String get currentPasswordLabel;
+
+  /// Placeholder text in the current password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter current password'**
+  String get enterCurrentPasswordHint;
+
+  /// Floating label on the new password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get newPasswordLabel;
+
+  /// Placeholder text in the new password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter new password'**
+  String get enterNewPasswordHint;
+
+  /// Floating label on the confirm-new-password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm New Password'**
+  String get confirmNewPasswordLabel;
+
+  /// Placeholder text in the confirm-new-password input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter new password'**
+  String get reenterNewPasswordHint;
+
+  /// Label above the password requirements checklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain:'**
+  String get passwordMustContainLabel;
+
+  /// Hero title shown on the PIN changed success screen.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN Changed!'**
+  String get pinChangedTitle;
+
+  /// Body text shown beneath the PIN changed title.
+  ///
+  /// In en, this message translates to:
+  /// **'Your transaction PIN has been updated successfully.'**
+  String get pinChangedBody;
+
+  /// AppBar title on the change PIN screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Change PIN'**
+  String get changePinAction;
+
+  /// Text button on the change PIN screen that navigates to the reset PIN flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot your PIN?'**
+  String get forgotPinLink;
+
+  /// Reassurance caption on the change PIN screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your PIN is securely encrypted and used to authorize transactions.'**
+  String get pinSecurityNote;
+
+  /// Hero title shown on the PIN reset success screen.
+  ///
+  /// In en, this message translates to:
+  /// **'PIN Reset!'**
+  String get pinResetTitle;
+
+  /// Body text shown beneath the PIN reset title.
+  ///
+  /// In en, this message translates to:
+  /// **'Your transaction PIN has been reset successfully.'**
+  String get pinResetBody;
+
+  /// AppBar title on the reset PIN screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset PIN'**
+  String get resetPinAction;
+
+  /// Step title in the reset PIN flow when entering the new PIN.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter New PIN'**
+  String get enterNewPinStepTitle;
+
+  /// Subtitle below the Enter New PIN step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new 6-digit transaction PIN'**
+  String get createNewPinSubtitle;
+
+  /// Step title in the reset PIN flow when confirming the new PIN.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm New PIN'**
+  String get confirmNewPinStepTitle;
+
+  /// Subtitle below the Confirm New PIN step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-enter your new PIN to confirm'**
+  String get reenterNewPinSubtitle;
+
+  /// Heading on the reset PIN method selection step.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Your Identity'**
+  String get verifyYourIdentityTitle;
+
+  /// Body text below the Verify Your Identity heading.
+  ///
+  /// In en, this message translates to:
+  /// **'To reset your PIN, please verify your identity using one of the options below.'**
+  String get resetPinVerifyIdentityBody;
+
+  /// Method card title for verifying identity via email and password.
+  ///
+  /// In en, this message translates to:
+  /// **'Email & Password'**
+  String get emailAndPasswordMethod;
+
+  /// Method card subtitle for the email and password verification option.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify using your login credentials'**
+  String get emailAndPasswordSubtitle;
+
+  /// Security reassurance caption on the reset PIN method selection step.
+  ///
+  /// In en, this message translates to:
+  /// **'This verification ensures only you can reset your PIN.'**
+  String get resetPinSecurityAssurance;
+
+  /// Step title when verifying via email and password during PIN reset.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Your Password'**
+  String get enterYourPasswordTitle;
+
+  /// Body text below the Enter Your Password step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your identity by entering your login credentials.'**
+  String get verifyByCredentialsBody;
+
+  /// Floating label on the email input field. Generic label that may be reused.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get emailLabel;
+
+  /// Floating label on the password input field. Generic label that may be reused.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// Placeholder text in the password input field on the PIN reset email-verification step.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password'**
+  String get enterYourPasswordHint;
+
+  /// Body text on the OTP entry step during PIN reset.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit code sent to {phone}'**
+  String enter6DigitCodePhone(String phone);
+
+  /// Error message shown when OTP send attempts have been rate-limited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please try again later.'**
+  String get tooManyAttemptsError;
+
+  /// Generic fallback error when OTP send fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to send OTP. Please try again.'**
+  String get failedToSendOtpError;
+
+  /// Error message shown when the user enters an incorrect OTP.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect code. Please try again.'**
+  String get incorrectCodeError;
+
+  /// Generic fallback error when OTP verification fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification failed. Please try again.'**
+  String get verificationFailedAgainError;
+
+  /// Method card subtitle for the phone OTP verification option.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify via OTP sent to your phone'**
+  String get verifyOtpToPhoneSubtitle;
+
+  /// Method card subtitle when no phone number is on file.
+  ///
+  /// In en, this message translates to:
+  /// **'No phone number linked to your account'**
+  String get noPhoneNumberLinkedSubtitle;
 }
 
 class _AppLocalizationsDelegate

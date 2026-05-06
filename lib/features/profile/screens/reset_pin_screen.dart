@@ -14,6 +14,7 @@ import '../../../core/services/secure_storage_service.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../providers/auth_provider.dart'; 
 
+import '../../../generated/l10n/app_localizations.dart';
 class ResetPinScreen extends ConsumerStatefulWidget {
   const ResetPinScreen({super.key});
 
@@ -76,9 +77,9 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
         if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
           _errorMessage = 'Incorrect password. Please try again.';
         } else if (e.code == 'too-many-requests') {
-          _errorMessage = 'Too many attempts. Please try again later.';
+          _errorMessage = AppLocalizations.of(context).tooManyAttemptsError;
         } else {
-          _errorMessage = 'Verification failed. Please try again.';
+          _errorMessage = AppLocalizations.of(context).verificationFailedAgainError;
         }
       });
     } catch (e) {
@@ -119,8 +120,8 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
             setState(() {
               _isLoading = false;
               _errorMessage = e.code == 'too-many-requests'
-                  ? 'Too many attempts. Please try again later.'
-                  : 'Failed to send OTP. Please try again.';
+                  ? AppLocalizations.of(context).tooManyAttemptsError
+                  : AppLocalizations.of(context).failedToSendOtpError;
             });
           }
         },
@@ -153,8 +154,8 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = e.code == 'invalid-verification-code'
-            ? 'Incorrect code. Please try again.'
-            : 'Verification failed. Please try again.';
+            ? AppLocalizations.of(context).incorrectCodeError
+            : AppLocalizations.of(context).verificationFailedAgainError;
       });
     } catch (e) {
       setState(() { _isLoading = false; _errorMessage = ErrorHandler.getUserFriendlyMessage(e); });
@@ -198,9 +199,9 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
                 child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 48),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
-              Text('PIN Reset!', style: AppTextStyles.headlineSmall()),
+              Text(AppLocalizations.of(context).pinResetTitle, style: AppTextStyles.headlineSmall()),
               const SizedBox(height: AppDimensions.spaceXS),
-              Text('Your transaction PIN has been reset successfully.',
+              Text(AppLocalizations.of(context).pinResetBody,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark), textAlign: TextAlign.center),
             ],
           ),
@@ -209,7 +210,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () { Navigator.pop(context); context.pop(); },
-                child: Text('Done', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                child: Text(AppLocalizations.of(context).doneButton, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
               ),
             ),
           ],
@@ -237,7 +238,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
             }
           },
         ),
-        title: Text('Reset PIN', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).resetPinAction, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Padding(
@@ -252,8 +253,8 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
     switch (_currentStep) {
       case 0: return _buildMethodSelection();
       case 1: return _selectedMethod == 'email' ? _buildEmailVerification() : _buildPhoneVerification();
-      case 2: return _buildPinStep(title: 'Enter New PIN', subtitle: 'Create a new 6-digit transaction PIN', controller: _newPinController, onCompleted: _setNewPin);
-      case 3: return _buildPinStep(title: 'Confirm New PIN', subtitle: 'Re-enter your new PIN to confirm', controller: _confirmPinController, onCompleted: _confirmNewPin);
+      case 2: return _buildPinStep(title: AppLocalizations.of(context).enterNewPinStepTitle, subtitle: AppLocalizations.of(context).createNewPinSubtitle, controller: _newPinController, onCompleted: _setNewPin);
+      case 3: return _buildPinStep(title: AppLocalizations.of(context).confirmNewPinStepTitle, subtitle: AppLocalizations.of(context).reenterNewPinSubtitle, controller: _confirmPinController, onCompleted: _confirmNewPin);
       default: return _buildMethodSelection();
     }
   }
@@ -268,16 +269,16 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppDimensions.spaceXL),
-        Text('Verify Your Identity', style: AppTextStyles.headlineSmall()),
+        Text(AppLocalizations.of(context).verifyYourIdentityTitle, style: AppTextStyles.headlineSmall()),
         const SizedBox(height: AppDimensions.spaceXS),
-        Text('To reset your PIN, please verify your identity using one of the options below.',
+        Text(AppLocalizations.of(context).resetPinVerifyIdentityBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceXXL),
-        _buildMethodCard(icon: Iconsax.sms, title: 'Email & Password', subtitle: 'Verify using your login credentials',
+        _buildMethodCard(icon: Iconsax.sms, title: AppLocalizations.of(context).emailAndPasswordMethod, subtitle: AppLocalizations.of(context).emailAndPasswordSubtitle,
           onTap: () { setState(() { _selectedMethod = 'email'; _currentStep = 1; _errorMessage = null; }); }),
         const SizedBox(height: AppDimensions.spaceMD),
-        _buildMethodCard(icon: Iconsax.call, title: 'Phone Number',
-          subtitle: hasPhone ? 'Verify via OTP sent to your phone' : 'No phone number linked to your account',
+        _buildMethodCard(icon: Iconsax.call, title: AppLocalizations.of(context).phoneNumberLabel,
+          subtitle: hasPhone ? AppLocalizations.of(context).verifyOtpToPhoneSubtitle : AppLocalizations.of(context).noPhoneNumberLinkedSubtitle,
           enabled: hasPhone,
           onTap: hasPhone ? () { setState(() { _selectedMethod = 'phone'; _currentStep = 1; _errorMessage = null; }); _sendPhoneOtp(); } : null),
         const Spacer(),
@@ -287,7 +288,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
           child: Row(children: [
             const Icon(Iconsax.shield_tick, color: AppColors.primary, size: 24),
             const SizedBox(width: AppDimensions.spaceMD),
-            Expanded(child: Text('This verification ensures only you can reset your PIN.',
+            Expanded(child: Text(AppLocalizations.of(context).resetPinSecurityAssurance,
               style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark))),
           ]),
         ),
@@ -332,12 +333,12 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
     return SingleChildScrollView(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const SizedBox(height: AppDimensions.spaceXL),
-        Text('Enter Your Password', style: AppTextStyles.headlineSmall()),
+        Text(AppLocalizations.of(context).enterYourPasswordTitle, style: AppTextStyles.headlineSmall()),
         const SizedBox(height: AppDimensions.spaceXS),
-        Text('Verify your identity by entering your login credentials.',
+        Text(AppLocalizations.of(context).verifyByCredentialsBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceXXL),
-        Text('Email', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+        Text(AppLocalizations.of(context).emailLabel, style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceSM),
         TextFormField(
           controller: _emailController..text = user?.email ?? '',
@@ -351,14 +352,14 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
           ),
         ),
         const SizedBox(height: AppDimensions.spaceLG),
-        Text('Password', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+        Text(AppLocalizations.of(context).passwordLabel, style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
         const SizedBox(height: AppDimensions.spaceSM),
         TextFormField(
           controller: _passwordController,
           obscureText: _obscurePassword,
           style: AppTextStyles.bodyLarge(),
           decoration: InputDecoration(
-            hintText: 'Enter your password',
+            hintText: AppLocalizations.of(context).enterYourPasswordHint,
             hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
             filled: true, fillColor: AppColors.surfaceDark,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusMD), borderSide: const BorderSide(color: AppColors.inputBorderDark)),
@@ -382,7 +383,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
             onPressed: _isLoading ? null : _verifyWithEmail,
             child: _isLoading
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark))
-                : Text('Verify', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                : Text(AppLocalizations.of(context).verifyButton, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
           ),
         ),
       ]),
@@ -397,9 +398,9 @@ final user = FirebaseAuth.instance.currentUser;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const SizedBox(height: AppDimensions.spaceXL),
-      Text('Enter OTP', style: AppTextStyles.headlineSmall()),
+      Text(AppLocalizations.of(context).enterOtpTitle, style: AppTextStyles.headlineSmall()),
       const SizedBox(height: AppDimensions.spaceXS),
-      Text('Enter the 6-digit code sent to $maskedPhone',
+      Text(AppLocalizations.of(context).enter6DigitCodePhone(maskedPhone),
         style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark)),
       const SizedBox(height: AppDimensions.spaceXXL),
       if (_isLoading && _verificationId == null)
@@ -425,7 +426,7 @@ final user = FirebaseAuth.instance.currentUser;
         const SizedBox(height: AppDimensions.spaceXL),
         Center(child: TextButton(
           onPressed: _isLoading ? null : _sendPhoneOtp,
-          child: Text('Resend Code', style: AppTextStyles.labelMedium(color: AppColors.primary)),
+          child: Text(AppLocalizations.of(context).resendCodeButton, style: AppTextStyles.labelMedium(color: AppColors.primary)),
         )),
         const SizedBox(height: AppDimensions.spaceXL),
         SizedBox(
@@ -434,7 +435,7 @@ final user = FirebaseAuth.instance.currentUser;
             onPressed: _isLoading ? null : _verifyPhoneOtp,
             child: _isLoading
                 ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark))
-                : Text('Verify', style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                : Text(AppLocalizations.of(context).verifyButton, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
           ),
         ),
       ],
