@@ -1419,4 +1419,123 @@
 
   "otpVerificationFailedError": "OTP verification failed",
   "@otpVerificationFailedError": {"description": "Fallback error snackbar when OTP verification during a withdrawal fails."}
+,
+  "aboutTitle": "About",
+  "@aboutTitle": {"description": "AppBar title on the About screen."},
+
+  "qrWalletAppName": "QR Wallet",
+  "@qrWalletAppName": {"description": "App name shown prominently on the About screen. Brand name."},
+
+  "versionAndBuild": "Version {version} (Build {buildNumber})",
+  "@versionAndBuild": {
+    "description": "Version and build number display on About screen, e.g. 'Version 1.2.3 (Build 456)'.",
+    "placeholders": {
+      "version": {"type": "String"},
+      "buildNumber": {"type": "String"}
+    }
+  },
+
+  "aboutAppDescription": "QR Wallet is a secure and easy-to-use digital wallet that allows you to send, receive, and manage money with just a scan. Experience the future of payments today.",
+  "@aboutAppDescription": {"description": "Marketing description paragraph on About screen describing the app."},
+
+  "termsOfServiceLink": "Terms of Service",
+  "@termsOfServiceLink": {"description": "About screen link item that opens the Terms of Service URL."},
+
+  "privacyPolicyLink": "Privacy Policy",
+  "@privacyPolicyLink": {"description": "About screen link item that opens the Privacy Policy URL."},
+
+  "rateUsLink": "Rate Us",
+  "@rateUsLink": {"description": "About screen link item that prompts the user to rate the app."},
+
+  "rateUsToast": "Rate us on the App Store!",
+  "@rateUsToast": {"description": "Snackbar shown when the user taps the Rate Us link."},
+
+  "shareAppLink": "Share App",
+  "@shareAppLink": {"description": "About screen link item to share the app with others."},
+
+  "shareComingSoonToast": "Share feature coming soon!",
+  "@shareComingSoonToast": {"description": "Snackbar shown when the user taps Share App."},
+
+  "copyrightLine": "© 2024 QR Wallet. All rights reserved.",
+  "@copyrightLine": {"description": "Copyright footer on the About screen."},
+
+  "madeInGhanaLine": "Made with ❤️ in Ghana",
+  "@madeInGhanaLine": {"description": "Pride-of-place footer on the About screen."},
+
+  "errorUpdatingProfile": "Error updating profile: {error}",
+  "@errorUpdatingProfile": {
+    "description": "Snackbar shown when saving profile changes fails.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "nameVerifiedKycCannotChange": "Name verified via KYC — cannot be changed",
+  "@nameVerifiedKycCannotChange": {"description": "Caption explaining why the name field is locked on the edit profile screen."},
+
+  "changePhotoButton": "Change Photo",
+  "@changePhotoButton": {"description": "Button label on the edit profile screen for changing the avatar photo."},
+
+  "blockAccountLabel": "Block Account",
+  "@blockAccountLabel": {"description": "Generic 'Block Account' label — shared across dialog title, dialog action button, and menu item label."},
+
+  "blockAccountConfirmBody": "Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n• Sending money\n• Withdrawing funds\n• Adding money\n\nYou can unblock anytime with your PIN.",
+  "@blockAccountConfirmBody": {"description": "Body text inside the Block Account confirmation dialog. Multi-line with bullet list."},
+
+  "accountBlockedSuccessToast": "Account blocked successfully. All transactions are disabled.",
+  "@accountBlockedSuccessToast": {"description": "Snackbar shown after the user successfully blocks their own account."},
+
+  "accountBlockedBySupportTitle": "Account Blocked by Support",
+  "@accountBlockedBySupportTitle": {"description": "Title of the modal dialog shown when the user's account has been blocked by customer support."},
+
+  "accountBlockedBySupportBody": "Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.",
+  "@accountBlockedBySupportBody": {"description": "Body of the support-blocked dialog explaining the situation."},
+
+  "accountUnblockedSuccessToast": "Account unblocked successfully. All transactions are now enabled.",
+  "@accountUnblockedSuccessToast": {"description": "Snackbar shown after the user successfully unblocks their account."},
+
+  "logoutConfirmBody": "Are you sure you want to log out?",
+  "@logoutConfirmBody": {"description": "Body text inside the Log Out confirmation dialog."},
+
+  "businessLabel": "Business",
+  "@businessLabel": {"description": "Section heading on the profile screen for business-account-related items."},
+
+  "noBiometricsEnrolledToast": "No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.",
+  "@noBiometricsEnrolledToast": {"description": "Snackbar shown when the user tries to enable biometric login but no biometrics are enrolled."},
+
+  "preferencesSection": "Preferences",
+  "@preferencesSection": {"description": "Section heading on the profile screen for user preferences."},
+
+  "appearanceMenuItem": "Appearance",
+  "@appearanceMenuItem": {"description": "Menu item label that opens the theme/appearance settings screen."},
+
+  "accountSafetySection": "Account Safety",
+  "@accountSafetySection": {"description": "Section heading on the profile screen for account safety options."},
+
+  "supportSection": "Support",
+  "@supportSection": {"description": "Section heading on the profile screen for support items."},
+
+  "currencyLabel": "Currency",
+  "@currencyLabel": {"description": "Label for the currency selection menu item on the profile screen."},
+
+  "currencyNameAndSymbol": "{name} ({symbol})",
+  "@currencyNameAndSymbol": {
+    "description": "Compact currency display showing both name and symbol, e.g. 'US Dollar (US$)'.",
+    "placeholders": {
+      "name": {"type": "String"},
+      "symbol": {"type": "String"}
+    }
+  },
+
+  "unblockAccountLabel": "Unblock Account",
+  "@unblockAccountLabel": {"description": "Menu item label shown when the account is currently blocked."},
+
+  "blockedBySupportSubtitle": "Blocked by support — contact us to unblock",
+  "@blockedBySupportSubtitle": {"description": "Compact subtitle on the block-account menu item shown when blocked by support."},
+
+  "accountBlockedSubtitle": "Your account is currently blocked",
+  "@accountBlockedSubtitle": {"description": "Subtitle on the block-account menu item shown when the user has self-blocked."},
+
+  "temporarilyDisableSubtitle": "Temporarily disable all transactions",
+  "@temporarilyDisableSubtitle": {"description": "Subtitle on the block-account menu item explaining what blocking does."}
 }

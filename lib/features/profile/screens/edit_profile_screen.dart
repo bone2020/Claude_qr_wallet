@@ -203,7 +203,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error updating profile: $e'),
+          content: Text(AppLocalizations.of(context).errorUpdatingProfile(e.toString())),
           backgroundColor: AppColors.error,
         ),
       );
@@ -268,7 +268,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             Icon(Icons.verified, size: 14, color: AppColors.success),
                             const SizedBox(width: 6),
                             Text(
-                              'Name verified via KYC — cannot be changed',
+                              AppLocalizations.of(context).nameVerifiedKycCannotChange,
                               style: AppTextStyles.caption(color: AppColors.success),
                             ),
                           ],
@@ -351,7 +351,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ),
           const SizedBox(height: AppDimensions.spaceSM),
           Text(
-            'Change Photo',
+            AppLocalizations.of(context).changePhotoButton,
             style: AppTextStyles.bodyMedium(color: AppColors.primary),
           ),
         ],

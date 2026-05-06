@@ -2397,6 +2397,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OTP verification failed'**
   String get otpVerificationFailedError;
+
+  /// AppBar title on the About screen.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aboutTitle;
+
+  /// App name shown prominently on the About screen. Brand name.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Wallet'**
+  String get qrWalletAppName;
+
+  /// Version and build number display on About screen, e.g. 'Version 1.2.3 (Build 456)'.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} (Build {buildNumber})'**
+  String versionAndBuild(String version, String buildNumber);
+
+  /// Marketing description paragraph on About screen describing the app.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Wallet is a secure and easy-to-use digital wallet that allows you to send, receive, and manage money with just a scan. Experience the future of payments today.'**
+  String get aboutAppDescription;
+
+  /// About screen link item that opens the Terms of Service URL.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Service'**
+  String get termsOfServiceLink;
+
+  /// About screen link item that opens the Privacy Policy URL.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicyLink;
+
+  /// About screen link item that prompts the user to rate the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate Us'**
+  String get rateUsLink;
+
+  /// Snackbar shown when the user taps the Rate Us link.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate us on the App Store!'**
+  String get rateUsToast;
+
+  /// About screen link item to share the app with others.
+  ///
+  /// In en, this message translates to:
+  /// **'Share App'**
+  String get shareAppLink;
+
+  /// Snackbar shown when the user taps Share App.
+  ///
+  /// In en, this message translates to:
+  /// **'Share feature coming soon!'**
+  String get shareComingSoonToast;
+
+  /// Copyright footer on the About screen.
+  ///
+  /// In en, this message translates to:
+  /// **'© 2024 QR Wallet. All rights reserved.'**
+  String get copyrightLine;
+
+  /// Pride-of-place footer on the About screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Made with ❤️ in Ghana'**
+  String get madeInGhanaLine;
+
+  /// Snackbar shown when saving profile changes fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error updating profile: {error}'**
+  String errorUpdatingProfile(String error);
+
+  /// Caption explaining why the name field is locked on the edit profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Name verified via KYC — cannot be changed'**
+  String get nameVerifiedKycCannotChange;
+
+  /// Button label on the edit profile screen for changing the avatar photo.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Photo'**
+  String get changePhotoButton;
+
+  /// Generic 'Block Account' label — shared across dialog title, dialog action button, and menu item label.
+  ///
+  /// In en, this message translates to:
+  /// **'Block Account'**
+  String get blockAccountLabel;
+
+  /// Body text inside the Block Account confirmation dialog. Multi-line with bullet list.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n• Sending money\n• Withdrawing funds\n• Adding money\n\nYou can unblock anytime with your PIN.'**
+  String get blockAccountConfirmBody;
+
+  /// Snackbar shown after the user successfully blocks their own account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account blocked successfully. All transactions are disabled.'**
+  String get accountBlockedSuccessToast;
+
+  /// Title of the modal dialog shown when the user's account has been blocked by customer support.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Blocked by Support'**
+  String get accountBlockedBySupportTitle;
+
+  /// Body of the support-blocked dialog explaining the situation.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.'**
+  String get accountBlockedBySupportBody;
+
+  /// Snackbar shown after the user successfully unblocks their account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account unblocked successfully. All transactions are now enabled.'**
+  String get accountUnblockedSuccessToast;
+
+  /// Body text inside the Log Out confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to log out?'**
+  String get logoutConfirmBody;
+
+  /// Section heading on the profile screen for business-account-related items.
+  ///
+  /// In en, this message translates to:
+  /// **'Business'**
+  String get businessLabel;
+
+  /// Snackbar shown when the user tries to enable biometric login but no biometrics are enrolled.
+  ///
+  /// In en, this message translates to:
+  /// **'No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.'**
+  String get noBiometricsEnrolledToast;
+
+  /// Section heading on the profile screen for user preferences.
+  ///
+  /// In en, this message translates to:
+  /// **'Preferences'**
+  String get preferencesSection;
+
+  /// Menu item label that opens the theme/appearance settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get appearanceMenuItem;
+
+  /// Section heading on the profile screen for account safety options.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Safety'**
+  String get accountSafetySection;
+
+  /// Section heading on the profile screen for support items.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get supportSection;
+
+  /// Label for the currency selection menu item on the profile screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get currencyLabel;
+
+  /// Compact currency display showing both name and symbol, e.g. 'US Dollar (US$)'.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} ({symbol})'**
+  String currencyNameAndSymbol(String name, String symbol);
+
+  /// Menu item label shown when the account is currently blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock Account'**
+  String get unblockAccountLabel;
+
+  /// Compact subtitle on the block-account menu item shown when blocked by support.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked by support — contact us to unblock'**
+  String get blockedBySupportSubtitle;
+
+  /// Subtitle on the block-account menu item shown when the user has self-blocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is currently blocked'**
+  String get accountBlockedSubtitle;
+
+  /// Subtitle on the block-account menu item explaining what blocking does.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporarily disable all transactions'**
+  String get temporarilyDisableSubtitle;
 }
 
 class _AppLocalizationsDelegate

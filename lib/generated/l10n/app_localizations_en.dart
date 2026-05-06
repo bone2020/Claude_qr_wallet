@@ -1261,4 +1261,121 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get otpVerificationFailedError => 'OTP verification failed';
+
+  @override
+  String get aboutTitle => 'About';
+
+  @override
+  String get qrWalletAppName => 'QR Wallet';
+
+  @override
+  String versionAndBuild(String version, String buildNumber) {
+    return 'Version $version (Build $buildNumber)';
+  }
+
+  @override
+  String get aboutAppDescription =>
+      'QR Wallet is a secure and easy-to-use digital wallet that allows you to send, receive, and manage money with just a scan. Experience the future of payments today.';
+
+  @override
+  String get termsOfServiceLink => 'Terms of Service';
+
+  @override
+  String get privacyPolicyLink => 'Privacy Policy';
+
+  @override
+  String get rateUsLink => 'Rate Us';
+
+  @override
+  String get rateUsToast => 'Rate us on the App Store!';
+
+  @override
+  String get shareAppLink => 'Share App';
+
+  @override
+  String get shareComingSoonToast => 'Share feature coming soon!';
+
+  @override
+  String get copyrightLine => '© 2024 QR Wallet. All rights reserved.';
+
+  @override
+  String get madeInGhanaLine => 'Made with ❤️ in Ghana';
+
+  @override
+  String errorUpdatingProfile(String error) {
+    return 'Error updating profile: $error';
+  }
+
+  @override
+  String get nameVerifiedKycCannotChange =>
+      'Name verified via KYC — cannot be changed';
+
+  @override
+  String get changePhotoButton => 'Change Photo';
+
+  @override
+  String get blockAccountLabel => 'Block Account';
+
+  @override
+  String get blockAccountConfirmBody =>
+      'Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n• Sending money\n• Withdrawing funds\n• Adding money\n\nYou can unblock anytime with your PIN.';
+
+  @override
+  String get accountBlockedSuccessToast =>
+      'Account blocked successfully. All transactions are disabled.';
+
+  @override
+  String get accountBlockedBySupportTitle => 'Account Blocked by Support';
+
+  @override
+  String get accountBlockedBySupportBody =>
+      'Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.';
+
+  @override
+  String get accountUnblockedSuccessToast =>
+      'Account unblocked successfully. All transactions are now enabled.';
+
+  @override
+  String get logoutConfirmBody => 'Are you sure you want to log out?';
+
+  @override
+  String get businessLabel => 'Business';
+
+  @override
+  String get noBiometricsEnrolledToast =>
+      'No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.';
+
+  @override
+  String get preferencesSection => 'Preferences';
+
+  @override
+  String get appearanceMenuItem => 'Appearance';
+
+  @override
+  String get accountSafetySection => 'Account Safety';
+
+  @override
+  String get supportSection => 'Support';
+
+  @override
+  String get currencyLabel => 'Currency';
+
+  @override
+  String currencyNameAndSymbol(String name, String symbol) {
+    return '$name ($symbol)';
+  }
+
+  @override
+  String get unblockAccountLabel => 'Unblock Account';
+
+  @override
+  String get blockedBySupportSubtitle =>
+      'Blocked by support — contact us to unblock';
+
+  @override
+  String get accountBlockedSubtitle => 'Your account is currently blocked';
+
+  @override
+  String get temporarilyDisableSubtitle =>
+      'Temporarily disable all transactions';
 }

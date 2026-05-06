@@ -132,7 +132,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     resultHash = null;
                     Navigator.of(dialogContext).pop();
                   },
-                  child: Text('Cancel', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+                  child: Text(AppLocalizations.of(context).cancel, style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
                 ),
               ],
             );
@@ -155,21 +155,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             const Icon(Icons.block, color: AppColors.error, size: 24),
             const SizedBox(width: 12),
-            Text('Block Account', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).blockAccountLabel, style: AppTextStyles.headlineSmall()),
           ],
         ),
         content: Text(
-          'Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n\u2022 Sending money\n\u2022 Withdrawing funds\n\u2022 Adding money\n\nYou can unblock anytime with your PIN.',
+          AppLocalizations.of(context).blockAccountConfirmBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+            child: Text(AppLocalizations.of(context).cancel, style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Block Account', style: AppTextStyles.labelMedium(color: AppColors.error)),
+            child: Text(AppLocalizations.of(context).blockAccountLabel, style: AppTextStyles.labelMedium(color: AppColors.error)),
           ),
         ],
       ),
@@ -190,8 +190,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _accountBlockedBy = 'user';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account blocked successfully. All transactions are disabled.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).accountBlockedSuccessToast),
             backgroundColor: AppColors.warning,
           ),
         );
@@ -219,9 +219,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
           ),
-          title: Text('Account Blocked by Support', style: AppTextStyles.headlineSmall()),
+          title: Text(AppLocalizations.of(context).accountBlockedBySupportTitle, style: AppTextStyles.headlineSmall()),
           content: Text(
-            'Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.',
+            AppLocalizations.of(context).accountBlockedBySupportBody,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
           actions: [
@@ -248,8 +248,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _accountBlockedBy = null;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account unblocked successfully. All transactions are now enabled.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).accountUnblockedSuccessToast),
             backgroundColor: AppColors.success,
           ),
         );
@@ -279,7 +279,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         title: Text(AppLocalizations.of(context).logOut, style: AppTextStyles.headlineSmall()),
         content: Text(
-          'Are you sure you want to log out?',
+          AppLocalizations.of(context).logoutConfirmBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         actions: [
@@ -313,7 +313,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     // Get real user data from provider
     final user = ref.watch(currentUserProvider);
-    final userName = user?.displayName ?? 'User';
+    final userName = user?.displayName ?? AppLocalizations.of(context).defaultUserName;
     final email = user?.email ?? '';
     final phone = user?.phoneNumber ?? '';
     final profilePhoto = user?.profilePhotoUrl;
@@ -368,7 +368,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 bottom: AppDimensions.spaceSM,
               ),
               child: Text(
-                'Business',
+                AppLocalizations.of(context).businessLabel,
                 style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
               ),
             ),
@@ -394,8 +394,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       if (!canCheck) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.'),
+                            SnackBar(
+                              content: Text(AppLocalizations.of(context).noBiometricsEnrolledToast),
                               backgroundColor: AppColors.error,
                             ),
                           );
@@ -424,12 +424,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // Preferences Section
             _buildSection(
-              title: 'Preferences',
+              title: AppLocalizations.of(context).preferencesSection,
               children: [
                 _buildCurrencyMenuItem(ref),
                 _buildMenuItem(
                   icon: Iconsax.moon,
-                  title: 'Appearance',
+                  title: AppLocalizations.of(context).appearanceMenuItem,
                   onTap: () => context.push(AppRoutes.themeSettings),
                 ),
                 _buildMenuItem(
@@ -444,7 +444,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // Account Safety Section
             _buildSection(
-              title: 'Account Safety',
+              title: AppLocalizations.of(context).accountSafetySection,
               children: [
                 Material(
                   color: Colors.transparent,
@@ -476,7 +476,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _accountBlocked ? 'Unblock Account' : 'Block Account',
+                                  _accountBlocked ? AppLocalizations.of(context).unblockAccountLabel : AppLocalizations.of(context).blockAccountLabel,
                                   style: AppTextStyles.bodyMedium(
                                     color: _accountBlocked ? AppColors.error : null,
                                   ),
@@ -484,9 +484,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 Text(
                                   _accountBlocked
                                       ? (_accountBlockedBy == 'admin'
-                                          ? 'Blocked by support \u2014 contact us to unblock'
-                                          : 'Your account is currently blocked')
-                                      : 'Temporarily disable all transactions',
+                                          ? AppLocalizations.of(context).blockedBySupportSubtitle
+                                          : AppLocalizations.of(context).accountBlockedSubtitle)
+                                      : AppLocalizations.of(context).temporarilyDisableSubtitle,
                                   style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                                 ),
                               ],
@@ -521,7 +521,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
             // Support Section
             _buildSection(
-              title: 'Support',
+              title: AppLocalizations.of(context).supportSection,
               children: [
                 _buildMenuItem(
                   icon: Iconsax.warning_2,
@@ -793,11 +793,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Currency',
+                      AppLocalizations.of(context).currencyLabel,
                       style: AppTextStyles.bodyMedium(),
                     ),
                     Text(
-                      '${currency.name} (${currency.symbol})',
+                      AppLocalizations.of(context).currencyNameAndSymbol(currency.name, currency.symbol),
                       style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                     ),
                   ],

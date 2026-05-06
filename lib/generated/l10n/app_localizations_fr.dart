@@ -1226,4 +1226,112 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get otpVerificationFailedError => '';
+
+  @override
+  String get aboutTitle => '';
+
+  @override
+  String get qrWalletAppName => '';
+
+  @override
+  String versionAndBuild(String version, String buildNumber) {
+    return '';
+  }
+
+  @override
+  String get aboutAppDescription => '';
+
+  @override
+  String get termsOfServiceLink => '';
+
+  @override
+  String get privacyPolicyLink => '';
+
+  @override
+  String get rateUsLink => '';
+
+  @override
+  String get rateUsToast => '';
+
+  @override
+  String get shareAppLink => '';
+
+  @override
+  String get shareComingSoonToast => '';
+
+  @override
+  String get copyrightLine => '';
+
+  @override
+  String get madeInGhanaLine => '';
+
+  @override
+  String errorUpdatingProfile(String error) {
+    return '';
+  }
+
+  @override
+  String get nameVerifiedKycCannotChange => '';
+
+  @override
+  String get changePhotoButton => '';
+
+  @override
+  String get blockAccountLabel => '';
+
+  @override
+  String get blockAccountConfirmBody => '';
+
+  @override
+  String get accountBlockedSuccessToast => '';
+
+  @override
+  String get accountBlockedBySupportTitle => '';
+
+  @override
+  String get accountBlockedBySupportBody => '';
+
+  @override
+  String get accountUnblockedSuccessToast => '';
+
+  @override
+  String get logoutConfirmBody => '';
+
+  @override
+  String get businessLabel => '';
+
+  @override
+  String get noBiometricsEnrolledToast => '';
+
+  @override
+  String get preferencesSection => '';
+
+  @override
+  String get appearanceMenuItem => '';
+
+  @override
+  String get accountSafetySection => '';
+
+  @override
+  String get supportSection => '';
+
+  @override
+  String get currencyLabel => '';
+
+  @override
+  String currencyNameAndSymbol(String name, String symbol) {
+    return '';
+  }
+
+  @override
+  String get unblockAccountLabel => '';
+
+  @override
+  String get blockedBySupportSubtitle => '';
+
+  @override
+  String get accountBlockedSubtitle => '';
+
+  @override
+  String get temporarilyDisableSubtitle => '';
 }

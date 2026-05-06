@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -49,7 +50,7 @@ class _AboutScreenState extends State<AboutScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('About', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).aboutTitle, style: AppTextStyles.headlineMedium()),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -74,10 +75,10 @@ class _AboutScreenState extends State<AboutScreen> {
             const SizedBox(height: 24),
 
             // App Name
-            Text('QR Wallet', style: AppTextStyles.headlineLarge()),
+            Text(AppLocalizations.of(context).qrWalletAppName, style: AppTextStyles.headlineLarge()),
             const SizedBox(height: 8),
             Text(
-              'Version $_version (Build $_buildNumber)',
+              AppLocalizations.of(context).versionAndBuild(_version, _buildNumber),
               style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
             ),
 
@@ -91,7 +92,7 @@ class _AboutScreenState extends State<AboutScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                'QR Wallet is a secure and easy-to-use digital wallet that allows you to send, receive, and manage money with just a scan. Experience the future of payments today.',
+                AppLocalizations.of(context).aboutAppDescription,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -102,29 +103,29 @@ class _AboutScreenState extends State<AboutScreen> {
             // Links
             _buildLinkItem(
               icon: Iconsax.document,
-              title: 'Terms of Service',
+              title: AppLocalizations.of(context).termsOfServiceLink,
               onTap: () => _launchUrl('https://qrwallet.com/terms'),
             ),
             _buildLinkItem(
               icon: Iconsax.shield_tick,
-              title: 'Privacy Policy',
+              title: AppLocalizations.of(context).privacyPolicyLink,
               onTap: () => _launchUrl('https://qrwallet.com/privacy'),
             ),
             _buildLinkItem(
               icon: Iconsax.star,
-              title: 'Rate Us',
+              title: AppLocalizations.of(context).rateUsLink,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Rate us on the App Store!')),
+                  SnackBar(content: Text(AppLocalizations.of(context).rateUsToast)),
                 );
               },
             ),
             _buildLinkItem(
               icon: Iconsax.share,
-              title: 'Share App',
+              title: AppLocalizations.of(context).shareAppLink,
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share feature coming soon!')),
+                  SnackBar(content: Text(AppLocalizations.of(context).shareComingSoonToast)),
                 );
               },
             ),
@@ -133,12 +134,12 @@ class _AboutScreenState extends State<AboutScreen> {
 
             // Copyright
             Text(
-              '© 2024 QR Wallet. All rights reserved.',
+              AppLocalizations.of(context).copyrightLine,
               style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
             ),
             const SizedBox(height: 8),
             Text(
-              'Made with ❤️ in Ghana',
+              AppLocalizations.of(context).madeInGhanaLine,
               style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
             ),
 
