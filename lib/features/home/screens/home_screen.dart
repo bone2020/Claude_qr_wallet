@@ -160,12 +160,12 @@ class HomeScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hello, $userName 👋',
+              AppLocalizations.of(context).helloUser(userName),
               style: AppTextStyles.headlineLarge(),
             ),
             const SizedBox(height: 2),
             Text(
-              'Welcome back',
+              AppLocalizations.of(context).welcomeBack,
               style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
             ),
           ],

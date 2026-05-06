@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Transaction tile widget for displaying a single transaction
 class TransactionTile extends StatelessWidget {
@@ -151,7 +152,7 @@ class TransactionTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Pending',
+                            AppLocalizations.of(context).transactionStatusPending,
                             style: AppTextStyles.caption(color: AppColors.warning),
                           ),
                         ),
@@ -168,7 +169,7 @@ class TransactionTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Failed',
+                            AppLocalizations.of(context).transactionStatusFailed,
                             style: AppTextStyles.caption(color: AppColors.error),
                           ),
                         ),
@@ -181,7 +182,7 @@ class TransactionTile extends StatelessWidget {
 
             // Amount
             Text(
-              '$_amountPrefix$currency$_formattedAmount',
+              AppLocalizations.of(context).signedCurrencyAmount(_amountPrefix, currency, _formattedAmount),
               style: AppTextStyles.labelMedium(color: _amountColor),
             ),
           ],

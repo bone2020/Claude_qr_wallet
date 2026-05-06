@@ -183,7 +183,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
                           ref.read(transactionsNotifierProvider.notifier).loadMore();
                         },
                         child: Text(
-                          'Load More',
+                          AppLocalizations.of(context).loadMore,
                           style: AppTextStyles.bodyMedium(color: AppColors.primary),
                         ),
                       ),

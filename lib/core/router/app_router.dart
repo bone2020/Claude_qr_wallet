@@ -50,6 +50,7 @@ import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
 import '../../features/settings/screens/currency_selector_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
+import '../../generated/l10n/app_localizations.dart';
 
 /// Route names
 class AppRoutes {
@@ -716,7 +717,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     // Error page
     errorBuilder: (context, state) => Scaffold(
       body: Center(
-        child: Text('Page not found: ${state.uri}'),
+        child: Text(AppLocalizations.of(context).pageNotFound(state.uri.toString())),
       ),
     ),
   );

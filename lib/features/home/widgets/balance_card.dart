@@ -174,11 +174,11 @@ class BalanceCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Available',
+                          AppLocalizations.of(context).availableBalanceLabel,
                           style: AppTextStyles.caption(color: AppColors.success),
                         ),
                         Text(
-                          '$currency ${(availableBalance / 100).toStringAsFixed(2)}',
+                          AppLocalizations.of(context).currencyAmount(currency, (availableBalance / 100).toStringAsFixed(2)),
                           style: AppTextStyles.bodySmall(color: AppColors.success),
                         ),
                       ],
@@ -200,11 +200,11 @@ class BalanceCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'On Hold',
+                          AppLocalizations.of(context).onHoldBalanceLabel,
                           style: AppTextStyles.caption(color: AppColors.warning),
                         ),
                         Text(
-                          '$currency ${(heldBalance / 100).toStringAsFixed(2)}',
+                          AppLocalizations.of(context).currencyAmount(currency, (heldBalance / 100).toStringAsFixed(2)),
                           style: AppTextStyles.bodySmall(color: AppColors.warning),
                         ),
                       ],

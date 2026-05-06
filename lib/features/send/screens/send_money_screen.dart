@@ -142,8 +142,8 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
     // Ensure recipient has been verified
     if (_recipientWalletId == null || _recipientName == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid wallet ID'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).pleaseEnterValidWalletId),
           backgroundColor: AppColors.error,
         ),
       );
@@ -258,7 +258,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Looking up wallet...',
+                              AppLocalizations.of(context).lookingUpWallet,
                               style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                             ),
                           ],
@@ -407,7 +407,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Scan recipient\'s QR code to send money',
+                    AppLocalizations.of(context).scanRecipientQrToSend,
                     style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                   ),
                 ],

@@ -277,14 +277,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 children: [
                   const Icon(Iconsax.lock, color: AppColors.primary, size: 24),
                   const SizedBox(width: 12),
-                  Text('Transaction PIN', style: AppTextStyles.headlineSmall()),
+                  Text(AppLocalizations.of(context).transactionPin, style: AppTextStyles.headlineSmall()),
                 ],
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Enter your 6-digit PIN to confirm this transfer',
+                    AppLocalizations.of(context).enterPinToConfirm,
                     style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                   ),
                   const SizedBox(height: 20),
@@ -348,7 +348,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(false),
                   child: Text(
-                    'Cancel',
+                    AppLocalizations.of(context).cancel,
                     style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
                   ),
                 ),
@@ -365,8 +365,8 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   Future<void> _handleSend() async {
     if (_amountMajor <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter an amount'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).pleaseEnterAmount),
           backgroundColor: AppColors.error,
         ),
       );
@@ -486,7 +486,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               ),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                '$_currency${_formatAmount(_amountMajor)} sent to ${widget.recipientName}',
+                AppLocalizations.of(context).amountSentTo(_currency, _formatAmount(_amountMajor), widget.recipientName),
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -648,7 +648,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               const Icon(Icons.receipt_long, color: AppColors.primary),
               const SizedBox(width: AppDimensions.spaceSM),
               Text(
-                'Payment Request',
+                AppLocalizations.of(context).paymentRequestLabel,
                 style: AppTextStyles.labelMedium(color: AppColors.primary),
               ),
             ],
@@ -793,14 +793,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           if (_previewError != null) ...[
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-              'Fee is approximate — $_previewError',
+              AppLocalizations.of(context).feeApproximateError(_previewError ?? ''),
               style: AppTextStyles.caption(color: AppColors.warning),
             ),
           ],
           if (_serverSufficient == false) ...[
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-              'Insufficient balance for this transfer',
+              AppLocalizations.of(context).insufficientBalance,
               style: AppTextStyles.caption(color: AppColors.error),
             ),
           ],
@@ -834,18 +834,18 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Seller requested:',
+                  AppLocalizations.of(context).sellerRequestedLabel,
                   style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 ),
                 Text(
-                  '$recipientSymbol${_formatAmount(_sellerRequestedAmount)}',
+                  AppLocalizations.of(context).symbolAmount(recipientSymbol, _formatAmount(_sellerRequestedAmount)),
                   style: AppTextStyles.bodyLarge(color: AppColors.info),
                 ),
               ],
             ),
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-               '1 ${widget.recipientCurrency} = ${_formatRate(reverseRate)} $_currencyCode',
+               AppLocalizations.of(context).exchangeRateLine(widget.recipientCurrency ?? '', _formatRate(reverseRate), _currencyCode),
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
             ),
           ],
@@ -868,18 +868,18 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Recipient receives:',
+                AppLocalizations.of(context).recipientReceivesLabel,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               ),
               Text(
-                '$recipientSymbol${_formatAmount(_convertedAmount!)}',
+                AppLocalizations.of(context).symbolAmount(recipientSymbol, _formatAmount(_convertedAmount!)),
                 style: AppTextStyles.bodyLarge(color: AppColors.info),
               ),
             ],
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-           '1 $_currencyCode = ${_formatRate(rate)} ${widget.recipientCurrency}',
+           AppLocalizations.of(context).exchangeRateLine(_currencyCode, _formatRate(rate), widget.recipientCurrency ?? ''),
             style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -941,7 +941,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                     ),
                   )
                 : Text(
-                    '${AppLocalizations.of(context).send} $_currency${_formatAmount(_totalMajor)}',
+                    AppLocalizations.of(context).sendButtonAmount(_currency, _formatAmount(_totalMajor)),
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),

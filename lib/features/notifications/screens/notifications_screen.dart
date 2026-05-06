@@ -8,6 +8,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../core/constants/constants.dart';
 import '../../../models/notification_model.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -115,7 +116,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Notifications', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).notificationsScreenTitle, style: AppTextStyles.headlineMedium()),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Iconsax.more, color: AppColors.textPrimaryDark),
@@ -132,7 +133,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   children: [
                     const Icon(Iconsax.tick_circle, size: 20, color: AppColors.textPrimaryDark),
                     const SizedBox(width: 12),
-                    Text('Mark all as read', style: AppTextStyles.bodyMedium()),
+                    Text(AppLocalizations.of(context).markAllAsRead, style: AppTextStyles.bodyMedium()),
                   ],
                 ),
               ),
@@ -157,7 +158,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   const Icon(Iconsax.warning_2, size: 64, color: AppColors.error),
                   const SizedBox(height: 16),
                   Text(
-                    'Failed to load notifications',
+                    AppLocalizations.of(context).failedToLoadNotifications,
                     style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
                   ),
                 ],
@@ -208,12 +209,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'No Notifications',
+            AppLocalizations.of(context).noNotifications,
             style: AppTextStyles.headlineSmall(),
           ),
           const SizedBox(height: 8),
           Text(
-            'You\'re all caught up!',
+            AppLocalizations.of(context).youreAllCaughtUp,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
         ],

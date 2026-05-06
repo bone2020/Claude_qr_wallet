@@ -748,5 +748,165 @@
   "languageChanged": "Language changed",
   "@languageChanged": {
     "description": "Snackbar shown after a successful language change (Phase 6 NEW)"
+  },
+  "currencyAmount": "{currency} {amount}",
+  "@currencyAmount": {
+    "description": "Currency code followed by amount with a space, e.g. 'USD 12.34'. Used in balance card.",
+    "placeholders": {
+      "currency": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+  "symbolAmount": "{symbol}{amount}",
+  "@symbolAmount": {
+    "description": "Currency symbol concatenated with amount, e.g. '$12.34'. Used in transaction details and confirm send.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+  "signedCurrencyAmount": "{prefix}{currency}{amount}",
+  "@signedCurrencyAmount": {
+    "description": "Sign prefix (+/- or empty) followed by currency code and amount. Used in transaction tile.",
+    "placeholders": {
+      "prefix": {"type": "String"},
+      "currency": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+  "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
+  "@exchangeRateLine": {
+    "description": "Exchange rate display line, e.g. '1 USD = 0.85 EUR'.",
+    "placeholders": {
+      "fromCurrency": {"type": "String"},
+      "rate": {"type": "String"},
+      "toCurrency": {"type": "String"}
+    }
+  },
+  "currencyCodeWithSymbol": "{symbol} ({code})",
+  "@currencyCodeWithSymbol": {
+    "description": "Currency symbol with code in parentheses, e.g. '$ (USD)'.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "code": {"type": "String"}
+    }
+  },
+  "pageNotFound": "Page not found: {uri}",
+  "@pageNotFound": {
+    "description": "Router 404 fallback message.",
+    "placeholders": {
+      "uri": {"type": "String"}
+    }
+  },
+  "youAreOffline": "You are offline",
+  "@youAreOffline": {"description": "Banner shown when device is offline."},
+  "helloUser": "Hello, {userName} 👋",
+  "@helloUser": {
+    "description": "Home screen greeting.",
+    "placeholders": {
+      "userName": {"type": "String"}
+    }
+  },
+  "welcomeBack": "Welcome back",
+  "@welcomeBack": {"description": "Home screen subtitle below the greeting."},
+  "availableBalanceLabel": "Available",
+  "@availableBalanceLabel": {"description": "Label above the available balance amount on the balance card."},
+  "onHoldBalanceLabel": "On Hold",
+  "@onHoldBalanceLabel": {"description": "Label above the held/escrow balance on the balance card."},
+  "transactionStatusPending": "Pending",
+  "@transactionStatusPending": {"description": "Status badge for pending transactions in the list."},
+  "transactionStatusFailed": "Failed",
+  "@transactionStatusFailed": {"description": "Status badge for failed transactions in the list."},
+  "notificationsScreenTitle": "Notifications",
+  "@notificationsScreenTitle": {"description": "AppBar title on the notifications screen."},
+  "markAllAsRead": "Mark all as read",
+  "@markAllAsRead": {"description": "Menu action on notifications screen."},
+  "failedToLoadNotifications": "Failed to load notifications",
+  "@failedToLoadNotifications": {"description": "Error state when notifications fail to load."},
+  "noNotifications": "No Notifications",
+  "@noNotifications": {"description": "Empty state heading on notifications screen."},
+  "youreAllCaughtUp": "You're all caught up!",
+  "@youreAllCaughtUp": {"description": "Empty state subtext on notifications screen."},
+  "selectCurrencyTitle": "Select Currency",
+  "@selectCurrencyTitle": {"description": "AppBar title on currency selector screen."},
+  "currencySelectorDescription": "Choose your preferred currency for displaying balances and transactions.",
+  "@currencySelectorDescription": {"description": "Body description on currency selector screen."},
+  "currencyChangedTo": "Currency changed to {currencyName}",
+  "@currencyChangedTo": {
+    "description": "Snackbar shown after successful currency change.",
+    "placeholders": {
+      "currencyName": {"type": "String"}
+    }
+  },
+  "failedToChangeCurrency": "Failed to change currency",
+  "@failedToChangeCurrency": {"description": "Snackbar shown when currency change fails."},
+  "loadMore": "Load More",
+  "@loadMore": {"description": "Pagination button at the bottom of transactions list."},
+  "copiedToClipboard": "{label} copied",
+  "@copiedToClipboard": {
+    "description": "Snackbar after copying a value to clipboard. {label} is the field name.",
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+  "transactionNotFound": "Transaction not found",
+  "@transactionNotFound": {"description": "Empty state when transaction can't be loaded on details screen."},
+  "reportIssue": "Report Issue",
+  "@reportIssue": {"description": "Outlined button on transaction details for sent transactions within 7 days."},
+  "currencyConversion": "Currency Conversion",
+  "@currencyConversion": {"description": "Section header on transaction details for cross-currency transactions."},
+  "originalAmount": "Original Amount",
+  "@originalAmount": {"description": "Label for sender-side amount in currency conversion section."},
+  "convertedAmount": "Converted Amount",
+  "@convertedAmount": {"description": "Label for receiver-side amount in currency conversion section."},
+  "exchangeRateLabel": "Exchange Rate",
+  "@exchangeRateLabel": {"description": "Label for the exchange rate row on transaction details."},
+  "transactionItemsLabel": "Items",
+  "@transactionItemsLabel": {"description": "Label above the list of items in a payment-request transaction."},
+  "positionQrCodeInFrame": "Position QR code within the frame",
+  "@positionQrCodeInFrame": {"description": "Instruction overlay on QR scanner screen."},
+  "pleaseEnterValidWalletId": "Please enter a valid wallet ID",
+  "@pleaseEnterValidWalletId": {"description": "Validation snackbar on send money screen."},
+  "lookingUpWallet": "Looking up wallet...",
+  "@lookingUpWallet": {"description": "Loading state when resolving a wallet ID on send money screen."},
+  "scanRecipientQrToSend": "Scan recipient's QR code to send money",
+  "@scanRecipientQrToSend": {"description": "Helper text under the wallet ID field on send money screen."},
+  "transactionPin": "Transaction PIN",
+  "@transactionPin": {"description": "Title of PIN entry dialog on confirm send screen."},
+  "enterPinToConfirm": "Enter your 6-digit PIN to confirm this transfer",
+  "@enterPinToConfirm": {"description": "Subtitle in PIN entry dialog on confirm send screen."},
+  "pleaseEnterAmount": "Please enter an amount",
+  "@pleaseEnterAmount": {"description": "Validation snackbar on confirm send screen."},
+  "amountSentTo": "{currency}{amount} sent to {recipient}",
+  "@amountSentTo": {
+    "description": "Success message after sending money.",
+    "placeholders": {
+      "currency": {"type": "String"},
+      "amount": {"type": "String"},
+      "recipient": {"type": "String"}
+    }
+  },
+  "paymentRequestLabel": "Payment Request",
+  "@paymentRequestLabel": {"description": "Badge on confirm send when paying a payment request rather than free-form send."},
+  "feeApproximateError": "Fee is approximate — {error}",
+  "@feeApproximateError": {
+    "description": "Caption when fee preview fails on confirm send.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "insufficientBalance": "Insufficient balance for this transfer",
+  "@insufficientBalance": {"description": "Error caption on confirm send when balance check fails."},
+  "sellerRequestedLabel": "Seller requested:",
+  "@sellerRequestedLabel": {"description": "Label preceding the seller's requested amount on confirm send (cross-currency)."},
+  "recipientReceivesLabel": "Recipient receives:",
+  "@recipientReceivesLabel": {"description": "Label preceding the converted amount on confirm send (cross-currency)."},
+  "sendButtonAmount": "Send {currency}{amount}",
+  "@sendButtonAmount": {
+    "description": "Send button label on confirm send including amount, e.g. 'Send USD12.34'.",
+    "placeholders": {
+      "currency": {"type": "String"},
+      "amount": {"type": "String"}
+    }
   }
 }

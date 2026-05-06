@@ -8,6 +8,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/models/currency_model.dart';
 import '../../../core/services/currency_service.dart';
 import '../../../providers/currency_provider.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Screen for selecting preferred currency
 class CurrencySelectorScreen extends ConsumerWidget {
@@ -28,7 +29,7 @@ class CurrencySelectorScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Select Currency',
+          AppLocalizations.of(context).selectCurrencyTitle,
           style: AppTextStyles.headlineSmall(),
         ),
         centerTitle: true,
@@ -41,7 +42,7 @@ class CurrencySelectorScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
               child: Text(
-                'Choose your preferred currency for displaying balances and transactions.',
+                AppLocalizations.of(context).currencySelectorDescription,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               ),
             ).animate().fadeIn(duration: 300.ms),
@@ -84,7 +85,7 @@ class CurrencySelectorScreen extends ConsumerWidget {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Currency changed to ${currency.name}'),
+          content: Text(AppLocalizations.of(context).currencyChangedTo(currency.name)),
           backgroundColor: AppColors.success,
         ),
       );
@@ -92,7 +93,7 @@ class CurrencySelectorScreen extends ConsumerWidget {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to change currency'),
+          content: Text(AppLocalizations.of(context).failedToChangeCurrency),
           backgroundColor: AppColors.error,
         ),
       );
@@ -154,7 +155,7 @@ class _CurrencyTile extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${currency.symbol} (${currency.code})',
+                        AppLocalizations.of(context).currencyCodeWithSymbol(currency.symbol, currency.code),
                         style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                       ),
                     ],

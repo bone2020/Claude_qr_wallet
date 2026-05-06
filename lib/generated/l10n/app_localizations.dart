@@ -1197,6 +1197,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language changed'**
   String get languageChanged;
+
+  /// Currency code followed by amount with a space, e.g. 'USD 12.34'. Used in balance card.
+  ///
+  /// In en, this message translates to:
+  /// **'{currency} {amount}'**
+  String currencyAmount(String currency, String amount);
+
+  /// Currency symbol concatenated with amount, e.g. '$12.34'. Used in transaction details and confirm send.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol}{amount}'**
+  String symbolAmount(String symbol, String amount);
+
+  /// Sign prefix (+/- or empty) followed by currency code and amount. Used in transaction tile.
+  ///
+  /// In en, this message translates to:
+  /// **'{prefix}{currency}{amount}'**
+  String signedCurrencyAmount(String prefix, String currency, String amount);
+
+  /// Exchange rate display line, e.g. '1 USD = 0.85 EUR'.
+  ///
+  /// In en, this message translates to:
+  /// **'1 {fromCurrency} = {rate} {toCurrency}'**
+  String exchangeRateLine(String fromCurrency, String rate, String toCurrency);
+
+  /// Currency symbol with code in parentheses, e.g. '$ (USD)'.
+  ///
+  /// In en, this message translates to:
+  /// **'{symbol} ({code})'**
+  String currencyCodeWithSymbol(String symbol, String code);
+
+  /// Router 404 fallback message.
+  ///
+  /// In en, this message translates to:
+  /// **'Page not found: {uri}'**
+  String pageNotFound(String uri);
+
+  /// Banner shown when device is offline.
+  ///
+  /// In en, this message translates to:
+  /// **'You are offline'**
+  String get youAreOffline;
+
+  /// Home screen greeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Hello, {userName} 👋'**
+  String helloUser(String userName);
+
+  /// Home screen subtitle below the greeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome back'**
+  String get welcomeBack;
+
+  /// Label above the available balance amount on the balance card.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get availableBalanceLabel;
+
+  /// Label above the held/escrow balance on the balance card.
+  ///
+  /// In en, this message translates to:
+  /// **'On Hold'**
+  String get onHoldBalanceLabel;
+
+  /// Status badge for pending transactions in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get transactionStatusPending;
+
+  /// Status badge for failed transactions in the list.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get transactionStatusFailed;
+
+  /// AppBar title on the notifications screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notificationsScreenTitle;
+
+  /// Menu action on notifications screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all as read'**
+  String get markAllAsRead;
+
+  /// Error state when notifications fail to load.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load notifications'**
+  String get failedToLoadNotifications;
+
+  /// Empty state heading on notifications screen.
+  ///
+  /// In en, this message translates to:
+  /// **'No Notifications'**
+  String get noNotifications;
+
+  /// Empty state subtext on notifications screen.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up!'**
+  String get youreAllCaughtUp;
+
+  /// AppBar title on currency selector screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Currency'**
+  String get selectCurrencyTitle;
+
+  /// Body description on currency selector screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your preferred currency for displaying balances and transactions.'**
+  String get currencySelectorDescription;
+
+  /// Snackbar shown after successful currency change.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency changed to {currencyName}'**
+  String currencyChangedTo(String currencyName);
+
+  /// Snackbar shown when currency change fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change currency'**
+  String get failedToChangeCurrency;
+
+  /// Pagination button at the bottom of transactions list.
+  ///
+  /// In en, this message translates to:
+  /// **'Load More'**
+  String get loadMore;
+
+  /// Snackbar after copying a value to clipboard. {label} is the field name.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} copied'**
+  String copiedToClipboard(String label);
+
+  /// Empty state when transaction can't be loaded on details screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction not found'**
+  String get transactionNotFound;
+
+  /// Outlined button on transaction details for sent transactions within 7 days.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Issue'**
+  String get reportIssue;
+
+  /// Section header on transaction details for cross-currency transactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency Conversion'**
+  String get currencyConversion;
+
+  /// Label for sender-side amount in currency conversion section.
+  ///
+  /// In en, this message translates to:
+  /// **'Original Amount'**
+  String get originalAmount;
+
+  /// Label for receiver-side amount in currency conversion section.
+  ///
+  /// In en, this message translates to:
+  /// **'Converted Amount'**
+  String get convertedAmount;
+
+  /// Label for the exchange rate row on transaction details.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchange Rate'**
+  String get exchangeRateLabel;
+
+  /// Label above the list of items in a payment-request transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Items'**
+  String get transactionItemsLabel;
+
+  /// Instruction overlay on QR scanner screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Position QR code within the frame'**
+  String get positionQrCodeInFrame;
+
+  /// Validation snackbar on send money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid wallet ID'**
+  String get pleaseEnterValidWalletId;
+
+  /// Loading state when resolving a wallet ID on send money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up wallet...'**
+  String get lookingUpWallet;
+
+  /// Helper text under the wallet ID field on send money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan recipient\'s QR code to send money'**
+  String get scanRecipientQrToSend;
+
+  /// Title of PIN entry dialog on confirm send screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction PIN'**
+  String get transactionPin;
+
+  /// Subtitle in PIN entry dialog on confirm send screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your 6-digit PIN to confirm this transfer'**
+  String get enterPinToConfirm;
+
+  /// Validation snackbar on confirm send screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter an amount'**
+  String get pleaseEnterAmount;
+
+  /// Success message after sending money.
+  ///
+  /// In en, this message translates to:
+  /// **'{currency}{amount} sent to {recipient}'**
+  String amountSentTo(String currency, String amount, String recipient);
+
+  /// Badge on confirm send when paying a payment request rather than free-form send.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Request'**
+  String get paymentRequestLabel;
+
+  /// Caption when fee preview fails on confirm send.
+  ///
+  /// In en, this message translates to:
+  /// **'Fee is approximate — {error}'**
+  String feeApproximateError(String error);
+
+  /// Error caption on confirm send when balance check fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient balance for this transfer'**
+  String get insufficientBalance;
+
+  /// Label preceding the seller's requested amount on confirm send (cross-currency).
+  ///
+  /// In en, this message translates to:
+  /// **'Seller requested:'**
+  String get sellerRequestedLabel;
+
+  /// Label preceding the converted amount on confirm send (cross-currency).
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient receives:'**
+  String get recipientReceivesLabel;
+
+  /// Send button label on confirm send including amount, e.g. 'Send USD12.34'.
+  ///
+  /// In en, this message translates to:
+  /// **'Send {currency}{amount}'**
+  String sendButtonAmount(String currency, String amount);
 }
 
 class _AppLocalizationsDelegate

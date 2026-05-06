@@ -173,13 +173,13 @@ class _OfflineBanner extends StatelessWidget {
           right: 16,
         ),
         color: const Color(0xFFFF9800),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.wifi_off, color: Colors.white, size: 16),
             SizedBox(width: 8),
             Text(
-              'You are offline',
+              AppLocalizations.of(context).youAreOffline,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 13,

@@ -563,4 +563,165 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get languageChanged => 'Language changed';
+
+  @override
+  String currencyAmount(String currency, String amount) {
+    return '$currency $amount';
+  }
+
+  @override
+  String symbolAmount(String symbol, String amount) {
+    return '$symbol$amount';
+  }
+
+  @override
+  String signedCurrencyAmount(String prefix, String currency, String amount) {
+    return '$prefix$currency$amount';
+  }
+
+  @override
+  String exchangeRateLine(String fromCurrency, String rate, String toCurrency) {
+    return '1 $fromCurrency = $rate $toCurrency';
+  }
+
+  @override
+  String currencyCodeWithSymbol(String symbol, String code) {
+    return '$symbol ($code)';
+  }
+
+  @override
+  String pageNotFound(String uri) {
+    return 'Page not found: $uri';
+  }
+
+  @override
+  String get youAreOffline => 'You are offline';
+
+  @override
+  String helloUser(String userName) {
+    return 'Hello, $userName 👋';
+  }
+
+  @override
+  String get welcomeBack => 'Welcome back';
+
+  @override
+  String get availableBalanceLabel => 'Available';
+
+  @override
+  String get onHoldBalanceLabel => 'On Hold';
+
+  @override
+  String get transactionStatusPending => 'Pending';
+
+  @override
+  String get transactionStatusFailed => 'Failed';
+
+  @override
+  String get notificationsScreenTitle => 'Notifications';
+
+  @override
+  String get markAllAsRead => 'Mark all as read';
+
+  @override
+  String get failedToLoadNotifications => 'Failed to load notifications';
+
+  @override
+  String get noNotifications => 'No Notifications';
+
+  @override
+  String get youreAllCaughtUp => 'You\'re all caught up!';
+
+  @override
+  String get selectCurrencyTitle => 'Select Currency';
+
+  @override
+  String get currencySelectorDescription =>
+      'Choose your preferred currency for displaying balances and transactions.';
+
+  @override
+  String currencyChangedTo(String currencyName) {
+    return 'Currency changed to $currencyName';
+  }
+
+  @override
+  String get failedToChangeCurrency => 'Failed to change currency';
+
+  @override
+  String get loadMore => 'Load More';
+
+  @override
+  String copiedToClipboard(String label) {
+    return '$label copied';
+  }
+
+  @override
+  String get transactionNotFound => 'Transaction not found';
+
+  @override
+  String get reportIssue => 'Report Issue';
+
+  @override
+  String get currencyConversion => 'Currency Conversion';
+
+  @override
+  String get originalAmount => 'Original Amount';
+
+  @override
+  String get convertedAmount => 'Converted Amount';
+
+  @override
+  String get exchangeRateLabel => 'Exchange Rate';
+
+  @override
+  String get transactionItemsLabel => 'Items';
+
+  @override
+  String get positionQrCodeInFrame => 'Position QR code within the frame';
+
+  @override
+  String get pleaseEnterValidWalletId => 'Please enter a valid wallet ID';
+
+  @override
+  String get lookingUpWallet => 'Looking up wallet...';
+
+  @override
+  String get scanRecipientQrToSend => 'Scan recipient\'s QR code to send money';
+
+  @override
+  String get transactionPin => 'Transaction PIN';
+
+  @override
+  String get enterPinToConfirm =>
+      'Enter your 6-digit PIN to confirm this transfer';
+
+  @override
+  String get pleaseEnterAmount => 'Please enter an amount';
+
+  @override
+  String amountSentTo(String currency, String amount, String recipient) {
+    return '$currency$amount sent to $recipient';
+  }
+
+  @override
+  String get paymentRequestLabel => 'Payment Request';
+
+  @override
+  String feeApproximateError(String error) {
+    return 'Fee is approximate — $error';
+  }
+
+  @override
+  String get insufficientBalance => 'Insufficient balance for this transfer';
+
+  @override
+  String get sellerRequestedLabel => 'Seller requested:';
+
+  @override
+  String get recipientReceivesLabel => 'Recipient receives:';
+
+  @override
+  String sendButtonAmount(String currency, String amount) {
+    return 'Send $currency$amount';
+  }
 }

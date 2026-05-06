@@ -556,4 +556,163 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get languageChanged => '';
+
+  @override
+  String currencyAmount(String currency, String amount) {
+    return '';
+  }
+
+  @override
+  String symbolAmount(String symbol, String amount) {
+    return '';
+  }
+
+  @override
+  String signedCurrencyAmount(String prefix, String currency, String amount) {
+    return '';
+  }
+
+  @override
+  String exchangeRateLine(String fromCurrency, String rate, String toCurrency) {
+    return '';
+  }
+
+  @override
+  String currencyCodeWithSymbol(String symbol, String code) {
+    return '';
+  }
+
+  @override
+  String pageNotFound(String uri) {
+    return '';
+  }
+
+  @override
+  String get youAreOffline => '';
+
+  @override
+  String helloUser(String userName) {
+    return '';
+  }
+
+  @override
+  String get welcomeBack => '';
+
+  @override
+  String get availableBalanceLabel => '';
+
+  @override
+  String get onHoldBalanceLabel => '';
+
+  @override
+  String get transactionStatusPending => '';
+
+  @override
+  String get transactionStatusFailed => '';
+
+  @override
+  String get notificationsScreenTitle => '';
+
+  @override
+  String get markAllAsRead => '';
+
+  @override
+  String get failedToLoadNotifications => '';
+
+  @override
+  String get noNotifications => '';
+
+  @override
+  String get youreAllCaughtUp => '';
+
+  @override
+  String get selectCurrencyTitle => '';
+
+  @override
+  String get currencySelectorDescription => '';
+
+  @override
+  String currencyChangedTo(String currencyName) {
+    return '';
+  }
+
+  @override
+  String get failedToChangeCurrency => '';
+
+  @override
+  String get loadMore => '';
+
+  @override
+  String copiedToClipboard(String label) {
+    return '';
+  }
+
+  @override
+  String get transactionNotFound => '';
+
+  @override
+  String get reportIssue => '';
+
+  @override
+  String get currencyConversion => '';
+
+  @override
+  String get originalAmount => '';
+
+  @override
+  String get convertedAmount => '';
+
+  @override
+  String get exchangeRateLabel => '';
+
+  @override
+  String get transactionItemsLabel => '';
+
+  @override
+  String get positionQrCodeInFrame => '';
+
+  @override
+  String get pleaseEnterValidWalletId => '';
+
+  @override
+  String get lookingUpWallet => '';
+
+  @override
+  String get scanRecipientQrToSend => '';
+
+  @override
+  String get transactionPin => '';
+
+  @override
+  String get enterPinToConfirm => '';
+
+  @override
+  String get pleaseEnterAmount => '';
+
+  @override
+  String amountSentTo(String currency, String amount, String recipient) {
+    return '';
+  }
+
+  @override
+  String get paymentRequestLabel => '';
+
+  @override
+  String feeApproximateError(String error) {
+    return '';
+  }
+
+  @override
+  String get insufficientBalance => '';
+
+  @override
+  String get sellerRequestedLabel => '';
+
+  @override
+  String get recipientReceivesLabel => '';
+
+  @override
+  String sendButtonAmount(String currency, String amount) {
+    return '';
+  }
 }

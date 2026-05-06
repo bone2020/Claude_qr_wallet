@@ -34,7 +34,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label copied'),
+        content: Text(AppLocalizations.of(context).copiedToClipboard(label)),
         backgroundColor: AppColors.success,
         duration: const Duration(seconds: 2),
       ),
@@ -127,7 +127,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppDimensions.spaceMD),
               Text(
-                'Transaction not found',
+                AppLocalizations.of(context).transactionNotFound,
                 style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
               ),
             ],
@@ -207,7 +207,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
                         },
                         icon: const Icon(Icons.flag_outlined, color: AppColors.error),
                         label: Text(
-                          'Report Issue',
+                          AppLocalizations.of(context).reportIssue,
                           style: AppTextStyles.bodyMedium(color: AppColors.error),
                         ),
                         style: OutlinedButton.styleFrom(
@@ -387,7 +387,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           // Items (if present — merchant QR payments)
           if (transaction.items != null && transaction.items!.isNotEmpty) ...[
             _buildDivider(),
-            _buildItemsList(transaction.items!),
+            _buildItemsList(context, transaction.items!),
           ],
 
           // Fee (if present)
@@ -402,7 +402,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           // Currency conversion info (if different currencies)
           if (_hasConversion(transaction)) ...[
             _buildDivider(),
-            _buildConversionInfo(transaction),
+            _buildConversionInfo(context, transaction),
           ],
 
           // Failure reason (if failed)
@@ -419,7 +419,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildConversionInfo(TransactionModel transaction) {
+  Widget _buildConversionInfo(BuildContext context, TransactionModel transaction) {
     final senderSymbol = _getCurrencySymbol(transaction.senderCurrency);
     final receiverSymbol = _getCurrencySymbol(transaction.receiverCurrency);
 
@@ -433,7 +433,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Currency Conversion',
+            AppLocalizations.of(context).currencyConversion,
             style: AppTextStyles.labelMedium(color: AppColors.info),
           ),
           const SizedBox(height: AppDimensions.spaceSM),
@@ -441,11 +441,11 @@ class TransactionDetailsScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Original Amount',
+                AppLocalizations.of(context).originalAmount,
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
               ),
               Text(
-                '$senderSymbol${_formatAmount(transaction.amount)}',
+                AppLocalizations.of(context).symbolAmount(senderSymbol, _formatAmount(transaction.amount)),
                 style: AppTextStyles.bodyMedium(),
               ),
             ],
@@ -455,11 +455,11 @@ class TransactionDetailsScreen extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Converted Amount',
+                AppLocalizations.of(context).convertedAmount,
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
               ),
               Text(
-                '$receiverSymbol${_formatAmount(transaction.convertedAmount ?? 0)}',
+                AppLocalizations.of(context).symbolAmount(receiverSymbol, _formatAmount(transaction.convertedAmount ?? 0)),
                 style: AppTextStyles.bodyMedium(color: AppColors.info),
               ),
             ],
@@ -470,11 +470,11 @@ class TransactionDetailsScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Exchange Rate',
+                  AppLocalizations.of(context).exchangeRateLabel,
                   style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 ),
                 Text(
-                  '1 ${transaction.senderCurrency} = ${transaction.exchangeRate!.toStringAsFixed(2)} ${transaction.receiverCurrency}',
+                  AppLocalizations.of(context).exchangeRateLine(transaction.senderCurrency ?? '', transaction.exchangeRate!.toStringAsFixed(2), transaction.receiverCurrency ?? ''),
                   style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                 ),
               ],
@@ -485,14 +485,14 @@ class TransactionDetailsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildItemsList(List<String> items) {
+  Widget _buildItemsList(BuildContext context, List<String> items) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceSM),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Items',
+            AppLocalizations.of(context).transactionItemsLabel,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceXS),

@@ -316,7 +316,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
                     const Icon(Iconsax.scan, size: 16, color: AppColors.primary),
                     const SizedBox(width: 8),
                     Text(
-                      'Position QR code within the frame',
+                      AppLocalizations.of(context).positionQrCodeInFrame,
                       style: AppTextStyles.bodySmall(color: AppColors.primary),
                     ),
                   ],
