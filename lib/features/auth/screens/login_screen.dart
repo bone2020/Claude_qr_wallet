@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
@@ -34,18 +35,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
+      return AppLocalizations.of(context).errorFieldRequired;
     }
     final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     if (!emailRegex.hasMatch(value)) {
-      return AppStrings.errorInvalidEmail;
+      return AppLocalizations.of(context).errorInvalidEmail;
     }
     return null;
   }
 
   String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
+      return AppLocalizations.of(context).errorFieldRequired;
     }
     return null;
   }
@@ -251,12 +252,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppStrings.logIn,
+          AppLocalizations.of(context).logIn,
           style: AppTextStyles.displaySmall(),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
         Text(
-          AppStrings.logInSubtitle,
+          AppLocalizations.of(context).logInSubtitle,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
       ],
@@ -268,7 +269,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       children: [
         // Email
         CustomTextField(
-          hintText: AppStrings.emailHint,
+          hintText: AppLocalizations.of(context).emailHint,
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
@@ -280,7 +281,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Password
         PasswordTextField(
           controller: _passwordController,
-          hintText: AppStrings.passwordHint,
+          hintText: AppLocalizations.of(context).passwordHint,
           textInputAction: TextInputAction.done,
           validator: _validatePassword,
           onChanged: (_) {},
@@ -295,7 +296,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: TextButton(
         onPressed: _handleForgotPassword,
         child: Text(
-          AppStrings.forgotPassword,
+          AppLocalizations.of(context).forgotPassword,
           style: AppTextStyles.bodyMedium(color: AppColors.primary),
         ),
       ),
@@ -318,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               )
             : Text(
-                AppStrings.logIn,
+                AppLocalizations.of(context).logIn,
                 style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
               ),
       ),
@@ -328,7 +329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildSocialLogin() {
     return Column(
       children: [
-        const OrDivider(text: AppStrings.orLogInWith),
+        OrDivider(text: AppLocalizations.of(context).orLogInWith),
         const SizedBox(height: AppDimensions.spaceLG),
         SocialLoginRow(
           onGooglePressed: () => _handleGoogleLogin(),
@@ -346,9 +347,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           text: TextSpan(
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
             children: [
-              const TextSpan(text: '${AppStrings.dontHaveAccount} '),
+              TextSpan(text: '${AppLocalizations.of(context).dontHaveAccount} '),
               TextSpan(
-                text: AppStrings.signUp,
+                text: AppLocalizations.of(context).signUp,
                 style: AppTextStyles.bodyMedium(color: AppColors.primary),
               ),
             ],

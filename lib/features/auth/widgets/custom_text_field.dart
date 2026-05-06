@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Custom text field with consistent styling
 class CustomTextField extends StatefulWidget {
@@ -170,7 +171,7 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
   @override
   Widget build(BuildContext context) {
     return CustomTextField(
-      hintText: AppStrings.phoneNumberHint,
+      hintText: AppLocalizations.of(context).phoneNumberHint,
       controller: widget.controller,
       keyboardType: TextInputType.phone,
       validator: widget.validator,
@@ -360,7 +361,7 @@ class PasswordTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CustomTextField(
-      hintText: hintText ?? AppStrings.passwordHint,
+      hintText: hintText ?? AppLocalizations.of(context).passwordHint,
       controller: controller,
       obscureText: true,
       validator: validator,

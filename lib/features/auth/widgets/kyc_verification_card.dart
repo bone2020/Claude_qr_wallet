@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Shared verification card widget used across all KYC screens
 class KycVerificationCard extends StatelessWidget {
@@ -77,7 +78,7 @@ class KycVerificationCard extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.camera_alt_rounded),
-                label: Text(isLoading ? 'Please wait...' : AppStrings.startVerification),
+                label: Text(isLoading ? 'Please wait...' : AppLocalizations.of(context).startVerification),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.backgroundDark,
@@ -174,7 +175,7 @@ class KycDateOfBirthPicker extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppStrings.dateOfBirth,
+          AppLocalizations.of(context).dateOfBirth,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
@@ -194,7 +195,7 @@ class KycDateOfBirthPicker extends StatelessWidget {
                   child: Text(
                     selectedDate != null
                         ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
-                        : AppStrings.selectDate,
+                        : AppLocalizations.of(context).selectDate,
                     style: selectedDate != null
                         ? AppTextStyles.inputText()
                         : AppTextStyles.inputHint(),
