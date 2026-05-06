@@ -1747,4 +1747,13 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get disputesCappedNotice => '';
+
+  @override
+  String get ugandaNinDescription => '';
+
+  @override
+  String get tpinDescription => '';
+
+  @override
+  String get verifyIdentityDefaultDescription => '';
 }

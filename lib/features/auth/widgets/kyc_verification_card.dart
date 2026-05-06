@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../generated/l10n/app_localizations.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 /// Shared verification card widget used across all KYC screens
 class KycVerificationCard extends StatelessWidget {
@@ -78,7 +79,7 @@ class KycVerificationCard extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.camera_alt_rounded),
-                label: Text(isLoading ? 'Please wait...' : AppLocalizations.of(context).startVerification),
+                label: Text(isLoading ? AppLocalizations.of(context).pleaseWait : AppLocalizations.of(context).startVerification),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.backgroundDark,

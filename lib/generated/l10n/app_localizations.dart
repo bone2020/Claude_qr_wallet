@@ -3399,6 +3399,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Showing latest 50 disputes. Older entries may not appear.'**
   String get disputesCappedNotice;
+
+  /// Description shown on the KYC ID-type selection screen for Uganda NIN. Returned by _getDescriptionForIdType switch case 'UGANDA_NIN'.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your identity with your Uganda National Identification Number'**
+  String get ugandaNinDescription;
+
+  /// Description shown on the KYC ID-type selection screen for Zambian Taxpayer PIN. Returned by _getDescriptionForIdType switch case 'TPIN'.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your identity with your Zambian Taxpayer PIN'**
+  String get tpinDescription;
+
+  /// Default description shown on the KYC ID-type selection screen when the ID type is not recognized. Returned by _getDescriptionForIdType switch default.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your identity'**
+  String get verifyIdentityDefaultDescription;
 }
 
 class _AppLocalizationsDelegate

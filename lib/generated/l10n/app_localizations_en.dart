@@ -1818,4 +1818,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get disputesCappedNotice =>
       'Showing latest 50 disputes. Older entries may not appear.';
+
+  @override
+  String get ugandaNinDescription =>
+      'Verify your identity with your Uganda National Identification Number';
+
+  @override
+  String get tpinDescription =>
+      'Verify your identity with your Zambian Taxpayer PIN';
+
+  @override
+  String get verifyIdentityDefaultDescription => 'Verify your identity';
 }

@@ -9,6 +9,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/services/smile_id_service.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/kyc_verification_card.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 /// KYC Selection Screen - Choose ID type for verification
 class KycScreen extends ConsumerStatefulWidget {
@@ -121,11 +122,11 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       case 'SSNIT':
         return AppLocalizations.of(context).ssnitDescription;
       case 'UGANDA_NIN':
-        return 'Verify your identity with your Uganda National Identification Number';
+        return AppLocalizations.of(context).ugandaNinDescription;
       case 'TPIN':
-        return 'Verify your identity with your Zambian Taxpayer PIN';
+        return AppLocalizations.of(context).tpinDescription;
       default:
-        return 'Verify your identity';
+        return AppLocalizations.of(context).verifyIdentityDefaultDescription;
     }
   }
 
