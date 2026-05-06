@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/smile_id_service.dart';
 import '../../../providers/auth_provider.dart';
@@ -106,19 +107,19 @@ class _KycScreenState extends ConsumerState<KycScreen> {
     final value = idType['value'] as String;
     switch (value) {
       case 'PASSPORT':
-        return AppStrings.passportDescription;
+        return AppLocalizations.of(context).passportDescription;
       case 'NIN':
-        return AppStrings.ninDescription;
+        return AppLocalizations.of(context).ninDescription;
       case 'BVN':
-        return AppStrings.bvnDescription;
+        return AppLocalizations.of(context).bvnDescription;
       case 'DRIVERS_LICENSE':
-        return AppStrings.driversLicenseDescription;
+        return AppLocalizations.of(context).driversLicenseDescription;
       case 'VOTERS_ID':
-        return AppStrings.votersCardDescription;
+        return AppLocalizations.of(context).votersCardDescription;
       case 'NATIONAL_ID':
-        return AppStrings.nationalIdDescription;
+        return AppLocalizations.of(context).nationalIdDescription;
       case 'SSNIT':
-        return AppStrings.ssnitDescription;
+        return AppLocalizations.of(context).ssnitDescription;
       case 'UGANDA_NIN':
         return 'Verify your identity with your Uganda National Identification Number';
       case 'TPIN':
@@ -177,12 +178,12 @@ class _KycScreenState extends ConsumerState<KycScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          AppStrings.selectVerificationMethod,
+          AppLocalizations.of(context).selectVerificationMethod,
           style: AppTextStyles.displaySmall(),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
         Text(
-          AppStrings.selectVerificationMethodSubtitle,
+          AppLocalizations.of(context).selectVerificationMethodSubtitle,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
       ],

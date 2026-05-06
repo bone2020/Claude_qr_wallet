@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
@@ -43,37 +44,37 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   String? _validateFullName(String? value) {
-    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
+    if (value == null || value.isEmpty) return AppLocalizations.of(context).errorFieldRequired;
     if (value.split(' ').length < 2) return 'Please enter your full name';
     return null;
   }
 
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return AppStrings.errorFieldRequired;
+      return AppLocalizations.of(context).errorFieldRequired;
     }
     final emailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
     if (!emailRegex.hasMatch(value)) {
-      return AppStrings.errorInvalidEmail;
+      return AppLocalizations.of(context).errorInvalidEmail;
     }
     return null;
   }
 
   String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value.length < 7) return AppStrings.errorInvalidPhone;
+    if (value == null || value.isEmpty) return AppLocalizations.of(context).errorFieldRequired;
+    if (value.length < 7) return AppLocalizations.of(context).errorInvalidPhone;
     return null;
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value.length < 8) return AppStrings.errorPasswordWeak;
+    if (value == null || value.isEmpty) return AppLocalizations.of(context).errorFieldRequired;
+    if (value.length < 8) return AppLocalizations.of(context).errorPasswordWeak;
     return null;
   }
 
   String? _validateConfirmPassword(String? value) {
-    if (value == null || value.isEmpty) return AppStrings.errorFieldRequired;
-    if (value != _passwordController.text) return AppStrings.errorPasswordMismatch;
+    if (value == null || value.isEmpty) return AppLocalizations.of(context).errorFieldRequired;
+    if (value != _passwordController.text) return AppLocalizations.of(context).errorPasswordMismatch;
     return null;
   }
 
@@ -129,7 +130,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? AppStrings.errorGeneric),
+            content: Text(result.error ?? AppLocalizations.of(context).errorGeneric),
             backgroundColor: AppColors.error,
           ),
         );
@@ -229,7 +230,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 // Title
                 Text(
-                  AppStrings.createAccount,
+                  AppLocalizations.of(context).createAccount,
                   style: AppTextStyles.displaySmall(),
                 )
                     .animate()
@@ -240,7 +241,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                 // Subtitle
                 Text(
-                  AppStrings.signUpSubtitle,
+                  AppLocalizations.of(context).signUpSubtitle,
                   style: AppTextStyles.bodyLarge(color: AppColors.textSecondaryDark),
                 )
                     .animate()
@@ -252,8 +253,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 // Full Name
                 CustomTextField(
                   controller: _fullNameController,
-                  label: AppStrings.fullName,
-                  hintText: AppStrings.fullNameHint,
+                  label: AppLocalizations.of(context).fullName,
+                  hintText: AppLocalizations.of(context).fullNameHint,
                   prefixIcon: const Icon(Icons.person_outline, color: AppColors.textSecondaryDark),
                   validator: _validateFullName,
                   textInputAction: TextInputAction.next,
@@ -267,8 +268,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 // Email
                 CustomTextField(
                   controller: _emailController,
-                  label: AppStrings.email,
-                  hintText: AppStrings.emailHint,
+                  label: AppLocalizations.of(context).email,
+                  hintText: AppLocalizations.of(context).emailHint,
                   prefixIcon: const Icon(Icons.email_outlined, color: AppColors.textSecondaryDark),
                   keyboardType: TextInputType.emailAddress,
                   validator: _validateEmail,
@@ -284,7 +285,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 PhoneInputField(
                   key: _phoneFieldKey,
                   controller: _phoneController,
-                  label: AppStrings.phoneNumber,
+                  label: AppLocalizations.of(context).phoneNumber,
                   initialCountry: _selectedCountry,
                   validator: _validatePhone,
                   onCountryChanged: (country) => setState(() => _selectedCountry = country),
@@ -299,8 +300,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 // Password
                 CustomTextField(
                   controller: _passwordController,
-                  label: AppStrings.password,
-                  hintText: AppStrings.passwordHint,
+                  label: AppLocalizations.of(context).password,
+                  hintText: AppLocalizations.of(context).passwordHint,
                   prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondaryDark),
                   obscureText: true,
                   validator: _validatePassword,
@@ -315,8 +316,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 // Confirm Password
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  label: AppStrings.confirmPassword,
-                  hintText: AppStrings.confirmPasswordHint,
+                  label: AppLocalizations.of(context).confirmPassword,
+                  hintText: AppLocalizations.of(context).confirmPasswordHint,
                   prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textSecondaryDark),
                   obscureText: true,
                   validator: _validateConfirmPassword,
@@ -346,11 +347,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     Expanded(
                       child: Text.rich(
                         TextSpan(
-                          text: '${AppStrings.termsAgreement} ',
+                          text: '${AppLocalizations.of(context).termsAgreement} ',
                           style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                           children: [
                             TextSpan(
-                              text: AppStrings.termsAndPrivacy,
+                              text: AppLocalizations.of(context).termsAndPrivacy,
                               style: AppTextStyles.bodySmall(color: AppColors.primary),
                             ),
                           ],
@@ -386,7 +387,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                               valueColor: AlwaysStoppedAnimation<Color>(AppColors.backgroundDark),
                             ),
                           )
-                        : Text(AppStrings.signUp, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
+                        : Text(AppLocalizations.of(context).signUp, style: AppTextStyles.labelLarge(color: AppColors.backgroundDark)),
                   ),
                 )
                     .animate()
@@ -396,7 +397,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 const SizedBox(height: AppDimensions.spaceXL),
 
                 // Divider
-                OrDivider(text: AppStrings.orSignUpWith)
+                OrDivider(text: AppLocalizations.of(context).orSignUpWith)
                     .animate()
                     .fadeIn(duration: 400.ms, delay: 1000.ms),
 
@@ -410,14 +411,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 Center(
                   child: Text.rich(
                     TextSpan(
-                      text: '${AppStrings.alreadyHaveAccount} ',
+                      text: '${AppLocalizations.of(context).alreadyHaveAccount} ',
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                       children: [
                         WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
                           child: GestureDetector(
                             onTap: () => context.push(AppRoutes.login),
-                            child: Text(AppStrings.logIn, style: AppTextStyles.bodyMedium(color: AppColors.primary)),
+                            child: Text(AppLocalizations.of(context).logIn, style: AppTextStyles.bodyMedium(color: AppColors.primary)),
                           ),
                         ),
                       ],
