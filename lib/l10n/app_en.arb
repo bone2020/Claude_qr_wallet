@@ -1979,5 +1979,63 @@
   "uploadButton": "Upload",
   "@uploadButton": {
     "description": "Button label on business logo card when no logo exists (paired with changeButton)."
+  },
+  "disputeNotFoundError": "Dispute not found",
+  "@disputeNotFoundError": {
+    "description": "Empty-state message on the dispute detail screen when the requested dispute cannot be loaded."
+  },
+  "descriptionLabel": "Description",
+  "@descriptionLabel": {
+    "description": "Section label above the dispute description text on the dispute detail screen."
+  },
+  "recipientResponseLabel": "Recipient Response",
+  "@recipientResponseLabel": {
+    "description": "Section label above the recipient's response text on the dispute detail screen (shown only when a response exists)."
+  },
+  "myDisputesTitle": "My Disputes",
+  "@myDisputesTitle": {
+    "description": "AppBar title on the my-disputes screen."
+  },
+  "filedByMeTab": "Filed by Me",
+  "@filedByMeTab": {
+    "description": "Outer tab label on the my-disputes screen showing disputes the user filed."
+  },
+  "againstMeTab": "Against Me",
+  "@againstMeTab": {
+    "description": "Outer tab label on the my-disputes screen showing disputes filed against the user."
+  },
+  "noActiveDisputesFiled": "No active disputes filed.",
+  "@noActiveDisputesFiled": {
+    "description": "Empty-state message in the Filed by Me / Active subtab when the user has filed no active disputes."
+  },
+  "noActiveDisputesAgainstYou": "No active disputes against you.",
+  "@noActiveDisputesAgainstYou": {
+    "description": "Empty-state message in the Against Me / Active subtab."
+  },
+  "noResolvedDisputes": "No resolved disputes.",
+  "@noResolvedDisputes": {
+    "description": "Empty-state message in the Resolved subtab. Shared between Filed by Me and Against Me outer tabs."
+  },
+  "activeTabWithCount": "Active ({count})",
+  "@activeTabWithCount": {
+    "description": "Inner tab label showing the number of active disputes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "resolvedTabWithCount": "Resolved ({count})",
+  "@resolvedTabWithCount": {
+    "description": "Inner tab label showing the number of resolved disputes.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "disputesCappedNotice": "Showing latest 50 disputes. Older entries may not appear.",
+  "@disputesCappedNotice": {
+    "description": "Informational banner shown when the dispute list has hit the 50-row cap."
   }
 }

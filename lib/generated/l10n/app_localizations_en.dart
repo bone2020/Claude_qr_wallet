@@ -1777,4 +1777,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get uploadButton => 'Upload';
+
+  @override
+  String get disputeNotFoundError => 'Dispute not found';
+
+  @override
+  String get descriptionLabel => 'Description';
+
+  @override
+  String get recipientResponseLabel => 'Recipient Response';
+
+  @override
+  String get myDisputesTitle => 'My Disputes';
+
+  @override
+  String get filedByMeTab => 'Filed by Me';
+
+  @override
+  String get againstMeTab => 'Against Me';
+
+  @override
+  String get noActiveDisputesFiled => 'No active disputes filed.';
+
+  @override
+  String get noActiveDisputesAgainstYou => 'No active disputes against you.';
+
+  @override
+  String get noResolvedDisputes => 'No resolved disputes.';
+
+  @override
+  String activeTabWithCount(int count) {
+    return 'Active ($count)';
+  }
+
+  @override
+  String resolvedTabWithCount(int count) {
+    return 'Resolved ($count)';
+  }
+
+  @override
+  String get disputesCappedNotice =>
+      'Showing latest 50 disputes. Older entries may not appear.';
 }

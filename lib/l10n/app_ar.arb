@@ -1094,5 +1094,17 @@
   "logoUploadedSubtitle": "",
   "addBusinessLogoSubtitle": "",
   "changeButton": "",
-  "uploadButton": ""
+  "uploadButton": "",
+  "disputeNotFoundError": "",
+  "descriptionLabel": "",
+  "recipientResponseLabel": "",
+  "myDisputesTitle": "",
+  "filedByMeTab": "",
+  "againstMeTab": "",
+  "noActiveDisputesFiled": "",
+  "noActiveDisputesAgainstYou": "",
+  "noResolvedDisputes": "",
+  "activeTabWithCount": "",
+  "resolvedTabWithCount": "",
+  "disputesCappedNotice": ""
 }

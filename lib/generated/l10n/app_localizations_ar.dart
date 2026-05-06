@@ -1707,4 +1707,44 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get uploadButton => '';
+
+  @override
+  String get disputeNotFoundError => '';
+
+  @override
+  String get descriptionLabel => '';
+
+  @override
+  String get recipientResponseLabel => '';
+
+  @override
+  String get myDisputesTitle => '';
+
+  @override
+  String get filedByMeTab => '';
+
+  @override
+  String get againstMeTab => '';
+
+  @override
+  String get noActiveDisputesFiled => '';
+
+  @override
+  String get noActiveDisputesAgainstYou => '';
+
+  @override
+  String get noResolvedDisputes => '';
+
+  @override
+  String activeTabWithCount(int count) {
+    return '';
+  }
+
+  @override
+  String resolvedTabWithCount(int count) {
+    return '';
+  }
+
+  @override
+  String get disputesCappedNotice => '';
 }

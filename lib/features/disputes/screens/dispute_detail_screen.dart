@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
 import '../providers/dispute_provider.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 class DisputeDetailScreen extends ConsumerStatefulWidget {
   final String disputeId;
@@ -49,7 +50,7 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
           : _error != null
               ? Center(child: Padding(padding: const EdgeInsets.all(20), child: Text(_error!, style: const TextStyle(color: AppColors.error))))
               : _dispute == null
-                  ? const Center(child: Text('Dispute not found'))
+                  ? Center(child: Text(AppLocalizations.of(context).disputeNotFoundError))
                   : RefreshIndicator(
                       onRefresh: _loadDispute,
                       child: ListView(
@@ -62,12 +63,12 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
                           _infoTile('Fee Charged', '\$${(_dispute!['feeCharged'] ?? 0).toStringAsFixed(2)} USD'),
                           _infoTile('Hold Amount', '${((_dispute!['currentHoldAmount'] ?? 0) / 100).toStringAsFixed(2)}'),
                           const Divider(height: 32),
-                          Text('Description', style: Theme.of(context).textTheme.titleSmall),
+                          Text(AppLocalizations.of(context).descriptionLabel, style: Theme.of(context).textTheme.titleSmall),
                           const SizedBox(height: 8),
                           Text(_dispute!['description'] ?? '', style: Theme.of(context).textTheme.bodyMedium),
                           if (_dispute!['recipientResponse'] != null) ...[
                             const Divider(height: 32),
-                            Text('Recipient Response', style: Theme.of(context).textTheme.titleSmall),
+                            Text(AppLocalizations.of(context).recipientResponseLabel, style: Theme.of(context).textTheme.titleSmall),
                             const SizedBox(height: 8),
                             Text(_dispute!['recipientResponse'], style: Theme.of(context).textTheme.bodyMedium),
                           ],

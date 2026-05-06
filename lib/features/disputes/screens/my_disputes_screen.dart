@@ -6,6 +6,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../providers/dispute_provider.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 // Phase 5c-B status grouping
 const _activeStatuses = {
@@ -167,16 +168,16 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Disputes'),
+        title: Text(AppLocalizations.of(context).myDisputesTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
         bottom: TabBar(
           controller: _outerTabController,
-          tabs: const [
-            Tab(text: 'Filed by Me'),
-            Tab(text: 'Against Me'),
+          tabs: [
+            Tab(text: AppLocalizations.of(context).filedByMeTab),
+            Tab(text: AppLocalizations.of(context).againstMeTab),
           ],
         ),
       ),
@@ -196,16 +197,16 @@ class _MyDisputesScreenState extends ConsumerState<MyDisputesScreen>
                       activeList: _filerActive,
                       resolvedList: _filerResolved,
                       hitCap: _filerHitCap,
-                      emptyActiveMessage: 'No active disputes filed.',
-                      emptyResolvedMessage: 'No resolved disputes.',
+                      emptyActiveMessage: AppLocalizations.of(context).noActiveDisputesFiled,
+                      emptyResolvedMessage: AppLocalizations.of(context).noResolvedDisputes,
                       onRefresh: _loadAll,
                     ),
                     _NestedActiveResolvedTabs(
                       activeList: _recipientActive,
                       resolvedList: _recipientResolved,
                       hitCap: _recipientHitCap,
-                      emptyActiveMessage: 'No active disputes against you.',
-                      emptyResolvedMessage: 'No resolved disputes.',
+                      emptyActiveMessage: AppLocalizations.of(context).noActiveDisputesAgainstYou,
+                      emptyResolvedMessage: AppLocalizations.of(context).noResolvedDisputes,
                       onRefresh: _loadAll,
                     ),
                   ],
@@ -241,8 +242,8 @@ class _NestedActiveResolvedTabs extends StatelessWidget {
             color: Theme.of(context).scaffoldBackgroundColor,
             child: TabBar(
               tabs: [
-                Tab(text: 'Active (${activeList.length})'),
-                Tab(text: 'Resolved (${resolvedList.length})'),
+                Tab(text: AppLocalizations.of(context).activeTabWithCount(activeList.length)),
+                Tab(text: AppLocalizations.of(context).resolvedTabWithCount(resolvedList.length)),
               ],
               labelColor: AppColors.primary,
               unselectedLabelColor: Colors.grey,
@@ -255,7 +256,7 @@ class _NestedActiveResolvedTabs extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               color: Colors.orange.withOpacity(0.1),
               child: Text(
-                'Showing latest 50 disputes. Older entries may not appear.',
+                AppLocalizations.of(context).disputesCappedNotice,
                 style: TextStyle(color: Colors.orange[800], fontSize: 12),
                 textAlign: TextAlign.center,
               ),

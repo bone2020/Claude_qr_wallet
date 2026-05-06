@@ -3327,6 +3327,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Upload'**
   String get uploadButton;
+
+  /// Empty-state message on the dispute detail screen when the requested dispute cannot be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute not found'**
+  String get disputeNotFoundError;
+
+  /// Section label above the dispute description text on the dispute detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get descriptionLabel;
+
+  /// Section label above the recipient's response text on the dispute detail screen (shown only when a response exists).
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient Response'**
+  String get recipientResponseLabel;
+
+  /// AppBar title on the my-disputes screen.
+  ///
+  /// In en, this message translates to:
+  /// **'My Disputes'**
+  String get myDisputesTitle;
+
+  /// Outer tab label on the my-disputes screen showing disputes the user filed.
+  ///
+  /// In en, this message translates to:
+  /// **'Filed by Me'**
+  String get filedByMeTab;
+
+  /// Outer tab label on the my-disputes screen showing disputes filed against the user.
+  ///
+  /// In en, this message translates to:
+  /// **'Against Me'**
+  String get againstMeTab;
+
+  /// Empty-state message in the Filed by Me / Active subtab when the user has filed no active disputes.
+  ///
+  /// In en, this message translates to:
+  /// **'No active disputes filed.'**
+  String get noActiveDisputesFiled;
+
+  /// Empty-state message in the Against Me / Active subtab.
+  ///
+  /// In en, this message translates to:
+  /// **'No active disputes against you.'**
+  String get noActiveDisputesAgainstYou;
+
+  /// Empty-state message in the Resolved subtab. Shared between Filed by Me and Against Me outer tabs.
+  ///
+  /// In en, this message translates to:
+  /// **'No resolved disputes.'**
+  String get noResolvedDisputes;
+
+  /// Inner tab label showing the number of active disputes.
+  ///
+  /// In en, this message translates to:
+  /// **'Active ({count})'**
+  String activeTabWithCount(int count);
+
+  /// Inner tab label showing the number of resolved disputes.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved ({count})'**
+  String resolvedTabWithCount(int count);
+
+  /// Informational banner shown when the dispute list has hit the 50-row cap.
+  ///
+  /// In en, this message translates to:
+  /// **'Showing latest 50 disputes. Older entries may not appear.'**
+  String get disputesCappedNotice;
 }
 
 class _AppLocalizationsDelegate
