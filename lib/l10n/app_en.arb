@@ -1177,4 +1177,161 @@
       "userName": {"type": "String"}
     }
   }
+,
+  "approvePaymentTitle": "Approve Payment",
+  "@approvePaymentTitle": {"description": "Title of the dialog asking the user to approve a pending MTN MoMo payment on their phone."},
+
+  "mtnMomoApprovePromptBody": "Please approve the payment of {symbol}{amount} on your MTN MoMo phone.",
+  "@mtnMomoApprovePromptBody": {
+    "description": "Body of the MTN MoMo approval dialog showing the amount to approve.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+
+  "checkPhoneForApprovalPrompt": "Check your phone for the approval prompt.",
+  "@checkPhoneForApprovalPrompt": {"description": "Caption beneath the MTN MoMo approval dialog body."},
+
+  "iveApproved": "I've Approved",
+  "@iveApproved": {"description": "Button label confirming the user has approved the payment on their MoMo phone."},
+
+  "labelCopiedToClipboard": "{label} copied to clipboard",
+  "@labelCopiedToClipboard": {
+    "description": "Snackbar shown when the user copies a value (e.g. account number) to the clipboard.",
+    "placeholders": {
+      "label": {"type": "String"}
+    }
+  },
+
+  "paymentSuccessful": "Payment Successful",
+  "@paymentSuccessful": {"description": "Title of the post-payment success dialog inside the add-money flow (no exclamation, used in dialog title)."},
+
+  "paymentSuccessfulHero": "Payment Successful!",
+  "@paymentSuccessfulHero": {"description": "Hero title on the dedicated payment result screen (with celebratory exclamation)."},
+
+  "paymentFailed": "Payment Failed",
+  "@paymentFailed": {"description": "Hero title on the payment result screen when the payment failed (capitalized as a title)."},
+
+  "amountWithCurrency": "Amount: {symbol}{amount}",
+  "@amountWithCurrency": {
+    "description": "Inline labeled amount, e.g. 'Amount: $5.00'.",
+    "placeholders": {
+      "symbol": {"type": "String"},
+      "amount": {"type": "String"}
+    }
+  },
+
+  "referenceWithValue": "Reference: {reference}",
+  "@referenceWithValue": {
+    "description": "Inline labeled transaction reference, e.g. 'Reference: ABC-123'.",
+    "placeholders": {
+      "reference": {"type": "String"}
+    }
+  },
+
+  "doneButton": "Done",
+  "@doneButton": {"description": "Generic Done button label used to dismiss a result dialog/screen."},
+
+  "mobileMoneyNotAvailableTitle": "Mobile Money Not Available",
+  "@mobileMoneyNotAvailableTitle": {"description": "Title shown when mobile money is not supported in the user's region (shared between add-money and withdraw)."},
+
+  "mobileMoneyNotAvailablePaymentsBody": "Mobile money payments are not available in your region. Please use Card or Bank Transfer.",
+  "@mobileMoneyNotAvailablePaymentsBody": {"description": "Body text for the mobile-money-unavailable empty state on the add-money screen (suggesting Card/Bank Transfer alternatives)."},
+
+  "enterAmountLabel": "Enter Amount",
+  "@enterAmountLabel": {"description": "Label above the amount input on the add-money screen."},
+
+  "quickSelectLabel": "Quick Select",
+  "@quickSelectLabel": {"description": "Label above the row of preset amount chips on the add-money screen."},
+
+  "securePaymentLabel": "Secure Payment",
+  "@securePaymentLabel": {"description": "Heading label above the Paystack security note."},
+
+  "paystackSecurityNote": "Powered by Paystack. Your payment details are secure.",
+  "@paystackSecurityNote": {"description": "Reassurance caption shown below the Secure Payment heading on add-money screen."},
+
+  "mobileMoneyProviderLabel": "Mobile Money Provider",
+  "@mobileMoneyProviderLabel": {"description": "Label above the mobile money provider dropdown (shared between add-money and withdraw)."},
+
+  "phoneNumberLabel": "Phone Number",
+  "@phoneNumberLabel": {"description": "Label above the phone number input field (shared between add-money and withdraw)."},
+
+  "loadingAccountDetails": "Loading account details...",
+  "@loadingAccountDetails": {"description": "Caption shown while the virtual bank account details are being generated/fetched."},
+
+  "virtualAccountTitle": "Virtual Account",
+  "@virtualAccountTitle": {"description": "Title for the virtual account empty state (before account is generated)."},
+
+  "tapToGenerateAccountPrompt": "Tap to generate your dedicated account number",
+  "@tapToGenerateAccountPrompt": {"description": "Caption inviting the user to tap the button below to generate a virtual bank account."},
+
+  "generateAccountButton": "Generate Account",
+  "@generateAccountButton": {"description": "Button to generate the user's virtual bank account."},
+
+  "yourVirtualAccountLabel": "Your Virtual Account",
+  "@yourVirtualAccountLabel": {"description": "Heading on the populated virtual account card."},
+
+  "bankNameLabel": "Bank Name",
+  "@bankNameLabel": {"description": "Label for the bank name field on the virtual account card."},
+
+  "accountNumberLabel": "Account Number",
+  "@accountNumberLabel": {"description": "Label for the account number field (shared between add-money virtual account card and withdraw screen)."},
+
+  "accountNameLabel": "Account Name",
+  "@accountNameLabel": {"description": "Label for the account holder name field (shared between add-money virtual account card and withdraw screen)."},
+
+  "howItWorksLabel": "How it works",
+  "@howItWorksLabel": {"description": "Heading above the explanatory bullet points on the virtual account screen."},
+
+  "virtualAccountInfoBody": "This account is unique to you. Any transfer to this account credits your wallet automatically.",
+  "@virtualAccountInfoBody": {"description": "Explanatory body text on the virtual account info card."},
+
+  "mtnMomoPaymentFailedError": "MTN MoMo payment failed",
+  "@mtnMomoPaymentFailedError": {"description": "Fallback error snackbar message when an MTN MoMo payment fails and the API didn't return a specific error."},
+
+  "paymentFailedOrRejectedError": "Payment failed or was rejected",
+  "@paymentFailedOrRejectedError": {"description": "Fallback error snackbar when a payment fails or is rejected by the user/processor."},
+
+  "paymentFailedError": "Payment failed",
+  "@paymentFailedError": {"description": "Generic fallback error snackbar for payment failures (lowercase 'failed' — distinct from the title-cased paymentFailed used as a hero title)."},
+
+  "cardTabLabel": "Card",
+  "@cardTabLabel": {"description": "Tab label for the card payment method on add-money screen."},
+
+  "mobileMoneyTabLabel": "Mobile Money",
+  "@mobileMoneyTabLabel": {"description": "Tab label for the mobile money payment method (shared between add-money and withdraw)."},
+
+  "bankTransferTabLabel": "Bank Transfer",
+  "@bankTransferTabLabel": {"description": "Tab label for the bank transfer payment method (shared between add-money and withdraw)."},
+
+  "continueToPaymentButton": "Continue to Payment",
+  "@continueToPaymentButton": {"description": "Submit button label on the card payment tab (proceeds to Paystack flow)."},
+
+  "payWithMobileMoneyButton": "Pay with Mobile Money",
+  "@payWithMobileMoneyButton": {"description": "Submit button label on the mobile money tab."},
+
+  "verifyingPaymentTitle": "Verifying payment...",
+  "@verifyingPaymentTitle": {"description": "Title shown on the payment result screen while the verification request is in flight."},
+
+  "verifyingPaymentBody": "Please wait while we confirm your payment",
+  "@verifyingPaymentBody": {"description": "Body caption shown beneath the verifying payment title."},
+
+  "referenceColon": "Reference: ",
+  "@referenceColon": {"description": "Inline label 'Reference: ' (with trailing colon and space) used as a prefix before a separately-rendered reference value widget."},
+
+  "referenceLabel": "Reference",
+  "@referenceLabel": {"description": "Standalone Reference label (no colon) used in the post-payment summary block."},
+
+  "hasBeenAddedToWallet": "has been added to your wallet",
+  "@hasBeenAddedToWallet": {"description": "Caption beneath the credited amount on the payment success screen."},
+
+  "newBalanceLabel": "New Balance",
+  "@newBalanceLabel": {"description": "Label for the updated wallet balance row on the payment success screen."},
+
+  "somethingWentWrongTryAgain": "Something went wrong. Please try again.",
+  "@somethingWentWrongTryAgain": {"description": "Generic error fallback shown on the payment failed screen when no specific error message is available."},
+
+  "goBackButton": "Go Back",
+  "@goBackButton": {"description": "Button label on the failed payment result screen (returns to previous screen)."}
 }

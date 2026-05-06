@@ -260,7 +260,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       // Payment initiated - user needs to approve on phone
       _showMtnApprovalDialog(amount, result.reference ?? '');
     } else {
-      _showError(result.error ?? 'MTN MoMo payment failed');
+      _showError(result.error ?? AppLocalizations.of(context).mtnMomoPaymentFailedError);
     }
   }
 
@@ -270,11 +270,11 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.phone_android, color: AppColors.warning),
             SizedBox(width: 12),
-            Text('Approve Payment'),
+            Text(AppLocalizations.of(context).approvePaymentTitle),
           ],
         ),
         content: Column(
@@ -283,12 +283,12 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             const CircularProgressIndicator(),
             const SizedBox(height: 16),
             Text(
-              'Please approve the payment of $_currencySymbol${(amount / 100).toStringAsFixed(2)} on your MTN MoMo phone.',
+              AppLocalizations.of(context).mtnMomoApprovePromptBody(_currencySymbol, (amount / 100).toStringAsFixed(2)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Check your phone for the approval prompt.',
+              AppLocalizations.of(context).checkPhoneForApprovalPrompt,
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
               textAlign: TextAlign.center,
             ),
@@ -300,11 +300,11 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               Navigator.of(context).pop();
               _checkMtnPaymentStatus(referenceId, amount);
             },
-            child: const Text('I\'ve Approved'),
+            child: Text(AppLocalizations.of(context).iveApproved),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
         ],
       ),
@@ -330,7 +330,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       } else if (result.status == 'PENDING') {
         _showError('Payment still pending. Please check your phone and try again.');
       } else {
-        _showError(result.error ?? 'Payment failed or was rejected');
+        _showError(result.error ?? AppLocalizations.of(context).paymentFailedOrRejectedError);
       }
     } catch (e) {
       if (!mounted) return;
@@ -371,7 +371,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         });
       }
     } else {
-      _showError(result.error ?? 'Payment failed');
+      _showError(result.error ?? AppLocalizations.of(context).paymentFailedError);
     }
   }
 
@@ -379,7 +379,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$label copied to clipboard'),
+        content: Text(AppLocalizations.of(context).labelCopiedToClipboard(label)),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -426,7 +426,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           children: [
             const Icon(Iconsax.tick_circle5, color: AppColors.success, size: 28),
             const SizedBox(width: AppDimensions.spaceSM),
-            Text('Payment Successful', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).paymentSuccessful, style: AppTextStyles.headlineSmall()),
           ],
         ),
         content: Column(
@@ -434,12 +434,12 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Amount: $_currencySymbol${(amount / 100).toStringAsFixed(2)}',
+              AppLocalizations.of(context).amountWithCurrency(_currencySymbol, (amount / 100).toStringAsFixed(2)),
               style: AppTextStyles.bodyLarge(),
             ),
             const SizedBox(height: AppDimensions.spaceSM),
             Text(
-              'Reference: $reference',
+              AppLocalizations.of(context).referenceWithValue(reference),
               style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
             ),
           ],
@@ -451,7 +451,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               context.pop(); // Go back to wallet screen
             },
             child: Text(
-              'Done',
+              AppLocalizations.of(context).doneButton,
               style: AppTextStyles.labelMedium(color: AppColors.backgroundDark),
             ),
           ),
@@ -481,10 +481,10 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           indicatorColor: AppColors.primary,
           labelColor: AppColors.primary,
           unselectedLabelColor: AppColors.textSecondaryDark,
-          tabs: const [
-            Tab(text: 'Card'),
-            Tab(text: 'Mobile Money'),
-            Tab(text: 'Bank Transfer'),
+          tabs: [
+            Tab(text: AppLocalizations.of(context).cardTabLabel),
+            Tab(text: AppLocalizations.of(context).mobileMoneyTabLabel),
+            Tab(text: AppLocalizations.of(context).bankTransferTabLabel),
           ],
         ),
       ),
@@ -540,7 +540,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           // Continue Button
           _buildContinueButton(
             onPressed: _handleCardPayment,
-            label: 'Continue to Payment',
+            label: AppLocalizations.of(context).continueToPaymentButton,
           ).animate().fadeIn(delay: 300.ms, duration: 400.ms),
 
           const SizedBox(height: AppDimensions.spaceLG),
@@ -568,13 +568,13 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               ),
               const SizedBox(height: AppDimensions.spaceLG),
               Text(
-                'Mobile Money Not Available',
+                AppLocalizations.of(context).mobileMoneyNotAvailableTitle,
                 style: AppTextStyles.headlineSmall(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceSM),
               Text(
-                'Mobile money payments are not available in your region. Please use Card or Bank Transfer.',
+                AppLocalizations.of(context).mobileMoneyNotAvailablePaymentsBody,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -622,7 +622,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           // Pay Button
           _buildContinueButton(
             onPressed: _handleMobileMoneyPayment,
-            label: 'Pay with Mobile Money',
+            label: AppLocalizations.of(context).payWithMobileMoneyButton,
           ).animate().fadeIn(delay: 400.ms, duration: 400.ms),
 
           const SizedBox(height: AppDimensions.spaceLG),
@@ -677,7 +677,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Enter Amount',
+            AppLocalizations.of(context).enterAmountLabel,
             style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceMD),
@@ -719,7 +719,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Quick Select',
+          AppLocalizations.of(context).quickSelectLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceMD),
@@ -740,7 +740,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
                   border: Border.all(color: AppColors.inputBorderDark),
                 ),
                 child: Text(
-                  '$_currencySymbol${_formatAmount(amount)}',
+                  AppLocalizations.of(context).symbolAmount(_currencySymbol, _formatAmount(amount)),
                   style: AppTextStyles.bodyMedium(),
                 ),
               ),
@@ -771,12 +771,12 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Secure Payment',
+                  AppLocalizations.of(context).securePaymentLabel,
                   style: AppTextStyles.labelMedium(),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Powered by Paystack. Your payment details are secure.',
+                  AppLocalizations.of(context).paystackSecurityNote,
                   style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 ),
               ],
@@ -818,7 +818,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Mobile Money Provider',
+          AppLocalizations.of(context).mobileMoneyProviderLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -862,7 +862,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Phone Number',
+          AppLocalizations.of(context).phoneNumberLabel,
           style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
@@ -871,7 +871,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           keyboardType: TextInputType.phone,
           style: AppTextStyles.bodyLarge(),
           decoration: InputDecoration(
-            hintText: 'Enter phone number',
+            hintText: AppLocalizations.of(context).enterPhoneNumberHint,
             hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
             filled: true,
             fillColor: AppColors.surfaceDark,
@@ -904,12 +904,12 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
           border: Border.all(color: AppColors.inputBorderDark),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             children: [
               CircularProgressIndicator(),
               SizedBox(height: AppDimensions.spaceMD),
-              Text('Loading account details...'),
+              Text(AppLocalizations.of(context).loadingAccountDetails),
             ],
           ),
         ),
@@ -933,19 +933,19 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             ),
             const SizedBox(height: AppDimensions.spaceMD),
             Text(
-              'Virtual Account',
+              AppLocalizations.of(context).virtualAccountTitle,
               style: AppTextStyles.headlineSmall(),
             ),
             const SizedBox(height: AppDimensions.spaceSM),
             Text(
-              'Tap to generate your dedicated account number',
+              AppLocalizations.of(context).tapToGenerateAccountPrompt,
               style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppDimensions.spaceLG),
             ElevatedButton(
               onPressed: _loadVirtualAccount,
-              child: const Text('Generate Account'),
+              child: Text(AppLocalizations.of(context).generateAccountButton),
             ),
           ],
         ),
@@ -973,7 +973,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
               Icon(Iconsax.bank, color: Colors.white, size: 24),
               const SizedBox(width: AppDimensions.spaceSM),
               Text(
-                'Your Virtual Account',
+                AppLocalizations.of(context).yourVirtualAccountLabel,
                 style: AppTextStyles.labelLarge(color: Colors.white),
               ),
             ],
@@ -982,12 +982,12 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
           // Bank Name
           Text(
-            'Bank Name',
+            AppLocalizations.of(context).bankNameLabel,
             style: AppTextStyles.caption(color: Colors.white70),
           ),
           const SizedBox(height: 4),
           Text(
-            _virtualBankName ?? 'Loading...',
+            _virtualBankName ?? AppLocalizations.of(context).loadingPlaceholder,
             style: AppTextStyles.bodyLarge(color: Colors.white),
           ),
 
@@ -995,7 +995,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
           // Account Number
           Text(
-            'Account Number',
+            AppLocalizations.of(context).accountNumberLabel,
             style: AppTextStyles.caption(color: Colors.white70),
           ),
           const SizedBox(height: 4),
@@ -1003,7 +1003,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _virtualAccountNumber ?? 'Loading...',
+                _virtualAccountNumber ?? AppLocalizations.of(context).loadingPlaceholder,
                 style: AppTextStyles.headlineSmall(color: Colors.white),
               ),
               IconButton(
@@ -1020,7 +1020,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
           // Account Name
           Text(
-            'Account Name',
+            AppLocalizations.of(context).accountNameLabel,
             style: AppTextStyles.caption(color: Colors.white70),
           ),
           const SizedBox(height: 4),
@@ -1029,7 +1029,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             children: [
               Expanded(
                 child: Text(
-                  _virtualAccountName ?? 'Loading...',
+                  _virtualAccountName ?? AppLocalizations.of(context).loadingPlaceholder,
                   style: AppTextStyles.bodyLarge(color: Colors.white),
                 ),
               ),
@@ -1058,7 +1058,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'How it works',
+            AppLocalizations.of(context).howItWorksLabel,
             style: AppTextStyles.labelLarge(),
           ),
           const SizedBox(height: AppDimensions.spaceMD),
@@ -1092,7 +1092,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
                 const SizedBox(width: AppDimensions.spaceSM),
                 Expanded(
                   child: Text(
-                    'This account is unique to you. Any transfer to this account credits your wallet automatically.',
+                    AppLocalizations.of(context).virtualAccountInfoBody,
                     style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                   ),
                 ),

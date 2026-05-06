@@ -1012,4 +1012,147 @@ class AppLocalizationsFr extends AppLocalizations {
   String payRequestShareText(String symbol, String amount, String userName) {
     return '';
   }
+
+  @override
+  String get approvePaymentTitle => '';
+
+  @override
+  String mtnMomoApprovePromptBody(String symbol, String amount) {
+    return '';
+  }
+
+  @override
+  String get checkPhoneForApprovalPrompt => '';
+
+  @override
+  String get iveApproved => '';
+
+  @override
+  String labelCopiedToClipboard(String label) {
+    return '';
+  }
+
+  @override
+  String get paymentSuccessful => '';
+
+  @override
+  String get paymentSuccessfulHero => '';
+
+  @override
+  String get paymentFailed => '';
+
+  @override
+  String amountWithCurrency(String symbol, String amount) {
+    return '';
+  }
+
+  @override
+  String referenceWithValue(String reference) {
+    return '';
+  }
+
+  @override
+  String get doneButton => '';
+
+  @override
+  String get mobileMoneyNotAvailableTitle => '';
+
+  @override
+  String get mobileMoneyNotAvailablePaymentsBody => '';
+
+  @override
+  String get enterAmountLabel => '';
+
+  @override
+  String get quickSelectLabel => '';
+
+  @override
+  String get securePaymentLabel => '';
+
+  @override
+  String get paystackSecurityNote => '';
+
+  @override
+  String get mobileMoneyProviderLabel => '';
+
+  @override
+  String get phoneNumberLabel => '';
+
+  @override
+  String get loadingAccountDetails => '';
+
+  @override
+  String get virtualAccountTitle => '';
+
+  @override
+  String get tapToGenerateAccountPrompt => '';
+
+  @override
+  String get generateAccountButton => '';
+
+  @override
+  String get yourVirtualAccountLabel => '';
+
+  @override
+  String get bankNameLabel => '';
+
+  @override
+  String get accountNumberLabel => '';
+
+  @override
+  String get accountNameLabel => '';
+
+  @override
+  String get howItWorksLabel => '';
+
+  @override
+  String get virtualAccountInfoBody => '';
+
+  @override
+  String get mtnMomoPaymentFailedError => '';
+
+  @override
+  String get paymentFailedOrRejectedError => '';
+
+  @override
+  String get paymentFailedError => '';
+
+  @override
+  String get cardTabLabel => '';
+
+  @override
+  String get mobileMoneyTabLabel => '';
+
+  @override
+  String get bankTransferTabLabel => '';
+
+  @override
+  String get continueToPaymentButton => '';
+
+  @override
+  String get payWithMobileMoneyButton => '';
+
+  @override
+  String get verifyingPaymentTitle => '';
+
+  @override
+  String get verifyingPaymentBody => '';
+
+  @override
+  String get referenceColon => '';
+
+  @override
+  String get referenceLabel => '';
+
+  @override
+  String get hasBeenAddedToWallet => '';
+
+  @override
+  String get newBalanceLabel => '';
+
+  @override
+  String get somethingWentWrongTryAgain => '';
+
+  @override
+  String get goBackButton => '';
 }

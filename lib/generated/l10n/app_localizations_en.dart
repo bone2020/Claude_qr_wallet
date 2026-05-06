@@ -1038,4 +1038,154 @@ class AppLocalizationsEn extends AppLocalizations {
   String payRequestShareText(String symbol, String amount, String userName) {
     return 'Pay $symbol$amount to $userName';
   }
+
+  @override
+  String get approvePaymentTitle => 'Approve Payment';
+
+  @override
+  String mtnMomoApprovePromptBody(String symbol, String amount) {
+    return 'Please approve the payment of $symbol$amount on your MTN MoMo phone.';
+  }
+
+  @override
+  String get checkPhoneForApprovalPrompt =>
+      'Check your phone for the approval prompt.';
+
+  @override
+  String get iveApproved => 'I\'ve Approved';
+
+  @override
+  String labelCopiedToClipboard(String label) {
+    return '$label copied to clipboard';
+  }
+
+  @override
+  String get paymentSuccessful => 'Payment Successful';
+
+  @override
+  String get paymentSuccessfulHero => 'Payment Successful!';
+
+  @override
+  String get paymentFailed => 'Payment Failed';
+
+  @override
+  String amountWithCurrency(String symbol, String amount) {
+    return 'Amount: $symbol$amount';
+  }
+
+  @override
+  String referenceWithValue(String reference) {
+    return 'Reference: $reference';
+  }
+
+  @override
+  String get doneButton => 'Done';
+
+  @override
+  String get mobileMoneyNotAvailableTitle => 'Mobile Money Not Available';
+
+  @override
+  String get mobileMoneyNotAvailablePaymentsBody =>
+      'Mobile money payments are not available in your region. Please use Card or Bank Transfer.';
+
+  @override
+  String get enterAmountLabel => 'Enter Amount';
+
+  @override
+  String get quickSelectLabel => 'Quick Select';
+
+  @override
+  String get securePaymentLabel => 'Secure Payment';
+
+  @override
+  String get paystackSecurityNote =>
+      'Powered by Paystack. Your payment details are secure.';
+
+  @override
+  String get mobileMoneyProviderLabel => 'Mobile Money Provider';
+
+  @override
+  String get phoneNumberLabel => 'Phone Number';
+
+  @override
+  String get loadingAccountDetails => 'Loading account details...';
+
+  @override
+  String get virtualAccountTitle => 'Virtual Account';
+
+  @override
+  String get tapToGenerateAccountPrompt =>
+      'Tap to generate your dedicated account number';
+
+  @override
+  String get generateAccountButton => 'Generate Account';
+
+  @override
+  String get yourVirtualAccountLabel => 'Your Virtual Account';
+
+  @override
+  String get bankNameLabel => 'Bank Name';
+
+  @override
+  String get accountNumberLabel => 'Account Number';
+
+  @override
+  String get accountNameLabel => 'Account Name';
+
+  @override
+  String get howItWorksLabel => 'How it works';
+
+  @override
+  String get virtualAccountInfoBody =>
+      'This account is unique to you. Any transfer to this account credits your wallet automatically.';
+
+  @override
+  String get mtnMomoPaymentFailedError => 'MTN MoMo payment failed';
+
+  @override
+  String get paymentFailedOrRejectedError => 'Payment failed or was rejected';
+
+  @override
+  String get paymentFailedError => 'Payment failed';
+
+  @override
+  String get cardTabLabel => 'Card';
+
+  @override
+  String get mobileMoneyTabLabel => 'Mobile Money';
+
+  @override
+  String get bankTransferTabLabel => 'Bank Transfer';
+
+  @override
+  String get continueToPaymentButton => 'Continue to Payment';
+
+  @override
+  String get payWithMobileMoneyButton => 'Pay with Mobile Money';
+
+  @override
+  String get verifyingPaymentTitle => 'Verifying payment...';
+
+  @override
+  String get verifyingPaymentBody =>
+      'Please wait while we confirm your payment';
+
+  @override
+  String get referenceColon => 'Reference: ';
+
+  @override
+  String get referenceLabel => 'Reference';
+
+  @override
+  String get hasBeenAddedToWallet => 'has been added to your wallet';
+
+  @override
+  String get newBalanceLabel => 'New Balance';
+
+  @override
+  String get somethingWentWrongTryAgain =>
+      'Something went wrong. Please try again.';
+
+  @override
+  String get goBackButton => 'Go Back';
 }

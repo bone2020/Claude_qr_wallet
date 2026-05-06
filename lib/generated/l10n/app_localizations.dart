@@ -2001,6 +2001,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pay {symbol}{amount} to {userName}'**
   String payRequestShareText(String symbol, String amount, String userName);
+
+  /// Title of the dialog asking the user to approve a pending MTN MoMo payment on their phone.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve Payment'**
+  String get approvePaymentTitle;
+
+  /// Body of the MTN MoMo approval dialog showing the amount to approve.
+  ///
+  /// In en, this message translates to:
+  /// **'Please approve the payment of {symbol}{amount} on your MTN MoMo phone.'**
+  String mtnMomoApprovePromptBody(String symbol, String amount);
+
+  /// Caption beneath the MTN MoMo approval dialog body.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your phone for the approval prompt.'**
+  String get checkPhoneForApprovalPrompt;
+
+  /// Button label confirming the user has approved the payment on their MoMo phone.
+  ///
+  /// In en, this message translates to:
+  /// **'I\'ve Approved'**
+  String get iveApproved;
+
+  /// Snackbar shown when the user copies a value (e.g. account number) to the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} copied to clipboard'**
+  String labelCopiedToClipboard(String label);
+
+  /// Title of the post-payment success dialog inside the add-money flow (no exclamation, used in dialog title).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Successful'**
+  String get paymentSuccessful;
+
+  /// Hero title on the dedicated payment result screen (with celebratory exclamation).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Successful!'**
+  String get paymentSuccessfulHero;
+
+  /// Hero title on the payment result screen when the payment failed (capitalized as a title).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Failed'**
+  String get paymentFailed;
+
+  /// Inline labeled amount, e.g. 'Amount: $5.00'.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount: {symbol}{amount}'**
+  String amountWithCurrency(String symbol, String amount);
+
+  /// Inline labeled transaction reference, e.g. 'Reference: ABC-123'.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference: {reference}'**
+  String referenceWithValue(String reference);
+
+  /// Generic Done button label used to dismiss a result dialog/screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get doneButton;
+
+  /// Title shown when mobile money is not supported in the user's region (shared between add-money and withdraw).
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Money Not Available'**
+  String get mobileMoneyNotAvailableTitle;
+
+  /// Body text for the mobile-money-unavailable empty state on the add-money screen (suggesting Card/Bank Transfer alternatives).
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile money payments are not available in your region. Please use Card or Bank Transfer.'**
+  String get mobileMoneyNotAvailablePaymentsBody;
+
+  /// Label above the amount input on the add-money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Amount'**
+  String get enterAmountLabel;
+
+  /// Label above the row of preset amount chips on the add-money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Select'**
+  String get quickSelectLabel;
+
+  /// Heading label above the Paystack security note.
+  ///
+  /// In en, this message translates to:
+  /// **'Secure Payment'**
+  String get securePaymentLabel;
+
+  /// Reassurance caption shown below the Secure Payment heading on add-money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Powered by Paystack. Your payment details are secure.'**
+  String get paystackSecurityNote;
+
+  /// Label above the mobile money provider dropdown (shared between add-money and withdraw).
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Money Provider'**
+  String get mobileMoneyProviderLabel;
+
+  /// Label above the phone number input field (shared between add-money and withdraw).
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Number'**
+  String get phoneNumberLabel;
+
+  /// Caption shown while the virtual bank account details are being generated/fetched.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading account details...'**
+  String get loadingAccountDetails;
+
+  /// Title for the virtual account empty state (before account is generated).
+  ///
+  /// In en, this message translates to:
+  /// **'Virtual Account'**
+  String get virtualAccountTitle;
+
+  /// Caption inviting the user to tap the button below to generate a virtual bank account.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to generate your dedicated account number'**
+  String get tapToGenerateAccountPrompt;
+
+  /// Button to generate the user's virtual bank account.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Account'**
+  String get generateAccountButton;
+
+  /// Heading on the populated virtual account card.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Virtual Account'**
+  String get yourVirtualAccountLabel;
+
+  /// Label for the bank name field on the virtual account card.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Name'**
+  String get bankNameLabel;
+
+  /// Label for the account number field (shared between add-money virtual account card and withdraw screen).
+  ///
+  /// In en, this message translates to:
+  /// **'Account Number'**
+  String get accountNumberLabel;
+
+  /// Label for the account holder name field (shared between add-money virtual account card and withdraw screen).
+  ///
+  /// In en, this message translates to:
+  /// **'Account Name'**
+  String get accountNameLabel;
+
+  /// Heading above the explanatory bullet points on the virtual account screen.
+  ///
+  /// In en, this message translates to:
+  /// **'How it works'**
+  String get howItWorksLabel;
+
+  /// Explanatory body text on the virtual account info card.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is unique to you. Any transfer to this account credits your wallet automatically.'**
+  String get virtualAccountInfoBody;
+
+  /// Fallback error snackbar message when an MTN MoMo payment fails and the API didn't return a specific error.
+  ///
+  /// In en, this message translates to:
+  /// **'MTN MoMo payment failed'**
+  String get mtnMomoPaymentFailedError;
+
+  /// Fallback error snackbar when a payment fails or is rejected by the user/processor.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed or was rejected'**
+  String get paymentFailedOrRejectedError;
+
+  /// Generic fallback error snackbar for payment failures (lowercase 'failed' — distinct from the title-cased paymentFailed used as a hero title).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment failed'**
+  String get paymentFailedError;
+
+  /// Tab label for the card payment method on add-money screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get cardTabLabel;
+
+  /// Tab label for the mobile money payment method (shared between add-money and withdraw).
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Money'**
+  String get mobileMoneyTabLabel;
+
+  /// Tab label for the bank transfer payment method (shared between add-money and withdraw).
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Transfer'**
+  String get bankTransferTabLabel;
+
+  /// Submit button label on the card payment tab (proceeds to Paystack flow).
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to Payment'**
+  String get continueToPaymentButton;
+
+  /// Submit button label on the mobile money tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay with Mobile Money'**
+  String get payWithMobileMoneyButton;
+
+  /// Title shown on the payment result screen while the verification request is in flight.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying payment...'**
+  String get verifyingPaymentTitle;
+
+  /// Body caption shown beneath the verifying payment title.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait while we confirm your payment'**
+  String get verifyingPaymentBody;
+
+  /// Inline label 'Reference: ' (with trailing colon and space) used as a prefix before a separately-rendered reference value widget.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference: '**
+  String get referenceColon;
+
+  /// Standalone Reference label (no colon) used in the post-payment summary block.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference'**
+  String get referenceLabel;
+
+  /// Caption beneath the credited amount on the payment success screen.
+  ///
+  /// In en, this message translates to:
+  /// **'has been added to your wallet'**
+  String get hasBeenAddedToWallet;
+
+  /// Label for the updated wallet balance row on the payment success screen.
+  ///
+  /// In en, this message translates to:
+  /// **'New Balance'**
+  String get newBalanceLabel;
+
+  /// Generic error fallback shown on the payment failed screen when no specific error message is available.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get somethingWentWrongTryAgain;
+
+  /// Button label on the failed payment result screen (returns to previous screen).
+  ///
+  /// In en, this message translates to:
+  /// **'Go Back'**
+  String get goBackButton;
 }
 
 class _AppLocalizationsDelegate

@@ -10,6 +10,7 @@ import '../../../core/services/payment_service.dart';
 import '../../../core/utils/error_handler.dart';
 import '../../../providers/wallet_provider.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 /// Screen shown after returning from Paystack payment
 class PaymentResultScreen extends ConsumerStatefulWidget {
   final String reference;
@@ -109,12 +110,12 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
           ),
           const SizedBox(height: AppDimensions.spaceXL),
           Text(
-            'Verifying payment...',
+            AppLocalizations.of(context).verifyingPaymentTitle,
             style: AppTextStyles.headlineSmall(),
           ),
           const SizedBox(height: AppDimensions.spaceSM),
           Text(
-            'Please wait while we confirm your payment',
+            AppLocalizations.of(context).verifyingPaymentBody,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceXL),
@@ -128,7 +129,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Reference: ',
+                  AppLocalizations.of(context).referenceColon,
                   style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                 ),
                 Text(
@@ -172,7 +173,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
 
         // Status Text
         Text(
-          _isSuccess ? 'Payment Successful!' : 'Payment Failed',
+          _isSuccess ? AppLocalizations.of(context).paymentSuccessfulHero : AppLocalizations.of(context).paymentFailed,
           style: AppTextStyles.headlineLarge(),
           textAlign: TextAlign.center,
         )
@@ -184,14 +185,14 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
         // Amount or Error
         if (_isSuccess && _amount > 0) ...[
           Text(
-            '$currencySymbol${_formatAmount(_amount)}',
+            AppLocalizations.of(context).symbolAmount(currencySymbol, _formatAmount(_amount)),
             style: AppTextStyles.displayMedium(color: AppColors.success),
           )
               .animate()
               .fadeIn(delay: 300.ms, duration: 400.ms),
           const SizedBox(height: AppDimensions.spaceSM),
           Text(
-            'has been added to your wallet',
+            AppLocalizations.of(context).hasBeenAddedToWallet,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           )
               .animate()
@@ -204,7 +205,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
               borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
             ),
             child: Text(
-              _errorMessage ?? 'Something went wrong. Please try again.',
+              _errorMessage ?? AppLocalizations.of(context).somethingWentWrongTryAgain,
               style: AppTextStyles.bodyMedium(color: AppColors.error),
               textAlign: TextAlign.center,
             ),
@@ -228,7 +229,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Reference',
+                    AppLocalizations.of(context).referenceLabel,
                     style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                   ),
                   Flexible(
@@ -248,11 +249,11 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'New Balance',
+                      AppLocalizations.of(context).newBalanceLabel,
                       style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                     ),
                     Text(
-                      '$currencySymbol${_formatAmount(walletState.balance)}',
+                      AppLocalizations.of(context).symbolAmount(currencySymbol, _formatAmount(walletState.balance)),
                       style: AppTextStyles.bodyMedium(color: AppColors.success),
                     ),
                   ],
@@ -279,7 +280,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
               ),
             ),
             child: Text(
-              _isSuccess ? 'Done' : 'Go Back',
+              _isSuccess ? AppLocalizations.of(context).doneButton : AppLocalizations.of(context).goBackButton,
               style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
             ),
           ),
@@ -296,7 +297,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
               _verifyPayment();
             },
             child: Text(
-              'Try Again',
+              AppLocalizations.of(context).tryAgainButton,
               style: AppTextStyles.labelMedium(color: AppColors.primary),
             ),
           ),
