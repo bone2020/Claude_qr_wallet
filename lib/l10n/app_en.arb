@@ -1748,5 +1748,236 @@
   "@verifyOtpToPhoneSubtitle": {"description": "Method card subtitle for the phone OTP verification option."},
 
   "noPhoneNumberLinkedSubtitle": "No phone number linked to your account",
-  "@noPhoneNumberLinkedSubtitle": {"description": "Method card subtitle when no phone number is on file."}
+  "@noPhoneNumberLinkedSubtitle": {"description": "Method card subtitle when no phone number is on file."},
+  "couldNotOpenEmailToast": "Could not open email app. Please email us at qrwallet.support@bongroups.co",
+  "@couldNotOpenEmailToast": {
+    "description": "Snackbar shown when the email app cannot be opened from the help screen."
+  },
+  "couldNotOpenWhatsAppToast": "Could not open WhatsApp. Please make sure WhatsApp is installed.",
+  "@couldNotOpenWhatsAppToast": {
+    "description": "Snackbar shown when WhatsApp cannot be opened."
+  },
+  "chatOnWhatsAppDialogTitle": "Chat on WhatsApp",
+  "@chatOnWhatsAppDialogTitle": {
+    "description": "Title of the dialog showing the WhatsApp QR code."
+  },
+  "scanWithAnotherPhoneCaption": "Scan with another phone\nor tap \"Open WhatsApp\" below",
+  "@scanWithAnotherPhoneCaption": {
+    "description": "Two-line caption inside the WhatsApp QR dialog."
+  },
+  "openWhatsAppButton": "Open WhatsApp",
+  "@openWhatsAppButton": {
+    "description": "Button label inside the WhatsApp QR dialog that opens the WhatsApp app."
+  },
+  "closeButton": "Close",
+  "@closeButton": {
+    "description": "Generic Close button label."
+  },
+  "helpAndSupportTitle": "Help & Support",
+  "@helpAndSupportTitle": {
+    "description": "AppBar title on the help and support screen."
+  },
+  "contactUsSection": "Contact Us",
+  "@contactUsSection": {
+    "description": "Section heading for contact methods (email, WhatsApp)."
+  },
+  "emailSupportLabel": "Email Support",
+  "@emailSupportLabel": {
+    "description": "Menu item label for contacting support via email."
+  },
+  "whatsappSupportLabel": "WhatsApp Support",
+  "@whatsappSupportLabel": {
+    "description": "Menu item label for contacting support via WhatsApp."
+  },
+  "whatsappSupportSubtitle": "Chat with us on WhatsApp",
+  "@whatsappSupportSubtitle": {
+    "description": "Subtitle for the WhatsApp Support menu item."
+  },
+  "faqSection": "Frequently Asked Questions",
+  "@faqSection": {
+    "description": "Section heading for the FAQ list."
+  },
+  "followUsSection": "Follow Us",
+  "@followUsSection": {
+    "description": "Section heading for social media follow links."
+  },
+  "emailSupportSubject": "QR Wallet Support Request",
+  "@emailSupportSubject": {
+    "description": "Pre-filled email subject for support emails."
+  },
+  "faqAddMoneyQuestion": "How do I add money to my wallet?",
+  "@faqAddMoneyQuestion": {
+    "description": "FAQ question about adding money."
+  },
+  "faqAddMoneyAnswer": "You can add money via Card, Mobile Money, or Bank Transfer. Go to Home → Add Money and choose your preferred method.",
+  "@faqAddMoneyAnswer": {
+    "description": "FAQ answer for adding money. Contains the Unicode arrow character."
+  },
+  "faqSendMoneyQuestion": "How do I send money to someone?",
+  "@faqSendMoneyQuestion": {
+    "description": "FAQ question about sending money."
+  },
+  "faqSendMoneyAnswer": "Tap \"Send\" on the home screen, enter the recipient's wallet ID or scan their QR code, enter the amount, and confirm.",
+  "@faqSendMoneyAnswer": {
+    "description": "FAQ answer for sending money. Contains double quotes and apostrophe."
+  },
+  "faqWithdrawalTimeQuestion": "How long do withdrawals take?",
+  "@faqWithdrawalTimeQuestion": {
+    "description": "FAQ question about withdrawal timing."
+  },
+  "faqWithdrawalTimeAnswer": "Bank transfers typically take 1-3 business days. Mobile Money withdrawals are usually instant.",
+  "@faqWithdrawalTimeAnswer": {
+    "description": "FAQ answer about withdrawal timing."
+  },
+  "faqMoneySafeQuestion": "Is my money safe?",
+  "@faqMoneySafeQuestion": {
+    "description": "FAQ question about security."
+  },
+  "faqMoneySafeAnswer": "Yes! We use bank-level encryption and secure payment processors. Your funds are protected at all times.",
+  "@faqMoneySafeAnswer": {
+    "description": "FAQ answer about security and encryption."
+  },
+  "faqChangePinQuestion": "How do I change my PIN?",
+  "@faqChangePinQuestion": {
+    "description": "FAQ question about changing PIN."
+  },
+  "faqChangePinAnswer": "Go to Profile → Change PIN. Enter your current PIN, then create and confirm your new PIN.",
+  "@faqChangePinAnswer": {
+    "description": "FAQ answer for changing PIN. Contains the Unicode arrow character."
+  },
+  "faqForgotPasswordQuestion": "What if I forget my password?",
+  "@faqForgotPasswordQuestion": {
+    "description": "FAQ question about forgotten password."
+  },
+  "faqForgotPasswordAnswer": "On the login screen, tap \"Forgot Password?\" and enter your email. We'll send you a reset link.",
+  "@faqForgotPasswordAnswer": {
+    "description": "FAQ answer for forgotten password. Contains double quotes and apostrophe."
+  },
+  "removeAccountConfirmTitle": "Remove Account?",
+  "@removeAccountConfirmTitle": {
+    "description": "Title of the confirmation dialog when removing a linked bank account."
+  },
+  "removeAccountConfirmBody": "Are you sure you want to remove this bank account?",
+  "@removeAccountConfirmBody": {
+    "description": "Body of the remove-account confirmation dialog."
+  },
+  "accountRemovedToast": "Account removed",
+  "@accountRemovedToast": {
+    "description": "Snackbar shown after a bank account is removed."
+  },
+  "failedToRemoveError": "Failed to remove: {error}",
+  "@failedToRemoveError": {
+    "description": "Snackbar shown when removing a bank account fails.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "linkedBankAccountsTitle": "Linked Bank Accounts",
+  "@linkedBankAccountsTitle": {
+    "description": "AppBar title on the linked bank accounts screen."
+  },
+  "noBankAccountsEmptyTitle": "No Bank Accounts",
+  "@noBankAccountsEmptyTitle": {
+    "description": "Empty-state title when no bank accounts are linked."
+  },
+  "noBankAccountsEmptySubtitle": "Add a bank account to make withdrawals easier",
+  "@noBankAccountsEmptySubtitle": {
+    "description": "Empty-state subtitle on the linked bank accounts screen."
+  },
+  "addBankAccountAction": "Add Bank Account",
+  "@addBankAccountAction": {
+    "description": "Action label for adding a bank account. Used in 3 places: empty-state CTA, bottom-sheet title, submit button."
+  },
+  "bankAccountFallback": "Bank Account",
+  "@bankAccountFallback": {
+    "description": "Generic fallback shown when a linked bank account has no bank name on file."
+  },
+  "bankNameHint": "e.g. GCB Bank",
+  "@bankNameHint": {
+    "description": "Placeholder text in the bank name input field."
+  },
+  "nameOnAccountHint": "Name on account",
+  "@nameOnAccountHint": {
+    "description": "Placeholder text in the account holder name input field."
+  },
+  "uploadBusinessLogoTitle": "Upload Business Logo",
+  "@uploadBusinessLogoTitle": {
+    "description": "Title of the upload-logo bottom sheet."
+  },
+  "logoAppearInQrCaption": "This logo will appear in your payment QR codes",
+  "@logoAppearInQrCaption": {
+    "description": "Caption inside the upload-logo bottom sheet."
+  },
+  "takePhotoOption": "Take Photo",
+  "@takePhotoOption": {
+    "description": "Bottom-sheet option to take a photo with the camera."
+  },
+  "chooseFromGalleryOption": "Choose from Gallery",
+  "@chooseFromGalleryOption": {
+    "description": "Bottom-sheet option to pick from the gallery."
+  },
+  "businessLogoUploadedToast": "Business logo uploaded successfully",
+  "@businessLogoUploadedToast": {
+    "description": "Snackbar shown after a business logo is uploaded."
+  },
+  "errorUploadingLogo": "Error uploading logo: {error}",
+  "@errorUploadingLogo": {
+    "description": "Snackbar shown when business logo upload fails.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "removeLogoTitle": "Remove Logo",
+  "@removeLogoTitle": {
+    "description": "Title of the remove-logo confirmation dialog."
+  },
+  "removeLogoConfirmBody": "Are you sure you want to remove your business logo?",
+  "@removeLogoConfirmBody": {
+    "description": "Body of the remove-logo confirmation dialog."
+  },
+  "removeButton": "Remove",
+  "@removeButton": {
+    "description": "Generic Remove button label. Shared between linked accounts and business logo dialogs/cards."
+  },
+  "businessLogoRemovedToast": "Business logo removed",
+  "@businessLogoRemovedToast": {
+    "description": "Snackbar shown after a business logo is removed."
+  },
+  "errorRemovingLogo": "Error removing logo: {error}",
+  "@errorRemovingLogo": {
+    "description": "Snackbar shown when business logo removal fails.",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "businessLogoLabel": "Business Logo",
+  "@businessLogoLabel": {
+    "description": "Label on the business logo card."
+  },
+  "logoEmbeddedInQrCaption": "This logo will be embedded in your payment QR codes",
+  "@logoEmbeddedInQrCaption": {
+    "description": "Caption on the business logo card. Distinct from logoAppearInQrCaption."
+  },
+  "logoUploadedSubtitle": "Logo uploaded",
+  "@logoUploadedSubtitle": {
+    "description": "Business logo card subtitle when a logo is uploaded."
+  },
+  "addBusinessLogoSubtitle": "Add your business logo",
+  "@addBusinessLogoSubtitle": {
+    "description": "Business logo card subtitle when no logo exists yet."
+  },
+  "changeButton": "Change",
+  "@changeButton": {
+    "description": "Button label on business logo card when a logo exists (paired with uploadButton)."
+  },
+  "uploadButton": "Upload",
+  "@uploadButton": {
+    "description": "Button label on business logo card when no logo exists (paired with changeButton)."
+  }
 }

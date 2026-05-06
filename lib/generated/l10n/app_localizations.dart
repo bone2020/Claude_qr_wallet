@@ -3003,6 +3003,330 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No phone number linked to your account'**
   String get noPhoneNumberLinkedSubtitle;
+
+  /// Snackbar shown when the email app cannot be opened from the help screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open email app. Please email us at qrwallet.support@bongroups.co'**
+  String get couldNotOpenEmailToast;
+
+  /// Snackbar shown when WhatsApp cannot be opened.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open WhatsApp. Please make sure WhatsApp is installed.'**
+  String get couldNotOpenWhatsAppToast;
+
+  /// Title of the dialog showing the WhatsApp QR code.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat on WhatsApp'**
+  String get chatOnWhatsAppDialogTitle;
+
+  /// Two-line caption inside the WhatsApp QR dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan with another phone\nor tap \"Open WhatsApp\" below'**
+  String get scanWithAnotherPhoneCaption;
+
+  /// Button label inside the WhatsApp QR dialog that opens the WhatsApp app.
+  ///
+  /// In en, this message translates to:
+  /// **'Open WhatsApp'**
+  String get openWhatsAppButton;
+
+  /// Generic Close button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeButton;
+
+  /// AppBar title on the help and support screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Help & Support'**
+  String get helpAndSupportTitle;
+
+  /// Section heading for contact methods (email, WhatsApp).
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Us'**
+  String get contactUsSection;
+
+  /// Menu item label for contacting support via email.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Support'**
+  String get emailSupportLabel;
+
+  /// Menu item label for contacting support via WhatsApp.
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp Support'**
+  String get whatsappSupportLabel;
+
+  /// Subtitle for the WhatsApp Support menu item.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with us on WhatsApp'**
+  String get whatsappSupportSubtitle;
+
+  /// Section heading for the FAQ list.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequently Asked Questions'**
+  String get faqSection;
+
+  /// Section heading for social media follow links.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow Us'**
+  String get followUsSection;
+
+  /// Pre-filled email subject for support emails.
+  ///
+  /// In en, this message translates to:
+  /// **'QR Wallet Support Request'**
+  String get emailSupportSubject;
+
+  /// FAQ question about adding money.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I add money to my wallet?'**
+  String get faqAddMoneyQuestion;
+
+  /// FAQ answer for adding money. Contains the Unicode arrow character.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add money via Card, Mobile Money, or Bank Transfer. Go to Home → Add Money and choose your preferred method.'**
+  String get faqAddMoneyAnswer;
+
+  /// FAQ question about sending money.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I send money to someone?'**
+  String get faqSendMoneyQuestion;
+
+  /// FAQ answer for sending money. Contains double quotes and apostrophe.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap \"Send\" on the home screen, enter the recipient\'s wallet ID or scan their QR code, enter the amount, and confirm.'**
+  String get faqSendMoneyAnswer;
+
+  /// FAQ question about withdrawal timing.
+  ///
+  /// In en, this message translates to:
+  /// **'How long do withdrawals take?'**
+  String get faqWithdrawalTimeQuestion;
+
+  /// FAQ answer about withdrawal timing.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank transfers typically take 1-3 business days. Mobile Money withdrawals are usually instant.'**
+  String get faqWithdrawalTimeAnswer;
+
+  /// FAQ question about security.
+  ///
+  /// In en, this message translates to:
+  /// **'Is my money safe?'**
+  String get faqMoneySafeQuestion;
+
+  /// FAQ answer about security and encryption.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes! We use bank-level encryption and secure payment processors. Your funds are protected at all times.'**
+  String get faqMoneySafeAnswer;
+
+  /// FAQ question about changing PIN.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I change my PIN?'**
+  String get faqChangePinQuestion;
+
+  /// FAQ answer for changing PIN. Contains the Unicode arrow character.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Profile → Change PIN. Enter your current PIN, then create and confirm your new PIN.'**
+  String get faqChangePinAnswer;
+
+  /// FAQ question about forgotten password.
+  ///
+  /// In en, this message translates to:
+  /// **'What if I forget my password?'**
+  String get faqForgotPasswordQuestion;
+
+  /// FAQ answer for forgotten password. Contains double quotes and apostrophe.
+  ///
+  /// In en, this message translates to:
+  /// **'On the login screen, tap \"Forgot Password?\" and enter your email. We\'ll send you a reset link.'**
+  String get faqForgotPasswordAnswer;
+
+  /// Title of the confirmation dialog when removing a linked bank account.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Account?'**
+  String get removeAccountConfirmTitle;
+
+  /// Body of the remove-account confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove this bank account?'**
+  String get removeAccountConfirmBody;
+
+  /// Snackbar shown after a bank account is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Account removed'**
+  String get accountRemovedToast;
+
+  /// Snackbar shown when removing a bank account fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to remove: {error}'**
+  String failedToRemoveError(String error);
+
+  /// AppBar title on the linked bank accounts screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked Bank Accounts'**
+  String get linkedBankAccountsTitle;
+
+  /// Empty-state title when no bank accounts are linked.
+  ///
+  /// In en, this message translates to:
+  /// **'No Bank Accounts'**
+  String get noBankAccountsEmptyTitle;
+
+  /// Empty-state subtitle on the linked bank accounts screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a bank account to make withdrawals easier'**
+  String get noBankAccountsEmptySubtitle;
+
+  /// Action label for adding a bank account. Used in 3 places: empty-state CTA, bottom-sheet title, submit button.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Bank Account'**
+  String get addBankAccountAction;
+
+  /// Generic fallback shown when a linked bank account has no bank name on file.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Account'**
+  String get bankAccountFallback;
+
+  /// Placeholder text in the bank name input field.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. GCB Bank'**
+  String get bankNameHint;
+
+  /// Placeholder text in the account holder name input field.
+  ///
+  /// In en, this message translates to:
+  /// **'Name on account'**
+  String get nameOnAccountHint;
+
+  /// Title of the upload-logo bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Business Logo'**
+  String get uploadBusinessLogoTitle;
+
+  /// Caption inside the upload-logo bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'This logo will appear in your payment QR codes'**
+  String get logoAppearInQrCaption;
+
+  /// Bottom-sheet option to take a photo with the camera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take Photo'**
+  String get takePhotoOption;
+
+  /// Bottom-sheet option to pick from the gallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from Gallery'**
+  String get chooseFromGalleryOption;
+
+  /// Snackbar shown after a business logo is uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Business logo uploaded successfully'**
+  String get businessLogoUploadedToast;
+
+  /// Snackbar shown when business logo upload fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error uploading logo: {error}'**
+  String errorUploadingLogo(String error);
+
+  /// Title of the remove-logo confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Logo'**
+  String get removeLogoTitle;
+
+  /// Body of the remove-logo confirmation dialog.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove your business logo?'**
+  String get removeLogoConfirmBody;
+
+  /// Generic Remove button label. Shared between linked accounts and business logo dialogs/cards.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeButton;
+
+  /// Snackbar shown after a business logo is removed.
+  ///
+  /// In en, this message translates to:
+  /// **'Business logo removed'**
+  String get businessLogoRemovedToast;
+
+  /// Snackbar shown when business logo removal fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Error removing logo: {error}'**
+  String errorRemovingLogo(String error);
+
+  /// Label on the business logo card.
+  ///
+  /// In en, this message translates to:
+  /// **'Business Logo'**
+  String get businessLogoLabel;
+
+  /// Caption on the business logo card. Distinct from logoAppearInQrCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'This logo will be embedded in your payment QR codes'**
+  String get logoEmbeddedInQrCaption;
+
+  /// Business logo card subtitle when a logo is uploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Logo uploaded'**
+  String get logoUploadedSubtitle;
+
+  /// Business logo card subtitle when no logo exists yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your business logo'**
+  String get addBusinessLogoSubtitle;
+
+  /// Button label on business logo card when a logo exists (paired with uploadButton).
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get changeButton;
+
+  /// Button label on business logo card when no logo exists (paired with changeButton).
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get uploadButton;
 }
 
 class _AppLocalizationsDelegate

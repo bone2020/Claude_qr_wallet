@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -76,7 +77,7 @@ User ID: $userId
       scheme: 'mailto',
       path: _supportEmail,
       queryParameters: {
-        'subject': 'QR Wallet Support Request',
+        'subject': AppLocalizations.of(context).emailSupportSubject,
         'body': body,
       },
     );
@@ -85,9 +86,9 @@ User ID: $userId
       await launchUrl(uri);
     } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-              'Could not open email app. Please email us at qrwallet.support@bongroups.co'),
+              AppLocalizations.of(context).couldNotOpenEmailToast),
         ),
       );
     }
@@ -104,9 +105,9 @@ User ID: $userId
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-              'Could not open WhatsApp. Please make sure WhatsApp is installed.'),
+              AppLocalizations.of(context).couldNotOpenWhatsAppToast),
         ),
       );
     }
@@ -130,13 +131,13 @@ User ID: $userId
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Chat on WhatsApp',
+                AppLocalizations.of(context).chatOnWhatsAppDialogTitle,
                 style: AppTextStyles.headlineSmall(),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Scan with another phone\nor tap "Open WhatsApp" below',
+                AppLocalizations.of(context).scanWithAnotherPhoneCaption,
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
@@ -164,7 +165,7 @@ User ID: $userId
                     _launchWhatsApp(context);
                   },
                   icon: const Icon(Iconsax.message, size: 20),
-                  label: const Text('Open WhatsApp'),
+                  label: Text(AppLocalizations.of(context).openWhatsAppButton),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF25D366),
                     foregroundColor: Colors.white,
@@ -179,7 +180,7 @@ User ID: $userId
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 child: Text(
-                  'Close',
+                  AppLocalizations.of(context).closeButton,
                   style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 ),
               ),
@@ -207,65 +208,65 @@ User ID: $userId
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Help & Support', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).helpAndSupportTitle, style: AppTextStyles.headlineMedium()),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Contact Us', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).contactUsSection, style: AppTextStyles.headlineSmall()),
             const SizedBox(height: 16),
             _buildContactItem(
               context: context,
               icon: Iconsax.sms,
-              title: 'Email Support',
+              title: AppLocalizations.of(context).emailSupportLabel,
               subtitle: _supportEmail,
               onTap: () => _launchEmail(context),
             ),
             _buildContactItem(
               context: context,
               icon: Iconsax.message,
-              title: 'WhatsApp Support',
-              subtitle: 'Chat with us on WhatsApp',
+              title: AppLocalizations.of(context).whatsappSupportLabel,
+              subtitle: AppLocalizations.of(context).whatsappSupportSubtitle,
               onTap: () => _showWhatsAppQrDialog(context),
               iconColor: const Color(0xFF25D366),
             ),
             const SizedBox(height: 32),
-            Text('Frequently Asked Questions', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).faqSection, style: AppTextStyles.headlineSmall()),
             const SizedBox(height: 16),
             _buildFaqItem(
-              question: 'How do I add money to my wallet?',
+              question: AppLocalizations.of(context).faqAddMoneyQuestion,
               answer:
-                  'You can add money via Card, Mobile Money, or Bank Transfer. Go to Home → Add Money and choose your preferred method.',
+                  AppLocalizations.of(context).faqAddMoneyAnswer,
             ),
             _buildFaqItem(
-              question: 'How do I send money to someone?',
+              question: AppLocalizations.of(context).faqSendMoneyQuestion,
               answer:
-                  'Tap "Send" on the home screen, enter the recipient\'s wallet ID or scan their QR code, enter the amount, and confirm.',
+                  AppLocalizations.of(context).faqSendMoneyAnswer,
             ),
             _buildFaqItem(
-              question: 'How long do withdrawals take?',
+              question: AppLocalizations.of(context).faqWithdrawalTimeQuestion,
               answer:
-                  'Bank transfers typically take 1-3 business days. Mobile Money withdrawals are usually instant.',
+                  AppLocalizations.of(context).faqWithdrawalTimeAnswer,
             ),
             _buildFaqItem(
-              question: 'Is my money safe?',
+              question: AppLocalizations.of(context).faqMoneySafeQuestion,
               answer:
-                  'Yes! We use bank-level encryption and secure payment processors. Your funds are protected at all times.',
+                  AppLocalizations.of(context).faqMoneySafeAnswer,
             ),
             _buildFaqItem(
-              question: 'How do I change my PIN?',
+              question: AppLocalizations.of(context).faqChangePinQuestion,
               answer:
-                  'Go to Profile → Change PIN. Enter your current PIN, then create and confirm your new PIN.',
+                  AppLocalizations.of(context).faqChangePinAnswer,
             ),
             _buildFaqItem(
-              question: 'What if I forget my password?',
+              question: AppLocalizations.of(context).faqForgotPasswordQuestion,
               answer:
-                  'On the login screen, tap "Forgot Password?" and enter your email. We\'ll send you a reset link.',
+                  AppLocalizations.of(context).faqForgotPasswordAnswer,
             ),
             const SizedBox(height: 32),
-            Text('Follow Us', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).followUsSection, style: AppTextStyles.headlineSmall()),
             const SizedBox(height: 16),
             Row(
               children: [

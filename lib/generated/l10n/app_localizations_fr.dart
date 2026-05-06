@@ -1539,4 +1539,172 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get noPhoneNumberLinkedSubtitle => '';
+
+  @override
+  String get couldNotOpenEmailToast => '';
+
+  @override
+  String get couldNotOpenWhatsAppToast => '';
+
+  @override
+  String get chatOnWhatsAppDialogTitle => '';
+
+  @override
+  String get scanWithAnotherPhoneCaption => '';
+
+  @override
+  String get openWhatsAppButton => '';
+
+  @override
+  String get closeButton => '';
+
+  @override
+  String get helpAndSupportTitle => '';
+
+  @override
+  String get contactUsSection => '';
+
+  @override
+  String get emailSupportLabel => '';
+
+  @override
+  String get whatsappSupportLabel => '';
+
+  @override
+  String get whatsappSupportSubtitle => '';
+
+  @override
+  String get faqSection => '';
+
+  @override
+  String get followUsSection => '';
+
+  @override
+  String get emailSupportSubject => '';
+
+  @override
+  String get faqAddMoneyQuestion => '';
+
+  @override
+  String get faqAddMoneyAnswer => '';
+
+  @override
+  String get faqSendMoneyQuestion => '';
+
+  @override
+  String get faqSendMoneyAnswer => '';
+
+  @override
+  String get faqWithdrawalTimeQuestion => '';
+
+  @override
+  String get faqWithdrawalTimeAnswer => '';
+
+  @override
+  String get faqMoneySafeQuestion => '';
+
+  @override
+  String get faqMoneySafeAnswer => '';
+
+  @override
+  String get faqChangePinQuestion => '';
+
+  @override
+  String get faqChangePinAnswer => '';
+
+  @override
+  String get faqForgotPasswordQuestion => '';
+
+  @override
+  String get faqForgotPasswordAnswer => '';
+
+  @override
+  String get removeAccountConfirmTitle => '';
+
+  @override
+  String get removeAccountConfirmBody => '';
+
+  @override
+  String get accountRemovedToast => '';
+
+  @override
+  String failedToRemoveError(String error) {
+    return '';
+  }
+
+  @override
+  String get linkedBankAccountsTitle => '';
+
+  @override
+  String get noBankAccountsEmptyTitle => '';
+
+  @override
+  String get noBankAccountsEmptySubtitle => '';
+
+  @override
+  String get addBankAccountAction => '';
+
+  @override
+  String get bankAccountFallback => '';
+
+  @override
+  String get bankNameHint => '';
+
+  @override
+  String get nameOnAccountHint => '';
+
+  @override
+  String get uploadBusinessLogoTitle => '';
+
+  @override
+  String get logoAppearInQrCaption => '';
+
+  @override
+  String get takePhotoOption => '';
+
+  @override
+  String get chooseFromGalleryOption => '';
+
+  @override
+  String get businessLogoUploadedToast => '';
+
+  @override
+  String errorUploadingLogo(String error) {
+    return '';
+  }
+
+  @override
+  String get removeLogoTitle => '';
+
+  @override
+  String get removeLogoConfirmBody => '';
+
+  @override
+  String get removeButton => '';
+
+  @override
+  String get businessLogoRemovedToast => '';
+
+  @override
+  String errorRemovingLogo(String error) {
+    return '';
+  }
+
+  @override
+  String get businessLogoLabel => '';
+
+  @override
+  String get logoEmbeddedInQrCaption => '';
+
+  @override
+  String get logoUploadedSubtitle => '';
+
+  @override
+  String get addBusinessLogoSubtitle => '';
+
+  @override
+  String get changeButton => '';
+
+  @override
+  String get uploadButton => '';
 }

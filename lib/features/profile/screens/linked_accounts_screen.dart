@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 class LinkedAccountsScreen extends ConsumerStatefulWidget {
   const LinkedAccountsScreen({super.key});
@@ -60,15 +61,15 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Remove Account?', style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).removeAccountConfirmTitle, style: AppTextStyles.headlineSmall()),
         content: Text(
-          'Are you sure you want to remove this bank account?',
+          AppLocalizations.of(context).removeAccountConfirmBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
+            child: Text(AppLocalizations.of(context).cancel, style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -76,7 +77,7 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
               backgroundColor: AppColors.error,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text('Remove', style: AppTextStyles.labelMedium(color: Colors.white)),
+            child: Text(AppLocalizations.of(context).removeButton, style: AppTextStyles.labelMedium(color: Colors.white)),
           ),
         ],
       ),
@@ -99,8 +100,8 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account removed'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).accountRemovedToast),
             backgroundColor: AppColors.success,
           ),
         );
@@ -109,7 +110,7 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to remove: $e'),
+            content: Text(AppLocalizations.of(context).failedToRemoveError(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -144,7 +145,7 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Linked Bank Accounts', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).linkedBankAccountsTitle, style: AppTextStyles.headlineMedium()),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -161,9 +162,9 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
     if (_bankAccounts.isEmpty) {
       return _buildEmptyState(
         icon: Iconsax.bank,
-        title: 'No Bank Accounts',
-        subtitle: 'Add a bank account to make withdrawals easier',
-        buttonText: 'Add Bank Account',
+        title: AppLocalizations.of(context).noBankAccountsEmptyTitle,
+        subtitle: AppLocalizations.of(context).noBankAccountsEmptySubtitle,
+        buttonText: AppLocalizations.of(context).addBankAccountAction,
         onPressed: _showAddAccountSheet,
       );
     }
@@ -252,7 +253,7 @@ class _LinkedAccountsScreenState extends ConsumerState<LinkedAccountsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  account['bankName'] ?? 'Bank Account',
+                  account['bankName'] ?? AppLocalizations.of(context).bankAccountFallback,
                   style: AppTextStyles.bodyLarge(),
                 ),
                 const SizedBox(height: 4),
@@ -332,7 +333,7 @@ class _AddBankAccountSheetState extends State<_AddBankAccountSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text(AppLocalizations.of(context).errorWithMessage(e.toString())), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -370,29 +371,29 @@ class _AddBankAccountSheetState extends State<_AddBankAccountSheet> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Add Bank Account',
+                AppLocalizations.of(context).addBankAccountAction,
                 style: AppTextStyles.headlineSmall(),
               ),
               const SizedBox(height: 24),
               _buildTextField(
                 controller: _bankNameController,
-                label: 'Bank Name',
-                hint: 'e.g. GCB Bank',
+                label: AppLocalizations.of(context).bankNameLabel,
+                hint: AppLocalizations.of(context).bankNameHint,
                 icon: Iconsax.bank,
               ),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _accountNumberController,
-                label: 'Account Number',
-                hint: 'Enter account number',
+                label: AppLocalizations.of(context).accountNumberLabel,
+                hint: AppLocalizations.of(context).enterAccountNumberHint,
                 icon: Iconsax.card,
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _accountNameController,
-                label: 'Account Name',
-                hint: 'Name on account',
+                label: AppLocalizations.of(context).accountNameLabel,
+                hint: AppLocalizations.of(context).nameOnAccountHint,
                 icon: Iconsax.user,
               ),
               const SizedBox(height: 24),
@@ -412,7 +413,7 @@ class _AddBankAccountSheetState extends State<_AddBankAccountSheet> {
                           child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
                         )
                       : Text(
-                          'Add Bank Account',
+                          AppLocalizations.of(context).addBankAccountAction,
                           style: AppTextStyles.labelLarge(color: Colors.black),
                         ),
                 ),

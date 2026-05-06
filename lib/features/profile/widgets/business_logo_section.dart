@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../providers/auth_provider.dart';
+import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 /// Business Logo Section Widget for Profile Screen
 class BusinessLogoSection extends ConsumerStatefulWidget {
@@ -47,24 +48,24 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
               ),
               const SizedBox(height: AppDimensions.spaceXL),
               Text(
-                'Upload Business Logo',
+                AppLocalizations.of(context).uploadBusinessLogoTitle,
                 style: AppTextStyles.headlineSmall(),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
               Text(
-                'This logo will appear in your payment QR codes',
+                AppLocalizations.of(context).logoAppearInQrCaption,
                 style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: AppDimensions.spaceXL),
               ListTile(
                 leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
-                title: Text('Take Photo', style: AppTextStyles.bodyLarge()),
+                title: Text(AppLocalizations.of(context).takePhotoOption, style: AppTextStyles.bodyLarge()),
                 onTap: () => _handleImageSource(ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
-                title: Text('Choose from Gallery', style: AppTextStyles.bodyLarge()),
+                title: Text(AppLocalizations.of(context).chooseFromGalleryOption, style: AppTextStyles.bodyLarge()),
                 onTap: () => _handleImageSource(ImageSource.gallery),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
@@ -127,8 +128,8 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Business logo uploaded successfully'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).businessLogoUploadedToast),
           backgroundColor: AppColors.success,
         ),
       );
@@ -136,7 +137,7 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading logo: $e'),
+          content: Text(AppLocalizations.of(context).errorUploadingLogo(e.toString())),
           backgroundColor: AppColors.error,
         ),
       );
@@ -155,23 +156,23 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
         ),
-        title: Text('Remove Logo', style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).removeLogoTitle, style: AppTextStyles.headlineSmall()),
         content: Text(
-          'Are you sure you want to remove your business logo?',
+          AppLocalizations.of(context).removeLogoConfirmBody,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
-              'Cancel',
+              AppLocalizations.of(context).cancel,
               style: AppTextStyles.labelMedium(color: AppColors.textSecondaryDark),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text(
-              'Remove',
+              AppLocalizations.of(context).removeButton,
               style: AppTextStyles.labelMedium(color: AppColors.error),
             ),
           ),
@@ -216,8 +217,8 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Business logo removed'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).businessLogoRemovedToast),
           backgroundColor: AppColors.success,
         ),
       );
@@ -225,7 +226,7 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error removing logo: $e'),
+          content: Text(AppLocalizations.of(context).errorRemovingLogo(e.toString())),
           backgroundColor: AppColors.error,
         ),
       );
@@ -272,11 +273,11 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Business Logo',
+                      AppLocalizations.of(context).businessLogoLabel,
                       style: AppTextStyles.bodyMedium(),
                     ),
                     Text(
-                      hasLogo ? 'Logo uploaded' : 'Add your business logo',
+                      hasLogo ? AppLocalizations.of(context).logoUploadedSubtitle : AppLocalizations.of(context).addBusinessLogoSubtitle,
                       style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                     ),
                   ],
@@ -335,7 +336,7 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'This logo will be embedded in your payment QR codes',
+                      AppLocalizations.of(context).logoEmbeddedInQrCaption,
                       style: AppTextStyles.caption(color: AppColors.textTertiaryDark),
                     ),
                     const SizedBox(height: AppDimensions.spaceSM),
@@ -349,7 +350,7 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
                               side: const BorderSide(color: AppColors.primary),
                             ),
                             child: Text(
-                              hasLogo ? 'Change' : 'Upload',
+                              hasLogo ? AppLocalizations.of(context).changeButton : AppLocalizations.of(context).uploadButton,
                               style: AppTextStyles.labelSmall(color: AppColors.primary),
                             ),
                           ),
@@ -364,7 +365,7 @@ class _BusinessLogoSectionState extends ConsumerState<BusinessLogoSection> {
                                 side: const BorderSide(color: AppColors.error),
                               ),
                               child: Text(
-                                'Remove',
+                                AppLocalizations.of(context).removeButton,
                                 style: AppTextStyles.labelSmall(color: AppColors.error),
                               ),
                             ),

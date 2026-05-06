@@ -1595,4 +1595,186 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noPhoneNumberLinkedSubtitle =>
       'No phone number linked to your account';
+
+  @override
+  String get couldNotOpenEmailToast =>
+      'Could not open email app. Please email us at qrwallet.support@bongroups.co';
+
+  @override
+  String get couldNotOpenWhatsAppToast =>
+      'Could not open WhatsApp. Please make sure WhatsApp is installed.';
+
+  @override
+  String get chatOnWhatsAppDialogTitle => 'Chat on WhatsApp';
+
+  @override
+  String get scanWithAnotherPhoneCaption =>
+      'Scan with another phone\nor tap \"Open WhatsApp\" below';
+
+  @override
+  String get openWhatsAppButton => 'Open WhatsApp';
+
+  @override
+  String get closeButton => 'Close';
+
+  @override
+  String get helpAndSupportTitle => 'Help & Support';
+
+  @override
+  String get contactUsSection => 'Contact Us';
+
+  @override
+  String get emailSupportLabel => 'Email Support';
+
+  @override
+  String get whatsappSupportLabel => 'WhatsApp Support';
+
+  @override
+  String get whatsappSupportSubtitle => 'Chat with us on WhatsApp';
+
+  @override
+  String get faqSection => 'Frequently Asked Questions';
+
+  @override
+  String get followUsSection => 'Follow Us';
+
+  @override
+  String get emailSupportSubject => 'QR Wallet Support Request';
+
+  @override
+  String get faqAddMoneyQuestion => 'How do I add money to my wallet?';
+
+  @override
+  String get faqAddMoneyAnswer =>
+      'You can add money via Card, Mobile Money, or Bank Transfer. Go to Home → Add Money and choose your preferred method.';
+
+  @override
+  String get faqSendMoneyQuestion => 'How do I send money to someone?';
+
+  @override
+  String get faqSendMoneyAnswer =>
+      'Tap \"Send\" on the home screen, enter the recipient\'s wallet ID or scan their QR code, enter the amount, and confirm.';
+
+  @override
+  String get faqWithdrawalTimeQuestion => 'How long do withdrawals take?';
+
+  @override
+  String get faqWithdrawalTimeAnswer =>
+      'Bank transfers typically take 1-3 business days. Mobile Money withdrawals are usually instant.';
+
+  @override
+  String get faqMoneySafeQuestion => 'Is my money safe?';
+
+  @override
+  String get faqMoneySafeAnswer =>
+      'Yes! We use bank-level encryption and secure payment processors. Your funds are protected at all times.';
+
+  @override
+  String get faqChangePinQuestion => 'How do I change my PIN?';
+
+  @override
+  String get faqChangePinAnswer =>
+      'Go to Profile → Change PIN. Enter your current PIN, then create and confirm your new PIN.';
+
+  @override
+  String get faqForgotPasswordQuestion => 'What if I forget my password?';
+
+  @override
+  String get faqForgotPasswordAnswer =>
+      'On the login screen, tap \"Forgot Password?\" and enter your email. We\'ll send you a reset link.';
+
+  @override
+  String get removeAccountConfirmTitle => 'Remove Account?';
+
+  @override
+  String get removeAccountConfirmBody =>
+      'Are you sure you want to remove this bank account?';
+
+  @override
+  String get accountRemovedToast => 'Account removed';
+
+  @override
+  String failedToRemoveError(String error) {
+    return 'Failed to remove: $error';
+  }
+
+  @override
+  String get linkedBankAccountsTitle => 'Linked Bank Accounts';
+
+  @override
+  String get noBankAccountsEmptyTitle => 'No Bank Accounts';
+
+  @override
+  String get noBankAccountsEmptySubtitle =>
+      'Add a bank account to make withdrawals easier';
+
+  @override
+  String get addBankAccountAction => 'Add Bank Account';
+
+  @override
+  String get bankAccountFallback => 'Bank Account';
+
+  @override
+  String get bankNameHint => 'e.g. GCB Bank';
+
+  @override
+  String get nameOnAccountHint => 'Name on account';
+
+  @override
+  String get uploadBusinessLogoTitle => 'Upload Business Logo';
+
+  @override
+  String get logoAppearInQrCaption =>
+      'This logo will appear in your payment QR codes';
+
+  @override
+  String get takePhotoOption => 'Take Photo';
+
+  @override
+  String get chooseFromGalleryOption => 'Choose from Gallery';
+
+  @override
+  String get businessLogoUploadedToast => 'Business logo uploaded successfully';
+
+  @override
+  String errorUploadingLogo(String error) {
+    return 'Error uploading logo: $error';
+  }
+
+  @override
+  String get removeLogoTitle => 'Remove Logo';
+
+  @override
+  String get removeLogoConfirmBody =>
+      'Are you sure you want to remove your business logo?';
+
+  @override
+  String get removeButton => 'Remove';
+
+  @override
+  String get businessLogoRemovedToast => 'Business logo removed';
+
+  @override
+  String errorRemovingLogo(String error) {
+    return 'Error removing logo: $error';
+  }
+
+  @override
+  String get businessLogoLabel => 'Business Logo';
+
+  @override
+  String get logoEmbeddedInQrCaption =>
+      'This logo will be embedded in your payment QR codes';
+
+  @override
+  String get logoUploadedSubtitle => 'Logo uploaded';
+
+  @override
+  String get addBusinessLogoSubtitle => 'Add your business logo';
+
+  @override
+  String get changeButton => 'Change';
+
+  @override
+  String get uploadButton => 'Upload';
 }
