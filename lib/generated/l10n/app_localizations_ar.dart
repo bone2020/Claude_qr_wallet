@@ -715,4 +715,118 @@ class AppLocalizationsAr extends AppLocalizations {
   String sendButtonAmount(String currency, String amount) {
     return '';
   }
+
+  @override
+  String errorWithMessage(String message) {
+    return '';
+  }
+
+  @override
+  String get selectCountryTitle => '';
+
+  @override
+  String get searchCountryHint => '';
+
+  @override
+  String get enterPhoneNumberHint => '';
+
+  @override
+  String get otpSentToPhone => '';
+
+  @override
+  String get phoneVerifiedSuccessfully => '';
+
+  @override
+  String get verifyButton => '';
+
+  @override
+  String get tryAgainButton => '';
+
+  @override
+  String get welcomeBackTitle => '';
+
+  @override
+  String get enterPasswordToUnlock => '';
+
+  @override
+  String get enterPinToUnlock => '';
+
+  @override
+  String get enterPasswordHint => '';
+
+  @override
+  String get unlockButton => '';
+
+  @override
+  String get useBiometric => '';
+
+  @override
+  String get forgotPasswordTitle => '';
+
+  @override
+  String get emailSentTitle => '';
+
+  @override
+  String emailResetLinkSent(String email) {
+    return '';
+  }
+
+  @override
+  String get checkEmailForInstructions => '';
+
+  @override
+  String get didntReceiveEmailTryAgain => '';
+
+  @override
+  String get resetYourPasswordTitle => '';
+
+  @override
+  String get enterEmailForResetLink => '';
+
+  @override
+  String get enterEmailHint => '';
+
+  @override
+  String get emailVerifiedSuccessfully => '';
+
+  @override
+  String get verificationEmailSent => '';
+
+  @override
+  String get verifyYourEmailTitle => '';
+
+  @override
+  String get weveSentVerificationLinkTo => '';
+
+  @override
+  String get checkingAutomatically => '';
+
+  @override
+  String get didntReceiveTheEmail => '';
+
+  @override
+  String get checkNowButton => '';
+
+  @override
+  String get verifyPhoneTitle => '';
+
+  @override
+  String get verifyYourPhone => '';
+
+  @override
+  String get weSent6DigitCode => '';
+
+  @override
+  String get pleaseAgreeToTerms => '';
+
+  @override
+  String get accountCreatedVerifyEmail => '';
+
+  @override
+  String get appleSignInComingSoon => '';
+
+  @override
+  String countryDisplayFormat(String dialCode, String symbol, String code) {
+    return '';
+  }
 }

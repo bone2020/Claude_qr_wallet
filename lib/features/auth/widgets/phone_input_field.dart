@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/constants/constants.dart';
 import 'country_codes.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Phone input field with country code picker
 class PhoneInputField extends StatefulWidget {
@@ -123,7 +124,7 @@ class PhoneInputFieldState extends State<PhoneInputField> {
             LengthLimitingTextInputFormatter(15),
           ],
           decoration: InputDecoration(
-            hintText: 'Enter phone number',
+            hintText: AppLocalizations.of(context).enterPhoneNumberHint,
             hintStyle: AppTextStyles.inputHint(),
             prefixIcon: GestureDetector(
               onTap: widget.enabled ? _showCountryPicker : null,
@@ -228,7 +229,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
           Padding(
             padding: const EdgeInsets.all(AppDimensions.spaceMD),
             child: Text(
-              'Select Country',
+              AppLocalizations.of(context).selectCountryTitle,
               style: AppTextStyles.headlineSmall(),
             ),
           ),
@@ -244,7 +245,7 @@ class _CountryPickerSheetState extends State<_CountryPickerSheet> {
               style: AppTextStyles.inputText(),
               cursorColor: AppColors.primary,
               decoration: InputDecoration(
-                hintText: 'Search country...',
+                hintText: AppLocalizations.of(context).searchCountryHint,
                 hintStyle: AppTextStyles.inputHint(),
                 prefixIcon: const Icon(
                   Icons.search,

@@ -7,6 +7,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/constants.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/custom_text_field.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -70,7 +71,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
+          content: Text(AppLocalizations.of(context).errorWithMessage(e.toString())),
           backgroundColor: AppColors.error,
         ),
       );
@@ -87,7 +88,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Forgot Password', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).forgotPasswordTitle, style: AppTextStyles.headlineMedium()),
       ),
       body: SafeArea(
         child: Padding(
@@ -116,18 +117,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         ),
         const SizedBox(height: AppDimensions.spaceLG),
         Text(
-          'Email Sent!',
+          AppLocalizations.of(context).emailSentTitle,
           style: AppTextStyles.headlineMedium(),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         Text(
-          'We\'ve sent a password reset link to:\n${_emailController.text.trim()}',
+          AppLocalizations.of(context).emailResetLinkSent(_emailController.text.trim()),
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: AppDimensions.spaceXS),
         Text(
-          'Please check your email and follow the instructions to reset your password.',
+          AppLocalizations.of(context).checkEmailForInstructions,
           style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
           textAlign: TextAlign.center,
         ),
@@ -138,7 +139,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           child: ElevatedButton(
             onPressed: () => context.go('/login'),
             child: Text(
-              'Back to Login',
+              AppLocalizations.of(context).backToLogin,
               style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
             ),
           ),
@@ -149,7 +150,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             setState(() => _emailSent = false);
           },
           child: Text(
-            'Didn\'t receive email? Try again',
+            AppLocalizations.of(context).didntReceiveEmailTryAgain,
             style: AppTextStyles.bodyMedium(color: AppColors.primary),
           ),
         ),
@@ -165,18 +166,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         children: [
           const SizedBox(height: AppDimensions.spaceLG),
           Text(
-            'Reset Your Password',
+            AppLocalizations.of(context).resetYourPasswordTitle,
             style: AppTextStyles.displaySmall(),
           ),
           const SizedBox(height: AppDimensions.spaceXS),
           Text(
-            'Enter your email address and we\'ll send you a link to reset your password.',
+            AppLocalizations.of(context).enterEmailForResetLink,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceXL),
           CustomTextField(
             controller: _emailController,
-            hintText: 'Enter your email',
+            hintText: AppLocalizations.of(context).enterEmailHint,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.done,
             validator: (value) {
@@ -205,7 +206,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       ),
                     )
                   : Text(
-                      'Send Reset Link',
+                      AppLocalizations.of(context).sendResetLink,
                       style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                     ),
             ),

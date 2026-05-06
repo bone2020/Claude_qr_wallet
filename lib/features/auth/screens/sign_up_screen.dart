@@ -84,8 +84,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please agree to the Terms and Privacy Policy'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).pleaseAgreeToTerms),
           backgroundColor: AppColors.error,
         ),
       );
@@ -112,8 +112,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         await authNotifier.sendEmailVerification();
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created! Please verify your email.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).accountCreatedVerifyEmail),
             backgroundColor: AppColors.success,
           ),
         );
@@ -193,8 +193,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   void _handleAppleSignUp() {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Apple Sign In coming soon'),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).appleSignInComingSoon),
         backgroundColor: AppColors.warning,
       ),
     );

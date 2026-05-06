@@ -724,4 +724,123 @@ class AppLocalizationsEn extends AppLocalizations {
   String sendButtonAmount(String currency, String amount) {
     return 'Send $currency$amount';
   }
+
+  @override
+  String errorWithMessage(String message) {
+    return 'Error: $message';
+  }
+
+  @override
+  String get selectCountryTitle => 'Select Country';
+
+  @override
+  String get searchCountryHint => 'Search country...';
+
+  @override
+  String get enterPhoneNumberHint => 'Enter phone number';
+
+  @override
+  String get otpSentToPhone => 'OTP sent to your phone';
+
+  @override
+  String get phoneVerifiedSuccessfully => 'Phone verified successfully!';
+
+  @override
+  String get verifyButton => 'Verify';
+
+  @override
+  String get tryAgainButton => 'Try Again';
+
+  @override
+  String get welcomeBackTitle => 'Welcome Back';
+
+  @override
+  String get enterPasswordToUnlock => 'Enter your password to unlock';
+
+  @override
+  String get enterPinToUnlock => 'Enter your PIN to unlock';
+
+  @override
+  String get enterPasswordHint => 'Enter your password';
+
+  @override
+  String get unlockButton => 'Unlock';
+
+  @override
+  String get useBiometric => 'Use Biometric';
+
+  @override
+  String get forgotPasswordTitle => 'Forgot Password';
+
+  @override
+  String get emailSentTitle => 'Email Sent!';
+
+  @override
+  String emailResetLinkSent(String email) {
+    return 'We\'ve sent a password reset link to:\n$email';
+  }
+
+  @override
+  String get checkEmailForInstructions =>
+      'Please check your email and follow the instructions to reset your password.';
+
+  @override
+  String get didntReceiveEmailTryAgain => 'Didn\'t receive email? Try again';
+
+  @override
+  String get resetYourPasswordTitle => 'Reset Your Password';
+
+  @override
+  String get enterEmailForResetLink =>
+      'Enter your email address and we\'ll send you a link to reset your password.';
+
+  @override
+  String get enterEmailHint => 'Enter your email';
+
+  @override
+  String get emailVerifiedSuccessfully => 'Email verified successfully!';
+
+  @override
+  String get verificationEmailSent => 'Verification email sent!';
+
+  @override
+  String get verifyYourEmailTitle => 'Verify Your Email';
+
+  @override
+  String get weveSentVerificationLinkTo =>
+      'We\'ve sent a verification link to:';
+
+  @override
+  String get checkingAutomatically => 'Checking automatically...';
+
+  @override
+  String get didntReceiveTheEmail => 'Didn\'t receive the email?';
+
+  @override
+  String get checkNowButton => 'Check Now';
+
+  @override
+  String get verifyPhoneTitle => 'Verify Phone';
+
+  @override
+  String get verifyYourPhone => 'Verify Your Phone';
+
+  @override
+  String get weSent6DigitCode => 'We sent a 6-digit code to';
+
+  @override
+  String get pleaseAgreeToTerms =>
+      'Please agree to the Terms and Privacy Policy';
+
+  @override
+  String get accountCreatedVerifyEmail =>
+      'Account created! Please verify your email.';
+
+  @override
+  String get appleSignInComingSoon => 'Apple Sign In coming soon';
+
+  @override
+  String countryDisplayFormat(String dialCode, String symbol, String code) {
+    return '$dialCode • $symbol $code';
+  }
 }

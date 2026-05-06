@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Email verification screen with auto-detect and manual check
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -100,8 +101,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
         // Show success and navigate to KYC
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email verified successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).emailVerifiedSuccessfully),
             backgroundColor: AppColors.success,
           ),
         );
@@ -156,8 +157,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       if (result.success) {
         _startResendTimer();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification email sent!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).verificationEmailSent),
             backgroundColor: AppColors.success,
           ),
         );
@@ -295,12 +296,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Verify Your Email',
+          AppLocalizations.of(context).verifyYourEmailTitle,
           style: AppTextStyles.displaySmall(),
         ),
         const SizedBox(height: AppDimensions.spaceSM),
         Text(
-          'We\'ve sent a verification link to:',
+          AppLocalizations.of(context).weveSentVerificationLinkTo,
           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
         ),
         const SizedBox(height: AppDimensions.spaceXS),
@@ -397,7 +398,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           ),
           const SizedBox(width: AppDimensions.spaceSM),
           Text(
-            'Checking automatically...',
+            AppLocalizations.of(context).checkingAutomatically,
             style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
           ),
         ],
@@ -410,7 +411,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       child: Column(
         children: [
           Text(
-            'Didn\'t receive the email?',
+            AppLocalizations.of(context).didntReceiveTheEmail,
             style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
           ),
           const SizedBox(height: AppDimensions.spaceXS),
@@ -460,7 +461,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 ),
               )
             : Text(
-                'Check Now',
+                AppLocalizations.of(context).checkNowButton,
                 style: AppTextStyles.labelLarge(color: AppColors.primary),
               ),
       ),

@@ -1467,6 +1467,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send {currency}{amount}'**
   String sendButtonAmount(String currency, String amount);
+
+  /// Generic error snackbar prefix with the underlying error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {message}'**
+  String errorWithMessage(String message);
+
+  /// Title of the country picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Country'**
+  String get selectCountryTitle;
+
+  /// Search field hint in the country picker bottom sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Search country...'**
+  String get searchCountryHint;
+
+  /// Phone number text field hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter phone number'**
+  String get enterPhoneNumberHint;
+
+  /// Snackbar after triggering an SMS OTP send.
+  ///
+  /// In en, this message translates to:
+  /// **'OTP sent to your phone'**
+  String get otpSentToPhone;
+
+  /// Snackbar after a successful phone OTP verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone verified successfully!'**
+  String get phoneVerifiedSuccessfully;
+
+  /// Generic Verify submit button label.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get verifyButton;
+
+  /// Generic Try Again button label after a failure.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get tryAgainButton;
+
+  /// App lock screen heading. Distinct from welcomeBack home subtitle (different capitalization).
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome Back'**
+  String get welcomeBackTitle;
+
+  /// App lock screen subtitle when password mode is selected.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password to unlock'**
+  String get enterPasswordToUnlock;
+
+  /// App lock screen subtitle when PIN mode is selected.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your PIN to unlock'**
+  String get enterPinToUnlock;
+
+  /// Password text field hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password'**
+  String get enterPasswordHint;
+
+  /// App lock screen unlock button.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get unlockButton;
+
+  /// App lock screen biometric authentication shortcut label.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Biometric'**
+  String get useBiometric;
+
+  /// AppBar title on the forgot password screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Forgot Password'**
+  String get forgotPasswordTitle;
+
+  /// Heading shown after a password reset email is sent successfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Sent!'**
+  String get emailSentTitle;
+
+  /// Body text after a password reset email send. Email appears on its own line.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ve sent a password reset link to:\n{email}'**
+  String emailResetLinkSent(String email);
+
+  /// Sub-instruction below the reset email confirmation.
+  ///
+  /// In en, this message translates to:
+  /// **'Please check your email and follow the instructions to reset your password.'**
+  String get checkEmailForInstructions;
+
+  /// Tertiary action below Back to Login on forgot password screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Didn\'t receive email? Try again'**
+  String get didntReceiveEmailTryAgain;
+
+  /// Display heading on the forgot password form.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Your Password'**
+  String get resetYourPasswordTitle;
+
+  /// Body text under the heading on forgot password form.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email address and we\'ll send you a link to reset your password.'**
+  String get enterEmailForResetLink;
+
+  /// Email text field hint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email'**
+  String get enterEmailHint;
+
+  /// Snackbar after successful email verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Email verified successfully!'**
+  String get emailVerifiedSuccessfully;
+
+  /// Snackbar after triggering a verification email resend.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification email sent!'**
+  String get verificationEmailSent;
+
+  /// Display heading on the email OTP verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Your Email'**
+  String get verifyYourEmailTitle;
+
+  /// Body text above the user's email on the OTP verification screen.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ve sent a verification link to:'**
+  String get weveSentVerificationLinkTo;
+
+  /// Status text shown while polling for email verification completion.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking automatically...'**
+  String get checkingAutomatically;
+
+  /// Section heading above resend/check-now actions on email OTP screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Didn\'t receive the email?'**
+  String get didntReceiveTheEmail;
+
+  /// Manual recheck button on email OTP screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Check Now'**
+  String get checkNowButton;
+
+  /// AppBar title on the phone OTP screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Phone'**
+  String get verifyPhoneTitle;
+
+  /// Display heading on the phone OTP screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Your Phone'**
+  String get verifyYourPhone;
+
+  /// Body text above the user's phone number on the phone OTP screen.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a 6-digit code to'**
+  String get weSent6DigitCode;
+
+  /// Validation snackbar on signup when the terms checkbox is unchecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Please agree to the Terms and Privacy Policy'**
+  String get pleaseAgreeToTerms;
+
+  /// Success snackbar after signup completes.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created! Please verify your email.'**
+  String get accountCreatedVerifyEmail;
+
+  /// Snackbar when user taps Apple sign-in button (not yet implemented).
+  ///
+  /// In en, this message translates to:
+  /// **'Apple Sign In coming soon'**
+  String get appleSignInComingSoon;
+
+  /// Subtitle in the country picker list, e.g. '+1 • $ USD'.
+  ///
+  /// In en, this message translates to:
+  /// **'{dialCode} • {symbol} {code}'**
+  String countryDisplayFormat(String dialCode, String symbol, String code);
 }
 
 class _AppLocalizationsDelegate

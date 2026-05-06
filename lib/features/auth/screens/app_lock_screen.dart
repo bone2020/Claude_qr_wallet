@@ -11,6 +11,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/services/secure_storage_service.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Lock screen shown on app open when PIN is set
 class AppLockScreen extends ConsumerStatefulWidget {
@@ -234,10 +235,10 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
 
               const SizedBox(height: AppDimensions.spaceXL),
 
-              Text('Welcome Back', style: AppTextStyles.headlineMedium()),
+              Text(AppLocalizations.of(context).welcomeBackTitle, style: AppTextStyles.headlineMedium()),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                _usePassword ? 'Enter your password to unlock' : 'Enter your PIN to unlock',
+                _usePassword ? AppLocalizations.of(context).enterPasswordToUnlock : AppLocalizations.of(context).enterPinToUnlock,
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
               ),
 
@@ -257,7 +258,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                         obscureText: _obscurePassword,
                         style: AppTextStyles.bodyMedium(),
                         decoration: InputDecoration(
-                          hintText: 'Enter your password',
+                          hintText: AppLocalizations.of(context).enterPasswordHint,
                           hintStyle: AppTextStyles.bodyMedium(color: AppColors.textTertiaryDark),
                           filled: true,
                           fillColor: AppColors.surfaceDark,
@@ -297,7 +298,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                             ),
                           ),
                           child: Text(
-                            'Unlock',
+                            AppLocalizations.of(context).unlockButton,
                             style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                           ),
                         ),
@@ -354,7 +355,7 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
                       ),
                       const SizedBox(height: AppDimensions.spaceXS),
                       Text(
-                        'Use Biometric',
+                        AppLocalizations.of(context).useBiometric,
                         style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
                       ),
                     ],

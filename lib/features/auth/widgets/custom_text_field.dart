@@ -271,7 +271,7 @@ class _CountryPickerSheetState extends State<CountryPickerSheet> {
             Padding(
               padding: const EdgeInsets.all(AppDimensions.spaceMD),
               child: Text(
-                'Select Country',
+                AppLocalizations.of(context).selectCountryTitle,
                 style: AppTextStyles.headlineSmall(),
               ),
             ),
@@ -284,7 +284,7 @@ class _CountryPickerSheetState extends State<CountryPickerSheet> {
                 onChanged: _onSearch,
                 style: AppTextStyles.inputText(),
                 decoration: InputDecoration(
-                  hintText: 'Search country...',
+                  hintText: AppLocalizations.of(context).searchCountryHint,
                   prefixIcon: const Icon(Icons.search, color: AppColors.textSecondaryDark),
                   filled: true,
                   fillColor: AppColors.inputBackgroundDark,
@@ -324,7 +324,7 @@ class _CountryPickerSheetState extends State<CountryPickerSheet> {
                       ),
                     ),
                     subtitle: Text(
-                      '${country.dialCode} • ${country.currencySymbol} ${country.currencyCode}',
+                      AppLocalizations.of(context).countryDisplayFormat(country.dialCode, country.currencySymbol, country.currencyCode),
                       style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark),
                     ),
                     trailing: isSelected

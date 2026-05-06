@@ -18,6 +18,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
+import '../../../generated/l10n/app_localizations.dart';
 
 /// Phone OTP verification screen
 class PhoneOtpScreen extends ConsumerStatefulWidget {
@@ -154,8 +155,8 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
       if (success) {
         _startResendTimer();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP sent to your phone'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).otpSentToPhone),
             backgroundColor: AppColors.success,
           ),
         );
@@ -203,8 +204,8 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone verified successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).phoneVerifiedSuccessfully),
             backgroundColor: AppColors.success,
           ),
         );
@@ -239,7 +240,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify Phone'),
+        title: Text(AppLocalizations.of(context).verifyPhoneTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -260,7 +261,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 24),
 
               Text(
-                'Verify Your Phone',
+                AppLocalizations.of(context).verifyYourPhone,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -270,7 +271,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
               const SizedBox(height: 12),
 
               Text(
-                'We sent a 6-digit code to',
+                AppLocalizations.of(context).weSent6DigitCode,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
                 ),
@@ -370,7 +371,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Verify'),
+                      : Text(AppLocalizations.of(context).verifyButton),
                 ).animate().fadeIn(delay: 400.ms),
 
                 const SizedBox(height: 16),
@@ -412,7 +413,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: _sendOtp,
-                  child: const Text('Try Again'),
+                  child: Text(AppLocalizations.of(context).tryAgainButton),
                 ),
               ],
 
