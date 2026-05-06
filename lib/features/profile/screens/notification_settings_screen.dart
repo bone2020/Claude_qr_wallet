@@ -8,6 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -84,8 +85,8 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Settings saved'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).settingsSavedToast),
             backgroundColor: AppColors.success,
             duration: Duration(seconds: 1),
           ),
@@ -95,7 +96,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save: $e'),
+            content: Text(AppLocalizations.of(context).failedToSaveError(e.toString())),
             backgroundColor: AppColors.error,
           ),
         );
@@ -139,7 +140,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Notification Settings', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).notificationSettingsTitle, style: AppTextStyles.headlineMedium()),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -149,20 +150,20 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // General Section
-                  Text('General', style: AppTextStyles.headlineSmall()),
+                  Text(AppLocalizations.of(context).generalSection, style: AppTextStyles.headlineSmall()),
                   const SizedBox(height: 16),
 
                   _buildToggleItem(
                     icon: Iconsax.notification,
-                    title: 'Push Notifications',
-                    subtitle: 'Receive notifications on your device',
+                    title: AppLocalizations.of(context).pushNotificationsLabel,
+                    subtitle: AppLocalizations.of(context).pushNotificationsSubtitle,
                     value: _pushNotifications,
                     onChanged: (v) => _updateSetting('push', v),
                   ),
                   _buildToggleItem(
                     icon: Iconsax.sms,
-                    title: 'Email Notifications',
-                    subtitle: 'Receive updates via email',
+                    title: AppLocalizations.of(context).emailNotificationsLabel,
+                    subtitle: AppLocalizations.of(context).emailNotificationsSubtitle,
                     value: _emailNotifications,
                     onChanged: (v) => _updateSetting('email', v),
                   ),
@@ -170,20 +171,20 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                   const SizedBox(height: 32),
 
                   // Transactions Section
-                  Text('Transactions', style: AppTextStyles.headlineSmall()),
+                  Text(AppLocalizations.of(context).transactionsSection, style: AppTextStyles.headlineSmall()),
                   const SizedBox(height: 16),
 
                   _buildToggleItem(
                     icon: Iconsax.wallet_2,
-                    title: 'Transaction Alerts',
-                    subtitle: 'Get notified for all transactions',
+                    title: AppLocalizations.of(context).transactionAlertsLabel,
+                    subtitle: AppLocalizations.of(context).transactionAlertsSubtitle,
                     value: _transactionAlerts,
                     onChanged: (v) => _updateSetting('transaction', v),
                   ),
                   _buildToggleItem(
                     icon: Iconsax.clock,
-                    title: 'Payment Reminders',
-                    subtitle: 'Reminders for pending payments',
+                    title: AppLocalizations.of(context).paymentRemindersLabel,
+                    subtitle: AppLocalizations.of(context).paymentRemindersSubtitle,
                     value: _paymentReminders,
                     onChanged: (v) => _updateSetting('reminders', v),
                   ),
@@ -191,21 +192,21 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                   const SizedBox(height: 32),
 
                   // Security & Updates Section
-                  Text('Security & Updates', style: AppTextStyles.headlineSmall()),
+                  Text(AppLocalizations.of(context).securityAndUpdatesSection, style: AppTextStyles.headlineSmall()),
                   const SizedBox(height: 16),
 
                   _buildToggleItem(
                     icon: Iconsax.shield_tick,
-                    title: 'Security Alerts',
-                    subtitle: 'Important security notifications',
+                    title: AppLocalizations.of(context).securityAlertsLabel,
+                    subtitle: AppLocalizations.of(context).securityAlertsSubtitle,
                     value: _securityAlerts,
                     onChanged: (v) => _updateSetting('security', v),
                     isImportant: true,
                   ),
                   _buildToggleItem(
                     icon: Iconsax.gift,
-                    title: 'Promotional Updates',
-                    subtitle: 'Offers, news, and promotions',
+                    title: AppLocalizations.of(context).promotionalUpdatesLabel,
+                    subtitle: AppLocalizations.of(context).promotionalUpdatesSubtitle,
                     value: _promotionalUpdates,
                     onChanged: (v) => _updateSetting('promotional', v),
                   ),
@@ -226,7 +227,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Security alerts cannot be disabled for your protection.',
+                            AppLocalizations.of(context).securityAlertsCannotBeDisabledNote,
                             style: AppTextStyles.bodySmall(color: AppColors.info),
                           ),
                         ),

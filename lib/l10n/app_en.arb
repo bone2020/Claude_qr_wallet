@@ -1538,4 +1538,90 @@
 
   "temporarilyDisableSubtitle": "Temporarily disable all transactions",
   "@temporarilyDisableSubtitle": {"description": "Subtitle on the block-account menu item explaining what blocking does."}
+,
+  "settingsSavedToast": "Settings saved",
+  "@settingsSavedToast": {"description": "Brief snackbar shown when notification settings are successfully saved."},
+
+  "failedToSaveError": "Failed to save: {error}",
+  "@failedToSaveError": {
+    "description": "Snackbar shown when saving notification settings fails.",
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+
+  "notificationSettingsTitle": "Notification Settings",
+  "@notificationSettingsTitle": {"description": "AppBar title on the notification settings screen."},
+
+  "generalSection": "General",
+  "@generalSection": {"description": "Section heading on the notification settings screen for general delivery channel toggles."},
+
+  "pushNotificationsLabel": "Push Notifications",
+  "@pushNotificationsLabel": {"description": "Toggle label for enabling push notifications."},
+
+  "pushNotificationsSubtitle": "Receive notifications on your device",
+  "@pushNotificationsSubtitle": {"description": "Subtitle below the Push Notifications toggle."},
+
+  "emailNotificationsLabel": "Email Notifications",
+  "@emailNotificationsLabel": {"description": "Toggle label for enabling email notifications."},
+
+  "emailNotificationsSubtitle": "Receive updates via email",
+  "@emailNotificationsSubtitle": {"description": "Subtitle below the Email Notifications toggle."},
+
+  "transactionsSection": "Transactions",
+  "@transactionsSection": {"description": "Section heading on the notification settings screen for transaction-related notifications."},
+
+  "transactionAlertsLabel": "Transaction Alerts",
+  "@transactionAlertsLabel": {"description": "Toggle label for enabling transaction alert notifications."},
+
+  "transactionAlertsSubtitle": "Get notified for all transactions",
+  "@transactionAlertsSubtitle": {"description": "Subtitle below the Transaction Alerts toggle."},
+
+  "paymentRemindersLabel": "Payment Reminders",
+  "@paymentRemindersLabel": {"description": "Toggle label for enabling payment reminder notifications."},
+
+  "paymentRemindersSubtitle": "Reminders for pending payments",
+  "@paymentRemindersSubtitle": {"description": "Subtitle below the Payment Reminders toggle."},
+
+  "securityAndUpdatesSection": "Security & Updates",
+  "@securityAndUpdatesSection": {"description": "Section heading for security alerts and promotional updates on the notification settings screen."},
+
+  "securityAlertsLabel": "Security Alerts",
+  "@securityAlertsLabel": {"description": "Toggle label for security alert notifications. This toggle is locked-on."},
+
+  "securityAlertsSubtitle": "Important security notifications",
+  "@securityAlertsSubtitle": {"description": "Subtitle below the Security Alerts toggle."},
+
+  "promotionalUpdatesLabel": "Promotional Updates",
+  "@promotionalUpdatesLabel": {"description": "Toggle label for marketing/promotional notifications."},
+
+  "promotionalUpdatesSubtitle": "Offers, news, and promotions",
+  "@promotionalUpdatesSubtitle": {"description": "Subtitle below the Promotional Updates toggle."},
+
+  "securityAlertsCannotBeDisabledNote": "Security alerts cannot be disabled for your protection.",
+  "@securityAlertsCannotBeDisabledNote": {"description": "Info note shown beneath the security alerts toggle explaining why it can't be turned off."},
+
+  "themeLabel": "Theme",
+  "@themeLabel": {"description": "Section heading on the theme settings screen above the light/dark/system options."},
+
+  "lightThemeLabel": "Light",
+  "@lightThemeLabel": {"description": "Theme option label for the light theme."},
+
+  "lightThemeSubtitle": "Light background with dark text",
+  "@lightThemeSubtitle": {"description": "Subtitle describing the Light theme option."},
+
+  "darkThemeLabel": "Dark",
+  "@darkThemeLabel": {"description": "Theme option label for the dark theme."},
+
+  "darkThemeSubtitle": "Dark background with light text",
+  "@darkThemeSubtitle": {"description": "Subtitle describing the Dark theme option."},
+
+  "systemThemeLabel": "System",
+  "@systemThemeLabel": {"description": "Theme option label for following the system theme."},
+
+  "systemThemeSubtitle": "Follow system settings",
+  "@systemThemeSubtitle": {"description": "Subtitle describing the System theme option."},
+
+  "previewLabel": "Preview",
+  "@previewLabel": {"description": "Heading above the theme preview section on the theme settings screen."}
 }

@@ -1378,4 +1378,89 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get temporarilyDisableSubtitle =>
       'Temporarily disable all transactions';
+
+  @override
+  String get settingsSavedToast => 'Settings saved';
+
+  @override
+  String failedToSaveError(String error) {
+    return 'Failed to save: $error';
+  }
+
+  @override
+  String get notificationSettingsTitle => 'Notification Settings';
+
+  @override
+  String get generalSection => 'General';
+
+  @override
+  String get pushNotificationsLabel => 'Push Notifications';
+
+  @override
+  String get pushNotificationsSubtitle =>
+      'Receive notifications on your device';
+
+  @override
+  String get emailNotificationsLabel => 'Email Notifications';
+
+  @override
+  String get emailNotificationsSubtitle => 'Receive updates via email';
+
+  @override
+  String get transactionsSection => 'Transactions';
+
+  @override
+  String get transactionAlertsLabel => 'Transaction Alerts';
+
+  @override
+  String get transactionAlertsSubtitle => 'Get notified for all transactions';
+
+  @override
+  String get paymentRemindersLabel => 'Payment Reminders';
+
+  @override
+  String get paymentRemindersSubtitle => 'Reminders for pending payments';
+
+  @override
+  String get securityAndUpdatesSection => 'Security & Updates';
+
+  @override
+  String get securityAlertsLabel => 'Security Alerts';
+
+  @override
+  String get securityAlertsSubtitle => 'Important security notifications';
+
+  @override
+  String get promotionalUpdatesLabel => 'Promotional Updates';
+
+  @override
+  String get promotionalUpdatesSubtitle => 'Offers, news, and promotions';
+
+  @override
+  String get securityAlertsCannotBeDisabledNote =>
+      'Security alerts cannot be disabled for your protection.';
+
+  @override
+  String get themeLabel => 'Theme';
+
+  @override
+  String get lightThemeLabel => 'Light';
+
+  @override
+  String get lightThemeSubtitle => 'Light background with dark text';
+
+  @override
+  String get darkThemeLabel => 'Dark';
+
+  @override
+  String get darkThemeSubtitle => 'Dark background with light text';
+
+  @override
+  String get systemThemeLabel => 'System';
+
+  @override
+  String get systemThemeSubtitle => 'Follow system settings';
+
+  @override
+  String get previewLabel => 'Preview';
 }

@@ -2601,6 +2601,168 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Temporarily disable all transactions'**
   String get temporarilyDisableSubtitle;
+
+  /// Brief snackbar shown when notification settings are successfully saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings saved'**
+  String get settingsSavedToast;
+
+  /// Snackbar shown when saving notification settings fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save: {error}'**
+  String failedToSaveError(String error);
+
+  /// AppBar title on the notification settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Settings'**
+  String get notificationSettingsTitle;
+
+  /// Section heading on the notification settings screen for general delivery channel toggles.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get generalSection;
+
+  /// Toggle label for enabling push notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Push Notifications'**
+  String get pushNotificationsLabel;
+
+  /// Subtitle below the Push Notifications toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive notifications on your device'**
+  String get pushNotificationsSubtitle;
+
+  /// Toggle label for enabling email notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Notifications'**
+  String get emailNotificationsLabel;
+
+  /// Subtitle below the Email Notifications toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive updates via email'**
+  String get emailNotificationsSubtitle;
+
+  /// Section heading on the notification settings screen for transaction-related notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get transactionsSection;
+
+  /// Toggle label for enabling transaction alert notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction Alerts'**
+  String get transactionAlertsLabel;
+
+  /// Subtitle below the Transaction Alerts toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get notified for all transactions'**
+  String get transactionAlertsSubtitle;
+
+  /// Toggle label for enabling payment reminder notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment Reminders'**
+  String get paymentRemindersLabel;
+
+  /// Subtitle below the Payment Reminders toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders for pending payments'**
+  String get paymentRemindersSubtitle;
+
+  /// Section heading for security alerts and promotional updates on the notification settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Security & Updates'**
+  String get securityAndUpdatesSection;
+
+  /// Toggle label for security alert notifications. This toggle is locked-on.
+  ///
+  /// In en, this message translates to:
+  /// **'Security Alerts'**
+  String get securityAlertsLabel;
+
+  /// Subtitle below the Security Alerts toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Important security notifications'**
+  String get securityAlertsSubtitle;
+
+  /// Toggle label for marketing/promotional notifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotional Updates'**
+  String get promotionalUpdatesLabel;
+
+  /// Subtitle below the Promotional Updates toggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offers, news, and promotions'**
+  String get promotionalUpdatesSubtitle;
+
+  /// Info note shown beneath the security alerts toggle explaining why it can't be turned off.
+  ///
+  /// In en, this message translates to:
+  /// **'Security alerts cannot be disabled for your protection.'**
+  String get securityAlertsCannotBeDisabledNote;
+
+  /// Section heading on the theme settings screen above the light/dark/system options.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get themeLabel;
+
+  /// Theme option label for the light theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get lightThemeLabel;
+
+  /// Subtitle describing the Light theme option.
+  ///
+  /// In en, this message translates to:
+  /// **'Light background with dark text'**
+  String get lightThemeSubtitle;
+
+  /// Theme option label for the dark theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get darkThemeLabel;
+
+  /// Subtitle describing the Dark theme option.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark background with light text'**
+  String get darkThemeSubtitle;
+
+  /// Theme option label for following the system theme.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get systemThemeLabel;
+
+  /// Subtitle describing the System theme option.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow system settings'**
+  String get systemThemeSubtitle;
+
+  /// Heading above the theme preview section on the theme settings screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get previewLabel;
 }
 
 class _AppLocalizationsDelegate

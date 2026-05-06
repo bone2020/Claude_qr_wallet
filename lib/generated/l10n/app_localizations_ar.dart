@@ -1334,4 +1334,87 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get temporarilyDisableSubtitle => '';
+
+  @override
+  String get settingsSavedToast => '';
+
+  @override
+  String failedToSaveError(String error) {
+    return '';
+  }
+
+  @override
+  String get notificationSettingsTitle => '';
+
+  @override
+  String get generalSection => '';
+
+  @override
+  String get pushNotificationsLabel => '';
+
+  @override
+  String get pushNotificationsSubtitle => '';
+
+  @override
+  String get emailNotificationsLabel => '';
+
+  @override
+  String get emailNotificationsSubtitle => '';
+
+  @override
+  String get transactionsSection => '';
+
+  @override
+  String get transactionAlertsLabel => '';
+
+  @override
+  String get transactionAlertsSubtitle => '';
+
+  @override
+  String get paymentRemindersLabel => '';
+
+  @override
+  String get paymentRemindersSubtitle => '';
+
+  @override
+  String get securityAndUpdatesSection => '';
+
+  @override
+  String get securityAlertsLabel => '';
+
+  @override
+  String get securityAlertsSubtitle => '';
+
+  @override
+  String get promotionalUpdatesLabel => '';
+
+  @override
+  String get promotionalUpdatesSubtitle => '';
+
+  @override
+  String get securityAlertsCannotBeDisabledNote => '';
+
+  @override
+  String get themeLabel => '';
+
+  @override
+  String get lightThemeLabel => '';
+
+  @override
+  String get lightThemeSubtitle => '';
+
+  @override
+  String get darkThemeLabel => '';
+
+  @override
+  String get darkThemeSubtitle => '';
+
+  @override
+  String get systemThemeLabel => '';
+
+  @override
+  String get systemThemeSubtitle => '';
+
+  @override
+  String get previewLabel => '';
 }

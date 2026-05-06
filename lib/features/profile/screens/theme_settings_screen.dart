@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../providers/theme_provider.dart';
 
+import '../../../generated/l10n/app_localizations.dart';
 class ThemeSettingsScreen extends ConsumerWidget {
   const ThemeSettingsScreen({super.key});
 
@@ -22,22 +23,22 @@ class ThemeSettingsScreen extends ConsumerWidget {
           icon: const Icon(Iconsax.arrow_left, color: AppColors.textPrimaryDark),
           onPressed: () => context.pop(),
         ),
-        title: Text('Appearance', style: AppTextStyles.headlineMedium()),
+        title: Text(AppLocalizations.of(context).appearanceMenuItem, style: AppTextStyles.headlineMedium()),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Theme', style: AppTextStyles.headlineSmall()),
+            Text(AppLocalizations.of(context).themeLabel, style: AppTextStyles.headlineSmall()),
             const SizedBox(height: 16),
 
             _buildThemeOption(
               context: context,
               ref: ref,
               icon: Iconsax.sun_1,
-              title: 'Light',
-              subtitle: 'Light background with dark text',
+              title: AppLocalizations.of(context).lightThemeLabel,
+              subtitle: AppLocalizations.of(context).lightThemeSubtitle,
               mode: AppThemeMode.light,
               currentMode: currentTheme,
             ),
@@ -45,8 +46,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
               context: context,
               ref: ref,
               icon: Iconsax.moon,
-              title: 'Dark',
-              subtitle: 'Dark background with light text',
+              title: AppLocalizations.of(context).darkThemeLabel,
+              subtitle: AppLocalizations.of(context).darkThemeSubtitle,
               mode: AppThemeMode.dark,
               currentMode: currentTheme,
             ),
@@ -54,8 +55,8 @@ class ThemeSettingsScreen extends ConsumerWidget {
               context: context,
               ref: ref,
               icon: Iconsax.mobile,
-              title: 'System',
-              subtitle: 'Follow system settings',
+              title: AppLocalizations.of(context).systemThemeLabel,
+              subtitle: AppLocalizations.of(context).systemThemeSubtitle,
               mode: AppThemeMode.system,
               currentMode: currentTheme,
             ),
@@ -72,7 +73,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Preview', style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark)),
+                  Text(AppLocalizations.of(context).previewLabel, style: AppTextStyles.bodySmall(color: AppColors.textSecondaryDark)),
                   const SizedBox(height: 12),
                   Row(
                     children: [
