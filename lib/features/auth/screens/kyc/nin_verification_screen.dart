@@ -8,6 +8,7 @@ import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
+import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/utils/error_handler.dart';
@@ -260,7 +261,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        title: Text(AppStrings.verifyNin, style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).verifyNin, style: AppTextStyles.headlineSmall()),
       ),
       body: SafeArea(
         child: Column(
@@ -277,7 +278,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
                     Text(
-                      AppStrings.ninDescription,
+                      AppLocalizations.of(context).ninDescription,
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                     ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
@@ -358,7 +359,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
                     ],
                   )
                 : Text(
-                    AppStrings.continueText,
+                    AppLocalizations.of(context).continueText,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),

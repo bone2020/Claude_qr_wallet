@@ -11,6 +11,7 @@ import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
+import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/user_service.dart';
@@ -360,7 +361,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark),
                   )
                 : Text(
-                    AppStrings.continueText,
+                    AppLocalizations.of(context).continueText,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),

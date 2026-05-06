@@ -11,6 +11,7 @@ import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
+import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/user_service.dart';
@@ -250,7 +251,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        title: Text(AppStrings.verifyBvn, style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).verifyBvn, style: AppTextStyles.headlineSmall()),
       ),
       body: SafeArea(
         child: Column(
@@ -267,7 +268,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
                     Text(
-                      AppStrings.bvnDescription,
+                      AppLocalizations.of(context).bvnDescription,
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                     ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
@@ -330,7 +331,7 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark),
                   )
                 : Text(
-                    AppStrings.continueText,
+                    AppLocalizations.of(context).continueText,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),

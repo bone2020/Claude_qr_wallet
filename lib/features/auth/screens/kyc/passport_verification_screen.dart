@@ -11,6 +11,7 @@ import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/document/smile_id_document_verification.dart';
 
 import '../../../../core/constants/constants.dart';
+import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/user_service.dart';
@@ -224,7 +225,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
-        title: Text(AppStrings.verifyPassport, style: AppTextStyles.headlineSmall()),
+        title: Text(AppLocalizations.of(context).verifyPassport, style: AppTextStyles.headlineSmall()),
       ),
       body: SafeArea(
         child: Column(
@@ -241,7 +242,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
                     ).animate().fadeIn(duration: 400.ms),
                     const SizedBox(height: AppDimensions.spaceXS),
                     Text(
-                      AppStrings.passportDescription,
+                      AppLocalizations.of(context).passportDescription,
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                     ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
 
@@ -251,7 +252,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
                       title: _isCaptured ? 'Document Captured' : 'Verify Your Passport',
                       description: _isCaptured
                           ? 'Your passport has been captured. Verification will begin when you continue.'
-                          : AppStrings.verificationDescription,
+                          : AppLocalizations.of(context).verificationDescription,
                       isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
@@ -295,7 +296,7 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.backgroundDark),
                   )
                 : Text(
-                    AppStrings.continueText,
+                    AppLocalizations.of(context).continueText,
                     style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
                   ),
           ),
