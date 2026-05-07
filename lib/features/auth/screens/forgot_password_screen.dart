@@ -35,12 +35,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final loc = AppLocalizations.of(context);
       final authNotifier = ref.read(authNotifierProvider.notifier);
       final result = await authNotifier.sendPasswordResetEmail(
         _emailController.text.trim(),
       );
       if (!result.success) {
-        throw Exception(resolveAuthResultError(AppLocalizations.of(context), result));
+        throw Exception(resolveAuthResultError(loc, result));
       }
 
       if (!mounted) return;
