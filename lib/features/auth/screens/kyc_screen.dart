@@ -7,6 +7,7 @@ import '../../../core/constants/constants.dart';
 import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/smile_id_service.dart';
+import '../../../core/services/smile_id_localization_resolver.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/kyc_verification_card.dart';
 import 'package:qr_wallet/generated/l10n/app_localizations.dart';
@@ -155,7 +156,7 @@ class _KycScreenState extends ConsumerState<KycScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
                   child: KycIdTypeCard(
-                    title: idType['label'] as String,
+                    title: resolveIdTypeLabel(AppLocalizations.of(context), idType['value'] as String),
                     description: _getDescriptionForIdType(idType),
                     icon: _getIconForIdType(idType['value'] as String),
                     onTap: () => _navigateToVerification(idType['value'] as String),

@@ -16,6 +16,7 @@ import '../../../../core/constants/constants.dart';
 import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
+import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
@@ -115,7 +116,11 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
       final idNumber = _idNumberController.text.trim();
       final validation = _smileIdService.validateIdNumber(idNumber, 'NATIONAL_ID', widget.countryCode);
       if (!validation.isValid) {
-        _showError(validation.error ?? AppLocalizations.of(context).invalidIdNumberFallback);
+        final loc = AppLocalizations.of(context);
+        final key = validation.errorKey;
+        _showError(key != null
+            ? resolveIdValidationErrorMessage(loc, key)
+            : loc.invalidIdNumberFallback);
         return;
       }
 

@@ -14,6 +14,7 @@ import '../../../../core/constants/constants.dart';
 import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
+import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
@@ -68,7 +69,11 @@ class _BvnVerificationScreenState extends ConsumerState<BvnVerificationScreen> {
     // Validate BVN
     final validation = _smileIdService.validateIdNumber(idNumber, 'BVN', widget.countryCode);
     if (!validation.isValid) {
-      _showError(validation.error ?? 'Invalid BVN');
+      final loc = AppLocalizations.of(context);
+      final key = validation.errorKey;
+      _showError(key != null
+          ? resolveIdValidationErrorMessage(loc, key)
+          : loc.invalidIdNumberFallback);
       return;
     }
 

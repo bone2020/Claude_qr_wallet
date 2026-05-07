@@ -14,6 +14,7 @@ import '../../../../core/constants/constants.dart';
 import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
+import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
@@ -74,7 +75,11 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
     // Validate NIN
     final validation = _smileIdService.validateIdNumber(nin, 'UGANDA_NIN', 'UG');
     if (!validation.isValid) {
-      _showError(validation.error ?? 'Invalid NIN');
+      final loc = AppLocalizations.of(context);
+      final key = validation.errorKey;
+      _showError(key != null
+          ? resolveIdValidationErrorMessage(loc, key)
+          : loc.invalidIdNumberFallback);
       return;
     }
 

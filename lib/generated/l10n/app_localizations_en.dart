@@ -1878,4 +1878,52 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get documentBothSidesAndSelfieDescription =>
       'We will capture both sides of your ID and take a selfie';
+
+  @override
+  String get ninLengthError => 'NIN must be exactly 11 digits';
+
+  @override
+  String get bvnLengthError => 'BVN must be exactly 11 digits';
+
+  @override
+  String get ssnitFormatError => 'SSNIT must be 1 letter followed by 12 digits';
+
+  @override
+  String get southAfricanIdLengthError =>
+      'South African ID must be exactly 13 digits';
+
+  @override
+  String get ugandaNinFormatError =>
+      'Uganda NIN must be exactly 14 alphanumeric characters';
+
+  @override
+  String get tpinLengthError => 'TPIN must be exactly 10 digits';
+
+  @override
+  String get smileIdParseError =>
+      'Could not read verification result. Please try again.';
+
+  @override
+  String get votersIdLabel => 'Voter\'s ID';
+
+  @override
+  String get internationalPassportLabel => 'International Passport';
+
+  @override
+  String get alienIdLabel => 'Alien ID';
+
+  @override
+  String get ninFullLabel => 'National Identification Number (NIN)';
+
+  @override
+  String get bvnFullLabel => 'Bank Verification Number (BVN)';
+
+  @override
+  String get ssnitLabel => 'SSNIT';
+
+  @override
+  String get ugandaNationalIdLabel => 'National ID (NIN)';
+
+  @override
+  String get tpinFullLabel => 'Taxpayer PIN (TPIN)';
 }

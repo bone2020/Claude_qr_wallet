@@ -1802,4 +1802,49 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get documentBothSidesAndSelfieDescription => '';
+
+  @override
+  String get ninLengthError => '';
+
+  @override
+  String get bvnLengthError => '';
+
+  @override
+  String get ssnitFormatError => '';
+
+  @override
+  String get southAfricanIdLengthError => '';
+
+  @override
+  String get ugandaNinFormatError => '';
+
+  @override
+  String get tpinLengthError => '';
+
+  @override
+  String get smileIdParseError => '';
+
+  @override
+  String get votersIdLabel => '';
+
+  @override
+  String get internationalPassportLabel => '';
+
+  @override
+  String get alienIdLabel => '';
+
+  @override
+  String get ninFullLabel => '';
+
+  @override
+  String get bvnFullLabel => '';
+
+  @override
+  String get ssnitLabel => '';
+
+  @override
+  String get ugandaNationalIdLabel => '';
+
+  @override
+  String get tpinFullLabel => '';
 }

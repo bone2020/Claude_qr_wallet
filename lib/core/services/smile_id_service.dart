@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
+import 'smile_id_localization_resolver.dart';
+
 /// Service for handling Smile ID verification operations
 ///
 /// NOTE: Smile ID Flutter SDK uses WIDGETS for verification, not method calls.
@@ -316,7 +318,7 @@ class SmileIDService {
   /// Validate ID number format
   IdValidationResult validateIdNumber(String idNumber, String idType, String countryCode) {
     if (idNumber.isEmpty) {
-      return IdValidationResult(isValid: false, error: 'ID number is required');
+      return IdValidationResult(isValid: false, errorKey: IdValidationErrorKey.idNumberRequired);
     }
 
     switch (idType) {
@@ -324,7 +326,7 @@ class SmileIDService {
         if (idNumber.length != 11 || !RegExp(r'^\d{11}$').hasMatch(idNumber)) {
           return IdValidationResult(
             isValid: false,
-            error: 'NIN must be exactly 11 digits',
+            errorKey: IdValidationErrorKey.ninLength,
             expectedFormat: '12345678901',
           );
         }
@@ -333,7 +335,7 @@ class SmileIDService {
         if (idNumber.length != 11 || !RegExp(r'^\d{11}$').hasMatch(idNumber)) {
           return IdValidationResult(
             isValid: false,
-            error: 'BVN must be exactly 11 digits',
+            errorKey: IdValidationErrorKey.bvnLength,
             expectedFormat: '12345678901',
           );
         }
@@ -342,7 +344,7 @@ class SmileIDService {
         if (!RegExp(r'^[A-Z]\d{12}$').hasMatch(idNumber.toUpperCase())) {
           return IdValidationResult(
             isValid: false,
-            error: 'SSNIT must be 1 letter followed by 12 digits',
+            errorKey: IdValidationErrorKey.ssnitFormat,
             expectedFormat: 'A123456789012',
           );
         }
@@ -352,7 +354,7 @@ class SmileIDService {
           if (idNumber.length != 13 || !RegExp(r'^\d{13}$').hasMatch(idNumber)) {
             return IdValidationResult(
               isValid: false,
-              error: 'South African ID must be exactly 13 digits',
+              errorKey: IdValidationErrorKey.southAfricanIdLength,
               expectedFormat: '1234567890123',
             );
           }
@@ -362,7 +364,7 @@ class SmileIDService {
         if (!RegExp(r'^[A-Z0-9]{14}$', caseSensitive: false).hasMatch(idNumber)) {
           return IdValidationResult(
             isValid: false,
-            error: 'Uganda NIN must be exactly 14 alphanumeric characters',
+            errorKey: IdValidationErrorKey.ugandaNinFormat,
             expectedFormat: 'CM12345678901X',
           );
         }
@@ -371,7 +373,7 @@ class SmileIDService {
         if (!RegExp(r'^\d{10}$').hasMatch(idNumber)) {
           return IdValidationResult(
             isValid: false,
-            error: 'TPIN must be exactly 10 digits',
+            errorKey: IdValidationErrorKey.tpinLength,
             expectedFormat: '1234567890',
           );
         }
@@ -452,15 +454,20 @@ class SmileIDService {
   }
 }
 
-/// Result of ID number validation
+/// Result of ID number validation.
+///
+/// When [isValid] is `false`, [errorKey] indicates the specific validation
+/// rule that was violated. Callers convert [errorKey] into a user-visible
+/// message via [resolveIdValidationErrorMessage] from
+/// `smile_id_localization_resolver.dart`.
 class IdValidationResult {
   final bool isValid;
-  final String? error;
+  final IdValidationErrorKey? errorKey;
   final String? expectedFormat;
 
   IdValidationResult({
     required this.isValid,
-    this.error,
+    this.errorKey,
     this.expectedFormat,
   });
 }
@@ -476,6 +483,7 @@ class SmileIDResult {
   final String? documentBackFile;
   final Map<String, dynamic>? userData;
   final String? error;
+  final SmileIDErrorKey? errorKey;
 
   SmileIDResult({
     required this.success,
@@ -487,6 +495,7 @@ class SmileIDResult {
     this.documentBackFile,
     this.userData,
     this.error,
+    this.errorKey,
   });
 
   factory SmileIDResult.fromJson(String jsonString) {
@@ -498,9 +507,11 @@ class SmileIDResult {
         resultText: jsonString,
       );
     } catch (e) {
+      debugPrint('Failed to parse Smile ID result: $e');
       return SmileIDResult(
         success: false,
         error: 'Failed to parse result: $e',
+        errorKey: SmileIDErrorKey.parseResultFailed,
       );
     }
   }

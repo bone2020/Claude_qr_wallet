@@ -839,8 +839,7 @@
   "verificationInProgressTitle": "",
   "verificationInProgressMessage": "",
   "pleaseWait": "",
-  "verificationDoNotCloseApp": ""
-,
+  "verificationDoNotCloseApp": "",
   "saving": "",
   "storagePermissionRequired": "",
   "qrCodeSavedToGallery": "",
@@ -861,15 +860,12 @@
   "payToUser": "",
   "shareButton": "",
   "qrCodeInfoForCustomer": "",
-  "createNewRequest": ""
-,
-  "downloadButton": ""
-,
+  "createNewRequest": "",
+  "downloadButton": "",
   "shareWalletIdSubject": "",
   "defaultUserName": "",
   "loadingPlaceholder": "",
-  "payRequestShareText": ""
-,
+  "payRequestShareText": "",
   "approvePaymentTitle": "",
   "mtnMomoApprovePromptBody": "",
   "checkPhoneForApprovalPrompt": "",
@@ -914,8 +910,7 @@
   "referenceLabel": "",
   "newBalanceLabel": "",
   "somethingWentWrongTryAgain": "",
-  "goBackButton": ""
-,
+  "goBackButton": "",
   "enterOtpTitle": "",
   "enterOtpBody": "",
   "confirmWithdrawalTitle": "",
@@ -936,8 +931,7 @@
   "enterAccountHolderNameHint": "",
   "couldNotVerifyAccountError": "",
   "withdrawalFailedError": "",
-  "otpVerificationFailedError": ""
-,
+  "otpVerificationFailedError": "",
   "aboutTitle": "",
   "qrWalletAppName": "",
   "versionAndBuild": "",
@@ -971,8 +965,7 @@
   "unblockAccountLabel": "",
   "blockedBySupportSubtitle": "",
   "accountBlockedSubtitle": "",
-  "temporarilyDisableSubtitle": ""
-,
+  "temporarilyDisableSubtitle": "",
   "settingsSavedToast": "",
   "failedToSaveError": "",
   "notificationSettingsTitle": "",
@@ -999,8 +992,7 @@
   "darkThemeSubtitle": "",
   "systemThemeLabel": "",
   "systemThemeSubtitle": "",
-  "previewLabel": ""
-,
+  "previewLabel": "",
   "passwordChangedTitle": "",
   "passwordChangedBody": "",
   "changePasswordAction": "",
@@ -1123,5 +1115,20 @@
   "verifyYourDocumentTitle": "",
   "documentCapturedBody": "",
   "idAndSelfieVerificationDescription": "",
-  "documentBothSidesAndSelfieDescription": ""
+  "documentBothSidesAndSelfieDescription": "",
+  "ninLengthError": "",
+  "bvnLengthError": "",
+  "ssnitFormatError": "",
+  "southAfricanIdLengthError": "",
+  "ugandaNinFormatError": "",
+  "tpinLengthError": "",
+  "smileIdParseError": "",
+  "votersIdLabel": "",
+  "internationalPassportLabel": "",
+  "alienIdLabel": "",
+  "ninFullLabel": "",
+  "bvnFullLabel": "",
+  "ssnitLabel": "",
+  "ugandaNationalIdLabel": "",
+  "tpinFullLabel": ""
 }

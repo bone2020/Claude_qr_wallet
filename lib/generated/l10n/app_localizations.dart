@@ -3501,6 +3501,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'We will capture both sides of your ID and take a selfie'**
   String get documentBothSidesAndSelfieDescription;
+
+  /// Validation error shown when the user enters a NIN that is not exactly 11 digits.
+  ///
+  /// In en, this message translates to:
+  /// **'NIN must be exactly 11 digits'**
+  String get ninLengthError;
+
+  /// Validation error shown when the user enters a BVN that is not exactly 11 digits.
+  ///
+  /// In en, this message translates to:
+  /// **'BVN must be exactly 11 digits'**
+  String get bvnLengthError;
+
+  /// Validation error shown when the user's SSNIT does not match the format: one letter followed by twelve digits.
+  ///
+  /// In en, this message translates to:
+  /// **'SSNIT must be 1 letter followed by 12 digits'**
+  String get ssnitFormatError;
+
+  /// Validation error shown when the user's South African National ID is not exactly 13 digits.
+  ///
+  /// In en, this message translates to:
+  /// **'South African ID must be exactly 13 digits'**
+  String get southAfricanIdLengthError;
+
+  /// Validation error shown when the user's Uganda NIN does not match the expected 14 alphanumeric characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Uganda NIN must be exactly 14 alphanumeric characters'**
+  String get ugandaNinFormatError;
+
+  /// Validation error shown when the user's Zambian TPIN is not exactly 10 digits.
+  ///
+  /// In en, this message translates to:
+  /// **'TPIN must be exactly 10 digits'**
+  String get tpinLengthError;
+
+  /// User-facing error shown when the app cannot parse the verification result returned by the Smile ID widget. Technical detail is logged separately.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read verification result. Please try again.'**
+  String get smileIdParseError;
+
+  /// Label for the 'Voter's ID' option in the KYC ID-type picker dropdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Voter\'s ID'**
+  String get votersIdLabel;
+
+  /// Label for the 'International Passport' option in the KYC ID-type picker dropdown.
+  ///
+  /// In en, this message translates to:
+  /// **'International Passport'**
+  String get internationalPassportLabel;
+
+  /// Label for the 'Alien ID' option in the KYC ID-type picker dropdown (Kenya only).
+  ///
+  /// In en, this message translates to:
+  /// **'Alien ID'**
+  String get alienIdLabel;
+
+  /// Label for the long-form NIN option in the KYC ID-type picker dropdown (Nigeria; pending SmileID entitlement activation).
+  ///
+  /// In en, this message translates to:
+  /// **'National Identification Number (NIN)'**
+  String get ninFullLabel;
+
+  /// Label for the long-form BVN option in the KYC ID-type picker dropdown (Nigeria; pending SmileID entitlement activation).
+  ///
+  /// In en, this message translates to:
+  /// **'Bank Verification Number (BVN)'**
+  String get bvnFullLabel;
+
+  /// Label for the SSNIT option in the KYC ID-type picker dropdown (Ghana; pending SmileID entitlement activation).
+  ///
+  /// In en, this message translates to:
+  /// **'SSNIT'**
+  String get ssnitLabel;
+
+  /// Label for the Uganda National ID option in the KYC ID-type picker dropdown (pending SmileID entitlement activation).
+  ///
+  /// In en, this message translates to:
+  /// **'National ID (NIN)'**
+  String get ugandaNationalIdLabel;
+
+  /// Label for the long-form Zambian TPIN option in the KYC ID-type picker dropdown (pending SmileID entitlement activation).
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer PIN (TPIN)'**
+  String get tpinFullLabel;
 }
 
 class _AppLocalizationsDelegate

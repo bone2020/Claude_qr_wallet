@@ -1,6 +1,5 @@
 {
   "@@locale": "en",
-
   "appName": "QR Wallet",
   "@appName": {
     "description": "App name shown in title bars and splash"
@@ -9,12 +8,10 @@
   "@appTagline": {
     "description": "Tagline shown on splash screen"
   },
-
   "getStarted": "Get Started",
   "@getStarted": {
     "description": "Button on splash screen to begin onboarding"
   },
-
   "signUp": "Sign up",
   "@signUp": {
     "description": "Sign up button label and screen title"
@@ -67,7 +64,6 @@
   "@backToLogin": {
     "description": "Link returning the user to the log in screen"
   },
-
   "fullName": "Full name",
   "@fullName": {
     "description": "Label for the full name input field"
@@ -116,7 +112,6 @@
   "@termsAndPrivacy": {
     "description": "Link to the terms and privacy policy"
   },
-
   "verifyPhone": "Verify Phone",
   "@verifyPhone": {
     "description": "Title shown when verifying a phone number via OTP"
@@ -149,7 +144,6 @@
   "@didntReceiveCode": {
     "description": "Prompt before the resend code link"
   },
-
   "completeProfile": "Complete Profile",
   "@completeProfile": {
     "description": "Title on the KYC completion screen"
@@ -230,7 +224,6 @@
   "@skip": {
     "description": "Button to skip the current optional step"
   },
-
   "home": "Home",
   "@home": {
     "description": "Bottom navigation tab label for the home screen"
@@ -283,7 +276,6 @@
   "@noTransactionsSubtitle": {
     "description": "Subtitle in the empty transactions state"
   },
-
   "sendMoney": "Send Money",
   "@sendMoney": {
     "description": "Title of the send money flow"
@@ -340,7 +332,6 @@
   "@totalAmount": {
     "description": "Label for the total to be sent including fees"
   },
-
   "receiveMoney": "Receive Money",
   "@receiveMoney": {
     "description": "Title of the receive money screen"
@@ -365,7 +356,6 @@
   "@tapToCopy": {
     "description": "Hint shown next to a copyable wallet ID"
   },
-
   "addMoneyTitle": "Add Money",
   "@addMoneyTitle": {
     "description": "Title of the add money screen (separate from action button)"
@@ -402,7 +392,6 @@
   "@transferFrom": {
     "description": "Label preceding the chosen funding source"
   },
-
   "transactions": "Transactions",
   "@transactions": {
     "description": "Bottom navigation label and screen title for the transactions list"
@@ -459,7 +448,6 @@
   "@to": {
     "description": "Label for the recipient of a transaction"
   },
-
   "profile": "Profile",
   "@profile": {
     "description": "Bottom navigation label and screen title for the user's profile"
@@ -516,7 +504,6 @@
   "@changePin": {
     "description": "Profile row to change the wallet PIN"
   },
-
   "errorGeneric": "Something went wrong. Please try again.",
   "@errorGeneric": {
     "description": "Fallback error message when the cause is unknown"
@@ -565,7 +552,6 @@
   "@errorWrongPassword": {
     "description": "Error shown when the password is incorrect on log in"
   },
-
   "successAccountCreated": "Account created successfully!",
   "@successAccountCreated": {
     "description": "Success message after sign up completes"
@@ -590,7 +576,6 @@
   "@successPasswordReset": {
     "description": "Success message after a password reset email is sent"
   },
-
   "ok": "OK",
   "@ok": {
     "description": "Confirmation button: acknowledge"
@@ -627,7 +612,6 @@
   "@close": {
     "description": "Action to dismiss a dialog or modal"
   },
-
   "selectVerificationMethod": "Select Verification Method",
   "@selectVerificationMethod": {
     "description": "Title of the KYC method selection screen"
@@ -716,7 +700,6 @@
   "@verificationFailed": {
     "description": "Error message when KYC fails"
   },
-
   "language": "Language",
   "@language": {
     "description": "Profile row label leading to the language settings screen (Phase 6 NEW)"
@@ -753,1002 +736,1451 @@
   "@currencyAmount": {
     "description": "Currency code followed by amount with a space, e.g. 'USD 12.34'. Used in balance card.",
     "placeholders": {
-      "currency": {"type": "String"},
-      "amount": {"type": "String"}
+      "currency": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
   "symbolAmount": "{symbol}{amount}",
   "@symbolAmount": {
     "description": "Currency symbol concatenated with amount, e.g. '$12.34'. Used in transaction details and confirm send.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
   "signedCurrencyAmount": "{prefix}{currency}{amount}",
   "@signedCurrencyAmount": {
     "description": "Sign prefix (+/- or empty) followed by currency code and amount. Used in transaction tile.",
     "placeholders": {
-      "prefix": {"type": "String"},
-      "currency": {"type": "String"},
-      "amount": {"type": "String"}
+      "prefix": {
+        "type": "String"
+      },
+      "currency": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
   "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
   "@exchangeRateLine": {
     "description": "Exchange rate display line, e.g. '1 USD = 0.85 EUR'.",
     "placeholders": {
-      "fromCurrency": {"type": "String"},
-      "rate": {"type": "String"},
-      "toCurrency": {"type": "String"}
+      "fromCurrency": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "toCurrency": {
+        "type": "String"
+      }
     }
   },
   "currencyCodeWithSymbol": "{symbol} ({code})",
   "@currencyCodeWithSymbol": {
     "description": "Currency symbol with code in parentheses, e.g. '$ (USD)'.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "code": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "code": {
+        "type": "String"
+      }
     }
   },
   "pageNotFound": "Page not found: {uri}",
   "@pageNotFound": {
     "description": "Router 404 fallback message.",
     "placeholders": {
-      "uri": {"type": "String"}
+      "uri": {
+        "type": "String"
+      }
     }
   },
   "youAreOffline": "You are offline",
-  "@youAreOffline": {"description": "Banner shown when device is offline."},
+  "@youAreOffline": {
+    "description": "Banner shown when device is offline."
+  },
   "helloUser": "Hello, {userName} 👋",
   "@helloUser": {
     "description": "Home screen greeting.",
     "placeholders": {
-      "userName": {"type": "String"}
+      "userName": {
+        "type": "String"
+      }
     }
   },
   "welcomeBack": "Welcome back",
-  "@welcomeBack": {"description": "Home screen subtitle below the greeting."},
+  "@welcomeBack": {
+    "description": "Home screen subtitle below the greeting."
+  },
   "availableBalanceLabel": "Available",
-  "@availableBalanceLabel": {"description": "Label above the available balance amount on the balance card."},
+  "@availableBalanceLabel": {
+    "description": "Label above the available balance amount on the balance card."
+  },
   "onHoldBalanceLabel": "On Hold",
-  "@onHoldBalanceLabel": {"description": "Label above the held/escrow balance on the balance card."},
+  "@onHoldBalanceLabel": {
+    "description": "Label above the held/escrow balance on the balance card."
+  },
   "transactionStatusPending": "Pending",
-  "@transactionStatusPending": {"description": "Status badge for pending transactions in the list."},
+  "@transactionStatusPending": {
+    "description": "Status badge for pending transactions in the list."
+  },
   "transactionStatusFailed": "Failed",
-  "@transactionStatusFailed": {"description": "Status badge for failed transactions in the list."},
+  "@transactionStatusFailed": {
+    "description": "Status badge for failed transactions in the list."
+  },
   "notificationsScreenTitle": "Notifications",
-  "@notificationsScreenTitle": {"description": "AppBar title on the notifications screen."},
+  "@notificationsScreenTitle": {
+    "description": "AppBar title on the notifications screen."
+  },
   "markAllAsRead": "Mark all as read",
-  "@markAllAsRead": {"description": "Menu action on notifications screen."},
+  "@markAllAsRead": {
+    "description": "Menu action on notifications screen."
+  },
   "failedToLoadNotifications": "Failed to load notifications",
-  "@failedToLoadNotifications": {"description": "Error state when notifications fail to load."},
+  "@failedToLoadNotifications": {
+    "description": "Error state when notifications fail to load."
+  },
   "noNotifications": "No Notifications",
-  "@noNotifications": {"description": "Empty state heading on notifications screen."},
+  "@noNotifications": {
+    "description": "Empty state heading on notifications screen."
+  },
   "youreAllCaughtUp": "You're all caught up!",
-  "@youreAllCaughtUp": {"description": "Empty state subtext on notifications screen."},
+  "@youreAllCaughtUp": {
+    "description": "Empty state subtext on notifications screen."
+  },
   "selectCurrencyTitle": "Select Currency",
-  "@selectCurrencyTitle": {"description": "AppBar title on currency selector screen."},
+  "@selectCurrencyTitle": {
+    "description": "AppBar title on currency selector screen."
+  },
   "currencySelectorDescription": "Choose your preferred currency for displaying balances and transactions.",
-  "@currencySelectorDescription": {"description": "Body description on currency selector screen."},
+  "@currencySelectorDescription": {
+    "description": "Body description on currency selector screen."
+  },
   "currencyChangedTo": "Currency changed to {currencyName}",
   "@currencyChangedTo": {
     "description": "Snackbar shown after successful currency change.",
     "placeholders": {
-      "currencyName": {"type": "String"}
+      "currencyName": {
+        "type": "String"
+      }
     }
   },
   "failedToChangeCurrency": "Failed to change currency",
-  "@failedToChangeCurrency": {"description": "Snackbar shown when currency change fails."},
+  "@failedToChangeCurrency": {
+    "description": "Snackbar shown when currency change fails."
+  },
   "loadMore": "Load More",
-  "@loadMore": {"description": "Pagination button at the bottom of transactions list."},
+  "@loadMore": {
+    "description": "Pagination button at the bottom of transactions list."
+  },
   "copiedToClipboard": "{label} copied",
   "@copiedToClipboard": {
     "description": "Snackbar after copying a value to clipboard. {label} is the field name.",
     "placeholders": {
-      "label": {"type": "String"}
+      "label": {
+        "type": "String"
+      }
     }
   },
   "transactionNotFound": "Transaction not found",
-  "@transactionNotFound": {"description": "Empty state when transaction can't be loaded on details screen."},
+  "@transactionNotFound": {
+    "description": "Empty state when transaction can't be loaded on details screen."
+  },
   "reportIssue": "Report Issue",
-  "@reportIssue": {"description": "Outlined button on transaction details for sent transactions within 7 days."},
+  "@reportIssue": {
+    "description": "Outlined button on transaction details for sent transactions within 7 days."
+  },
   "currencyConversion": "Currency Conversion",
-  "@currencyConversion": {"description": "Section header on transaction details for cross-currency transactions."},
+  "@currencyConversion": {
+    "description": "Section header on transaction details for cross-currency transactions."
+  },
   "originalAmount": "Original Amount",
-  "@originalAmount": {"description": "Label for sender-side amount in currency conversion section."},
+  "@originalAmount": {
+    "description": "Label for sender-side amount in currency conversion section."
+  },
   "convertedAmount": "Converted Amount",
-  "@convertedAmount": {"description": "Label for receiver-side amount in currency conversion section."},
+  "@convertedAmount": {
+    "description": "Label for receiver-side amount in currency conversion section."
+  },
   "exchangeRateLabel": "Exchange Rate",
-  "@exchangeRateLabel": {"description": "Label for the exchange rate row on transaction details."},
+  "@exchangeRateLabel": {
+    "description": "Label for the exchange rate row on transaction details."
+  },
   "transactionItemsLabel": "Items",
-  "@transactionItemsLabel": {"description": "Label above the list of items in a payment-request transaction."},
+  "@transactionItemsLabel": {
+    "description": "Label above the list of items in a payment-request transaction."
+  },
   "positionQrCodeInFrame": "Position QR code within the frame",
-  "@positionQrCodeInFrame": {"description": "Instruction overlay on QR scanner screen."},
+  "@positionQrCodeInFrame": {
+    "description": "Instruction overlay on QR scanner screen."
+  },
   "pleaseEnterValidWalletId": "Please enter a valid wallet ID",
-  "@pleaseEnterValidWalletId": {"description": "Validation snackbar on send money screen."},
+  "@pleaseEnterValidWalletId": {
+    "description": "Validation snackbar on send money screen."
+  },
   "lookingUpWallet": "Looking up wallet...",
-  "@lookingUpWallet": {"description": "Loading state when resolving a wallet ID on send money screen."},
+  "@lookingUpWallet": {
+    "description": "Loading state when resolving a wallet ID on send money screen."
+  },
   "scanRecipientQrToSend": "Scan recipient's QR code to send money",
-  "@scanRecipientQrToSend": {"description": "Helper text under the wallet ID field on send money screen."},
+  "@scanRecipientQrToSend": {
+    "description": "Helper text under the wallet ID field on send money screen."
+  },
   "transactionPin": "Transaction PIN",
-  "@transactionPin": {"description": "Title of PIN entry dialog on confirm send screen."},
+  "@transactionPin": {
+    "description": "Title of PIN entry dialog on confirm send screen."
+  },
   "enterPinToConfirm": "Enter your 6-digit PIN to confirm this transfer",
-  "@enterPinToConfirm": {"description": "Subtitle in PIN entry dialog on confirm send screen."},
+  "@enterPinToConfirm": {
+    "description": "Subtitle in PIN entry dialog on confirm send screen."
+  },
   "pleaseEnterAmount": "Please enter an amount",
-  "@pleaseEnterAmount": {"description": "Validation snackbar on confirm send screen."},
+  "@pleaseEnterAmount": {
+    "description": "Validation snackbar on confirm send screen."
+  },
   "amountSentTo": "{currency}{amount} sent to {recipient}",
   "@amountSentTo": {
     "description": "Success message after sending money.",
     "placeholders": {
-      "currency": {"type": "String"},
-      "amount": {"type": "String"},
-      "recipient": {"type": "String"}
+      "currency": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "recipient": {
+        "type": "String"
+      }
     }
   },
   "paymentRequestLabel": "Payment Request",
-  "@paymentRequestLabel": {"description": "Badge on confirm send when paying a payment request rather than free-form send."},
+  "@paymentRequestLabel": {
+    "description": "Badge on confirm send when paying a payment request rather than free-form send."
+  },
   "feeApproximateError": "Fee is approximate — {error}",
   "@feeApproximateError": {
     "description": "Caption when fee preview fails on confirm send.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "insufficientBalance": "Insufficient balance for this transfer",
-  "@insufficientBalance": {"description": "Error caption on confirm send when balance check fails."},
+  "@insufficientBalance": {
+    "description": "Error caption on confirm send when balance check fails."
+  },
   "sellerRequestedLabel": "Seller requested:",
-  "@sellerRequestedLabel": {"description": "Label preceding the seller's requested amount on confirm send (cross-currency)."},
+  "@sellerRequestedLabel": {
+    "description": "Label preceding the seller's requested amount on confirm send (cross-currency)."
+  },
   "recipientReceivesLabel": "Recipient receives:",
-  "@recipientReceivesLabel": {"description": "Label preceding the converted amount on confirm send (cross-currency)."},
+  "@recipientReceivesLabel": {
+    "description": "Label preceding the converted amount on confirm send (cross-currency)."
+  },
   "sendButtonAmount": "Send {currency}{amount}",
   "@sendButtonAmount": {
     "description": "Send button label on confirm send including amount, e.g. 'Send USD12.34'.",
     "placeholders": {
-      "currency": {"type": "String"},
-      "amount": {"type": "String"}
+      "currency": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
   "errorWithMessage": "Error: {message}",
   "@errorWithMessage": {
     "description": "Generic error snackbar prefix with the underlying error message.",
     "placeholders": {
-      "message": {"type": "String"}
+      "message": {
+        "type": "String"
+      }
     }
   },
   "selectCountryTitle": "Select Country",
-  "@selectCountryTitle": {"description": "Title of the country picker bottom sheet."},
+  "@selectCountryTitle": {
+    "description": "Title of the country picker bottom sheet."
+  },
   "searchCountryHint": "Search country...",
-  "@searchCountryHint": {"description": "Search field hint in the country picker bottom sheet."},
+  "@searchCountryHint": {
+    "description": "Search field hint in the country picker bottom sheet."
+  },
   "enterPhoneNumberHint": "Enter phone number",
-  "@enterPhoneNumberHint": {"description": "Phone number text field hint."},
+  "@enterPhoneNumberHint": {
+    "description": "Phone number text field hint."
+  },
   "otpSentToPhone": "OTP sent to your phone",
-  "@otpSentToPhone": {"description": "Snackbar after triggering an SMS OTP send."},
+  "@otpSentToPhone": {
+    "description": "Snackbar after triggering an SMS OTP send."
+  },
   "phoneVerifiedSuccessfully": "Phone verified successfully!",
-  "@phoneVerifiedSuccessfully": {"description": "Snackbar after a successful phone OTP verification."},
+  "@phoneVerifiedSuccessfully": {
+    "description": "Snackbar after a successful phone OTP verification."
+  },
   "verifyButton": "Verify",
-  "@verifyButton": {"description": "Generic Verify submit button label."},
+  "@verifyButton": {
+    "description": "Generic Verify submit button label."
+  },
   "tryAgainButton": "Try Again",
-  "@tryAgainButton": {"description": "Generic Try Again button label after a failure."},
+  "@tryAgainButton": {
+    "description": "Generic Try Again button label after a failure."
+  },
   "welcomeBackTitle": "Welcome Back",
-  "@welcomeBackTitle": {"description": "App lock screen heading. Distinct from welcomeBack home subtitle (different capitalization)."},
+  "@welcomeBackTitle": {
+    "description": "App lock screen heading. Distinct from welcomeBack home subtitle (different capitalization)."
+  },
   "enterPasswordToUnlock": "Enter your password to unlock",
-  "@enterPasswordToUnlock": {"description": "App lock screen subtitle when password mode is selected."},
+  "@enterPasswordToUnlock": {
+    "description": "App lock screen subtitle when password mode is selected."
+  },
   "enterPinToUnlock": "Enter your PIN to unlock",
-  "@enterPinToUnlock": {"description": "App lock screen subtitle when PIN mode is selected."},
+  "@enterPinToUnlock": {
+    "description": "App lock screen subtitle when PIN mode is selected."
+  },
   "enterPasswordHint": "Enter your password",
-  "@enterPasswordHint": {"description": "Password text field hint."},
+  "@enterPasswordHint": {
+    "description": "Password text field hint."
+  },
   "unlockButton": "Unlock",
-  "@unlockButton": {"description": "App lock screen unlock button."},
+  "@unlockButton": {
+    "description": "App lock screen unlock button."
+  },
   "useBiometric": "Use Biometric",
-  "@useBiometric": {"description": "App lock screen biometric authentication shortcut label."},
+  "@useBiometric": {
+    "description": "App lock screen biometric authentication shortcut label."
+  },
   "forgotPasswordTitle": "Forgot Password",
-  "@forgotPasswordTitle": {"description": "AppBar title on the forgot password screen."},
+  "@forgotPasswordTitle": {
+    "description": "AppBar title on the forgot password screen."
+  },
   "emailSentTitle": "Email Sent!",
-  "@emailSentTitle": {"description": "Heading shown after a password reset email is sent successfully."},
+  "@emailSentTitle": {
+    "description": "Heading shown after a password reset email is sent successfully."
+  },
   "emailResetLinkSent": "We've sent a password reset link to:\n{email}",
   "@emailResetLinkSent": {
     "description": "Body text after a password reset email send. Email appears on its own line.",
     "placeholders": {
-      "email": {"type": "String"}
+      "email": {
+        "type": "String"
+      }
     }
   },
   "checkEmailForInstructions": "Please check your email and follow the instructions to reset your password.",
-  "@checkEmailForInstructions": {"description": "Sub-instruction below the reset email confirmation."},
+  "@checkEmailForInstructions": {
+    "description": "Sub-instruction below the reset email confirmation."
+  },
   "didntReceiveEmailTryAgain": "Didn't receive email? Try again",
-  "@didntReceiveEmailTryAgain": {"description": "Tertiary action below Back to Login on forgot password screen."},
+  "@didntReceiveEmailTryAgain": {
+    "description": "Tertiary action below Back to Login on forgot password screen."
+  },
   "resetYourPasswordTitle": "Reset Your Password",
-  "@resetYourPasswordTitle": {"description": "Display heading on the forgot password form."},
+  "@resetYourPasswordTitle": {
+    "description": "Display heading on the forgot password form."
+  },
   "enterEmailForResetLink": "Enter your email address and we'll send you a link to reset your password.",
-  "@enterEmailForResetLink": {"description": "Body text under the heading on forgot password form."},
+  "@enterEmailForResetLink": {
+    "description": "Body text under the heading on forgot password form."
+  },
   "enterEmailHint": "Enter your email",
-  "@enterEmailHint": {"description": "Email text field hint."},
+  "@enterEmailHint": {
+    "description": "Email text field hint."
+  },
   "emailVerifiedSuccessfully": "Email verified successfully!",
-  "@emailVerifiedSuccessfully": {"description": "Snackbar after successful email verification."},
+  "@emailVerifiedSuccessfully": {
+    "description": "Snackbar after successful email verification."
+  },
   "verificationEmailSent": "Verification email sent!",
-  "@verificationEmailSent": {"description": "Snackbar after triggering a verification email resend."},
+  "@verificationEmailSent": {
+    "description": "Snackbar after triggering a verification email resend."
+  },
   "verifyYourEmailTitle": "Verify Your Email",
-  "@verifyYourEmailTitle": {"description": "Display heading on the email OTP verification screen."},
+  "@verifyYourEmailTitle": {
+    "description": "Display heading on the email OTP verification screen."
+  },
   "weveSentVerificationLinkTo": "We've sent a verification link to:",
-  "@weveSentVerificationLinkTo": {"description": "Body text above the user's email on the OTP verification screen."},
+  "@weveSentVerificationLinkTo": {
+    "description": "Body text above the user's email on the OTP verification screen."
+  },
   "checkingAutomatically": "Checking automatically...",
-  "@checkingAutomatically": {"description": "Status text shown while polling for email verification completion."},
+  "@checkingAutomatically": {
+    "description": "Status text shown while polling for email verification completion."
+  },
   "didntReceiveTheEmail": "Didn't receive the email?",
-  "@didntReceiveTheEmail": {"description": "Section heading above resend/check-now actions on email OTP screen."},
+  "@didntReceiveTheEmail": {
+    "description": "Section heading above resend/check-now actions on email OTP screen."
+  },
   "checkNowButton": "Check Now",
-  "@checkNowButton": {"description": "Manual recheck button on email OTP screen."},
+  "@checkNowButton": {
+    "description": "Manual recheck button on email OTP screen."
+  },
   "verifyPhoneTitle": "Verify Phone",
-  "@verifyPhoneTitle": {"description": "AppBar title on the phone OTP screen."},
+  "@verifyPhoneTitle": {
+    "description": "AppBar title on the phone OTP screen."
+  },
   "verifyYourPhone": "Verify Your Phone",
-  "@verifyYourPhone": {"description": "Display heading on the phone OTP screen."},
+  "@verifyYourPhone": {
+    "description": "Display heading on the phone OTP screen."
+  },
   "weSent6DigitCode": "We sent a 6-digit code to",
-  "@weSent6DigitCode": {"description": "Body text above the user's phone number on the phone OTP screen."},
+  "@weSent6DigitCode": {
+    "description": "Body text above the user's phone number on the phone OTP screen."
+  },
   "pleaseAgreeToTerms": "Please agree to the Terms and Privacy Policy",
-  "@pleaseAgreeToTerms": {"description": "Validation snackbar on signup when the terms checkbox is unchecked."},
+  "@pleaseAgreeToTerms": {
+    "description": "Validation snackbar on signup when the terms checkbox is unchecked."
+  },
   "accountCreatedVerifyEmail": "Account created! Please verify your email.",
-  "@accountCreatedVerifyEmail": {"description": "Success snackbar after signup completes."},
+  "@accountCreatedVerifyEmail": {
+    "description": "Success snackbar after signup completes."
+  },
   "appleSignInComingSoon": "Apple Sign In coming soon",
-  "@appleSignInComingSoon": {"description": "Snackbar when user taps Apple sign-in button (not yet implemented)."},
+  "@appleSignInComingSoon": {
+    "description": "Snackbar when user taps Apple sign-in button (not yet implemented)."
+  },
   "countryDisplayFormat": "{dialCode} • {symbol} {code}",
   "@countryDisplayFormat": {
     "description": "Subtitle in the country picker list, e.g. '+1 • $ USD'.",
     "placeholders": {
-      "dialCode": {"type": "String"},
-      "symbol": {"type": "String"},
-      "code": {"type": "String"}
+      "dialCode": {
+        "type": "String"
+      },
+      "symbol": {
+        "type": "String"
+      },
+      "code": {
+        "type": "String"
+      }
     }
   },
   "verificationFailedWithError": "Verification failed: {error}",
   "@verificationFailedWithError": {
     "description": "Snackbar shown when an identity verification call fails. Used across all KYC verification screens.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
   "bvnVerificationTitle": "BVN Verification",
-  "@bvnVerificationTitle": {"description": "Display heading on BVN (Bank Verification Number) verification screen, Nigeria."},
+  "@bvnVerificationTitle": {
+    "description": "Display heading on BVN (Bank Verification Number) verification screen, Nigeria."
+  },
   "driversLicenseVerificationTitle": "Driver's License Verification",
-  "@driversLicenseVerificationTitle": {"description": "Display heading on driver's license verification screen."},
+  "@driversLicenseVerificationTitle": {
+    "description": "Display heading on driver's license verification screen."
+  },
   "ninVerificationTitle": "NIN Verification",
-  "@ninVerificationTitle": {"description": "Display heading on NIN (National Identification Number) verification screen, Nigeria."},
+  "@ninVerificationTitle": {
+    "description": "Display heading on NIN (National Identification Number) verification screen, Nigeria."
+  },
   "passportVerificationTitle": "Passport Verification",
-  "@passportVerificationTitle": {"description": "Display heading on passport verification screen."},
+  "@passportVerificationTitle": {
+    "description": "Display heading on passport verification screen."
+  },
   "ssnitVerificationTitle": "SSNIT Verification",
-  "@ssnitVerificationTitle": {"description": "Display heading on SSNIT verification screen, Ghana."},
+  "@ssnitVerificationTitle": {
+    "description": "Display heading on SSNIT verification screen, Ghana."
+  },
   "votersCardVerificationTitle": "Voter's Card Verification",
-  "@votersCardVerificationTitle": {"description": "Display heading on voter's card verification screen."},
+  "@votersCardVerificationTitle": {
+    "description": "Display heading on voter's card verification screen."
+  },
   "nationalIdVerificationTitleWithCountry": "{countryName} Verification",
   "@nationalIdVerificationTitleWithCountry": {
     "description": "Display heading on the generic national ID verification screen — countryName is dynamic.",
     "placeholders": {
-      "countryName": {"type": "String"}
+      "countryName": {
+        "type": "String"
+      }
     }
   },
   "ugandaNationalIdAppBarTitle": "Uganda National ID",
-  "@ugandaNationalIdAppBarTitle": {"description": "AppBar title on the Uganda NIN verification screen."},
+  "@ugandaNationalIdAppBarTitle": {
+    "description": "AppBar title on the Uganda NIN verification screen."
+  },
   "ugandaNationalIdHeading": "National ID Verification",
-  "@ugandaNationalIdHeading": {"description": "Body heading on the Uganda NIN verification screen, below the AppBar."},
+  "@ugandaNationalIdHeading": {
+    "description": "Body heading on the Uganda NIN verification screen, below the AppBar."
+  },
   "ugandaNationalIdDescription": "Verify your identity using your Uganda National Identification Number (NIN) and card number.",
-  "@ugandaNationalIdDescription": {"description": "Body description on the Uganda NIN verification screen."},
+  "@ugandaNationalIdDescription": {
+    "description": "Body description on the Uganda NIN verification screen."
+  },
   "bvnHelperText": "Your Bank Verification Number linked to your bank accounts",
-  "@bvnHelperText": {"description": "Helper text under the BVN input field."},
+  "@bvnHelperText": {
+    "description": "Helper text under the BVN input field."
+  },
   "ninHelperText": "Your National Identification Number as shown on your NIN slip",
-  "@ninHelperText": {"description": "Helper text under the NIN input field."},
+  "@ninHelperText": {
+    "description": "Helper text under the NIN input field."
+  },
   "ssnitHelperText": "Your SSNIT number: 1 letter followed by 12 digits",
-  "@ssnitHelperText": {"description": "Helper text under the SSNIT input field explaining the format."},
+  "@ssnitHelperText": {
+    "description": "Helper text under the SSNIT input field explaining the format."
+  },
   "ugandaNinHelperText": "Your NIN is 14 alphanumeric characters",
-  "@ugandaNinHelperText": {"description": "Helper text under the Uganda NIN input field explaining the format."},
+  "@ugandaNinHelperText": {
+    "description": "Helper text under the Uganda NIN input field explaining the format."
+  },
   "ugandaNinCardNumberHelperText": "The number printed on your physical ID card",
-  "@ugandaNinCardNumberHelperText": {"description": "Helper text under the Uganda card-number input field."},
+  "@ugandaNinCardNumberHelperText": {
+    "description": "Helper text under the Uganda card-number input field."
+  },
   "phoneVerificationAppBarTitle": "Phone Verification",
-  "@phoneVerificationAppBarTitle": {"description": "AppBar title on the KYC phone verification screen. Distinct from verifyPhoneTitle ('Verify Phone') used in standalone phone_otp_screen."},
+  "@phoneVerificationAppBarTitle": {
+    "description": "AppBar title on the KYC phone verification screen. Distinct from verifyPhoneTitle ('Verify Phone') used in standalone phone_otp_screen."
+  },
   "verifyCodeButton": "Verify Code",
-  "@verifyCodeButton": {"description": "Submit button label on the OTP code entry view of phone verification."},
+  "@verifyCodeButton": {
+    "description": "Submit button label on the OTP code entry view of phone verification."
+  },
   "resendCodeIn": "Resend code in {seconds}s",
   "@resendCodeIn": {
     "description": "Countdown caption shown while resend is locked, e.g. 'Resend code in 30s'.",
     "placeholders": {
-      "seconds": {"type": "String"}
+      "seconds": {
+        "type": "String"
+      }
     }
   },
   "resendCodeButton": "Resend Code",
-  "@resendCodeButton": {"description": "Tappable resend OTP button (active after countdown)."},
+  "@resendCodeButton": {
+    "description": "Tappable resend OTP button (active after countdown)."
+  },
   "sendVerificationCodeButton": "Send Verification Code",
-  "@sendVerificationCodeButton": {"description": "Initial send-OTP button before any code has been sent."},
+  "@sendVerificationCodeButton": {
+    "description": "Initial send-OTP button before any code has been sent."
+  },
   "verificationFailedTitle": "Verification Failed",
-  "@verificationFailedTitle": {"description": "Title of the failure dialog on the verification pending screen."},
+  "@verificationFailedTitle": {
+    "description": "Title of the failure dialog on the verification pending screen."
+  },
   "verificationFailedMessage": "Your identity verification did not pass. This may be due to a face mismatch or document issue. Please try again.",
-  "@verificationFailedMessage": {"description": "Body of the failure dialog on the verification pending screen."},
+  "@verificationFailedMessage": {
+    "description": "Body of the failure dialog on the verification pending screen."
+  },
   "verificationInProgressTitle": "Verification In Progress",
-  "@verificationInProgressTitle": {"description": "Heading shown while waiting for KYC verification to complete."},
+  "@verificationInProgressTitle": {
+    "description": "Heading shown while waiting for KYC verification to complete."
+  },
   "verificationInProgressMessage": "Your identity documents are being verified. This usually takes a few seconds but may take up to a few minutes.",
-  "@verificationInProgressMessage": {"description": "Body text below the verification in-progress heading."},
+  "@verificationInProgressMessage": {
+    "description": "Body text below the verification in-progress heading."
+  },
   "pleaseWait": "Please wait...",
-  "@pleaseWait": {"description": "Generic loading/wait caption."},
+  "@pleaseWait": {
+    "description": "Generic loading/wait caption."
+  },
   "verificationDoNotCloseApp": "You will be automatically redirected once verification is complete. Do not close the app.",
-  "@verificationDoNotCloseApp": {"description": "Reassurance message at bottom of verification pending screen."}
-,
+  "@verificationDoNotCloseApp": {
+    "description": "Reassurance message at bottom of verification pending screen."
+  },
   "saving": "Saving...",
-  "@saving": {"description": "Loading caption shown while a download is in progress. Clears Step 8 deferral #1 (receive_money_screen.dart line ~322 ternary)."},
-
+  "@saving": {
+    "description": "Loading caption shown while a download is in progress. Clears Step 8 deferral #1 (receive_money_screen.dart line ~322 ternary)."
+  },
   "storagePermissionRequired": "Storage permission required to save QR code",
-  "@storagePermissionRequired": {"description": "Snackbar when device storage permission is needed but not granted."},
-
+  "@storagePermissionRequired": {
+    "description": "Snackbar when device storage permission is needed but not granted."
+  },
   "qrCodeSavedToGallery": "QR code saved to gallery!",
-  "@qrCodeSavedToGallery": {"description": "Success snackbar after saving QR code image to device gallery."},
-
+  "@qrCodeSavedToGallery": {
+    "description": "Success snackbar after saving QR code image to device gallery."
+  },
   "errorSavingQrCode": "Error saving QR code: {error}",
   "@errorSavingQrCode": {
     "description": "Snackbar when saving QR code to gallery fails.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
-
   "maximum20ItemsAllowed": "Maximum 20 items allowed",
-  "@maximum20ItemsAllowed": {"description": "Snackbar when user tries to add more than 20 items to a payment request."},
-
+  "@maximum20ItemsAllowed": {
+    "description": "Snackbar when user tries to add more than 20 items to a payment request."
+  },
   "pleaseEnterValidAmount": "Please enter a valid amount",
-  "@pleaseEnterValidAmount": {"description": "Validation snackbar when amount is non-numeric or zero. Distinct from pleaseEnterAmount which fires when the field is empty."},
-
+  "@pleaseEnterValidAmount": {
+    "description": "Validation snackbar when amount is non-numeric or zero. Distinct from pleaseEnterAmount which fires when the field is empty."
+  },
   "errorGeneratingQr": "Error generating QR: {error}",
   "@errorGeneratingQr": {
     "description": "Snackbar when QR code generation fails on payment request screen.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
-
   "errorSharingQr": "Error sharing QR: {error}",
   "@errorSharingQr": {
     "description": "Snackbar when QR code sharing (system share sheet) fails.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
-
   "requestPaymentTitle": "Request Payment",
-  "@requestPaymentTitle": {"description": "AppBar title on the payment request screen."},
-
+  "@requestPaymentTitle": {
+    "description": "AppBar title on the payment request screen."
+  },
   "newRequestTooltip": "New Request",
-  "@newRequestTooltip": {"description": "Tooltip on the refresh icon button that resets the payment request form."},
-
+  "@newRequestTooltip": {
+    "description": "Tooltip on the refresh icon button that resets the payment request form."
+  },
   "createPaymentRequestTitle": "Create Payment Request",
-  "@createPaymentRequestTitle": {"description": "Heading on the payment request form's create view."},
-
+  "@createPaymentRequestTitle": {
+    "description": "Heading on the payment request form's create view."
+  },
   "createPaymentRequestDescription": "Enter the amount and add items. Customers can scan the QR code to pay you instantly.",
-  "@createPaymentRequestDescription": {"description": "Body description below the create heading on payment request screen."},
-
+  "@createPaymentRequestDescription": {
+    "description": "Body description below the create heading on payment request screen."
+  },
   "amountLabel": "Amount",
-  "@amountLabel": {"description": "Label above the amount input field on payment request screen."},
-
+  "@amountLabel": {
+    "description": "Label above the amount input field on payment request screen."
+  },
   "itemsOptional": "Items (optional)",
-  "@itemsOptional": {"description": "Label above the items list section, indicating items are optional."},
-
+  "@itemsOptional": {
+    "description": "Label above the items list section, indicating items are optional."
+  },
   "itemsHint": "e.g., Jollof Rice, Chicken, Drinks",
-  "@itemsHint": {"description": "Placeholder text in the items input field showing example item names."},
-
+  "@itemsHint": {
+    "description": "Placeholder text in the items input field showing example item names."
+  },
   "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
   "@itemCount": {
     "description": "Pluralized item count. Renders '1 item' for count=1 and '{count} items' otherwise.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
-
   "generateQrCode": "Generate QR Code",
-  "@generateQrCode": {"description": "Submit button on the payment request form."},
-
+  "@generateQrCode": {
+    "description": "Submit button on the payment request form."
+  },
   "payToUser": "Pay to: {userName}",
   "@payToUser": {
     "description": "Recipient label on the generated QR code preview, e.g. 'Pay to: Eric'.",
     "placeholders": {
-      "userName": {"type": "String"}
+      "userName": {
+        "type": "String"
+      }
     }
   },
-
   "shareButton": "Share",
-  "@shareButton": {"description": "Generic Share button label (used in payment request QR preview)."},
-
+  "@shareButton": {
+    "description": "Generic Share button label (used in payment request QR preview)."
+  },
   "qrCodeInfoForCustomer": "Show this QR code to the customer.\nThey scan it, confirm the amount, and pay instantly!",
-  "@qrCodeInfoForCustomer": {"description": "Info caption below the generated QR code on payment request screen. Two lines (line break in middle)."},
-
+  "@qrCodeInfoForCustomer": {
+    "description": "Info caption below the generated QR code on payment request screen. Two lines (line break in middle)."
+  },
   "createNewRequest": "Create New Request",
-  "@createNewRequest": {"description": "Outlined button to reset and create another payment request after a QR is generated."}
-,
+  "@createNewRequest": {
+    "description": "Outlined button to reset and create another payment request after a QR is generated."
+  },
   "downloadButton": "Download",
-  "@downloadButton": {"description": "Generic Download button label (used in payment request QR preview, alongside Share)."}
-,
+  "@downloadButton": {
+    "description": "Generic Download button label (used in payment request QR preview, alongside Share)."
+  },
   "shareWalletIdSubject": "My QR Wallet ID",
-  "@shareWalletIdSubject": {"description": "Subject line when sharing wallet ID via system share sheet (receive_money_screen Share.share call)."},
-
+  "@shareWalletIdSubject": {
+    "description": "Subject line when sharing wallet ID via system share sheet (receive_money_screen Share.share call)."
+  },
   "defaultUserName": "User",
-  "@defaultUserName": {"description": "Generic fallback display name shown when the authenticated user has no displayName set on their account."},
-
+  "@defaultUserName": {
+    "description": "Generic fallback display name shown when the authenticated user has no displayName set on their account."
+  },
   "loadingPlaceholder": "Loading...",
-  "@loadingPlaceholder": {"description": "Generic loading caption shown while content is being fetched (e.g. wallet ID resolving)."},
-
+  "@loadingPlaceholder": {
+    "description": "Generic loading caption shown while content is being fetched (e.g. wallet ID resolving)."
+  },
   "payRequestShareText": "Pay {symbol}{amount} to {userName}",
   "@payRequestShareText": {
     "description": "Body text in system share sheet when sharing a payment request, e.g. 'Pay $5.00 to Eric'.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"},
-      "userName": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      },
+      "userName": {
+        "type": "String"
+      }
     }
-  }
-,
+  },
   "approvePaymentTitle": "Approve Payment",
-  "@approvePaymentTitle": {"description": "Title of the dialog asking the user to approve a pending MTN MoMo payment on their phone."},
-
+  "@approvePaymentTitle": {
+    "description": "Title of the dialog asking the user to approve a pending MTN MoMo payment on their phone."
+  },
   "mtnMomoApprovePromptBody": "Please approve the payment of {symbol}{amount} on your MTN MoMo phone.",
   "@mtnMomoApprovePromptBody": {
     "description": "Body of the MTN MoMo approval dialog showing the amount to approve.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
-
   "checkPhoneForApprovalPrompt": "Check your phone for the approval prompt.",
-  "@checkPhoneForApprovalPrompt": {"description": "Caption beneath the MTN MoMo approval dialog body."},
-
+  "@checkPhoneForApprovalPrompt": {
+    "description": "Caption beneath the MTN MoMo approval dialog body."
+  },
   "iveApproved": "I've Approved",
-  "@iveApproved": {"description": "Button label confirming the user has approved the payment on their MoMo phone."},
-
+  "@iveApproved": {
+    "description": "Button label confirming the user has approved the payment on their MoMo phone."
+  },
   "labelCopiedToClipboard": "{label} copied to clipboard",
   "@labelCopiedToClipboard": {
     "description": "Snackbar shown when the user copies a value (e.g. account number) to the clipboard.",
     "placeholders": {
-      "label": {"type": "String"}
+      "label": {
+        "type": "String"
+      }
     }
   },
-
   "paymentSuccessful": "Payment Successful",
-  "@paymentSuccessful": {"description": "Title of the post-payment success dialog inside the add-money flow (no exclamation, used in dialog title)."},
-
+  "@paymentSuccessful": {
+    "description": "Title of the post-payment success dialog inside the add-money flow (no exclamation, used in dialog title)."
+  },
   "paymentSuccessfulHero": "Payment Successful!",
-  "@paymentSuccessfulHero": {"description": "Hero title on the dedicated payment result screen (with celebratory exclamation)."},
-
+  "@paymentSuccessfulHero": {
+    "description": "Hero title on the dedicated payment result screen (with celebratory exclamation)."
+  },
   "paymentFailed": "Payment Failed",
-  "@paymentFailed": {"description": "Hero title on the payment result screen when the payment failed (capitalized as a title)."},
-
+  "@paymentFailed": {
+    "description": "Hero title on the payment result screen when the payment failed (capitalized as a title)."
+  },
   "amountWithCurrency": "Amount: {symbol}{amount}",
   "@amountWithCurrency": {
     "description": "Inline labeled amount, e.g. 'Amount: $5.00'.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
-
   "referenceWithValue": "Reference: {reference}",
   "@referenceWithValue": {
     "description": "Inline labeled transaction reference, e.g. 'Reference: ABC-123'.",
     "placeholders": {
-      "reference": {"type": "String"}
+      "reference": {
+        "type": "String"
+      }
     }
   },
-
   "doneButton": "Done",
-  "@doneButton": {"description": "Generic Done button label used to dismiss a result dialog/screen."},
-
+  "@doneButton": {
+    "description": "Generic Done button label used to dismiss a result dialog/screen."
+  },
   "mobileMoneyNotAvailableTitle": "Mobile Money Not Available",
-  "@mobileMoneyNotAvailableTitle": {"description": "Title shown when mobile money is not supported in the user's region (shared between add-money and withdraw)."},
-
+  "@mobileMoneyNotAvailableTitle": {
+    "description": "Title shown when mobile money is not supported in the user's region (shared between add-money and withdraw)."
+  },
   "mobileMoneyNotAvailablePaymentsBody": "Mobile money payments are not available in your region. Please use Card or Bank Transfer.",
-  "@mobileMoneyNotAvailablePaymentsBody": {"description": "Body text for the mobile-money-unavailable empty state on the add-money screen (suggesting Card/Bank Transfer alternatives)."},
-
+  "@mobileMoneyNotAvailablePaymentsBody": {
+    "description": "Body text for the mobile-money-unavailable empty state on the add-money screen (suggesting Card/Bank Transfer alternatives)."
+  },
   "enterAmountLabel": "Enter Amount",
-  "@enterAmountLabel": {"description": "Label above the amount input on the add-money screen."},
-
+  "@enterAmountLabel": {
+    "description": "Label above the amount input on the add-money screen."
+  },
   "quickSelectLabel": "Quick Select",
-  "@quickSelectLabel": {"description": "Label above the row of preset amount chips on the add-money screen."},
-
+  "@quickSelectLabel": {
+    "description": "Label above the row of preset amount chips on the add-money screen."
+  },
   "securePaymentLabel": "Secure Payment",
-  "@securePaymentLabel": {"description": "Heading label above the Paystack security note."},
-
+  "@securePaymentLabel": {
+    "description": "Heading label above the Paystack security note."
+  },
   "paystackSecurityNote": "Powered by Paystack. Your payment details are secure.",
-  "@paystackSecurityNote": {"description": "Reassurance caption shown below the Secure Payment heading on add-money screen."},
-
+  "@paystackSecurityNote": {
+    "description": "Reassurance caption shown below the Secure Payment heading on add-money screen."
+  },
   "mobileMoneyProviderLabel": "Mobile Money Provider",
-  "@mobileMoneyProviderLabel": {"description": "Label above the mobile money provider dropdown (shared between add-money and withdraw)."},
-
+  "@mobileMoneyProviderLabel": {
+    "description": "Label above the mobile money provider dropdown (shared between add-money and withdraw)."
+  },
   "phoneNumberLabel": "Phone Number",
-  "@phoneNumberLabel": {"description": "Label above the phone number input field (shared between add-money and withdraw)."},
-
+  "@phoneNumberLabel": {
+    "description": "Label above the phone number input field (shared between add-money and withdraw)."
+  },
   "loadingAccountDetails": "Loading account details...",
-  "@loadingAccountDetails": {"description": "Caption shown while the virtual bank account details are being generated/fetched."},
-
+  "@loadingAccountDetails": {
+    "description": "Caption shown while the virtual bank account details are being generated/fetched."
+  },
   "virtualAccountTitle": "Virtual Account",
-  "@virtualAccountTitle": {"description": "Title for the virtual account empty state (before account is generated)."},
-
+  "@virtualAccountTitle": {
+    "description": "Title for the virtual account empty state (before account is generated)."
+  },
   "tapToGenerateAccountPrompt": "Tap to generate your dedicated account number",
-  "@tapToGenerateAccountPrompt": {"description": "Caption inviting the user to tap the button below to generate a virtual bank account."},
-
+  "@tapToGenerateAccountPrompt": {
+    "description": "Caption inviting the user to tap the button below to generate a virtual bank account."
+  },
   "generateAccountButton": "Generate Account",
-  "@generateAccountButton": {"description": "Button to generate the user's virtual bank account."},
-
+  "@generateAccountButton": {
+    "description": "Button to generate the user's virtual bank account."
+  },
   "yourVirtualAccountLabel": "Your Virtual Account",
-  "@yourVirtualAccountLabel": {"description": "Heading on the populated virtual account card."},
-
+  "@yourVirtualAccountLabel": {
+    "description": "Heading on the populated virtual account card."
+  },
   "bankNameLabel": "Bank Name",
-  "@bankNameLabel": {"description": "Label for the bank name field on the virtual account card."},
-
+  "@bankNameLabel": {
+    "description": "Label for the bank name field on the virtual account card."
+  },
   "accountNumberLabel": "Account Number",
-  "@accountNumberLabel": {"description": "Label for the account number field (shared between add-money virtual account card and withdraw screen)."},
-
+  "@accountNumberLabel": {
+    "description": "Label for the account number field (shared between add-money virtual account card and withdraw screen)."
+  },
   "accountNameLabel": "Account Name",
-  "@accountNameLabel": {"description": "Label for the account holder name field (shared between add-money virtual account card and withdraw screen)."},
-
+  "@accountNameLabel": {
+    "description": "Label for the account holder name field (shared between add-money virtual account card and withdraw screen)."
+  },
   "howItWorksLabel": "How it works",
-  "@howItWorksLabel": {"description": "Heading above the explanatory bullet points on the virtual account screen."},
-
+  "@howItWorksLabel": {
+    "description": "Heading above the explanatory bullet points on the virtual account screen."
+  },
   "virtualAccountInfoBody": "This account is unique to you. Any transfer to this account credits your wallet automatically.",
-  "@virtualAccountInfoBody": {"description": "Explanatory body text on the virtual account info card."},
-
+  "@virtualAccountInfoBody": {
+    "description": "Explanatory body text on the virtual account info card."
+  },
   "mtnMomoPaymentFailedError": "MTN MoMo payment failed",
-  "@mtnMomoPaymentFailedError": {"description": "Fallback error snackbar message when an MTN MoMo payment fails and the API didn't return a specific error."},
-
+  "@mtnMomoPaymentFailedError": {
+    "description": "Fallback error snackbar message when an MTN MoMo payment fails and the API didn't return a specific error."
+  },
   "paymentFailedOrRejectedError": "Payment failed or was rejected",
-  "@paymentFailedOrRejectedError": {"description": "Fallback error snackbar when a payment fails or is rejected by the user/processor."},
-
+  "@paymentFailedOrRejectedError": {
+    "description": "Fallback error snackbar when a payment fails or is rejected by the user/processor."
+  },
   "paymentFailedError": "Payment failed",
-  "@paymentFailedError": {"description": "Generic fallback error snackbar for payment failures (lowercase 'failed' — distinct from the title-cased paymentFailed used as a hero title)."},
-
+  "@paymentFailedError": {
+    "description": "Generic fallback error snackbar for payment failures (lowercase 'failed' — distinct from the title-cased paymentFailed used as a hero title)."
+  },
   "cardTabLabel": "Card",
-  "@cardTabLabel": {"description": "Tab label for the card payment method on add-money screen."},
-
+  "@cardTabLabel": {
+    "description": "Tab label for the card payment method on add-money screen."
+  },
   "mobileMoneyTabLabel": "Mobile Money",
-  "@mobileMoneyTabLabel": {"description": "Tab label for the mobile money payment method (shared between add-money and withdraw)."},
-
+  "@mobileMoneyTabLabel": {
+    "description": "Tab label for the mobile money payment method (shared between add-money and withdraw)."
+  },
   "bankTransferTabLabel": "Bank Transfer",
-  "@bankTransferTabLabel": {"description": "Tab label for the bank transfer payment method (shared between add-money and withdraw)."},
-
+  "@bankTransferTabLabel": {
+    "description": "Tab label for the bank transfer payment method (shared between add-money and withdraw)."
+  },
   "continueToPaymentButton": "Continue to Payment",
-  "@continueToPaymentButton": {"description": "Submit button label on the card payment tab (proceeds to Paystack flow)."},
-
+  "@continueToPaymentButton": {
+    "description": "Submit button label on the card payment tab (proceeds to Paystack flow)."
+  },
   "payWithMobileMoneyButton": "Pay with Mobile Money",
-  "@payWithMobileMoneyButton": {"description": "Submit button label on the mobile money tab."},
-
+  "@payWithMobileMoneyButton": {
+    "description": "Submit button label on the mobile money tab."
+  },
   "verifyingPaymentTitle": "Verifying payment...",
-  "@verifyingPaymentTitle": {"description": "Title shown on the payment result screen while the verification request is in flight."},
-
+  "@verifyingPaymentTitle": {
+    "description": "Title shown on the payment result screen while the verification request is in flight."
+  },
   "verifyingPaymentBody": "Please wait while we confirm your payment",
-  "@verifyingPaymentBody": {"description": "Body caption shown beneath the verifying payment title."},
-
+  "@verifyingPaymentBody": {
+    "description": "Body caption shown beneath the verifying payment title."
+  },
   "referenceColon": "Reference: ",
-  "@referenceColon": {"description": "Inline label 'Reference: ' (with trailing colon and space) used as a prefix before a separately-rendered reference value widget."},
-
+  "@referenceColon": {
+    "description": "Inline label 'Reference: ' (with trailing colon and space) used as a prefix before a separately-rendered reference value widget."
+  },
   "referenceLabel": "Reference",
-  "@referenceLabel": {"description": "Standalone Reference label (no colon) used in the post-payment summary block."},
-
+  "@referenceLabel": {
+    "description": "Standalone Reference label (no colon) used in the post-payment summary block."
+  },
   "hasBeenAddedToWallet": "has been added to your wallet",
-  "@hasBeenAddedToWallet": {"description": "Caption beneath the credited amount on the payment success screen."},
-
+  "@hasBeenAddedToWallet": {
+    "description": "Caption beneath the credited amount on the payment success screen."
+  },
   "newBalanceLabel": "New Balance",
-  "@newBalanceLabel": {"description": "Label for the updated wallet balance row on the payment success screen."},
-
+  "@newBalanceLabel": {
+    "description": "Label for the updated wallet balance row on the payment success screen."
+  },
   "somethingWentWrongTryAgain": "Something went wrong. Please try again.",
-  "@somethingWentWrongTryAgain": {"description": "Generic error fallback shown on the payment failed screen when no specific error message is available."},
-
+  "@somethingWentWrongTryAgain": {
+    "description": "Generic error fallback shown on the payment failed screen when no specific error message is available."
+  },
   "goBackButton": "Go Back",
-  "@goBackButton": {"description": "Button label on the failed payment result screen (returns to previous screen)."}
-,
+  "@goBackButton": {
+    "description": "Button label on the failed payment result screen (returns to previous screen)."
+  },
   "enterOtpTitle": "Enter OTP",
-  "@enterOtpTitle": {"description": "Title of the dialog asking the user to enter the OTP for completing a withdrawal."},
-
+  "@enterOtpTitle": {
+    "description": "Title of the dialog asking the user to enter the OTP for completing a withdrawal."
+  },
   "enterOtpBody": "Please enter the OTP sent to your registered phone/email to complete the withdrawal of {symbol}{amount}",
   "@enterOtpBody": {
     "description": "Body of the OTP dialog showing the withdrawal amount, e.g. 'Please enter the OTP sent to your registered phone/email to complete the withdrawal of $50.00'.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
-
   "confirmWithdrawalTitle": "Confirm Withdrawal",
-  "@confirmWithdrawalTitle": {"description": "Title of the dialog asking the user to confirm withdrawal details before submitting."},
-
+  "@confirmWithdrawalTitle": {
+    "description": "Title of the dialog asking the user to confirm withdrawal details before submitting."
+  },
   "pleaseVerifyDetailsCorrect": "Please verify the details are correct",
-  "@pleaseVerifyDetailsCorrect": {"description": "Warning caption inside the confirm-withdrawal dialog asking the user to double-check the entered details."},
-
+  "@pleaseVerifyDetailsCorrect": {
+    "description": "Warning caption inside the confirm-withdrawal dialog asking the user to double-check the entered details."
+  },
   "confirmButton": "Confirm",
-  "@confirmButton": {"description": "Generic Confirm button label (paired with Cancel inside the confirm-withdrawal dialog)."},
-
+  "@confirmButton": {
+    "description": "Generic Confirm button label (paired with Cancel inside the confirm-withdrawal dialog)."
+  },
   "withdrawalInitiatedTitle": "Withdrawal Initiated",
-  "@withdrawalInitiatedTitle": {"description": "Success title shown after a withdrawal request is successfully submitted."},
-
+  "@withdrawalInitiatedTitle": {
+    "description": "Success title shown after a withdrawal request is successfully submitted."
+  },
   "withdrawalBeingProcessed": "{symbol}{amount} is being processed",
   "@withdrawalBeingProcessed": {
     "description": "Caption beneath the withdrawal-initiated title showing the amount being processed.",
     "placeholders": {
-      "symbol": {"type": "String"},
-      "amount": {"type": "String"}
+      "symbol": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
     }
   },
-
   "refLine": "Ref: {reference}",
   "@refLine": {
     "description": "Compact reference line shown after a withdrawal, e.g. 'Ref: ABC-123'. Distinct from referenceWithValue which uses the full word 'Reference'.",
     "placeholders": {
-      "reference": {"type": "String"}
+      "reference": {
+        "type": "String"
+      }
     }
   },
-
   "withdrawAction": "Withdraw",
-  "@withdrawAction": {"description": "Withdraw label, used both as AppBar title and as the primary action button label on the withdraw screen."},
-
+  "@withdrawAction": {
+    "description": "Withdraw label, used both as AppBar title and as the primary action button label on the withdraw screen."
+  },
   "mobileMoneyNotAvailableWithdrawalsBody": "Mobile money withdrawals are not available in your region. Please use bank transfer.",
-  "@mobileMoneyNotAvailableWithdrawalsBody": {"description": "Body text for the mobile-money-unavailable empty state on the withdraw screen. Distinct from mobileMoneyNotAvailablePaymentsBody."},
-
+  "@mobileMoneyNotAvailableWithdrawalsBody": {
+    "description": "Body text for the mobile-money-unavailable empty state on the withdraw screen. Distinct from mobileMoneyNotAvailablePaymentsBody."
+  },
   "availableBalanceFull": "Available Balance",
-  "@availableBalanceFull": {"description": "Full 'Available Balance' phrase used as a label above the user's withdrawable balance on the withdraw screen. Distinct from the existing availableBalanceLabel which is the shorter 'Available' used elsewhere."},
-
+  "@availableBalanceFull": {
+    "description": "Full 'Available Balance' phrase used as a label above the user's withdrawable balance on the withdraw screen. Distinct from the existing availableBalanceLabel which is the shorter 'Available' used elsewhere."
+  },
   "amountToWithdrawLabel": "Amount to Withdraw",
-  "@amountToWithdrawLabel": {"description": "Label above the amount input on the withdraw screen."},
-
+  "@amountToWithdrawLabel": {
+    "description": "Label above the amount input on the withdraw screen."
+  },
   "selectBankLabel": "Select Bank",
-  "@selectBankLabel": {"description": "Label above the bank selection dropdown on the withdraw screen."},
-
+  "@selectBankLabel": {
+    "description": "Label above the bank selection dropdown on the withdraw screen."
+  },
   "selectABankHint": "Select a bank",
-  "@selectABankHint": {"description": "Placeholder/hint shown inside the bank selection dropdown when no bank is selected."},
-
+  "@selectABankHint": {
+    "description": "Placeholder/hint shown inside the bank selection dropdown when no bank is selected."
+  },
   "enterAccountNumberHint": "Enter account number",
-  "@enterAccountNumberHint": {"description": "Placeholder text in the account number input field."},
-
+  "@enterAccountNumberHint": {
+    "description": "Placeholder text in the account number input field."
+  },
   "enterAtLeastDigitsToVerify": "Enter at least {count} digits to verify",
   "@enterAtLeastDigitsToVerify": {
     "description": "Validation caption shown when the user has typed too few digits to trigger account verification.",
     "placeholders": {
-      "count": {"type": "int"}
+      "count": {
+        "type": "int"
+      }
     }
   },
-
   "accountVerifiedLabel": "Account Verified",
-  "@accountVerifiedLabel": {"description": "Success caption shown after a bank account number has been successfully verified."},
-
+  "@accountVerifiedLabel": {
+    "description": "Success caption shown after a bank account number has been successfully verified."
+  },
   "enterAccountHolderNameHint": "Enter account holder name",
-  "@enterAccountHolderNameHint": {"description": "Placeholder text in the account holder name input field for mobile money withdrawals."},
-
+  "@enterAccountHolderNameHint": {
+    "description": "Placeholder text in the account holder name input field for mobile money withdrawals."
+  },
   "couldNotVerifyAccountError": "Could not verify account",
-  "@couldNotVerifyAccountError": {"description": "Fallback error snackbar when the bank account verification API call fails."},
-
+  "@couldNotVerifyAccountError": {
+    "description": "Fallback error snackbar when the bank account verification API call fails."
+  },
   "withdrawalFailedError": "Withdrawal failed",
-  "@withdrawalFailedError": {"description": "Fallback error snackbar when a withdrawal submission fails."},
-
+  "@withdrawalFailedError": {
+    "description": "Fallback error snackbar when a withdrawal submission fails."
+  },
   "otpVerificationFailedError": "OTP verification failed",
-  "@otpVerificationFailedError": {"description": "Fallback error snackbar when OTP verification during a withdrawal fails."}
-,
+  "@otpVerificationFailedError": {
+    "description": "Fallback error snackbar when OTP verification during a withdrawal fails."
+  },
   "aboutTitle": "About",
-  "@aboutTitle": {"description": "AppBar title on the About screen."},
-
+  "@aboutTitle": {
+    "description": "AppBar title on the About screen."
+  },
   "qrWalletAppName": "QR Wallet",
-  "@qrWalletAppName": {"description": "App name shown prominently on the About screen. Brand name."},
-
+  "@qrWalletAppName": {
+    "description": "App name shown prominently on the About screen. Brand name."
+  },
   "versionAndBuild": "Version {version} (Build {buildNumber})",
   "@versionAndBuild": {
     "description": "Version and build number display on About screen, e.g. 'Version 1.2.3 (Build 456)'.",
     "placeholders": {
-      "version": {"type": "String"},
-      "buildNumber": {"type": "String"}
+      "version": {
+        "type": "String"
+      },
+      "buildNumber": {
+        "type": "String"
+      }
     }
   },
-
   "aboutAppDescription": "QR Wallet is a secure and easy-to-use digital wallet that allows you to send, receive, and manage money with just a scan. Experience the future of payments today.",
-  "@aboutAppDescription": {"description": "Marketing description paragraph on About screen describing the app."},
-
+  "@aboutAppDescription": {
+    "description": "Marketing description paragraph on About screen describing the app."
+  },
   "termsOfServiceLink": "Terms of Service",
-  "@termsOfServiceLink": {"description": "About screen link item that opens the Terms of Service URL."},
-
+  "@termsOfServiceLink": {
+    "description": "About screen link item that opens the Terms of Service URL."
+  },
   "privacyPolicyLink": "Privacy Policy",
-  "@privacyPolicyLink": {"description": "About screen link item that opens the Privacy Policy URL."},
-
+  "@privacyPolicyLink": {
+    "description": "About screen link item that opens the Privacy Policy URL."
+  },
   "rateUsLink": "Rate Us",
-  "@rateUsLink": {"description": "About screen link item that prompts the user to rate the app."},
-
+  "@rateUsLink": {
+    "description": "About screen link item that prompts the user to rate the app."
+  },
   "rateUsToast": "Rate us on the App Store!",
-  "@rateUsToast": {"description": "Snackbar shown when the user taps the Rate Us link."},
-
+  "@rateUsToast": {
+    "description": "Snackbar shown when the user taps the Rate Us link."
+  },
   "shareAppLink": "Share App",
-  "@shareAppLink": {"description": "About screen link item to share the app with others."},
-
+  "@shareAppLink": {
+    "description": "About screen link item to share the app with others."
+  },
   "shareComingSoonToast": "Share feature coming soon!",
-  "@shareComingSoonToast": {"description": "Snackbar shown when the user taps Share App."},
-
+  "@shareComingSoonToast": {
+    "description": "Snackbar shown when the user taps Share App."
+  },
   "copyrightLine": "© 2024 QR Wallet. All rights reserved.",
-  "@copyrightLine": {"description": "Copyright footer on the About screen."},
-
+  "@copyrightLine": {
+    "description": "Copyright footer on the About screen."
+  },
   "madeInGhanaLine": "Made with ❤️ in Ghana",
-  "@madeInGhanaLine": {"description": "Pride-of-place footer on the About screen."},
-
+  "@madeInGhanaLine": {
+    "description": "Pride-of-place footer on the About screen."
+  },
   "errorUpdatingProfile": "Error updating profile: {error}",
   "@errorUpdatingProfile": {
     "description": "Snackbar shown when saving profile changes fails.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
-
   "nameVerifiedKycCannotChange": "Name verified via KYC — cannot be changed",
-  "@nameVerifiedKycCannotChange": {"description": "Caption explaining why the name field is locked on the edit profile screen."},
-
+  "@nameVerifiedKycCannotChange": {
+    "description": "Caption explaining why the name field is locked on the edit profile screen."
+  },
   "changePhotoButton": "Change Photo",
-  "@changePhotoButton": {"description": "Button label on the edit profile screen for changing the avatar photo."},
-
+  "@changePhotoButton": {
+    "description": "Button label on the edit profile screen for changing the avatar photo."
+  },
   "blockAccountLabel": "Block Account",
-  "@blockAccountLabel": {"description": "Generic 'Block Account' label — shared across dialog title, dialog action button, and menu item label."},
-
+  "@blockAccountLabel": {
+    "description": "Generic 'Block Account' label — shared across dialog title, dialog action button, and menu item label."
+  },
   "blockAccountConfirmBody": "Are you sure you want to block your account?\n\nThis will prevent all transactions including:\n• Sending money\n• Withdrawing funds\n• Adding money\n\nYou can unblock anytime with your PIN.",
-  "@blockAccountConfirmBody": {"description": "Body text inside the Block Account confirmation dialog. Multi-line with bullet list."},
-
+  "@blockAccountConfirmBody": {
+    "description": "Body text inside the Block Account confirmation dialog. Multi-line with bullet list."
+  },
   "accountBlockedSuccessToast": "Account blocked successfully. All transactions are disabled.",
-  "@accountBlockedSuccessToast": {"description": "Snackbar shown after the user successfully blocks their own account."},
-
+  "@accountBlockedSuccessToast": {
+    "description": "Snackbar shown after the user successfully blocks their own account."
+  },
   "accountBlockedBySupportTitle": "Account Blocked by Support",
-  "@accountBlockedBySupportTitle": {"description": "Title of the modal dialog shown when the user's account has been blocked by customer support."},
-
+  "@accountBlockedBySupportTitle": {
+    "description": "Title of the modal dialog shown when the user's account has been blocked by customer support."
+  },
   "accountBlockedBySupportBody": "Your account was blocked by customer support for security reasons.\n\nPlease contact our support team to verify your identity and unblock your account.",
-  "@accountBlockedBySupportBody": {"description": "Body of the support-blocked dialog explaining the situation."},
-
+  "@accountBlockedBySupportBody": {
+    "description": "Body of the support-blocked dialog explaining the situation."
+  },
   "accountUnblockedSuccessToast": "Account unblocked successfully. All transactions are now enabled.",
-  "@accountUnblockedSuccessToast": {"description": "Snackbar shown after the user successfully unblocks their account."},
-
+  "@accountUnblockedSuccessToast": {
+    "description": "Snackbar shown after the user successfully unblocks their account."
+  },
   "logoutConfirmBody": "Are you sure you want to log out?",
-  "@logoutConfirmBody": {"description": "Body text inside the Log Out confirmation dialog."},
-
+  "@logoutConfirmBody": {
+    "description": "Body text inside the Log Out confirmation dialog."
+  },
   "businessLabel": "Business",
-  "@businessLabel": {"description": "Section heading on the profile screen for business-account-related items."},
-
+  "@businessLabel": {
+    "description": "Section heading on the profile screen for business-account-related items."
+  },
   "noBiometricsEnrolledToast": "No biometrics enrolled on this device. Please set up fingerprint or Face ID in device settings.",
-  "@noBiometricsEnrolledToast": {"description": "Snackbar shown when the user tries to enable biometric login but no biometrics are enrolled."},
-
+  "@noBiometricsEnrolledToast": {
+    "description": "Snackbar shown when the user tries to enable biometric login but no biometrics are enrolled."
+  },
   "preferencesSection": "Preferences",
-  "@preferencesSection": {"description": "Section heading on the profile screen for user preferences."},
-
+  "@preferencesSection": {
+    "description": "Section heading on the profile screen for user preferences."
+  },
   "appearanceMenuItem": "Appearance",
-  "@appearanceMenuItem": {"description": "Menu item label that opens the theme/appearance settings screen."},
-
+  "@appearanceMenuItem": {
+    "description": "Menu item label that opens the theme/appearance settings screen."
+  },
   "accountSafetySection": "Account Safety",
-  "@accountSafetySection": {"description": "Section heading on the profile screen for account safety options."},
-
+  "@accountSafetySection": {
+    "description": "Section heading on the profile screen for account safety options."
+  },
   "supportSection": "Support",
-  "@supportSection": {"description": "Section heading on the profile screen for support items."},
-
+  "@supportSection": {
+    "description": "Section heading on the profile screen for support items."
+  },
   "currencyLabel": "Currency",
-  "@currencyLabel": {"description": "Label for the currency selection menu item on the profile screen."},
-
+  "@currencyLabel": {
+    "description": "Label for the currency selection menu item on the profile screen."
+  },
   "currencyNameAndSymbol": "{name} ({symbol})",
   "@currencyNameAndSymbol": {
     "description": "Compact currency display showing both name and symbol, e.g. 'US Dollar (US$)'.",
     "placeholders": {
-      "name": {"type": "String"},
-      "symbol": {"type": "String"}
+      "name": {
+        "type": "String"
+      },
+      "symbol": {
+        "type": "String"
+      }
     }
   },
-
   "unblockAccountLabel": "Unblock Account",
-  "@unblockAccountLabel": {"description": "Menu item label shown when the account is currently blocked."},
-
+  "@unblockAccountLabel": {
+    "description": "Menu item label shown when the account is currently blocked."
+  },
   "blockedBySupportSubtitle": "Blocked by support — contact us to unblock",
-  "@blockedBySupportSubtitle": {"description": "Compact subtitle on the block-account menu item shown when blocked by support."},
-
+  "@blockedBySupportSubtitle": {
+    "description": "Compact subtitle on the block-account menu item shown when blocked by support."
+  },
   "accountBlockedSubtitle": "Your account is currently blocked",
-  "@accountBlockedSubtitle": {"description": "Subtitle on the block-account menu item shown when the user has self-blocked."},
-
+  "@accountBlockedSubtitle": {
+    "description": "Subtitle on the block-account menu item shown when the user has self-blocked."
+  },
   "temporarilyDisableSubtitle": "Temporarily disable all transactions",
-  "@temporarilyDisableSubtitle": {"description": "Subtitle on the block-account menu item explaining what blocking does."}
-,
+  "@temporarilyDisableSubtitle": {
+    "description": "Subtitle on the block-account menu item explaining what blocking does."
+  },
   "settingsSavedToast": "Settings saved",
-  "@settingsSavedToast": {"description": "Brief snackbar shown when notification settings are successfully saved."},
-
+  "@settingsSavedToast": {
+    "description": "Brief snackbar shown when notification settings are successfully saved."
+  },
   "failedToSaveError": "Failed to save: {error}",
   "@failedToSaveError": {
     "description": "Snackbar shown when saving notification settings fails.",
     "placeholders": {
-      "error": {"type": "String"}
+      "error": {
+        "type": "String"
+      }
     }
   },
-
   "notificationSettingsTitle": "Notification Settings",
-  "@notificationSettingsTitle": {"description": "AppBar title on the notification settings screen."},
-
+  "@notificationSettingsTitle": {
+    "description": "AppBar title on the notification settings screen."
+  },
   "generalSection": "General",
-  "@generalSection": {"description": "Section heading on the notification settings screen for general delivery channel toggles."},
-
+  "@generalSection": {
+    "description": "Section heading on the notification settings screen for general delivery channel toggles."
+  },
   "pushNotificationsLabel": "Push Notifications",
-  "@pushNotificationsLabel": {"description": "Toggle label for enabling push notifications."},
-
+  "@pushNotificationsLabel": {
+    "description": "Toggle label for enabling push notifications."
+  },
   "pushNotificationsSubtitle": "Receive notifications on your device",
-  "@pushNotificationsSubtitle": {"description": "Subtitle below the Push Notifications toggle."},
-
+  "@pushNotificationsSubtitle": {
+    "description": "Subtitle below the Push Notifications toggle."
+  },
   "emailNotificationsLabel": "Email Notifications",
-  "@emailNotificationsLabel": {"description": "Toggle label for enabling email notifications."},
-
+  "@emailNotificationsLabel": {
+    "description": "Toggle label for enabling email notifications."
+  },
   "emailNotificationsSubtitle": "Receive updates via email",
-  "@emailNotificationsSubtitle": {"description": "Subtitle below the Email Notifications toggle."},
-
+  "@emailNotificationsSubtitle": {
+    "description": "Subtitle below the Email Notifications toggle."
+  },
   "transactionsSection": "Transactions",
-  "@transactionsSection": {"description": "Section heading on the notification settings screen for transaction-related notifications."},
-
+  "@transactionsSection": {
+    "description": "Section heading on the notification settings screen for transaction-related notifications."
+  },
   "transactionAlertsLabel": "Transaction Alerts",
-  "@transactionAlertsLabel": {"description": "Toggle label for enabling transaction alert notifications."},
-
+  "@transactionAlertsLabel": {
+    "description": "Toggle label for enabling transaction alert notifications."
+  },
   "transactionAlertsSubtitle": "Get notified for all transactions",
-  "@transactionAlertsSubtitle": {"description": "Subtitle below the Transaction Alerts toggle."},
-
+  "@transactionAlertsSubtitle": {
+    "description": "Subtitle below the Transaction Alerts toggle."
+  },
   "paymentRemindersLabel": "Payment Reminders",
-  "@paymentRemindersLabel": {"description": "Toggle label for enabling payment reminder notifications."},
-
+  "@paymentRemindersLabel": {
+    "description": "Toggle label for enabling payment reminder notifications."
+  },
   "paymentRemindersSubtitle": "Reminders for pending payments",
-  "@paymentRemindersSubtitle": {"description": "Subtitle below the Payment Reminders toggle."},
-
+  "@paymentRemindersSubtitle": {
+    "description": "Subtitle below the Payment Reminders toggle."
+  },
   "securityAndUpdatesSection": "Security & Updates",
-  "@securityAndUpdatesSection": {"description": "Section heading for security alerts and promotional updates on the notification settings screen."},
-
+  "@securityAndUpdatesSection": {
+    "description": "Section heading for security alerts and promotional updates on the notification settings screen."
+  },
   "securityAlertsLabel": "Security Alerts",
-  "@securityAlertsLabel": {"description": "Toggle label for security alert notifications. This toggle is locked-on."},
-
+  "@securityAlertsLabel": {
+    "description": "Toggle label for security alert notifications. This toggle is locked-on."
+  },
   "securityAlertsSubtitle": "Important security notifications",
-  "@securityAlertsSubtitle": {"description": "Subtitle below the Security Alerts toggle."},
-
+  "@securityAlertsSubtitle": {
+    "description": "Subtitle below the Security Alerts toggle."
+  },
   "promotionalUpdatesLabel": "Promotional Updates",
-  "@promotionalUpdatesLabel": {"description": "Toggle label for marketing/promotional notifications."},
-
+  "@promotionalUpdatesLabel": {
+    "description": "Toggle label for marketing/promotional notifications."
+  },
   "promotionalUpdatesSubtitle": "Offers, news, and promotions",
-  "@promotionalUpdatesSubtitle": {"description": "Subtitle below the Promotional Updates toggle."},
-
+  "@promotionalUpdatesSubtitle": {
+    "description": "Subtitle below the Promotional Updates toggle."
+  },
   "securityAlertsCannotBeDisabledNote": "Security alerts cannot be disabled for your protection.",
-  "@securityAlertsCannotBeDisabledNote": {"description": "Info note shown beneath the security alerts toggle explaining why it can't be turned off."},
-
+  "@securityAlertsCannotBeDisabledNote": {
+    "description": "Info note shown beneath the security alerts toggle explaining why it can't be turned off."
+  },
   "themeLabel": "Theme",
-  "@themeLabel": {"description": "Section heading on the theme settings screen above the light/dark/system options."},
-
+  "@themeLabel": {
+    "description": "Section heading on the theme settings screen above the light/dark/system options."
+  },
   "lightThemeLabel": "Light",
-  "@lightThemeLabel": {"description": "Theme option label for the light theme."},
-
+  "@lightThemeLabel": {
+    "description": "Theme option label for the light theme."
+  },
   "lightThemeSubtitle": "Light background with dark text",
-  "@lightThemeSubtitle": {"description": "Subtitle describing the Light theme option."},
-
+  "@lightThemeSubtitle": {
+    "description": "Subtitle describing the Light theme option."
+  },
   "darkThemeLabel": "Dark",
-  "@darkThemeLabel": {"description": "Theme option label for the dark theme."},
-
+  "@darkThemeLabel": {
+    "description": "Theme option label for the dark theme."
+  },
   "darkThemeSubtitle": "Dark background with light text",
-  "@darkThemeSubtitle": {"description": "Subtitle describing the Dark theme option."},
-
+  "@darkThemeSubtitle": {
+    "description": "Subtitle describing the Dark theme option."
+  },
   "systemThemeLabel": "System",
-  "@systemThemeLabel": {"description": "Theme option label for following the system theme."},
-
+  "@systemThemeLabel": {
+    "description": "Theme option label for following the system theme."
+  },
   "systemThemeSubtitle": "Follow system settings",
-  "@systemThemeSubtitle": {"description": "Subtitle describing the System theme option."},
-
+  "@systemThemeSubtitle": {
+    "description": "Subtitle describing the System theme option."
+  },
   "previewLabel": "Preview",
-  "@previewLabel": {"description": "Heading above the theme preview section on the theme settings screen."}
-,
+  "@previewLabel": {
+    "description": "Heading above the theme preview section on the theme settings screen."
+  },
   "passwordChangedTitle": "Password Changed!",
-  "@passwordChangedTitle": {"description": "Hero title shown on the password changed success screen."},
-
+  "@passwordChangedTitle": {
+    "description": "Hero title shown on the password changed success screen."
+  },
   "passwordChangedBody": "Your password has been updated successfully.",
-  "@passwordChangedBody": {"description": "Body text shown beneath the password changed title."},
-
+  "@passwordChangedBody": {
+    "description": "Body text shown beneath the password changed title."
+  },
   "changePasswordAction": "Change Password",
-  "@changePasswordAction": {"description": "Change Password label, used both as AppBar title and as the primary action button on the change password screen."},
-
+  "@changePasswordAction": {
+    "description": "Change Password label, used both as AppBar title and as the primary action button on the change password screen."
+  },
   "createNewPasswordSubtitle": "Create a new password",
-  "@createNewPasswordSubtitle": {"description": "Subtitle below the AppBar on the change password screen."},
-
+  "@createNewPasswordSubtitle": {
+    "description": "Subtitle below the AppBar on the change password screen."
+  },
   "currentPasswordLabel": "Current Password",
-  "@currentPasswordLabel": {"description": "Floating label on the current password input field."},
-
+  "@currentPasswordLabel": {
+    "description": "Floating label on the current password input field."
+  },
   "enterCurrentPasswordHint": "Enter current password",
-  "@enterCurrentPasswordHint": {"description": "Placeholder text in the current password input field."},
-
+  "@enterCurrentPasswordHint": {
+    "description": "Placeholder text in the current password input field."
+  },
   "newPasswordLabel": "New Password",
-  "@newPasswordLabel": {"description": "Floating label on the new password input field."},
-
+  "@newPasswordLabel": {
+    "description": "Floating label on the new password input field."
+  },
   "enterNewPasswordHint": "Enter new password",
-  "@enterNewPasswordHint": {"description": "Placeholder text in the new password input field."},
-
+  "@enterNewPasswordHint": {
+    "description": "Placeholder text in the new password input field."
+  },
   "confirmNewPasswordLabel": "Confirm New Password",
-  "@confirmNewPasswordLabel": {"description": "Floating label on the confirm-new-password input field."},
-
+  "@confirmNewPasswordLabel": {
+    "description": "Floating label on the confirm-new-password input field."
+  },
   "reenterNewPasswordHint": "Re-enter new password",
-  "@reenterNewPasswordHint": {"description": "Placeholder text in the confirm-new-password input field."},
-
+  "@reenterNewPasswordHint": {
+    "description": "Placeholder text in the confirm-new-password input field."
+  },
   "passwordMustContainLabel": "Password must contain:",
-  "@passwordMustContainLabel": {"description": "Label above the password requirements checklist."},
-
+  "@passwordMustContainLabel": {
+    "description": "Label above the password requirements checklist."
+  },
   "pinChangedTitle": "PIN Changed!",
-  "@pinChangedTitle": {"description": "Hero title shown on the PIN changed success screen."},
-
+  "@pinChangedTitle": {
+    "description": "Hero title shown on the PIN changed success screen."
+  },
   "pinChangedBody": "Your transaction PIN has been updated successfully.",
-  "@pinChangedBody": {"description": "Body text shown beneath the PIN changed title."},
-
+  "@pinChangedBody": {
+    "description": "Body text shown beneath the PIN changed title."
+  },
   "changePinAction": "Change PIN",
-  "@changePinAction": {"description": "AppBar title on the change PIN screen."},
-
+  "@changePinAction": {
+    "description": "AppBar title on the change PIN screen."
+  },
   "forgotPinLink": "Forgot your PIN?",
-  "@forgotPinLink": {"description": "Text button on the change PIN screen that navigates to the reset PIN flow."},
-
+  "@forgotPinLink": {
+    "description": "Text button on the change PIN screen that navigates to the reset PIN flow."
+  },
   "pinSecurityNote": "Your PIN is securely encrypted and used to authorize transactions.",
-  "@pinSecurityNote": {"description": "Reassurance caption on the change PIN screen."},
-
+  "@pinSecurityNote": {
+    "description": "Reassurance caption on the change PIN screen."
+  },
   "pinResetTitle": "PIN Reset!",
-  "@pinResetTitle": {"description": "Hero title shown on the PIN reset success screen."},
-
+  "@pinResetTitle": {
+    "description": "Hero title shown on the PIN reset success screen."
+  },
   "pinResetBody": "Your transaction PIN has been reset successfully.",
-  "@pinResetBody": {"description": "Body text shown beneath the PIN reset title."},
-
+  "@pinResetBody": {
+    "description": "Body text shown beneath the PIN reset title."
+  },
   "resetPinAction": "Reset PIN",
-  "@resetPinAction": {"description": "AppBar title on the reset PIN screen."},
-
+  "@resetPinAction": {
+    "description": "AppBar title on the reset PIN screen."
+  },
   "enterNewPinStepTitle": "Enter New PIN",
-  "@enterNewPinStepTitle": {"description": "Step title in the reset PIN flow when entering the new PIN."},
-
+  "@enterNewPinStepTitle": {
+    "description": "Step title in the reset PIN flow when entering the new PIN."
+  },
   "createNewPinSubtitle": "Create a new 6-digit transaction PIN",
-  "@createNewPinSubtitle": {"description": "Subtitle below the Enter New PIN step heading."},
-
+  "@createNewPinSubtitle": {
+    "description": "Subtitle below the Enter New PIN step heading."
+  },
   "confirmNewPinStepTitle": "Confirm New PIN",
-  "@confirmNewPinStepTitle": {"description": "Step title in the reset PIN flow when confirming the new PIN."},
-
+  "@confirmNewPinStepTitle": {
+    "description": "Step title in the reset PIN flow when confirming the new PIN."
+  },
   "reenterNewPinSubtitle": "Re-enter your new PIN to confirm",
-  "@reenterNewPinSubtitle": {"description": "Subtitle below the Confirm New PIN step heading."},
-
+  "@reenterNewPinSubtitle": {
+    "description": "Subtitle below the Confirm New PIN step heading."
+  },
   "verifyYourIdentityTitle": "Verify Your Identity",
-  "@verifyYourIdentityTitle": {"description": "Heading on the reset PIN method selection step."},
-
+  "@verifyYourIdentityTitle": {
+    "description": "Heading on the reset PIN method selection step."
+  },
   "resetPinVerifyIdentityBody": "To reset your PIN, please verify your identity using one of the options below.",
-  "@resetPinVerifyIdentityBody": {"description": "Body text below the Verify Your Identity heading."},
-
+  "@resetPinVerifyIdentityBody": {
+    "description": "Body text below the Verify Your Identity heading."
+  },
   "emailAndPasswordMethod": "Email & Password",
-  "@emailAndPasswordMethod": {"description": "Method card title for verifying identity via email and password."},
-
+  "@emailAndPasswordMethod": {
+    "description": "Method card title for verifying identity via email and password."
+  },
   "emailAndPasswordSubtitle": "Verify using your login credentials",
-  "@emailAndPasswordSubtitle": {"description": "Method card subtitle for the email and password verification option."},
-
+  "@emailAndPasswordSubtitle": {
+    "description": "Method card subtitle for the email and password verification option."
+  },
   "resetPinSecurityAssurance": "This verification ensures only you can reset your PIN.",
-  "@resetPinSecurityAssurance": {"description": "Security reassurance caption on the reset PIN method selection step."},
-
+  "@resetPinSecurityAssurance": {
+    "description": "Security reassurance caption on the reset PIN method selection step."
+  },
   "enterYourPasswordTitle": "Enter Your Password",
-  "@enterYourPasswordTitle": {"description": "Step title when verifying via email and password during PIN reset."},
-
+  "@enterYourPasswordTitle": {
+    "description": "Step title when verifying via email and password during PIN reset."
+  },
   "verifyByCredentialsBody": "Verify your identity by entering your login credentials.",
-  "@verifyByCredentialsBody": {"description": "Body text below the Enter Your Password step heading."},
-
+  "@verifyByCredentialsBody": {
+    "description": "Body text below the Enter Your Password step heading."
+  },
   "emailLabel": "Email",
-  "@emailLabel": {"description": "Floating label on the email input field. Generic label that may be reused."},
-
+  "@emailLabel": {
+    "description": "Floating label on the email input field. Generic label that may be reused."
+  },
   "passwordLabel": "Password",
-  "@passwordLabel": {"description": "Floating label on the password input field. Generic label that may be reused."},
-
+  "@passwordLabel": {
+    "description": "Floating label on the password input field. Generic label that may be reused."
+  },
   "enterYourPasswordHint": "Enter your password",
-  "@enterYourPasswordHint": {"description": "Placeholder text in the password input field on the PIN reset email-verification step."},
-
+  "@enterYourPasswordHint": {
+    "description": "Placeholder text in the password input field on the PIN reset email-verification step."
+  },
   "enter6DigitCodePhone": "Enter the 6-digit code sent to {phone}",
   "@enter6DigitCodePhone": {
     "description": "Body text on the OTP entry step during PIN reset.",
     "placeholders": {
-      "phone": {"type": "String"}
+      "phone": {
+        "type": "String"
+      }
     }
   },
-
   "tooManyAttemptsError": "Too many attempts. Please try again later.",
-  "@tooManyAttemptsError": {"description": "Error message shown when OTP send attempts have been rate-limited."},
-
+  "@tooManyAttemptsError": {
+    "description": "Error message shown when OTP send attempts have been rate-limited."
+  },
   "failedToSendOtpError": "Failed to send OTP. Please try again.",
-  "@failedToSendOtpError": {"description": "Generic fallback error when OTP send fails."},
-
+  "@failedToSendOtpError": {
+    "description": "Generic fallback error when OTP send fails."
+  },
   "incorrectCodeError": "Incorrect code. Please try again.",
-  "@incorrectCodeError": {"description": "Error message shown when the user enters an incorrect OTP."},
-
+  "@incorrectCodeError": {
+    "description": "Error message shown when the user enters an incorrect OTP."
+  },
   "verificationFailedAgainError": "Verification failed. Please try again.",
-  "@verificationFailedAgainError": {"description": "Generic fallback error when OTP verification fails."},
-
+  "@verificationFailedAgainError": {
+    "description": "Generic fallback error when OTP verification fails."
+  },
   "verifyOtpToPhoneSubtitle": "Verify via OTP sent to your phone",
-  "@verifyOtpToPhoneSubtitle": {"description": "Method card subtitle for the phone OTP verification option."},
-
+  "@verifyOtpToPhoneSubtitle": {
+    "description": "Method card subtitle for the phone OTP verification option."
+  },
   "noPhoneNumberLinkedSubtitle": "No phone number linked to your account",
-  "@noPhoneNumberLinkedSubtitle": {"description": "Method card subtitle when no phone number is on file."},
+  "@noPhoneNumberLinkedSubtitle": {
+    "description": "Method card subtitle when no phone number is on file."
+  },
   "couldNotOpenEmailToast": "Could not open email app. Please email us at qrwallet.support@bongroups.co",
   "@couldNotOpenEmailToast": {
     "description": "Snackbar shown when the email app cannot be opened from the help screen."
@@ -2115,5 +2547,65 @@
   "documentBothSidesAndSelfieDescription": "We will capture both sides of your ID and take a selfie",
   "@documentBothSidesAndSelfieDescription": {
     "description": "Body text shown on the KYC verification card before capture, when verification mode is full document capture. Used when _isPhotoCapture is false."
+  },
+  "ninLengthError": "NIN must be exactly 11 digits",
+  "@ninLengthError": {
+    "description": "Validation error shown when the user enters a NIN that is not exactly 11 digits."
+  },
+  "bvnLengthError": "BVN must be exactly 11 digits",
+  "@bvnLengthError": {
+    "description": "Validation error shown when the user enters a BVN that is not exactly 11 digits."
+  },
+  "ssnitFormatError": "SSNIT must be 1 letter followed by 12 digits",
+  "@ssnitFormatError": {
+    "description": "Validation error shown when the user's SSNIT does not match the format: one letter followed by twelve digits."
+  },
+  "southAfricanIdLengthError": "South African ID must be exactly 13 digits",
+  "@southAfricanIdLengthError": {
+    "description": "Validation error shown when the user's South African National ID is not exactly 13 digits."
+  },
+  "ugandaNinFormatError": "Uganda NIN must be exactly 14 alphanumeric characters",
+  "@ugandaNinFormatError": {
+    "description": "Validation error shown when the user's Uganda NIN does not match the expected 14 alphanumeric characters."
+  },
+  "tpinLengthError": "TPIN must be exactly 10 digits",
+  "@tpinLengthError": {
+    "description": "Validation error shown when the user's Zambian TPIN is not exactly 10 digits."
+  },
+  "smileIdParseError": "Could not read verification result. Please try again.",
+  "@smileIdParseError": {
+    "description": "User-facing error shown when the app cannot parse the verification result returned by the Smile ID widget. Technical detail is logged separately."
+  },
+  "votersIdLabel": "Voter's ID",
+  "@votersIdLabel": {
+    "description": "Label for the 'Voter's ID' option in the KYC ID-type picker dropdown."
+  },
+  "internationalPassportLabel": "International Passport",
+  "@internationalPassportLabel": {
+    "description": "Label for the 'International Passport' option in the KYC ID-type picker dropdown."
+  },
+  "alienIdLabel": "Alien ID",
+  "@alienIdLabel": {
+    "description": "Label for the 'Alien ID' option in the KYC ID-type picker dropdown (Kenya only)."
+  },
+  "ninFullLabel": "National Identification Number (NIN)",
+  "@ninFullLabel": {
+    "description": "Label for the long-form NIN option in the KYC ID-type picker dropdown (Nigeria; pending SmileID entitlement activation)."
+  },
+  "bvnFullLabel": "Bank Verification Number (BVN)",
+  "@bvnFullLabel": {
+    "description": "Label for the long-form BVN option in the KYC ID-type picker dropdown (Nigeria; pending SmileID entitlement activation)."
+  },
+  "ssnitLabel": "SSNIT",
+  "@ssnitLabel": {
+    "description": "Label for the SSNIT option in the KYC ID-type picker dropdown (Ghana; pending SmileID entitlement activation)."
+  },
+  "ugandaNationalIdLabel": "National ID (NIN)",
+  "@ugandaNationalIdLabel": {
+    "description": "Label for the Uganda National ID option in the KYC ID-type picker dropdown (pending SmileID entitlement activation)."
+  },
+  "tpinFullLabel": "Taxpayer PIN (TPIN)",
+  "@tpinFullLabel": {
+    "description": "Label for the long-form Zambian TPIN option in the KYC ID-type picker dropdown (pending SmileID entitlement activation)."
   }
 }
