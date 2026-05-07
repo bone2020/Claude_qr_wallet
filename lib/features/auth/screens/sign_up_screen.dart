@@ -7,6 +7,7 @@ import '../../../core/constants/constants.dart';
 import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/services/auth_localization_resolver.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/phone_input_field.dart';
 import '../widgets/country_codes.dart';
@@ -130,7 +131,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? AppLocalizations.of(context).errorGeneric),
+            content: Text(resolveAuthResultError(AppLocalizations.of(context), result)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -173,7 +174,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Google sign up failed'),
+            content: Text(resolveAuthResultError(AppLocalizations.of(context), result)),
             backgroundColor: AppColors.error,
           ),
         );

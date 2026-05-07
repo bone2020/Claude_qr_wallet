@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/services/auth_localization_resolver.dart';
 import '../../../generated/l10n/app_localizations.dart';
 
 /// Email verification screen with auto-detect and manual check
@@ -164,7 +165,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         );
       } else {
         setState(() {
-          _errorMessage = result.error ?? 'Failed to send email';
+          _errorMessage = resolveAuthResultError(AppLocalizations.of(context), result);
         });
       }
     } catch (e) {

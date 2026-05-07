@@ -2775,5 +2775,97 @@
   "firebaseAuthErrorFallback": "Something went wrong. Please try again.",
   "@firebaseAuthErrorFallback": {
     "description": "Firebase auth fallback when no more specific code applies."
+  },
+  "authErrorFailedToCreateUser": "Failed to create user",
+  "@authErrorFailedToCreateUser": {
+    "description": "Shown when account creation fails after Firebase auth succeeds (e.g. Firestore write fails)."
+  },
+  "authErrorFailedToSignIn": "Failed to sign in",
+  "@authErrorFailedToSignIn": {
+    "description": "Shown when sign-in completes without throwing but returns a null user."
+  },
+  "authErrorUserDataNotFound": "User data not found",
+  "@authErrorUserDataNotFound": {
+    "description": "Shown when Firebase auth succeeds but the user's Firestore document is missing."
+  },
+  "authErrorGoogleSignInCancelled": "Google sign in cancelled",
+  "@authErrorGoogleSignInCancelled": {
+    "description": "Shown when the user cancels the Google sign-in flow."
+  },
+  "authErrorFailedToSignInWithGoogle": "Failed to sign in with Google",
+  "@authErrorFailedToSignInWithGoogle": {
+    "description": "Shown when Google sign-in fails for an unspecified reason."
+  },
+  "authErrorFailedToSignInWithApple": "Failed to sign in with Apple",
+  "@authErrorFailedToSignInWithApple": {
+    "description": "Shown when Apple sign-in fails for an unspecified reason."
+  },
+  "authErrorAppleSignInCancelled": "Apple sign in cancelled",
+  "@authErrorAppleSignInCancelled": {
+    "description": "Shown when the user cancels the Apple sign-in flow."
+  },
+  "authErrorAppleSignInFailed": "Apple sign in failed",
+  "@authErrorAppleSignInFailed": {
+    "description": "Shown when Apple sign-in throws a SignInWithAppleException. Technical detail is logged separately."
+  },
+  "authErrorFailedToVerifyOtp": "Failed to verify OTP",
+  "@authErrorFailedToVerifyOtp": {
+    "description": "Shown when OTP verification completes without throwing but returns a null user."
+  },
+  "authErrorUserNotFound": "User not found",
+  "@authErrorUserNotFound": {
+    "description": "Shown when an authenticated user's Firestore document cannot be found during a post-auth lookup."
+  },
+  "authErrorNoUserLoggedIn": "No user logged in",
+  "@authErrorNoUserLoggedIn": {
+    "description": "Shown when an operation requires a logged-in user but no current user is found."
+  },
+  "authErrorNoVerificationId": "No verification ID. Please request OTP again.",
+  "@authErrorNoVerificationId": {
+    "description": "Shown when phone OTP verification is attempted without a stored verification ID."
+  },
+  "authErrorFirebaseAccountNotFound": "No account found with this email",
+  "@authErrorFirebaseAccountNotFound": {
+    "description": "Firebase auth code 'user-not-found': no account exists for the given email."
+  },
+  "authErrorFirebaseWrongPassword": "Incorrect password",
+  "@authErrorFirebaseWrongPassword": {
+    "description": "Firebase auth code 'wrong-password': supplied password is incorrect."
+  },
+  "authErrorFirebaseEmailAlreadyInUse": "An account already exists with this email",
+  "@authErrorFirebaseEmailAlreadyInUse": {
+    "description": "Firebase auth code 'email-already-in-use': email already registered."
+  },
+  "authErrorFirebaseInvalidEmail": "Please enter a valid email address",
+  "@authErrorFirebaseInvalidEmail": {
+    "description": "Firebase auth code 'invalid-email': email format invalid."
+  },
+  "authErrorFirebaseWeakPassword": "Password must be at least 6 characters",
+  "@authErrorFirebaseWeakPassword": {
+    "description": "Firebase auth code 'weak-password': password too short."
+  },
+  "authErrorFirebaseTooManyRequests": "Too many attempts. Please try again later",
+  "@authErrorFirebaseTooManyRequests": {
+    "description": "Firebase auth code 'too-many-requests': throttled."
+  },
+  "authErrorFirebaseInvalidVerificationCode": "Invalid OTP code. Please try again",
+  "@authErrorFirebaseInvalidVerificationCode": {
+    "description": "Firebase auth code 'invalid-verification-code': OTP code rejected."
+  },
+  "authErrorFirebaseInvalidVerificationId": "Verification session expired. Please request a new code",
+  "@authErrorFirebaseInvalidVerificationId": {
+    "description": "Firebase auth code 'invalid-verification-id': verification session expired."
+  },
+  "authErrorFirebaseCredentialAlreadyInUse": "This phone number is already linked to another account",
+  "@authErrorFirebaseCredentialAlreadyInUse": {
+    "description": "Firebase auth code 'credential-already-in-use': phone number already linked elsewhere."
+  },
+  "authErrorFirebaseNetworkRequestFailed": "Network error. Please check your connection",
+  "@authErrorFirebaseNetworkRequestFailed": {
+    "description": "Firebase auth code 'network-request-failed': network unreachable."
+  },
+  "authErrorFallback": "An error occurred. Please try again",
+  "@authErrorFallback": {
+    "description": "Generic auth fallback when no specific Firebase code or service-layer case applies."
   }
 }

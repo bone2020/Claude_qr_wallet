@@ -8,6 +8,7 @@ import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/currency_provider.dart';
+import '../../../core/services/auth_localization_resolver.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/social_login_button.dart';
 
@@ -77,7 +78,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Login failed'),
+            content: Text(resolveAuthResultError(AppLocalizations.of(context), result)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -115,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Google login failed'),
+            content: Text(resolveAuthResultError(AppLocalizations.of(context), result)),
             backgroundColor: AppColors.error,
           ),
         );
@@ -153,7 +154,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Apple sign in failed'),
+            content: Text(resolveAuthResultError(AppLocalizations.of(context), result)),
             backgroundColor: AppColors.error,
           ),
         );

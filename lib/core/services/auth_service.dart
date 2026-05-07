@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -11,6 +12,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../models/user_model.dart';
 import '../../models/wallet_model.dart';
 import '../utils/error_handler.dart';
+import 'auth_localization_resolver.dart';
 
 /// Authentication service handling all Firebase Auth operations
 class AuthService {
@@ -50,7 +52,7 @@ class AuthService {
 
       final user = credential.user;
       if (user == null) {
-        return AuthResult.failure('Failed to create user');
+        return AuthResult.failure('Failed to create user', errorKey: AuthErrorKey.failedToCreateUser);
       }
 
       // Update display name
@@ -74,7 +76,7 @@ class AuthService {
 
       return AuthResult.success(userModel);
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -93,20 +95,20 @@ class AuthService {
 
       final user = credential.user;
       if (user == null) {
-        return AuthResult.failure('Failed to sign in');
+        return AuthResult.failure('Failed to sign in', errorKey: AuthErrorKey.failedToSignIn);
       }
 
       // Fetch user data from Firestore
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       
       if (!userDoc.exists) {
-        return AuthResult.failure('User data not found');
+        return AuthResult.failure('User data not found', errorKey: AuthErrorKey.userDataNotFound);
       }
 
       final userModel = UserModel.fromJson(userDoc.data()!);
       return AuthResult.success(userModel);
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -123,7 +125,7 @@ class AuthService {
       final googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        return AuthResult.failure('Google sign in cancelled');
+        return AuthResult.failure('Google sign in cancelled', errorKey: AuthErrorKey.googleSignInCancelled);
       }
 
       // Obtain the auth details from the request
@@ -140,7 +142,7 @@ class AuthService {
       final user = userCredential.user;
 
       if (user == null) {
-        return AuthResult.failure('Failed to sign in with Google');
+        return AuthResult.failure('Failed to sign in with Google', errorKey: AuthErrorKey.failedToSignInWithGoogle);
       }
 
       // Check if user exists in Firestore
@@ -169,7 +171,7 @@ class AuthService {
         return AuthResult.success(userModel, isNewUser: true);
       }
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -220,7 +222,7 @@ class AuthService {
       final user = userCredential.user;
 
       if (user == null) {
-        return AuthResult.failure('Failed to sign in with Apple');
+        return AuthResult.failure('Failed to sign in with Apple', errorKey: AuthErrorKey.failedToSignInWithApple);
       }
 
       // Check if user exists in Firestore
@@ -254,11 +256,15 @@ class AuthService {
       }
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
-        return AuthResult.failure('Apple sign in cancelled');
+        return AuthResult.failure('Apple sign in cancelled', errorKey: AuthErrorKey.appleSignInCancelled);
       }
-      return AuthResult.failure('Apple sign in failed: ${e.message}');
+      debugPrint('Apple sign in failed: ${e.message}');
+      return AuthResult.failure(
+        'Apple sign in failed',
+        errorKey: AuthErrorKey.appleSignInFailed,
+      );
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -279,7 +285,7 @@ class AuthService {
       phoneNumber: phoneNumber,
       verificationCompleted: onAutoVerify,
       verificationFailed: (FirebaseAuthException e) {
-        onError(_getAuthErrorMessage(e.code));
+        onError(_englishOf(_classifyAuthCode(e.code)));
       },
       codeSent: (String verificationId, int? resendToken) {
         onCodeSent(verificationId);
@@ -317,7 +323,7 @@ class AuthService {
         final user = userCredential.user;
         
         if (user == null) {
-          return AuthResult.failure('Failed to verify OTP');
+          return AuthResult.failure('Failed to verify OTP', errorKey: AuthErrorKey.failedToVerifyOtp);
         }
 
         final userDoc = await _firestore.collection('users').doc(user.uid).get();
@@ -326,10 +332,10 @@ class AuthService {
           return AuthResult.success(userModel);
         }
 
-        return AuthResult.failure('User not found');
+        return AuthResult.failure('User not found', errorKey: AuthErrorKey.userNotFound);
       }
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -355,7 +361,7 @@ class AuthService {
     } on FirebaseFunctionsException catch (e) {
       // ignore: avoid_print
       print('markPhoneVerified failed (${e.code}): ${e.message}');
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -377,7 +383,7 @@ class AuthService {
     try {
       final user = currentUser;
       if (user == null) {
-        return AuthResult.failure('No user logged in');
+        return AuthResult.failure('No user logged in', errorKey: AuthErrorKey.noUserLoggedIn);
       }
 
       if (user.emailVerified) {
@@ -406,7 +412,7 @@ class AuthService {
         return AuthResult.success(null);
       }
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -435,7 +441,7 @@ class AuthService {
     try {
       final user = currentUser;
       if (user == null) {
-        return AuthResult.failure('No user logged in');
+        return AuthResult.failure('No user logged in', errorKey: AuthErrorKey.noUserLoggedIn);
       }
 
       // Update Firestore
@@ -489,7 +495,7 @@ class AuthService {
         return AuthResult.success(null);
       }
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -503,7 +509,7 @@ class AuthService {
     try {
       final user = currentUser;
       if (user == null) {
-        return AuthResult.failure('No user logged in');
+        return AuthResult.failure('No user logged in', errorKey: AuthErrorKey.noUserLoggedIn);
       }
 
       // Re-authenticate user
@@ -517,7 +523,7 @@ class AuthService {
       await user.updatePassword(newPassword);
       return AuthResult.success(null);
     } on FirebaseAuthException catch (e) {
-      return AuthResult.failure(_getAuthErrorMessage(e.code));
+      return _failureFromAuthCode(e.code);
     } catch (e) {
       return AuthResult.failure(ErrorHandler.getUserFriendlyMessage(e));
     }
@@ -553,32 +559,99 @@ class AuthService {
     return 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
   }
 
-  /// Get user-friendly error message
-  String _getAuthErrorMessage(String code) {
+  /// Maps a FirebaseAuthException code to an [AuthErrorKey] enum value.
+  AuthErrorKey _classifyAuthCode(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'No account found with this email';
+        return AuthErrorKey.firebaseAccountNotFound;
       case 'wrong-password':
-        return 'Incorrect password';
+        return AuthErrorKey.firebaseWrongPassword;
       case 'email-already-in-use':
-        return 'An account already exists with this email';
+        return AuthErrorKey.firebaseEmailAlreadyInUse;
       case 'invalid-email':
-        return 'Please enter a valid email address';
+        return AuthErrorKey.firebaseInvalidEmail;
       case 'weak-password':
-        return 'Password must be at least 6 characters';
+        return AuthErrorKey.firebaseWeakPassword;
       case 'too-many-requests':
-        return 'Too many attempts. Please try again later';
+        return AuthErrorKey.firebaseTooManyRequests;
       case 'invalid-verification-code':
-        return 'Invalid OTP code. Please try again';
+        return AuthErrorKey.firebaseInvalidVerificationCode;
       case 'invalid-verification-id':
-        return 'Verification session expired. Please request a new code';
+        return AuthErrorKey.firebaseInvalidVerificationId;
       case 'credential-already-in-use':
-        return 'This phone number is already linked to another account';
+        return AuthErrorKey.firebaseCredentialAlreadyInUse;
       case 'network-request-failed':
-        return 'Network error. Please check your connection';
+        return AuthErrorKey.firebaseNetworkRequestFailed;
       default:
+        return AuthErrorKey.fallback;
+    }
+  }
+
+  /// English fallback for the transitional [AuthResult.error] String field.
+  ///
+  /// Kept in sync with [resolveAuthErrorMessage] in auth_localization_resolver.dart.
+  /// IMPORTANT: any English wording change must update BOTH this method AND the
+  /// corresponding ARB key in app_en.arb. C.5 will collapse this duplication.
+  String _englishOf(AuthErrorKey key) {
+    switch (key) {
+      // Service-layer
+      case AuthErrorKey.failedToCreateUser:
+        return 'Failed to create user';
+      case AuthErrorKey.failedToSignIn:
+        return 'Failed to sign in';
+      case AuthErrorKey.userDataNotFound:
+        return 'User data not found';
+      case AuthErrorKey.googleSignInCancelled:
+        return 'Google sign in cancelled';
+      case AuthErrorKey.failedToSignInWithGoogle:
+        return 'Failed to sign in with Google';
+      case AuthErrorKey.failedToSignInWithApple:
+        return 'Failed to sign in with Apple';
+      case AuthErrorKey.appleSignInCancelled:
+        return 'Apple sign in cancelled';
+      case AuthErrorKey.appleSignInFailed:
+        return 'Apple sign in failed';
+      case AuthErrorKey.failedToVerifyOtp:
+        return 'Failed to verify OTP';
+      case AuthErrorKey.userNotFound:
+        return 'User not found';
+      case AuthErrorKey.noUserLoggedIn:
+        return 'No user logged in';
+      case AuthErrorKey.noVerificationId:
+        return 'No verification ID. Please request OTP again.';
+      // Firebase-code-derived
+      case AuthErrorKey.firebaseAccountNotFound:
+        return 'No account found with this email';
+      case AuthErrorKey.firebaseWrongPassword:
+        return 'Incorrect password';
+      case AuthErrorKey.firebaseEmailAlreadyInUse:
+        return 'An account already exists with this email';
+      case AuthErrorKey.firebaseInvalidEmail:
+        return 'Please enter a valid email address';
+      case AuthErrorKey.firebaseWeakPassword:
+        return 'Password must be at least 6 characters';
+      case AuthErrorKey.firebaseTooManyRequests:
+        return 'Too many attempts. Please try again later';
+      case AuthErrorKey.firebaseInvalidVerificationCode:
+        return 'Invalid OTP code. Please try again';
+      case AuthErrorKey.firebaseInvalidVerificationId:
+        return 'Verification session expired. Please request a new code';
+      case AuthErrorKey.firebaseCredentialAlreadyInUse:
+        return 'This phone number is already linked to another account';
+      case AuthErrorKey.firebaseNetworkRequestFailed:
+        return 'Network error. Please check your connection';
+      // Fallback
+      case AuthErrorKey.fallback:
         return 'An error occurred. Please try again';
     }
+  }
+
+  /// Compact helper: build an AuthResult.failure from a FirebaseAuthException
+  /// code, populating both the transitional [AuthResult.error] String and
+  /// the new [AuthResult.errorKey].
+  AuthResult _failureFromAuthCode(String code) {
+    final key = _classifyAuthCode(code);
+    return AuthResult.failure(_englishOf(key), errorKey: key);
   }
 }
 
@@ -587,12 +660,14 @@ class AuthResult {
   final bool success;
   final UserModel? user;
   final String? error;
+  final AuthErrorKey? errorKey;
   final bool isNewUser;
 
   AuthResult._({
     required this.success,
     this.user,
     this.error,
+    this.errorKey,
     this.isNewUser = false,
   });
 
@@ -600,7 +675,7 @@ class AuthResult {
     return AuthResult._(success: true, user: user, isNewUser: isNewUser);
   }
 
-  factory AuthResult.failure(String error) {
-    return AuthResult._(success: false, error: error);
+  factory AuthResult.failure(String error, {AuthErrorKey? errorKey}) {
+    return AuthResult._(success: false, error: error, errorKey: errorKey);
   }
 }

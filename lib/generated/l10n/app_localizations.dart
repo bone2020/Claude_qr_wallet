@@ -3843,6 +3843,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong. Please try again.'**
   String get firebaseAuthErrorFallback;
+
+  /// Shown when account creation fails after Firebase auth succeeds (e.g. Firestore write fails).
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create user'**
+  String get authErrorFailedToCreateUser;
+
+  /// Shown when sign-in completes without throwing but returns a null user.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to sign in'**
+  String get authErrorFailedToSignIn;
+
+  /// Shown when Firebase auth succeeds but the user's Firestore document is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'User data not found'**
+  String get authErrorUserDataNotFound;
+
+  /// Shown when the user cancels the Google sign-in flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Google sign in cancelled'**
+  String get authErrorGoogleSignInCancelled;
+
+  /// Shown when Google sign-in fails for an unspecified reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to sign in with Google'**
+  String get authErrorFailedToSignInWithGoogle;
+
+  /// Shown when Apple sign-in fails for an unspecified reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to sign in with Apple'**
+  String get authErrorFailedToSignInWithApple;
+
+  /// Shown when the user cancels the Apple sign-in flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple sign in cancelled'**
+  String get authErrorAppleSignInCancelled;
+
+  /// Shown when Apple sign-in throws a SignInWithAppleException. Technical detail is logged separately.
+  ///
+  /// In en, this message translates to:
+  /// **'Apple sign in failed'**
+  String get authErrorAppleSignInFailed;
+
+  /// Shown when OTP verification completes without throwing but returns a null user.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to verify OTP'**
+  String get authErrorFailedToVerifyOtp;
+
+  /// Shown when an authenticated user's Firestore document cannot be found during a post-auth lookup.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found'**
+  String get authErrorUserNotFound;
+
+  /// Shown when an operation requires a logged-in user but no current user is found.
+  ///
+  /// In en, this message translates to:
+  /// **'No user logged in'**
+  String get authErrorNoUserLoggedIn;
+
+  /// Shown when phone OTP verification is attempted without a stored verification ID.
+  ///
+  /// In en, this message translates to:
+  /// **'No verification ID. Please request OTP again.'**
+  String get authErrorNoVerificationId;
+
+  /// Firebase auth code 'user-not-found': no account exists for the given email.
+  ///
+  /// In en, this message translates to:
+  /// **'No account found with this email'**
+  String get authErrorFirebaseAccountNotFound;
+
+  /// Firebase auth code 'wrong-password': supplied password is incorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password'**
+  String get authErrorFirebaseWrongPassword;
+
+  /// Firebase auth code 'email-already-in-use': email already registered.
+  ///
+  /// In en, this message translates to:
+  /// **'An account already exists with this email'**
+  String get authErrorFirebaseEmailAlreadyInUse;
+
+  /// Firebase auth code 'invalid-email': email format invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid email address'**
+  String get authErrorFirebaseInvalidEmail;
+
+  /// Firebase auth code 'weak-password': password too short.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get authErrorFirebaseWeakPassword;
+
+  /// Firebase auth code 'too-many-requests': throttled.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please try again later'**
+  String get authErrorFirebaseTooManyRequests;
+
+  /// Firebase auth code 'invalid-verification-code': OTP code rejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid OTP code. Please try again'**
+  String get authErrorFirebaseInvalidVerificationCode;
+
+  /// Firebase auth code 'invalid-verification-id': verification session expired.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification session expired. Please request a new code'**
+  String get authErrorFirebaseInvalidVerificationId;
+
+  /// Firebase auth code 'credential-already-in-use': phone number already linked elsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone number is already linked to another account'**
+  String get authErrorFirebaseCredentialAlreadyInUse;
+
+  /// Firebase auth code 'network-request-failed': network unreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error. Please check your connection'**
+  String get authErrorFirebaseNetworkRequestFailed;
+
+  /// Generic auth fallback when no specific Firebase code or service-layer case applies.
+  ///
+  /// In en, this message translates to:
+  /// **'An error occurred. Please try again'**
+  String get authErrorFallback;
 }
 
 class _AppLocalizationsDelegate

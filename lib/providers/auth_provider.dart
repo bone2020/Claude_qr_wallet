@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import '../core/services/services.dart';
+import '../core/services/auth_localization_resolver.dart';
 import '../core/services/push_notification_service.dart';
 import '../models/user_model.dart';
 
@@ -278,7 +279,10 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
   /// Verify OTP code
   Future<AuthResult> verifyPhoneOtp(String otp) async {
     if (_verificationId == null) {
-      return AuthResult.failure('No verification ID. Please request OTP again.');
+      return AuthResult.failure(
+        'No verification ID. Please request OTP again.',
+        errorKey: AuthErrorKey.noVerificationId,
+      );
     }
     final result = await _authService.verifyOtp(
       verificationId: _verificationId!,

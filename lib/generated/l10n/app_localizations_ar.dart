@@ -1973,4 +1973,73 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get firebaseAuthErrorFallback => '';
+
+  @override
+  String get authErrorFailedToCreateUser => '';
+
+  @override
+  String get authErrorFailedToSignIn => '';
+
+  @override
+  String get authErrorUserDataNotFound => '';
+
+  @override
+  String get authErrorGoogleSignInCancelled => '';
+
+  @override
+  String get authErrorFailedToSignInWithGoogle => '';
+
+  @override
+  String get authErrorFailedToSignInWithApple => '';
+
+  @override
+  String get authErrorAppleSignInCancelled => '';
+
+  @override
+  String get authErrorAppleSignInFailed => '';
+
+  @override
+  String get authErrorFailedToVerifyOtp => '';
+
+  @override
+  String get authErrorUserNotFound => '';
+
+  @override
+  String get authErrorNoUserLoggedIn => '';
+
+  @override
+  String get authErrorNoVerificationId => '';
+
+  @override
+  String get authErrorFirebaseAccountNotFound => '';
+
+  @override
+  String get authErrorFirebaseWrongPassword => '';
+
+  @override
+  String get authErrorFirebaseEmailAlreadyInUse => '';
+
+  @override
+  String get authErrorFirebaseInvalidEmail => '';
+
+  @override
+  String get authErrorFirebaseWeakPassword => '';
+
+  @override
+  String get authErrorFirebaseTooManyRequests => '';
+
+  @override
+  String get authErrorFirebaseInvalidVerificationCode => '';
+
+  @override
+  String get authErrorFirebaseInvalidVerificationId => '';
+
+  @override
+  String get authErrorFirebaseCredentialAlreadyInUse => '';
+
+  @override
+  String get authErrorFirebaseNetworkRequestFailed => '';
+
+  @override
+  String get authErrorFallback => '';
 }

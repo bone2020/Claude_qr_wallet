@@ -6,6 +6,7 @@ import 'package:iconsax/iconsax.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/services/auth_localization_resolver.dart';
 import '../widgets/custom_text_field.dart';
 import '../../../generated/l10n/app_localizations.dart';
 
@@ -39,7 +40,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         _emailController.text.trim(),
       );
       if (!result.success) {
-        throw Exception(result.error ?? 'Failed to send reset email');
+        throw Exception(resolveAuthResultError(AppLocalizations.of(context), result));
       }
 
       if (!mounted) return;

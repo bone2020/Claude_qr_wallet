@@ -10,6 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../core/services/auth_localization_resolver.dart';
 import '../../../../generated/l10n/app_localizations.dart';
 
 /// Universal phone verification screen using Firebase SMS OTP.
@@ -202,7 +203,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
         if (mounted) context.pop(true);
       } else {
         setState(() {
-          _errorMessage = result.error ?? 'Invalid code. Please try again.';
+          _errorMessage = resolveAuthResultError(AppLocalizations.of(context), result);
         });
       }
     } catch (e) {

@@ -2093,4 +2093,84 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get firebaseAuthErrorFallback =>
       'Something went wrong. Please try again.';
+
+  @override
+  String get authErrorFailedToCreateUser => 'Failed to create user';
+
+  @override
+  String get authErrorFailedToSignIn => 'Failed to sign in';
+
+  @override
+  String get authErrorUserDataNotFound => 'User data not found';
+
+  @override
+  String get authErrorGoogleSignInCancelled => 'Google sign in cancelled';
+
+  @override
+  String get authErrorFailedToSignInWithGoogle =>
+      'Failed to sign in with Google';
+
+  @override
+  String get authErrorFailedToSignInWithApple => 'Failed to sign in with Apple';
+
+  @override
+  String get authErrorAppleSignInCancelled => 'Apple sign in cancelled';
+
+  @override
+  String get authErrorAppleSignInFailed => 'Apple sign in failed';
+
+  @override
+  String get authErrorFailedToVerifyOtp => 'Failed to verify OTP';
+
+  @override
+  String get authErrorUserNotFound => 'User not found';
+
+  @override
+  String get authErrorNoUserLoggedIn => 'No user logged in';
+
+  @override
+  String get authErrorNoVerificationId =>
+      'No verification ID. Please request OTP again.';
+
+  @override
+  String get authErrorFirebaseAccountNotFound =>
+      'No account found with this email';
+
+  @override
+  String get authErrorFirebaseWrongPassword => 'Incorrect password';
+
+  @override
+  String get authErrorFirebaseEmailAlreadyInUse =>
+      'An account already exists with this email';
+
+  @override
+  String get authErrorFirebaseInvalidEmail =>
+      'Please enter a valid email address';
+
+  @override
+  String get authErrorFirebaseWeakPassword =>
+      'Password must be at least 6 characters';
+
+  @override
+  String get authErrorFirebaseTooManyRequests =>
+      'Too many attempts. Please try again later';
+
+  @override
+  String get authErrorFirebaseInvalidVerificationCode =>
+      'Invalid OTP code. Please try again';
+
+  @override
+  String get authErrorFirebaseInvalidVerificationId =>
+      'Verification session expired. Please request a new code';
+
+  @override
+  String get authErrorFirebaseCredentialAlreadyInUse =>
+      'This phone number is already linked to another account';
+
+  @override
+  String get authErrorFirebaseNetworkRequestFailed =>
+      'Network error. Please check your connection';
+
+  @override
+  String get authErrorFallback => 'An error occurred. Please try again';
 }

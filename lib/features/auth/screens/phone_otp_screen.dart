@@ -15,6 +15,7 @@ import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/currency_provider.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/services/auth_localization_resolver.dart';
 import '../../../../providers/wallet_provider.dart';
 import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
@@ -218,7 +219,7 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
         context.go(AppRoutes.main);
       } else {
         setState(() {
-          _errorMessage = result.error ?? 'Invalid OTP. Please try again.';
+          _errorMessage = resolveAuthResultError(AppLocalizations.of(context), result);
         });
       }
     } catch (e) {
