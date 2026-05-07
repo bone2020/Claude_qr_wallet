@@ -1847,4 +1847,130 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get tpinFullLabel => '';
+
+  @override
+  String get momoErrorNotConfigured => '';
+
+  @override
+  String get momoErrorPaymentDeclined => '';
+
+  @override
+  String get momoErrorInsufficientFunds => '';
+
+  @override
+  String get momoErrorInvalidPhone => '';
+
+  @override
+  String get momoErrorPaymentTimeout => '';
+
+  @override
+  String get genericErrorNetwork => '';
+
+  @override
+  String get genericErrorCameraPermission => '';
+
+  @override
+  String get genericErrorUserCancelled => '';
+
+  @override
+  String get genericErrorFaceDetection => '';
+
+  @override
+  String get genericErrorFaceMismatch => '';
+
+  @override
+  String get genericErrorIdVerification => '';
+
+  @override
+  String get genericErrorDocument => '';
+
+  @override
+  String get genericErrorServer => '';
+
+  @override
+  String get genericErrorTimeout => '';
+
+  @override
+  String get genericErrorAuth => '';
+
+  @override
+  String get genericErrorFallback => '';
+
+  @override
+  String get smileIdResultVerified => '';
+
+  @override
+  String get smileIdResultFaceMatchFailed => '';
+
+  @override
+  String get smileIdResultIdDocFailed => '';
+
+  @override
+  String get smileIdResultLivenessFailed => '';
+
+  @override
+  String get smileIdResultExpiredDoc => '';
+
+  @override
+  String get smileIdResultInfoMismatch => '';
+
+  @override
+  String get smileIdResultUnsupportedDoc => '';
+
+  @override
+  String get smileIdResultFaceNotDetected => '';
+
+  @override
+  String get smileIdResultMultipleFacesDetected => '';
+
+  @override
+  String get smileIdResultPoorImageQuality => '';
+
+  @override
+  String get smileIdResultCouldNotComplete => '';
+
+  @override
+  String get kycErrorDocumentUploadNetwork => '';
+
+  @override
+  String get kycErrorImageTooLarge => '';
+
+  @override
+  String get kycErrorDocumentUploadGeneric => '';
+
+  @override
+  String get firebaseAuthErrorNetwork => '';
+
+  @override
+  String get firebaseAuthErrorTooManyRequests => '';
+
+  @override
+  String get firebaseAuthErrorUserNotFound => '';
+
+  @override
+  String get firebaseAuthErrorWrongPassword => '';
+
+  @override
+  String get firebaseAuthErrorEmailAlreadyInUse => '';
+
+  @override
+  String get firebaseAuthErrorInvalidEmail => '';
+
+  @override
+  String get firebaseAuthErrorWeakPassword => '';
+
+  @override
+  String get firebaseAuthErrorInvalidPhone => '';
+
+  @override
+  String get firebaseAuthErrorInvalidVerificationCode => '';
+
+  @override
+  String get firebaseAuthErrorServiceUnavailable => '';
+
+  @override
+  String get firebaseAuthErrorOperationNotAllowed => '';
+
+  @override
+  String get firebaseAuthErrorFallback => '';
 }

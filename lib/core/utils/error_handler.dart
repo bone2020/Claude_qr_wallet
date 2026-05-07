@@ -1,3 +1,5 @@
+import 'error_handler_localization_resolver.dart';
+
 /// Centralized error handling utility for user-friendly error messages
 class ErrorHandler {
   ErrorHandler._();
@@ -198,6 +200,191 @@ class ErrorHandler {
   }
 
   // ============================================================
+  // CLASSIFY METHODS — return enum keys for localized resolution
+  // ============================================================
+  //
+  // C.1 of cleanup-4: these methods classify errors into typed enum values
+  // without performing any localization. UI and service consumers convert
+  // the returned enum to a translated string via the resolver functions in
+  // `error_handler_localization_resolver.dart`.
+  //
+  // The existing String-returning methods above (getMomoUserFriendlyMessage,
+  // getUserFriendlyMessage, getSmileIdUserFriendlyMessage, getKycErrorMessage,
+  // _getFirebaseUserFriendlyMessage) continue to work unchanged for backward
+  // compatibility and will be migrated in cleanup-4 sub-batch C.5.
+  //
+  // IMPORTANT — TRANSITIONAL DUPLICATION:
+  // The English text returned by the existing methods is duplicated in
+  // app_en.arb. Until C.5 collapses the duplication, both must stay in sync.
+  // When updating any English error string, update BOTH the hardcoded return
+  // value AND the corresponding ARB key (search for the string in app_en.arb).
+
+  /// Classify a Mobile Money error into a [MomoErrorKey].
+  ///
+  /// Unmatched errors return [MomoErrorKey.fallback], which the resolver maps
+  /// to a generic "something went wrong" message. The OLD String-returning
+  /// [getMomoUserFriendlyMessage] still falls through to the more specific
+  /// [getUserFriendlyMessage] for unmatched cases — caller migration in
+  /// cleanup-4 sub-batches accepts this minor specificity loss.
+  static MomoErrorKey classifyMomoError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    if (isMomoNotConfiguredError(error) ||
+        errorString.contains('config_missing') ||
+        errorString.contains('service unavailable')) {
+      return MomoErrorKey.notConfigured;
+    }
+    if (errorString.contains('rejected') || errorString.contains('declined')) {
+      return MomoErrorKey.paymentDeclined;
+    }
+    if (errorString.contains('insufficient') || errorString.contains('not enough')) {
+      return MomoErrorKey.insufficientFunds;
+    }
+    if (errorString.contains('invalid') && errorString.contains('phone')) {
+      return MomoErrorKey.invalidPhone;
+    }
+    if (_isTimeoutError(errorString)) {
+      return MomoErrorKey.paymentTimeout;
+    }
+    return MomoErrorKey.fallback;
+  }
+
+  /// Classify a generic error into a [GenericErrorKey].
+  ///
+  /// Firebase-specific errors return [GenericErrorKey.somethingWentWrong] from
+  /// this method — callers that want Firebase-specific classification should
+  /// call [classifyFirebaseAuthError] directly. The OLD [getUserFriendlyMessage]
+  /// still routes Firebase errors to [_getFirebaseUserFriendlyMessage] for
+  /// backward compatibility.
+  static GenericErrorKey classifyUserError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    // Firebase errors are a separate category — fall through to the generic
+    // fallback rather than cross-routing. C.2 will migrate Firebase callers
+    // to classifyFirebaseAuthError directly.
+    if (_isFirebaseError(errorString)) {
+      return GenericErrorKey.somethingWentWrong;
+    }
+    if (_isNetworkError(errorString)) return GenericErrorKey.network;
+    if (_isCameraPermissionError(errorString)) return GenericErrorKey.cameraPermission;
+    if (_isUserCancelled(errorString)) return GenericErrorKey.userCancelled;
+    if (_isFaceDetectionError(errorString)) return GenericErrorKey.faceDetection;
+    if (_isFaceMismatchError(errorString)) return GenericErrorKey.faceMismatch;
+    if (_isIdVerificationError(errorString)) return GenericErrorKey.idVerification;
+    if (_isDocumentError(errorString)) return GenericErrorKey.document;
+    if (_isServerError(errorString)) return GenericErrorKey.server;
+    if (_isTimeoutError(errorString)) return GenericErrorKey.timeout;
+    if (_isAuthError(errorString)) return GenericErrorKey.auth;
+    return GenericErrorKey.somethingWentWrong;
+  }
+
+  /// Classify a Smile ID verification result into a [SmileIdResultKey].
+  ///
+  /// Unknown result codes (or the null/null case) return
+  /// [SmileIdResultKey.couldNotComplete]. The OLD
+  /// [getSmileIdUserFriendlyMessage] falls through to [getUserFriendlyMessage]
+  /// for unknown codes when an error string is provided — the new method
+  /// drops that cross-category routing per Decision β.
+  static SmileIdResultKey classifySmileIdResult(String? resultCode, String? error) {
+    if (resultCode != null) {
+      switch (resultCode) {
+        case '0810': return SmileIdResultKey.verified;
+        case '0811': return SmileIdResultKey.faceMatchFailed;
+        case '0812': return SmileIdResultKey.idDocFailed;
+        case '0813': return SmileIdResultKey.livenessFailed;
+        case '0814': return SmileIdResultKey.expiredDoc;
+        case '0815': return SmileIdResultKey.infoMismatch;
+        case '0816': return SmileIdResultKey.unsupportedDoc;
+        case '0820': return SmileIdResultKey.faceNotDetected;
+        case '0821': return SmileIdResultKey.multipleFacesDetected;
+        case '0822': return SmileIdResultKey.poorImageQuality;
+        default: return SmileIdResultKey.couldNotComplete;
+      }
+    }
+    return SmileIdResultKey.couldNotComplete;
+  }
+
+  /// Classify a KYC operation error into a [KycErrorKey].
+  ///
+  /// Unknown operations and the `'biometric_kyc'` operation both return
+  /// [KycErrorKey.fallback]. The OLD [getKycErrorMessage] handles these via
+  /// cross-category routing through [getUserFriendlyMessage]; the new method
+  /// collapses to a single fallback per Decision β. Callers needing finer
+  /// classification should call [classifyUserError] or [classifySmileIdResult]
+  /// directly.
+  static KycErrorKey classifyKycError(String operation, dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    if (operation == 'id_validation') {
+      if (errorString.contains('nin') || errorString.contains('national identification')) {
+        return KycErrorKey.ninLength;
+      }
+      if (errorString.contains('bvn') || errorString.contains('bank verification')) {
+        return KycErrorKey.bvnLength;
+      }
+      if (errorString.contains('ssnit')) {
+        return KycErrorKey.ssnitFormat;
+      }
+      return KycErrorKey.fallback;
+    }
+
+    if (operation == 'document_upload') {
+      if (_isNetworkError(errorString)) {
+        return KycErrorKey.documentUploadNetwork;
+      }
+      if (errorString.contains('size') || errorString.contains('large')) {
+        return KycErrorKey.imageTooLarge;
+      }
+      return KycErrorKey.documentUploadGeneric;
+    }
+
+    return KycErrorKey.fallback;
+  }
+
+  /// Classify a Firebase Auth error string into a [FirebaseAuthErrorKey].
+  ///
+  /// Mirrors the existing private [_getFirebaseUserFriendlyMessage] except
+  /// that it returns an enum rather than a localized string.
+  static FirebaseAuthErrorKey classifyFirebaseAuthError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    if (errorString.contains('network-request-failed') || errorString.contains('network')) {
+      return FirebaseAuthErrorKey.network;
+    }
+    if (errorString.contains('too-many-requests')) {
+      return FirebaseAuthErrorKey.tooManyRequests;
+    }
+    if (errorString.contains('user-not-found')) {
+      return FirebaseAuthErrorKey.userNotFound;
+    }
+    if (errorString.contains('wrong-password')) {
+      return FirebaseAuthErrorKey.wrongPassword;
+    }
+    if (errorString.contains('email-already-in-use')) {
+      return FirebaseAuthErrorKey.emailAlreadyInUse;
+    }
+    if (errorString.contains('invalid-email')) {
+      return FirebaseAuthErrorKey.invalidEmail;
+    }
+    if (errorString.contains('weak-password')) {
+      return FirebaseAuthErrorKey.weakPassword;
+    }
+    if (errorString.contains('invalid-phone-number')) {
+      return FirebaseAuthErrorKey.invalidPhoneNumber;
+    }
+    if (errorString.contains('invalid-verification-code')) {
+      return FirebaseAuthErrorKey.invalidVerificationCode;
+    }
+    if (errorString.contains('service-unavailable')) {
+      return FirebaseAuthErrorKey.serviceUnavailable;
+    }
+    if (errorString.contains('operation-not-allowed')) {
+      return FirebaseAuthErrorKey.operationNotAllowed;
+    }
+    return FirebaseAuthErrorKey.fallback;
+  }
+
+  // ============================================================
   // PRIVATE HELPER METHODS
   // ============================================================
 
@@ -319,9 +506,4 @@ class ErrorHandler {
     }
     return 'Something went wrong. Please try again.';
   }
-}
-
-/// Extension on dynamic to easily get user-friendly error messages
-extension ErrorExtension on Object {
-  String get userFriendlyMessage => ErrorHandler.getUserFriendlyMessage(this);
 }

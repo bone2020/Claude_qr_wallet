@@ -3591,6 +3591,258 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Taxpayer PIN (TPIN)'**
   String get tpinFullLabel;
+
+  /// Shown when a user tries to use Mobile Money but the service is not yet configured.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile Money is coming soon! This feature is not yet available. Please use Card or Bank Transfer instead.'**
+  String get momoErrorNotConfigured;
+
+  /// Shown when a Mobile Money payment is rejected or declined by the provider.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment was declined. Please check your Mobile Money balance and try again.'**
+  String get momoErrorPaymentDeclined;
+
+  /// Shown when the user's Mobile Money account does not have enough balance for the transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient funds in your Mobile Money account.'**
+  String get momoErrorInsufficientFunds;
+
+  /// Shown when the phone number provided for Mobile Money is invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid phone number. Please check and try again.'**
+  String get momoErrorInvalidPhone;
+
+  /// Shown when a Mobile Money payment request times out before user approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment request timed out. Please check your phone for approval prompt and try again.'**
+  String get momoErrorPaymentTimeout;
+
+  /// Shown when a network error prevents an operation from completing.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to connect. Please check your internet connection and try again.'**
+  String get genericErrorNetwork;
+
+  /// Shown when camera permission is denied during a verification flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is required for verification. Please enable camera permissions in your device settings.'**
+  String get genericErrorCameraPermission;
+
+  /// Shown when the user cancels a verification flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification was cancelled. You can try again when ready.'**
+  String get genericErrorUserCancelled;
+
+  /// Shown when the camera cannot detect the user's face during verification.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t detect your face clearly. Please ensure good lighting and position your face within the frame.'**
+  String get genericErrorFaceDetection;
+
+  /// Shown when the user's selfie does not match the photo on their ID document.
+  ///
+  /// In en, this message translates to:
+  /// **'Face verification failed. The selfie doesn\'t match the ID photo. Please ensure you\'re using your own ID document.'**
+  String get genericErrorFaceMismatch;
+
+  /// Shown when ID verification fails for unknown reasons.
+  ///
+  /// In en, this message translates to:
+  /// **'ID verification failed. Please ensure your ID is valid, not expired, and the information entered is correct.'**
+  String get genericErrorIdVerification;
+
+  /// Shown when an uploaded document cannot be read by the verification system.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t read your document clearly. Please ensure the document is well-lit, flat, and all text is visible.'**
+  String get genericErrorDocument;
+
+  /// Shown when the verification backend returns a server error.
+  ///
+  /// In en, this message translates to:
+  /// **'Our verification service is temporarily unavailable. Please try again in a few minutes.'**
+  String get genericErrorServer;
+
+  /// Shown when a request times out.
+  ///
+  /// In en, this message translates to:
+  /// **'The request took too long. Please check your connection and try again.'**
+  String get genericErrorTimeout;
+
+  /// Shown when the user's authentication session has expired.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session has expired. Please sign in again to continue.'**
+  String get genericErrorAuth;
+
+  /// Generic last-resort error message when no more specific classification applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again or contact support if the problem persists.'**
+  String get genericErrorFallback;
+
+  /// Shown when a Smile ID verification completes successfully (result code 0810).
+  ///
+  /// In en, this message translates to:
+  /// **'Verification successful!'**
+  String get smileIdResultVerified;
+
+  /// Smile ID result code 0811 — selfie/ID photo mismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Face verification failed. The selfie doesn\'t match the ID photo.'**
+  String get smileIdResultFaceMatchFailed;
+
+  /// Smile ID result code 0812 — ID document failed verification.
+  ///
+  /// In en, this message translates to:
+  /// **'ID document could not be verified. Please try with a different document.'**
+  String get smileIdResultIdDocFailed;
+
+  /// Smile ID result code 0813 — liveness check failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Liveness check failed. Please follow the on-screen instructions carefully.'**
+  String get smileIdResultLivenessFailed;
+
+  /// Smile ID result code 0814 — document is expired.
+  ///
+  /// In en, this message translates to:
+  /// **'Document is expired. Please use a valid, non-expired ID.'**
+  String get smileIdResultExpiredDoc;
+
+  /// Smile ID result code 0815 — information on ID does not match what user entered.
+  ///
+  /// In en, this message translates to:
+  /// **'ID information mismatch. Please ensure you entered the correct details.'**
+  String get smileIdResultInfoMismatch;
+
+  /// Smile ID result code 0816 — document type not supported.
+  ///
+  /// In en, this message translates to:
+  /// **'Document not supported. Please try with a different ID type.'**
+  String get smileIdResultUnsupportedDoc;
+
+  /// Smile ID result code 0820 — no face detected in selfie.
+  ///
+  /// In en, this message translates to:
+  /// **'Face not detected. Please ensure your face is clearly visible and well-lit.'**
+  String get smileIdResultFaceNotDetected;
+
+  /// Smile ID result code 0821 — more than one face in selfie.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple faces detected. Please ensure only your face is in the frame.'**
+  String get smileIdResultMultipleFacesDetected;
+
+  /// Smile ID result code 0822 — image quality too low for verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Poor image quality. Please ensure good lighting and a clear photo.'**
+  String get smileIdResultPoorImageQuality;
+
+  /// Smile ID fallback when result code is unknown or no error info available.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification could not be completed. Please try again.'**
+  String get smileIdResultCouldNotComplete;
+
+  /// Shown when document upload fails due to a network issue.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload document. Please check your connection and try again.'**
+  String get kycErrorDocumentUploadNetwork;
+
+  /// Shown when an uploaded document image is too large.
+  ///
+  /// In en, this message translates to:
+  /// **'Image file is too large. Please use a smaller image.'**
+  String get kycErrorImageTooLarge;
+
+  /// Generic fallback when document upload fails for unspecified reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to upload document. Please try again.'**
+  String get kycErrorDocumentUploadGeneric;
+
+  /// Firebase auth error: network request failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to connect. Please check your internet connection.'**
+  String get firebaseAuthErrorNetwork;
+
+  /// Firebase auth error: too many requests, throttled.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Please wait a few minutes and try again.'**
+  String get firebaseAuthErrorTooManyRequests;
+
+  /// Firebase auth error: account does not exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Account not found. Please check your credentials or sign up.'**
+  String get firebaseAuthErrorUserNotFound;
+
+  /// Firebase auth error: wrong password supplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password. Please try again.'**
+  String get firebaseAuthErrorWrongPassword;
+
+  /// Firebase auth error: email already used by another account.
+  ///
+  /// In en, this message translates to:
+  /// **'This email is already registered. Please sign in instead.'**
+  String get firebaseAuthErrorEmailAlreadyInUse;
+
+  /// Firebase auth error: email format invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid email address.'**
+  String get firebaseAuthErrorInvalidEmail;
+
+  /// Firebase auth error: password does not meet strength requirement.
+  ///
+  /// In en, this message translates to:
+  /// **'Password is too weak. Please use at least 6 characters.'**
+  String get firebaseAuthErrorWeakPassword;
+
+  /// Firebase auth error: phone number invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid phone number.'**
+  String get firebaseAuthErrorInvalidPhone;
+
+  /// Firebase auth error: SMS or email verification code is invalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid verification code. Please check and try again.'**
+  String get firebaseAuthErrorInvalidVerificationCode;
+
+  /// Firebase auth error: backend service unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Service temporarily unavailable. Please try again later.'**
+  String get firebaseAuthErrorServiceUnavailable;
+
+  /// Firebase auth error: operation not allowed for current user.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have permission to perform this action.'**
+  String get firebaseAuthErrorOperationNotAllowed;
+
+  /// Firebase auth fallback when no more specific code applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get firebaseAuthErrorFallback;
 }
 
 class _AppLocalizationsDelegate

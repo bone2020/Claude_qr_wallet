@@ -2607,5 +2607,173 @@
   "tpinFullLabel": "Taxpayer PIN (TPIN)",
   "@tpinFullLabel": {
     "description": "Label for the long-form Zambian TPIN option in the KYC ID-type picker dropdown (pending SmileID entitlement activation)."
+  },
+  "momoErrorNotConfigured": "Mobile Money is coming soon! This feature is not yet available. Please use Card or Bank Transfer instead.",
+  "@momoErrorNotConfigured": {
+    "description": "Shown when a user tries to use Mobile Money but the service is not yet configured."
+  },
+  "momoErrorPaymentDeclined": "Payment was declined. Please check your Mobile Money balance and try again.",
+  "@momoErrorPaymentDeclined": {
+    "description": "Shown when a Mobile Money payment is rejected or declined by the provider."
+  },
+  "momoErrorInsufficientFunds": "Insufficient funds in your Mobile Money account.",
+  "@momoErrorInsufficientFunds": {
+    "description": "Shown when the user's Mobile Money account does not have enough balance for the transaction."
+  },
+  "momoErrorInvalidPhone": "Invalid phone number. Please check and try again.",
+  "@momoErrorInvalidPhone": {
+    "description": "Shown when the phone number provided for Mobile Money is invalid."
+  },
+  "momoErrorPaymentTimeout": "Payment request timed out. Please check your phone for approval prompt and try again.",
+  "@momoErrorPaymentTimeout": {
+    "description": "Shown when a Mobile Money payment request times out before user approval."
+  },
+  "genericErrorNetwork": "Unable to connect. Please check your internet connection and try again.",
+  "@genericErrorNetwork": {
+    "description": "Shown when a network error prevents an operation from completing."
+  },
+  "genericErrorCameraPermission": "Camera access is required for verification. Please enable camera permissions in your device settings.",
+  "@genericErrorCameraPermission": {
+    "description": "Shown when camera permission is denied during a verification flow."
+  },
+  "genericErrorUserCancelled": "Verification was cancelled. You can try again when ready.",
+  "@genericErrorUserCancelled": {
+    "description": "Shown when the user cancels a verification flow."
+  },
+  "genericErrorFaceDetection": "We couldn't detect your face clearly. Please ensure good lighting and position your face within the frame.",
+  "@genericErrorFaceDetection": {
+    "description": "Shown when the camera cannot detect the user's face during verification."
+  },
+  "genericErrorFaceMismatch": "Face verification failed. The selfie doesn't match the ID photo. Please ensure you're using your own ID document.",
+  "@genericErrorFaceMismatch": {
+    "description": "Shown when the user's selfie does not match the photo on their ID document."
+  },
+  "genericErrorIdVerification": "ID verification failed. Please ensure your ID is valid, not expired, and the information entered is correct.",
+  "@genericErrorIdVerification": {
+    "description": "Shown when ID verification fails for unknown reasons."
+  },
+  "genericErrorDocument": "We couldn't read your document clearly. Please ensure the document is well-lit, flat, and all text is visible.",
+  "@genericErrorDocument": {
+    "description": "Shown when an uploaded document cannot be read by the verification system."
+  },
+  "genericErrorServer": "Our verification service is temporarily unavailable. Please try again in a few minutes.",
+  "@genericErrorServer": {
+    "description": "Shown when the verification backend returns a server error."
+  },
+  "genericErrorTimeout": "The request took too long. Please check your connection and try again.",
+  "@genericErrorTimeout": {
+    "description": "Shown when a request times out."
+  },
+  "genericErrorAuth": "Your session has expired. Please sign in again to continue.",
+  "@genericErrorAuth": {
+    "description": "Shown when the user's authentication session has expired."
+  },
+  "genericErrorFallback": "Something went wrong. Please try again or contact support if the problem persists.",
+  "@genericErrorFallback": {
+    "description": "Generic last-resort error message when no more specific classification applies."
+  },
+  "smileIdResultVerified": "Verification successful!",
+  "@smileIdResultVerified": {
+    "description": "Shown when a Smile ID verification completes successfully (result code 0810)."
+  },
+  "smileIdResultFaceMatchFailed": "Face verification failed. The selfie doesn't match the ID photo.",
+  "@smileIdResultFaceMatchFailed": {
+    "description": "Smile ID result code 0811 — selfie/ID photo mismatch."
+  },
+  "smileIdResultIdDocFailed": "ID document could not be verified. Please try with a different document.",
+  "@smileIdResultIdDocFailed": {
+    "description": "Smile ID result code 0812 — ID document failed verification."
+  },
+  "smileIdResultLivenessFailed": "Liveness check failed. Please follow the on-screen instructions carefully.",
+  "@smileIdResultLivenessFailed": {
+    "description": "Smile ID result code 0813 — liveness check failed."
+  },
+  "smileIdResultExpiredDoc": "Document is expired. Please use a valid, non-expired ID.",
+  "@smileIdResultExpiredDoc": {
+    "description": "Smile ID result code 0814 — document is expired."
+  },
+  "smileIdResultInfoMismatch": "ID information mismatch. Please ensure you entered the correct details.",
+  "@smileIdResultInfoMismatch": {
+    "description": "Smile ID result code 0815 — information on ID does not match what user entered."
+  },
+  "smileIdResultUnsupportedDoc": "Document not supported. Please try with a different ID type.",
+  "@smileIdResultUnsupportedDoc": {
+    "description": "Smile ID result code 0816 — document type not supported."
+  },
+  "smileIdResultFaceNotDetected": "Face not detected. Please ensure your face is clearly visible and well-lit.",
+  "@smileIdResultFaceNotDetected": {
+    "description": "Smile ID result code 0820 — no face detected in selfie."
+  },
+  "smileIdResultMultipleFacesDetected": "Multiple faces detected. Please ensure only your face is in the frame.",
+  "@smileIdResultMultipleFacesDetected": {
+    "description": "Smile ID result code 0821 — more than one face in selfie."
+  },
+  "smileIdResultPoorImageQuality": "Poor image quality. Please ensure good lighting and a clear photo.",
+  "@smileIdResultPoorImageQuality": {
+    "description": "Smile ID result code 0822 — image quality too low for verification."
+  },
+  "smileIdResultCouldNotComplete": "Verification could not be completed. Please try again.",
+  "@smileIdResultCouldNotComplete": {
+    "description": "Smile ID fallback when result code is unknown or no error info available."
+  },
+  "kycErrorDocumentUploadNetwork": "Failed to upload document. Please check your connection and try again.",
+  "@kycErrorDocumentUploadNetwork": {
+    "description": "Shown when document upload fails due to a network issue."
+  },
+  "kycErrorImageTooLarge": "Image file is too large. Please use a smaller image.",
+  "@kycErrorImageTooLarge": {
+    "description": "Shown when an uploaded document image is too large."
+  },
+  "kycErrorDocumentUploadGeneric": "Failed to upload document. Please try again.",
+  "@kycErrorDocumentUploadGeneric": {
+    "description": "Generic fallback when document upload fails for unspecified reason."
+  },
+  "firebaseAuthErrorNetwork": "Unable to connect. Please check your internet connection.",
+  "@firebaseAuthErrorNetwork": {
+    "description": "Firebase auth error: network request failed."
+  },
+  "firebaseAuthErrorTooManyRequests": "Too many attempts. Please wait a few minutes and try again.",
+  "@firebaseAuthErrorTooManyRequests": {
+    "description": "Firebase auth error: too many requests, throttled."
+  },
+  "firebaseAuthErrorUserNotFound": "Account not found. Please check your credentials or sign up.",
+  "@firebaseAuthErrorUserNotFound": {
+    "description": "Firebase auth error: account does not exist."
+  },
+  "firebaseAuthErrorWrongPassword": "Incorrect password. Please try again.",
+  "@firebaseAuthErrorWrongPassword": {
+    "description": "Firebase auth error: wrong password supplied."
+  },
+  "firebaseAuthErrorEmailAlreadyInUse": "This email is already registered. Please sign in instead.",
+  "@firebaseAuthErrorEmailAlreadyInUse": {
+    "description": "Firebase auth error: email already used by another account."
+  },
+  "firebaseAuthErrorInvalidEmail": "Please enter a valid email address.",
+  "@firebaseAuthErrorInvalidEmail": {
+    "description": "Firebase auth error: email format invalid."
+  },
+  "firebaseAuthErrorWeakPassword": "Password is too weak. Please use at least 6 characters.",
+  "@firebaseAuthErrorWeakPassword": {
+    "description": "Firebase auth error: password does not meet strength requirement."
+  },
+  "firebaseAuthErrorInvalidPhone": "Please enter a valid phone number.",
+  "@firebaseAuthErrorInvalidPhone": {
+    "description": "Firebase auth error: phone number invalid."
+  },
+  "firebaseAuthErrorInvalidVerificationCode": "Invalid verification code. Please check and try again.",
+  "@firebaseAuthErrorInvalidVerificationCode": {
+    "description": "Firebase auth error: SMS or email verification code is invalid."
+  },
+  "firebaseAuthErrorServiceUnavailable": "Service temporarily unavailable. Please try again later.",
+  "@firebaseAuthErrorServiceUnavailable": {
+    "description": "Firebase auth error: backend service unavailable."
+  },
+  "firebaseAuthErrorOperationNotAllowed": "You don't have permission to perform this action.",
+  "@firebaseAuthErrorOperationNotAllowed": {
+    "description": "Firebase auth error: operation not allowed for current user."
+  },
+  "firebaseAuthErrorFallback": "Something went wrong. Please try again.",
+  "@firebaseAuthErrorFallback": {
+    "description": "Firebase auth fallback when no more specific code applies."
   }
 }

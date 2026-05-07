@@ -1926,4 +1926,171 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tpinFullLabel => 'Taxpayer PIN (TPIN)';
+
+  @override
+  String get momoErrorNotConfigured =>
+      'Mobile Money is coming soon! This feature is not yet available. Please use Card or Bank Transfer instead.';
+
+  @override
+  String get momoErrorPaymentDeclined =>
+      'Payment was declined. Please check your Mobile Money balance and try again.';
+
+  @override
+  String get momoErrorInsufficientFunds =>
+      'Insufficient funds in your Mobile Money account.';
+
+  @override
+  String get momoErrorInvalidPhone =>
+      'Invalid phone number. Please check and try again.';
+
+  @override
+  String get momoErrorPaymentTimeout =>
+      'Payment request timed out. Please check your phone for approval prompt and try again.';
+
+  @override
+  String get genericErrorNetwork =>
+      'Unable to connect. Please check your internet connection and try again.';
+
+  @override
+  String get genericErrorCameraPermission =>
+      'Camera access is required for verification. Please enable camera permissions in your device settings.';
+
+  @override
+  String get genericErrorUserCancelled =>
+      'Verification was cancelled. You can try again when ready.';
+
+  @override
+  String get genericErrorFaceDetection =>
+      'We couldn\'t detect your face clearly. Please ensure good lighting and position your face within the frame.';
+
+  @override
+  String get genericErrorFaceMismatch =>
+      'Face verification failed. The selfie doesn\'t match the ID photo. Please ensure you\'re using your own ID document.';
+
+  @override
+  String get genericErrorIdVerification =>
+      'ID verification failed. Please ensure your ID is valid, not expired, and the information entered is correct.';
+
+  @override
+  String get genericErrorDocument =>
+      'We couldn\'t read your document clearly. Please ensure the document is well-lit, flat, and all text is visible.';
+
+  @override
+  String get genericErrorServer =>
+      'Our verification service is temporarily unavailable. Please try again in a few minutes.';
+
+  @override
+  String get genericErrorTimeout =>
+      'The request took too long. Please check your connection and try again.';
+
+  @override
+  String get genericErrorAuth =>
+      'Your session has expired. Please sign in again to continue.';
+
+  @override
+  String get genericErrorFallback =>
+      'Something went wrong. Please try again or contact support if the problem persists.';
+
+  @override
+  String get smileIdResultVerified => 'Verification successful!';
+
+  @override
+  String get smileIdResultFaceMatchFailed =>
+      'Face verification failed. The selfie doesn\'t match the ID photo.';
+
+  @override
+  String get smileIdResultIdDocFailed =>
+      'ID document could not be verified. Please try with a different document.';
+
+  @override
+  String get smileIdResultLivenessFailed =>
+      'Liveness check failed. Please follow the on-screen instructions carefully.';
+
+  @override
+  String get smileIdResultExpiredDoc =>
+      'Document is expired. Please use a valid, non-expired ID.';
+
+  @override
+  String get smileIdResultInfoMismatch =>
+      'ID information mismatch. Please ensure you entered the correct details.';
+
+  @override
+  String get smileIdResultUnsupportedDoc =>
+      'Document not supported. Please try with a different ID type.';
+
+  @override
+  String get smileIdResultFaceNotDetected =>
+      'Face not detected. Please ensure your face is clearly visible and well-lit.';
+
+  @override
+  String get smileIdResultMultipleFacesDetected =>
+      'Multiple faces detected. Please ensure only your face is in the frame.';
+
+  @override
+  String get smileIdResultPoorImageQuality =>
+      'Poor image quality. Please ensure good lighting and a clear photo.';
+
+  @override
+  String get smileIdResultCouldNotComplete =>
+      'Verification could not be completed. Please try again.';
+
+  @override
+  String get kycErrorDocumentUploadNetwork =>
+      'Failed to upload document. Please check your connection and try again.';
+
+  @override
+  String get kycErrorImageTooLarge =>
+      'Image file is too large. Please use a smaller image.';
+
+  @override
+  String get kycErrorDocumentUploadGeneric =>
+      'Failed to upload document. Please try again.';
+
+  @override
+  String get firebaseAuthErrorNetwork =>
+      'Unable to connect. Please check your internet connection.';
+
+  @override
+  String get firebaseAuthErrorTooManyRequests =>
+      'Too many attempts. Please wait a few minutes and try again.';
+
+  @override
+  String get firebaseAuthErrorUserNotFound =>
+      'Account not found. Please check your credentials or sign up.';
+
+  @override
+  String get firebaseAuthErrorWrongPassword =>
+      'Incorrect password. Please try again.';
+
+  @override
+  String get firebaseAuthErrorEmailAlreadyInUse =>
+      'This email is already registered. Please sign in instead.';
+
+  @override
+  String get firebaseAuthErrorInvalidEmail =>
+      'Please enter a valid email address.';
+
+  @override
+  String get firebaseAuthErrorWeakPassword =>
+      'Password is too weak. Please use at least 6 characters.';
+
+  @override
+  String get firebaseAuthErrorInvalidPhone =>
+      'Please enter a valid phone number.';
+
+  @override
+  String get firebaseAuthErrorInvalidVerificationCode =>
+      'Invalid verification code. Please check and try again.';
+
+  @override
+  String get firebaseAuthErrorServiceUnavailable =>
+      'Service temporarily unavailable. Please try again later.';
+
+  @override
+  String get firebaseAuthErrorOperationNotAllowed =>
+      'You don\'t have permission to perform this action.';
+
+  @override
+  String get firebaseAuthErrorFallback =>
+      'Something went wrong. Please try again.';
 }
