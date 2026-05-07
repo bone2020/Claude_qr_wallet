@@ -16,6 +16,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
+import '../../../../core/services/user_localization_resolver.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
@@ -69,13 +70,13 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   }
 
   Future<void> _startVerification() async {
+    final loc = AppLocalizations.of(context);
     final nin = _ninController.text.trim();
     final cardNumber = _cardNumberController.text.trim();
 
     // Validate NIN
     final validation = _smileIdService.validateIdNumber(nin, 'UGANDA_NIN', 'UG');
     if (!validation.isValid) {
-      final loc = AppLocalizations.of(context);
       final key = validation.errorKey;
       _showError(key != null
           ? resolveIdValidationErrorMessage(loc, key)
@@ -85,7 +86,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
 
     // Validate Card Number
     if (cardNumber.isEmpty) {
-      _showError('Please enter your card number');
+      _showError(loc.kycErrorPleaseEnterCardNumber);
       return;
     }
 
@@ -135,13 +136,14 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   }
 
   Future<void> _handleContinue() async {
+    final loc = AppLocalizations.of(context);
     if (!_isCaptured) {
-      _showError('Please complete verification with Smile ID');
+      _showError(loc.kycErrorPleaseCompleteSmileId);
       return;
     }
 
     if (_dateOfBirth == null) {
-      _showError('Please select your date of birth');
+      _showError(loc.kycErrorPleaseSelectDateOfBirth);
       return;
     }
 
@@ -238,7 +240,7 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
         if (!mounted) return;
         context.go(AppRoutes.verificationPending);
       } else {
-        _showError(result.error ?? 'Failed to complete verification');
+        _showError(resolveUserResultError(loc, result));
       }
     } catch (e) {
       if (!mounted) return;

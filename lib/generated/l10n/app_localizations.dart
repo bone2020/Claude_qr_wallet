@@ -3981,6 +3981,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An error occurred. Please try again'**
   String get authErrorFallback;
+
+  /// Shown when an action requires authentication but the user is not signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'User not authenticated'**
+  String get userErrorUserNotAuthenticated;
+
+  /// Shown when an updateProfile call is made with no fields to update.
+  ///
+  /// In en, this message translates to:
+  /// **'No updates provided'**
+  String get userErrorNoUpdatesProvided;
+
+  /// Shown when KYC document upload is missing the required ID front image.
+  ///
+  /// In en, this message translates to:
+  /// **'ID front image is required'**
+  String get userErrorIdFrontImageRequired;
+
+  /// Generic UserResult fallback when no specific case applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t complete the action. Please try again.'**
+  String get userErrorFallback;
+
+  /// Shown across KYC screens when the Smile ID flow has not been completed yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Please complete verification with Smile ID'**
+  String get kycErrorPleaseCompleteSmileId;
+
+  /// Shown across KYC screens when the user attempts to submit without selecting a DOB.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select your date of birth'**
+  String get kycErrorPleaseSelectDateOfBirth;
+
+  /// Shown specifically in the NIN flow when the user tries to take the selfie before entering their DOB.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select your date of birth before taking the selfie'**
+  String get kycErrorPleaseSelectDateOfBirthBeforeSelfie;
+
+  /// Shown specifically in the Uganda NIN flow when the user attempts to submit without entering a card number.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your card number'**
+  String get kycErrorPleaseEnterCardNumber;
+
+  /// Shown specifically in the NIN flow when the auth session is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not signed in. Please sign in and try again.'**
+  String get kycErrorNotSignedIn;
+
+  /// Shown specifically in the NIN flow when the verification session has timed out.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification session expired. Please retake your selfie.'**
+  String get kycErrorVerificationSessionExpired;
+
+  /// Generic NIN-flow fallback when verification fails for an unspecified reason.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get kycErrorSomethingWentWrong;
+
+  /// Shown in the phone verification flow when the user's account has no phone number on file.
+  ///
+  /// In en, this message translates to:
+  /// **'No phone number found on your account. Please go back and re-enter it.'**
+  String get kycErrorPhoneVerificationNoPhoneNumber;
+
+  /// Shown in the phone verification flow when the user submits without entering the OTP.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the 6-digit code'**
+  String get kycErrorPhoneVerificationEnter6DigitCode;
 }
 
 class _AppLocalizationsDelegate

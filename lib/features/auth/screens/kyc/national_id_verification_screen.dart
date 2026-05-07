@@ -18,6 +18,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
+import '../../../../core/services/user_localization_resolver.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
@@ -193,13 +194,14 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   }
 
   Future<void> _handleContinue() async {
+    final loc = AppLocalizations.of(context);
     if (!_isCaptured) {
-      _showError('Please complete verification with Smile ID');
+      _showError(loc.kycErrorPleaseCompleteSmileId);
       return;
     }
 
     if (_dateOfBirth == null) {
-      _showError('Please select your date of birth');
+      _showError(loc.kycErrorPleaseSelectDateOfBirth);
       return;
     }
 
@@ -298,7 +300,7 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
         if (!mounted) return;
         context.go(AppRoutes.verificationPending);
       } else {
-        _showError(result.error ?? AppLocalizations.of(context).failedToCompleteVerification);
+        _showError(resolveUserResultError(loc, result));
       }
     } catch (e) {
       if (!mounted) return;

@@ -75,6 +75,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
   }
 
   Future<void> _initializePhone() async {
+    final loc = AppLocalizations.of(context);
     // Source 1: current Riverpod user
     final user = ref.read(currentUserProvider);
     if (user != null && user.phoneNumber.isNotEmpty) {
@@ -106,7 +107,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
 
     if (mounted) {
       setState(() {
-        _errorMessage = 'No phone number found on your account. Please go back and re-enter it.';
+        _errorMessage = loc.kycErrorPhoneVerificationNoPhoneNumber;
       });
     }
   }
@@ -158,9 +159,10 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
   }
 
   Future<void> _verifyOtp() async {
+    final loc = AppLocalizations.of(context);
     final otp = _pinController.text;
     if (otp.length != 6) {
-      setState(() => _errorMessage = 'Please enter the 6-digit code');
+      setState(() => _errorMessage = loc.kycErrorPhoneVerificationEnter6DigitCode);
       return;
     }
 
@@ -203,7 +205,7 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
         if (mounted) context.pop(true);
       } else {
         setState(() {
-          _errorMessage = resolveAuthResultError(AppLocalizations.of(context), result);
+          _errorMessage = resolveAuthResultError(loc, result);
         });
       }
     } catch (e) {

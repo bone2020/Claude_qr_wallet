@@ -2042,4 +2042,43 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get authErrorFallback => '';
+
+  @override
+  String get userErrorUserNotAuthenticated => '';
+
+  @override
+  String get userErrorNoUpdatesProvided => '';
+
+  @override
+  String get userErrorIdFrontImageRequired => '';
+
+  @override
+  String get userErrorFallback => '';
+
+  @override
+  String get kycErrorPleaseCompleteSmileId => '';
+
+  @override
+  String get kycErrorPleaseSelectDateOfBirth => '';
+
+  @override
+  String get kycErrorPleaseSelectDateOfBirthBeforeSelfie => '';
+
+  @override
+  String get kycErrorPleaseEnterCardNumber => '';
+
+  @override
+  String get kycErrorNotSignedIn => '';
+
+  @override
+  String get kycErrorVerificationSessionExpired => '';
+
+  @override
+  String get kycErrorSomethingWentWrong => '';
+
+  @override
+  String get kycErrorPhoneVerificationNoPhoneNumber => '';
+
+  @override
+  String get kycErrorPhoneVerificationEnter6DigitCode => '';
 }

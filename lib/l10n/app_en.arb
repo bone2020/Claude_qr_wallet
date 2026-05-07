@@ -2867,5 +2867,57 @@
   "authErrorFallback": "An error occurred. Please try again",
   "@authErrorFallback": {
     "description": "Generic auth fallback when no specific Firebase code or service-layer case applies."
+  },
+  "userErrorUserNotAuthenticated": "User not authenticated",
+  "@userErrorUserNotAuthenticated": {
+    "description": "Shown when an action requires authentication but the user is not signed in."
+  },
+  "userErrorNoUpdatesProvided": "No updates provided",
+  "@userErrorNoUpdatesProvided": {
+    "description": "Shown when an updateProfile call is made with no fields to update."
+  },
+  "userErrorIdFrontImageRequired": "ID front image is required",
+  "@userErrorIdFrontImageRequired": {
+    "description": "Shown when KYC document upload is missing the required ID front image."
+  },
+  "userErrorFallback": "Couldn't complete the action. Please try again.",
+  "@userErrorFallback": {
+    "description": "Generic UserResult fallback when no specific case applies."
+  },
+  "kycErrorPleaseCompleteSmileId": "Please complete verification with Smile ID",
+  "@kycErrorPleaseCompleteSmileId": {
+    "description": "Shown across KYC screens when the Smile ID flow has not been completed yet."
+  },
+  "kycErrorPleaseSelectDateOfBirth": "Please select your date of birth",
+  "@kycErrorPleaseSelectDateOfBirth": {
+    "description": "Shown across KYC screens when the user attempts to submit without selecting a DOB."
+  },
+  "kycErrorPleaseSelectDateOfBirthBeforeSelfie": "Please select your date of birth before taking the selfie",
+  "@kycErrorPleaseSelectDateOfBirthBeforeSelfie": {
+    "description": "Shown specifically in the NIN flow when the user tries to take the selfie before entering their DOB."
+  },
+  "kycErrorPleaseEnterCardNumber": "Please enter your card number",
+  "@kycErrorPleaseEnterCardNumber": {
+    "description": "Shown specifically in the Uganda NIN flow when the user attempts to submit without entering a card number."
+  },
+  "kycErrorNotSignedIn": "You are not signed in. Please sign in and try again.",
+  "@kycErrorNotSignedIn": {
+    "description": "Shown specifically in the NIN flow when the auth session is missing."
+  },
+  "kycErrorVerificationSessionExpired": "Verification session expired. Please retake your selfie.",
+  "@kycErrorVerificationSessionExpired": {
+    "description": "Shown specifically in the NIN flow when the verification session has timed out."
+  },
+  "kycErrorSomethingWentWrong": "Something went wrong. Please try again.",
+  "@kycErrorSomethingWentWrong": {
+    "description": "Generic NIN-flow fallback when verification fails for an unspecified reason."
+  },
+  "kycErrorPhoneVerificationNoPhoneNumber": "No phone number found on your account. Please go back and re-enter it.",
+  "@kycErrorPhoneVerificationNoPhoneNumber": {
+    "description": "Shown in the phone verification flow when the user's account has no phone number on file."
+  },
+  "kycErrorPhoneVerificationEnter6DigitCode": "Please enter the 6-digit code",
+  "@kycErrorPhoneVerificationEnter6DigitCode": {
+    "description": "Shown in the phone verification flow when the user submits without entering the OTP."
   }
 }

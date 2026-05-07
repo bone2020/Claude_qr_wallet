@@ -2173,4 +2173,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authErrorFallback => 'An error occurred. Please try again';
+
+  @override
+  String get userErrorUserNotAuthenticated => 'User not authenticated';
+
+  @override
+  String get userErrorNoUpdatesProvided => 'No updates provided';
+
+  @override
+  String get userErrorIdFrontImageRequired => 'ID front image is required';
+
+  @override
+  String get userErrorFallback =>
+      'Couldn\'t complete the action. Please try again.';
+
+  @override
+  String get kycErrorPleaseCompleteSmileId =>
+      'Please complete verification with Smile ID';
+
+  @override
+  String get kycErrorPleaseSelectDateOfBirth =>
+      'Please select your date of birth';
+
+  @override
+  String get kycErrorPleaseSelectDateOfBirthBeforeSelfie =>
+      'Please select your date of birth before taking the selfie';
+
+  @override
+  String get kycErrorPleaseEnterCardNumber => 'Please enter your card number';
+
+  @override
+  String get kycErrorNotSignedIn =>
+      'You are not signed in. Please sign in and try again.';
+
+  @override
+  String get kycErrorVerificationSessionExpired =>
+      'Verification session expired. Please retake your selfie.';
+
+  @override
+  String get kycErrorSomethingWentWrong =>
+      'Something went wrong. Please try again.';
+
+  @override
+  String get kycErrorPhoneVerificationNoPhoneNumber =>
+      'No phone number found on your account. Please go back and re-enter it.';
+
+  @override
+  String get kycErrorPhoneVerificationEnter6DigitCode =>
+      'Please enter the 6-digit code';
 }

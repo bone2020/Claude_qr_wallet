@@ -1195,5 +1195,18 @@
   "authErrorFirebaseInvalidVerificationId": "",
   "authErrorFirebaseCredentialAlreadyInUse": "",
   "authErrorFirebaseNetworkRequestFailed": "",
-  "authErrorFallback": ""
+  "authErrorFallback": "",
+  "userErrorUserNotAuthenticated": "",
+  "userErrorNoUpdatesProvided": "",
+  "userErrorIdFrontImageRequired": "",
+  "userErrorFallback": "",
+  "kycErrorPleaseCompleteSmileId": "",
+  "kycErrorPleaseSelectDateOfBirth": "",
+  "kycErrorPleaseSelectDateOfBirthBeforeSelfie": "",
+  "kycErrorPleaseEnterCardNumber": "",
+  "kycErrorNotSignedIn": "",
+  "kycErrorVerificationSessionExpired": "",
+  "kycErrorSomethingWentWrong": "",
+  "kycErrorPhoneVerificationNoPhoneNumber": "",
+  "kycErrorPhoneVerificationEnter6DigitCode": ""
 }

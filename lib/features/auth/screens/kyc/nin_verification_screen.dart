@@ -58,12 +58,12 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 
   Future<void> _startVerification() async {
+    final loc = AppLocalizations.of(context);
     final idNumber = _idNumberController.text.trim();
 
     // Validate NIN
     final validation = _smileIdService.validateIdNumber(idNumber, 'NIN', widget.countryCode);
     if (!validation.isValid) {
-      final loc = AppLocalizations.of(context);
       final key = validation.errorKey;
       _showError(key != null
           ? resolveIdValidationErrorMessage(loc, key)
@@ -72,7 +72,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     }
 
     if (_dateOfBirth == null) {
-      _showError('Please select your date of birth before taking the selfie');
+      _showError(loc.kycErrorPleaseSelectDateOfBirthBeforeSelfie);
       return;
     }
 
@@ -140,13 +140,14 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 
   Future<void> _handleContinue() async {
+    final loc = AppLocalizations.of(context);
     if (!_isCaptured) {
-      _showError('Please complete verification with Smile ID');
+      _showError(loc.kycErrorPleaseCompleteSmileId);
       return;
     }
 
     if (_dateOfBirth == null) {
-      _showError('Please select your date of birth');
+      _showError(loc.kycErrorPleaseSelectDateOfBirth);
       return;
     }
 
@@ -176,11 +177,11 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
 
       final firebaseUser = FirebaseAuth.instance.currentUser;
       if (firebaseUser == null) {
-        _showError('You are not signed in. Please sign in and try again.');
+        _showError(loc.kycErrorNotSignedIn);
         return;
       }
       if (_userId == null) {
-        _showError('Verification session expired. Please retake your selfie.');
+        _showError(loc.kycErrorVerificationSessionExpired);
         return;
       }
 
@@ -232,7 +233,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     } catch (e) {
       if (!mounted) return;
       debugPrint('Unexpected error during KYC finalization: $e');
-      _showError('Something went wrong. Please try again.');
+      _showError(loc.kycErrorSomethingWentWrong);
     } finally {
       if (mounted) {
         setState(() {

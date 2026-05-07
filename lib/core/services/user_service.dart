@@ -8,6 +8,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import '../../models/user_model.dart';
 import '../utils/error_handler.dart';
 import '../utils/network_retry.dart';
+import 'user_localization_resolver.dart';
 
 /// User service handling profile and user data operations
 class UserService {
@@ -60,7 +61,7 @@ class UserService {
     String? country,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated');
+      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -72,7 +73,7 @@ class UserService {
       if (country != null) updates['country'] = country;
 
       if (updates.isEmpty) {
-        return UserResult.failure('No updates provided');
+        return UserResult.failure('No updates provided', errorKey: UserErrorKey.noUpdatesProvided);
       }
 
       await NetworkRetry.execute(
@@ -95,7 +96,7 @@ class UserService {
   /// Upload and update profile photo
   Future<UserResult> updateProfilePhoto(File imageFile) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated');
+      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -155,12 +156,12 @@ class UserService {
     String? smileIdResult,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated');
+      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
     }
 
     // Require ID front image unless verified via Smile ID
     if (idFront == null && !smileIdVerified) {
-      return UserResult.failure('ID front image is required');
+      return UserResult.failure('ID front image is required', errorKey: UserErrorKey.idFrontImageRequired);
     }
 
     try {
@@ -287,7 +288,7 @@ class UserService {
     File? selfie,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated');
+      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -427,7 +428,7 @@ class UserService {
   /// Delete user account
   Future<UserResult> deleteAccount() async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated');
+      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -475,19 +476,21 @@ class UserResult {
   final bool success;
   final UserModel? user;
   final String? error;
+  final UserErrorKey? errorKey;
 
   UserResult._({
     required this.success,
     this.user,
     this.error,
+    this.errorKey,
   });
 
   factory UserResult.success(UserModel? user) {
     return UserResult._(success: true, user: user);
   }
 
-  factory UserResult.failure(String error) {
-    return UserResult._(success: false, error: error);
+  factory UserResult.failure(String error, {UserErrorKey? errorKey}) {
+    return UserResult._(success: false, error: error, errorKey: errorKey);
   }
 }
 
