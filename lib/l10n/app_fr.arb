@@ -260,19 +260,19 @@
   "@withdraw": {
     "description": "Action: withdraw funds from the wallet"
   },
-  "recentTransactions": "",
+  "recentTransactions": "Transactions récentes",
   "@recentTransactions": {
     "description": "Section header on home screen above the latest transactions"
   },
-  "viewAll": "",
+  "viewAll": "Voir tout",
   "@viewAll": {
     "description": "Link to navigate to the full transactions list"
   },
-  "noTransactions": "",
+  "noTransactions": "Aucune transaction pour l'instant",
   "@noTransactions": {
     "description": "Empty state message when no transactions exist"
   },
-  "noTransactionsSubtitle": "",
+  "noTransactionsSubtitle": "Votre historique de transactions apparaîtra ici",
   "@noTransactionsSubtitle": {
     "description": "Subtitle in the empty transactions state"
   },
@@ -312,7 +312,7 @@
   "@noteHint": {
     "description": "Placeholder inside the optional transaction note field"
   },
-  "review": "",
+  "review": "Examiner",
   "@review": {
     "description": "Button to advance from amount to confirmation screen"
   },
@@ -392,59 +392,59 @@
   "@transferFrom": {
     "description": "Label preceding the chosen funding source"
   },
-  "transactions": "",
+  "transactions": "Transactions",
   "@transactions": {
     "description": "Bottom navigation label and screen title for the transactions list"
   },
-  "allTransactions": "",
+  "allTransactions": "Toutes",
   "@allTransactions": {
     "description": "Filter chip showing all transactions"
   },
-  "sent": "",
+  "sent": "Envoyée",
   "@sent": {
     "description": "Filter chip and status label for sent transactions"
   },
-  "received": "",
+  "received": "Reçue",
   "@received": {
     "description": "Filter chip and status label for received transactions"
   },
-  "pending": "",
+  "pending": "En attente",
   "@pending": {
     "description": "Status label for pending transactions"
   },
-  "completed": "",
+  "completed": "Terminée",
   "@completed": {
     "description": "Status label for completed transactions"
   },
-  "failed": "",
+  "failed": "Échouée",
   "@failed": {
     "description": "Status label for failed transactions"
   },
-  "transactionDetails": "",
+  "transactionDetails": "Détails de la transaction",
   "@transactionDetails": {
     "description": "Title of the single transaction detail screen"
   },
-  "transactionId": "",
+  "transactionId": "ID de transaction",
   "@transactionId": {
     "description": "Label for the transaction's unique identifier"
   },
-  "date": "",
+  "date": "Date",
   "@date": {
     "description": "Label for a transaction date field"
   },
-  "time": "",
+  "time": "Heure",
   "@time": {
     "description": "Label for a transaction time field"
   },
-  "status": "",
+  "status": "Statut",
   "@status": {
     "description": "Label for a transaction status field"
   },
-  "from": "",
+  "from": "De",
   "@from": {
     "description": "Label for the sender of a transaction"
   },
-  "to": "",
+  "to": "À",
   "@to": {
     "description": "Label for the recipient of a transaction"
   },
@@ -476,7 +476,7 @@
   "@helpSupport": {
     "description": "Profile row leading to help and support"
   },
-  "myDisputes": "",
+  "myDisputes": "Mes litiges",
   "@myDisputes": {
     "description": "Profile row leading to the user's dispute list"
   },
@@ -743,8 +743,8 @@
   "welcomeBack": "Bon retour",
   "availableBalanceLabel": "Disponible",
   "onHoldBalanceLabel": "En attente",
-  "transactionStatusPending": "",
-  "transactionStatusFailed": "",
+  "transactionStatusPending": "En attente",
+  "transactionStatusFailed": "Échouée",
   "notificationsScreenTitle": "",
   "markAllAsRead": "",
   "failedToLoadNotifications": "",
@@ -754,20 +754,20 @@
   "currencySelectorDescription": "",
   "currencyChangedTo": "",
   "failedToChangeCurrency": "",
-  "loadMore": "",
+  "loadMore": "Charger plus",
   "copiedToClipboard": "{label} copié",
-  "transactionNotFound": "",
-  "reportIssue": "",
+  "transactionNotFound": "Transaction introuvable",
+  "reportIssue": "Signaler un problème",
   "currencyConversion": "Conversion de devise",
   "originalAmount": "Montant original",
   "convertedAmount": "Montant converti",
   "exchangeRateLabel": "Taux de change",
-  "transactionItemsLabel": "",
+  "transactionItemsLabel": "Articles",
   "positionQrCodeInFrame": "Placez le QR code dans le cadre",
   "pleaseEnterValidWalletId": "Veuillez saisir un ID de portefeuille valide",
   "lookingUpWallet": "Recherche du portefeuille...",
   "scanRecipientQrToSend": "Scannez le QR code du destinataire pour envoyer de l'argent",
-  "transactionPin": "",
+  "transactionPin": "Code PIN de transaction",
   "enterPinToConfirm": "Saisissez votre code PIN à 6 chiffres pour confirmer ce transfert",
   "pleaseEnterAmount": "Veuillez saisir un montant",
   "amountSentTo": "{currency}{amount} envoyé à {recipient}",
@@ -893,7 +893,7 @@
   "bankNameLabel": "Nom de la banque",
   "accountNumberLabel": "Numéro de compte",
   "accountNameLabel": "Nom du titulaire",
-  "howItWorksLabel": "",
+  "howItWorksLabel": "Comment ça marche",
   "virtualAccountInfoBody": "Ce compte vous est unique. Tout virement vers ce compte crédite automatiquement votre portefeuille.",
   "mtnMomoPaymentFailedError": "Échec du paiement MTN MoMo",
   "paymentFailedOrRejectedError": "Le paiement a échoué ou a été rejeté",
@@ -974,7 +974,7 @@
   "pushNotificationsSubtitle": "",
   "emailNotificationsLabel": "",
   "emailNotificationsSubtitle": "",
-  "transactionsSection": "",
+  "transactionsSection": "Transactions",
   "transactionAlertsLabel": "",
   "transactionAlertsSubtitle": "",
   "paymentRemindersLabel": "",
@@ -1087,18 +1087,18 @@
   "addBusinessLogoSubtitle": "",
   "changeButton": "",
   "uploadButton": "",
-  "disputeNotFoundError": "",
+  "disputeNotFoundError": "Litige introuvable",
   "descriptionLabel": "Description",
   "recipientResponseLabel": "Réponse du destinataire",
-  "myDisputesTitle": "",
-  "filedByMeTab": "",
-  "againstMeTab": "",
-  "noActiveDisputesFiled": "",
-  "noActiveDisputesAgainstYou": "",
-  "noResolvedDisputes": "",
-  "activeTabWithCount": "",
-  "resolvedTabWithCount": "",
-  "disputesCappedNotice": "",
+  "myDisputesTitle": "Mes litiges",
+  "filedByMeTab": "Déposés par moi",
+  "againstMeTab": "Contre moi",
+  "noActiveDisputesFiled": "Aucun litige actif déposé.",
+  "noActiveDisputesAgainstYou": "Aucun litige actif contre vous.",
+  "noResolvedDisputes": "Aucun litige résolu.",
+  "activeTabWithCount": "Actifs ({count})",
+  "resolvedTabWithCount": "Résolus ({count})",
+  "disputesCappedNotice": "Affichage des 50 derniers litiges. Les entrées plus anciennes peuvent ne pas apparaître.",
   "ugandaNinDescription": "Vérifiez votre identité avec votre numéro d'identification national ougandais",
   "tpinDescription": "Vérifiez votre identité avec votre PIN du contribuable zambien",
   "verifyIdentityDefaultDescription": "Vérifier votre identité",
