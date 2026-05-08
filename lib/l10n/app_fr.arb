@@ -200,7 +200,7 @@
   "@faceScanInstructions": {
     "description": "Instructions shown during face scan"
   },
-  "startScan": "",
+  "startScan": "Démarrer le scan",
   "@startScan": {
     "description": "Button to begin the face scan"
   },
@@ -244,11 +244,11 @@
   "@showBalance": {
     "description": "Action to reveal the obscured wallet balance"
   },
-  "send": "",
+  "send": "Envoyer",
   "@send": {
     "description": "Action: send money to another wallet"
   },
-  "receive": "",
+  "receive": "Recevoir",
   "@receive": {
     "description": "Action: receive money via QR or wallet ID"
   },
@@ -276,15 +276,15 @@
   "@noTransactionsSubtitle": {
     "description": "Subtitle in the empty transactions state"
   },
-  "sendMoney": "",
+  "sendMoney": "Envoyer de l'argent",
   "@sendMoney": {
     "description": "Title of the send money flow"
   },
-  "scanQrCode": "",
+  "scanQrCode": "Scanner le QR code",
   "@scanQrCode": {
     "description": "Action to open the camera and scan a QR code"
   },
-  "enterWalletId": "",
+  "enterWalletId": "Saisir l'ID du portefeuille",
   "@enterWalletId": {
     "description": "Action to manually type a recipient wallet ID"
   },
@@ -292,7 +292,7 @@
   "@walletId": {
     "description": "Label for a wallet ID field or display"
   },
-  "walletIdHint": "",
+  "walletIdHint": "Saisissez l'ID du portefeuille du destinataire",
   "@walletIdHint": {
     "description": "Placeholder text in the recipient wallet ID field"
   },
@@ -304,11 +304,11 @@
   "@amountHint": {
     "description": "Placeholder text inside the amount field"
   },
-  "note": "",
+  "note": "Note (facultative)",
   "@note": {
     "description": "Label for the optional transaction note field"
   },
-  "noteHint": "",
+  "noteHint": "Ajoutez une note",
   "@noteHint": {
     "description": "Placeholder inside the optional transaction note field"
   },
@@ -316,35 +316,35 @@
   "@review": {
     "description": "Button to advance from amount to confirmation screen"
   },
-  "confirmSend": "",
+  "confirmSend": "Confirmer et envoyer",
   "@confirmSend": {
     "description": "Button on the confirmation screen to dispatch the send"
   },
-  "sendingTo": "",
+  "sendingTo": "Envoi à",
   "@sendingTo": {
     "description": "Label above the recipient name on the confirmation screen"
   },
-  "transactionFee": "",
+  "transactionFee": "Frais de transaction",
   "@transactionFee": {
     "description": "Label for the displayed transaction fee"
   },
-  "totalAmount": "",
+  "totalAmount": "Montant total",
   "@totalAmount": {
     "description": "Label for the total to be sent including fees"
   },
-  "receiveMoney": "",
+  "receiveMoney": "Recevoir de l'argent",
   "@receiveMoney": {
     "description": "Title of the receive money screen"
   },
-  "myQrCode": "",
+  "myQrCode": "Mon QR code",
   "@myQrCode": {
     "description": "Section header above the user's QR code"
   },
-  "shareQrCode": "",
+  "shareQrCode": "Partager le QR code",
   "@shareQrCode": {
     "description": "Action to share the QR code via system share sheet"
   },
-  "downloadQrCode": "",
+  "downloadQrCode": "Télécharger le QR code",
   "@downloadQrCode": {
     "description": "Action to save the QR code as an image"
   },
@@ -352,7 +352,7 @@
   "@walletIdCopied": {
     "description": "Confirmation snackbar after copying the wallet ID"
   },
-  "tapToCopy": "",
+  "tapToCopy": "Appuyez pour copier",
   "@tapToCopy": {
     "description": "Hint shown next to a copyable wallet ID"
   },
@@ -560,7 +560,7 @@
   "@successLoggedIn": {
     "description": "Success message after a successful log in"
   },
-  "successMoneySent": "",
+  "successMoneySent": "Argent envoyé avec succès !",
   "@successMoneySent": {
     "description": "Success message after a transaction is dispatched"
   },
@@ -755,28 +755,28 @@
   "currencyChangedTo": "",
   "failedToChangeCurrency": "",
   "loadMore": "",
-  "copiedToClipboard": "",
+  "copiedToClipboard": "{label} copié",
   "transactionNotFound": "",
   "reportIssue": "",
-  "currencyConversion": "",
-  "originalAmount": "",
-  "convertedAmount": "",
+  "currencyConversion": "Conversion de devise",
+  "originalAmount": "Montant original",
+  "convertedAmount": "Montant converti",
   "exchangeRateLabel": "Taux de change",
   "transactionItemsLabel": "",
-  "positionQrCodeInFrame": "",
-  "pleaseEnterValidWalletId": "",
-  "lookingUpWallet": "",
-  "scanRecipientQrToSend": "",
+  "positionQrCodeInFrame": "Placez le QR code dans le cadre",
+  "pleaseEnterValidWalletId": "Veuillez saisir un ID de portefeuille valide",
+  "lookingUpWallet": "Recherche du portefeuille...",
+  "scanRecipientQrToSend": "Scannez le QR code du destinataire pour envoyer de l'argent",
   "transactionPin": "",
-  "enterPinToConfirm": "",
+  "enterPinToConfirm": "Saisissez votre code PIN à 6 chiffres pour confirmer ce transfert",
   "pleaseEnterAmount": "Veuillez saisir un montant",
-  "amountSentTo": "",
-  "paymentRequestLabel": "",
-  "feeApproximateError": "",
+  "amountSentTo": "{currency}{amount} envoyé à {recipient}",
+  "paymentRequestLabel": "Demande de paiement",
+  "feeApproximateError": "Les frais sont approximatifs — {error}",
   "insufficientBalance": "Solde insuffisant pour ce transfert",
-  "sellerRequestedLabel": "",
-  "recipientReceivesLabel": "",
-  "sendButtonAmount": "",
+  "sellerRequestedLabel": "Le vendeur a demandé :",
+  "recipientReceivesLabel": "Le destinataire reçoit :",
+  "sendButtonAmount": "Envoyer {currency}{amount}",
   "errorWithMessage": "",
   "selectCountryTitle": "Sélectionner le pays",
   "searchCountryHint": "Rechercher un pays...",
@@ -841,47 +841,47 @@
   "pleaseWait": "",
   "verificationDoNotCloseApp": "Vous serez automatiquement redirigé une fois la vérification terminée. Ne fermez pas l'application.",
   "saving": "",
-  "storagePermissionRequired": "",
-  "qrCodeSavedToGallery": "",
-  "errorSavingQrCode": "",
-  "maximum20ItemsAllowed": "",
+  "storagePermissionRequired": "Autorisation de stockage requise pour enregistrer le QR code",
+  "qrCodeSavedToGallery": "QR code enregistré dans la galerie !",
+  "errorSavingQrCode": "Erreur lors de l'enregistrement du QR code : {error}",
+  "maximum20ItemsAllowed": "Maximum 20 articles autorisés",
   "pleaseEnterValidAmount": "Veuillez saisir un montant valide",
-  "errorGeneratingQr": "",
-  "errorSharingQr": "",
-  "requestPaymentTitle": "",
-  "newRequestTooltip": "",
-  "createPaymentRequestTitle": "",
-  "createPaymentRequestDescription": "",
+  "errorGeneratingQr": "Erreur lors de la génération du QR : {error}",
+  "errorSharingQr": "Erreur lors du partage du QR : {error}",
+  "requestPaymentTitle": "Demander un paiement",
+  "newRequestTooltip": "Nouvelle demande",
+  "createPaymentRequestTitle": "Créer une demande de paiement",
+  "createPaymentRequestDescription": "Saisissez le montant et ajoutez des articles. Les clients peuvent scanner le QR code pour vous payer instantanément.",
   "amountLabel": "Montant",
-  "itemsOptional": "",
-  "itemsHint": "",
+  "itemsOptional": "Articles (facultatifs)",
+  "itemsHint": "ex. : riz jollof, poulet, boissons",
   "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
-  "generateQrCode": "",
-  "payToUser": "",
+  "generateQrCode": "Générer le QR code",
+  "payToUser": "Payer à : {userName}",
   "shareButton": "",
-  "qrCodeInfoForCustomer": "",
-  "createNewRequest": "",
+  "qrCodeInfoForCustomer": "Présentez ce QR code au client.\nIl le scanne, confirme le montant, et paie instantanément !",
+  "createNewRequest": "Créer une nouvelle demande",
   "downloadButton": "",
-  "shareWalletIdSubject": "",
+  "shareWalletIdSubject": "Mon ID QR Wallet",
   "defaultUserName": "",
   "loadingPlaceholder": "",
-  "payRequestShareText": "",
-  "approvePaymentTitle": "",
+  "payRequestShareText": "Payez {symbol}{amount} à {userName}",
+  "approvePaymentTitle": "Approuver le paiement",
   "mtnMomoApprovePromptBody": "Veuillez approuver le paiement de {symbol}{amount} sur votre téléphone MTN MoMo.",
   "checkPhoneForApprovalPrompt": "Vérifiez votre téléphone pour l'invite d'approbation.",
   "iveApproved": "J'ai approuvé",
-  "labelCopiedToClipboard": "",
-  "paymentSuccessful": "",
-  "paymentSuccessfulHero": "",
-  "paymentFailed": "",
+  "labelCopiedToClipboard": "{label} copié dans le presse-papiers",
+  "paymentSuccessful": "Paiement réussi",
+  "paymentSuccessfulHero": "Paiement réussi !",
+  "paymentFailed": "Échec du paiement",
   "amountWithCurrency": "Montant : {symbol}{amount}",
-  "referenceWithValue": "",
+  "referenceWithValue": "Référence : {reference}",
   "doneButton": "",
   "mobileMoneyNotAvailableTitle": "Mobile Money non disponible",
   "mobileMoneyNotAvailablePaymentsBody": "Les paiements Mobile Money ne sont pas disponibles dans votre région. Veuillez utiliser la carte ou le virement bancaire.",
   "enterAmountLabel": "Saisir le montant",
   "quickSelectLabel": "",
-  "securePaymentLabel": "",
+  "securePaymentLabel": "Paiement sécurisé",
   "paystackSecurityNote": "Propulsé par Paystack. Vos informations de paiement sont sécurisées.",
   "mobileMoneyProviderLabel": "Opérateur Mobile Money",
   "phoneNumberLabel": "Numéro de téléphone",
@@ -896,25 +896,25 @@
   "howItWorksLabel": "",
   "virtualAccountInfoBody": "Ce compte vous est unique. Tout virement vers ce compte crédite automatiquement votre portefeuille.",
   "mtnMomoPaymentFailedError": "Échec du paiement MTN MoMo",
-  "paymentFailedOrRejectedError": "",
-  "paymentFailedError": "",
+  "paymentFailedOrRejectedError": "Le paiement a échoué ou a été rejeté",
+  "paymentFailedError": "Échec du paiement",
   "cardTabLabel": "Carte",
   "mobileMoneyTabLabel": "Mobile Money",
   "bankTransferTabLabel": "Virement bancaire",
   "continueToPaymentButton": "Continuer vers le paiement",
   "payWithMobileMoneyButton": "Payer avec Mobile Money",
-  "verifyingPaymentTitle": "",
-  "verifyingPaymentBody": "",
-  "referenceColon": "",
+  "verifyingPaymentTitle": "Vérification du paiement...",
+  "verifyingPaymentBody": "Veuillez patienter pendant que nous confirmons votre paiement",
+  "referenceColon": "Référence : ",
   "hasBeenAddedToWallet": "a été ajouté à votre portefeuille",
-  "referenceLabel": "",
+  "referenceLabel": "Référence",
   "newBalanceLabel": "Nouveau solde",
   "somethingWentWrongTryAgain": "",
   "goBackButton": "",
   "enterOtpTitle": "Saisir l'OTP",
   "enterOtpBody": "Veuillez saisir l'OTP envoyé à votre téléphone/e-mail enregistré pour finaliser le retrait de {symbol}{amount}",
   "confirmWithdrawalTitle": "Confirmer le retrait",
-  "pleaseVerifyDetailsCorrect": "",
+  "pleaseVerifyDetailsCorrect": "Veuillez vérifier que les détails sont corrects",
   "confirmButton": "",
   "withdrawalInitiatedTitle": "Retrait initié",
   "withdrawalBeingProcessed": "{symbol}{amount} est en cours de traitement",
@@ -933,7 +933,7 @@
   "withdrawalFailedError": "Échec du retrait",
   "otpVerificationFailedError": "Échec de la vérification de l'OTP",
   "aboutTitle": "",
-  "qrWalletAppName": "",
+  "qrWalletAppName": "QR Wallet",
   "versionAndBuild": "",
   "aboutAppDescription": "",
   "termsOfServiceLink": "Conditions d'utilisation",
@@ -1034,10 +1034,10 @@
   "verifyOtpToPhoneSubtitle": "",
   "noPhoneNumberLinkedSubtitle": "",
   "couldNotOpenEmailToast": "",
-  "couldNotOpenWhatsAppToast": "",
-  "chatOnWhatsAppDialogTitle": "",
-  "scanWithAnotherPhoneCaption": "",
-  "openWhatsAppButton": "",
+  "couldNotOpenWhatsAppToast": "Impossible d'ouvrir WhatsApp. Veuillez vérifier que WhatsApp est installé.",
+  "chatOnWhatsAppDialogTitle": "Discuter sur WhatsApp",
+  "scanWithAnotherPhoneCaption": "Scannez avec un autre téléphone\nou appuyez sur « Ouvrir WhatsApp » ci-dessous",
+  "openWhatsAppButton": "Ouvrir WhatsApp",
   "closeButton": "",
   "helpAndSupportTitle": "",
   "contactUsSection": "",
@@ -1088,8 +1088,8 @@
   "changeButton": "",
   "uploadButton": "",
   "disputeNotFoundError": "",
-  "descriptionLabel": "",
-  "recipientResponseLabel": "",
+  "descriptionLabel": "Description",
+  "recipientResponseLabel": "Réponse du destinataire",
   "myDisputesTitle": "",
   "filedByMeTab": "",
   "againstMeTab": "",
@@ -1208,16 +1208,16 @@
   "kycErrorSomethingWentWrong": "Une erreur s'est produite. Veuillez réessayer.",
   "kycErrorPhoneVerificationNoPhoneNumber": "Aucun numéro de téléphone trouvé sur votre compte. Veuillez revenir en arrière et le saisir à nouveau.",
   "kycErrorPhoneVerificationEnter6DigitCode": "Veuillez saisir le code à 6 chiffres",
-  "transactionErrorUserNotAuthenticated": "",
-  "transactionErrorPleaseLogInToSendMoney": "",
-  "transactionErrorRecipientWalletNotFound": "",
-  "transactionErrorInsufficientBalance": "",
-  "transactionErrorInvalidRequest": "",
-  "transactionErrorTransactionFailed": "",
-  "transactionErrorPaymentAlreadyProcessed": "",
-  "transactionErrorPaymentVerificationFailed": "",
-  "transactionErrorDepositFailed": "",
-  "transactionErrorFallback": "",
+  "transactionErrorUserNotAuthenticated": "Utilisateur non authentifié",
+  "transactionErrorPleaseLogInToSendMoney": "Veuillez vous connecter pour envoyer de l'argent",
+  "transactionErrorRecipientWalletNotFound": "Portefeuille du destinataire introuvable",
+  "transactionErrorInsufficientBalance": "Solde insuffisant",
+  "transactionErrorInvalidRequest": "Requête invalide",
+  "transactionErrorTransactionFailed": "Échec de la transaction",
+  "transactionErrorPaymentAlreadyProcessed": "Paiement déjà traité",
+  "transactionErrorPaymentVerificationFailed": "Échec de la vérification du paiement",
+  "transactionErrorDepositFailed": "Échec du dépôt",
+  "transactionErrorFallback": "Impossible de finaliser la transaction. Veuillez réessayer.",
   "biometricErrorNotAvailable": "L'authentification biométrique n'est pas disponible",
   "biometricErrorNotEnrolled": "Aucune biométrie enregistrée. Veuillez configurer l'empreinte digitale ou la reconnaissance faciale dans les paramètres de l'appareil",
   "biometricErrorLockedOut": "Trop de tentatives échouées. Veuillez réessayer plus tard",
@@ -1246,8 +1246,8 @@
   "walletUiErrorPleaseEnterAccountName": "Veuillez saisir le nom du titulaire",
   "walletUiErrorWithdrawalFailedRefunded": "Échec du retrait. Votre solde a été remboursé.",
   "walletUiErrorPleaseEnter6DigitOtp": "Veuillez saisir un OTP valide à 6 chiffres",
-  "sendUiErrorCouldNotVerifyRecipientWallet": "",
-  "sendUiErrorCouldNotReadQrCode": "",
-  "sendUiErrorPreviewTimedOut": "",
-  "sendUiErrorRequestTimedOut": ""
+  "sendUiErrorCouldNotVerifyRecipientWallet": "Impossible de vérifier le portefeuille du destinataire",
+  "sendUiErrorCouldNotReadQrCode": "Impossible de lire le QR code",
+  "sendUiErrorPreviewTimedOut": "Aperçu expiré",
+  "sendUiErrorRequestTimedOut": "Délai de la requête expiré. Veuillez vérifier votre connexion et réessayer."
 }
