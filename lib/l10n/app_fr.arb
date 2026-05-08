@@ -8,131 +8,131 @@
   "@appTagline": {
     "description": "Tagline shown on splash screen"
   },
-  "getStarted": "",
+  "getStarted": "Commencer",
   "@getStarted": {
     "description": "Button on splash screen to begin onboarding"
   },
-  "signUp": "",
+  "signUp": "S'inscrire",
   "@signUp": {
     "description": "Sign up button label and screen title"
   },
-  "signUpSubtitle": "",
+  "signUpSubtitle": "Inscrivez-vous et passez à la vitesse supérieure",
   "@signUpSubtitle": {
     "description": "Subtitle shown on the sign up screen"
   },
-  "logIn": "",
+  "logIn": "Se connecter",
   "@logIn": {
     "description": "Log in button label and screen title"
   },
-  "logInSubtitle": "",
+  "logInSubtitle": "Bon retour ! Connectez-vous pour continuer",
   "@logInSubtitle": {
     "description": "Subtitle shown on the log in screen"
   },
-  "createAccount": "",
+  "createAccount": "Créer un compte",
   "@createAccount": {
     "description": "Button on sign up screen to submit the form"
   },
-  "alreadyHaveAccount": "",
+  "alreadyHaveAccount": "Vous avez déjà un compte ?",
   "@alreadyHaveAccount": {
     "description": "Prompt before the Log in link on the sign up screen"
   },
-  "dontHaveAccount": "",
+  "dontHaveAccount": "Vous n'avez pas de compte ?",
   "@dontHaveAccount": {
     "description": "Prompt before the Sign up link on the log in screen"
   },
-  "orSignUpWith": "",
+  "orSignUpWith": "Ou inscrivez-vous avec",
   "@orSignUpWith": {
     "description": "Divider text above social sign up options"
   },
-  "orLogInWith": "",
+  "orLogInWith": "Ou connectez-vous avec",
   "@orLogInWith": {
     "description": "Divider text above social log in options"
   },
-  "forgotPassword": "",
+  "forgotPassword": "Mot de passe oublié ?",
   "@forgotPassword": {
     "description": "Link to password reset on the log in screen"
   },
-  "resetPassword": "",
+  "resetPassword": "Réinitialiser le mot de passe",
   "@resetPassword": {
     "description": "Title on the password reset screen"
   },
-  "sendResetLink": "",
+  "sendResetLink": "Envoyer le lien de réinitialisation",
   "@sendResetLink": {
     "description": "Button to email the password reset link"
   },
-  "backToLogin": "",
+  "backToLogin": "Retour à la connexion",
   "@backToLogin": {
     "description": "Link returning the user to the log in screen"
   },
-  "fullName": "",
+  "fullName": "Nom complet",
   "@fullName": {
     "description": "Label for the full name input field"
   },
-  "fullNameHint": "",
+  "fullNameHint": "Entrez votre nom complet",
   "@fullNameHint": {
     "description": "Placeholder text inside the full name field"
   },
-  "email": "",
+  "email": "Adresse e-mail",
   "@email": {
     "description": "Label for the email input field"
   },
-  "emailHint": "",
+  "emailHint": "Entrez votre adresse e-mail",
   "@emailHint": {
     "description": "Placeholder text inside the email field"
   },
-  "phoneNumber": "",
+  "phoneNumber": "Numéro de téléphone",
   "@phoneNumber": {
     "description": "Label for the phone number input field"
   },
-  "phoneNumberHint": "",
+  "phoneNumberHint": "Entrez votre numéro de téléphone",
   "@phoneNumberHint": {
     "description": "Placeholder text inside the phone number field"
   },
-  "password": "",
+  "password": "Mot de passe",
   "@password": {
     "description": "Label for the password input field"
   },
-  "passwordHint": "",
+  "passwordHint": "Entrez votre mot de passe",
   "@passwordHint": {
     "description": "Placeholder text inside the password field"
   },
-  "confirmPassword": "",
+  "confirmPassword": "Confirmer le mot de passe",
   "@confirmPassword": {
     "description": "Label for the confirm password input field"
   },
-  "confirmPasswordHint": "",
+  "confirmPasswordHint": "Confirmez votre mot de passe",
   "@confirmPasswordHint": {
     "description": "Placeholder inside the confirm password field"
   },
-  "termsAgreement": "",
+  "termsAgreement": "J'accepte",
   "@termsAgreement": {
     "description": "Prefix before the Terms and Privacy link on sign up"
   },
-  "termsAndPrivacy": "",
+  "termsAndPrivacy": "les conditions et la politique de confidentialité",
   "@termsAndPrivacy": {
     "description": "Link to the terms and privacy policy"
   },
-  "verifyPhone": "",
+  "verifyPhone": "Vérifier le téléphone",
   "@verifyPhone": {
     "description": "Title shown when verifying a phone number via OTP"
   },
-  "verifyEmail": "",
+  "verifyEmail": "Vérifier l'e-mail",
   "@verifyEmail": {
     "description": "Title shown when verifying an email address"
   },
-  "enterOtp": "",
+  "enterOtp": "Saisir l'OTP",
   "@enterOtp": {
     "description": "Prompt above the OTP input field"
   },
-  "otpSentTo": "",
+  "otpSentTo": "Nous avons envoyé un code de vérification à",
   "@otpSentTo": {
     "description": "Confirmation text above the masked email or phone"
   },
-  "resendCode": "",
+  "resendCode": "Renvoyer le code",
   "@resendCode": {
     "description": "Button to request a new OTP"
   },
-  "resendIn": "",
+  "resendIn": "Renvoyer dans",
   "@resendIn": {
     "description": "Prefix shown next to the OTP resend countdown timer"
   },
@@ -140,15 +140,15 @@
   "@verify": {
     "description": "Button to submit an OTP for verification"
   },
-  "didntReceiveCode": "",
+  "didntReceiveCode": "Vous n'avez pas reçu le code ?",
   "@didntReceiveCode": {
     "description": "Prompt before the resend code link"
   },
-  "completeProfile": "",
+  "completeProfile": "Compléter le profil",
   "@completeProfile": {
     "description": "Title on the KYC completion screen"
   },
-  "completeProfileSubtitle": "",
+  "completeProfileSubtitle": "Nous avons besoin de quelques informations supplémentaires pour sécuriser votre compte",
   "@completeProfileSubtitle": {
     "description": "Subtitle on the KYC completion screen"
   },
@@ -220,7 +220,7 @@
   "@continueText": {
     "description": "Generic continue/next button"
   },
-  "skip": "",
+  "skip": "Passer pour l'instant",
   "@skip": {
     "description": "Button to skip the current optional step"
   },
@@ -492,7 +492,7 @@
   "@darkMode": {
     "description": "Toggle label for dark theme"
   },
-  "biometricLogin": "",
+  "biometricLogin": "Connexion biométrique",
   "@biometricLogin": {
     "description": "Toggle label for biometric authentication"
   },
@@ -552,11 +552,11 @@
   "@errorWrongPassword": {
     "description": "Error shown when the password is incorrect on log in"
   },
-  "successAccountCreated": "",
+  "successAccountCreated": "Compte créé avec succès !",
   "@successAccountCreated": {
     "description": "Success message after sign up completes"
   },
-  "successLoggedIn": "",
+  "successLoggedIn": "Bon retour !",
   "@successLoggedIn": {
     "description": "Success message after a successful log in"
   },
@@ -572,7 +572,7 @@
   "@successProfileUpdated": {
     "description": "Success message after editing the profile"
   },
-  "successPasswordReset": "",
+  "successPasswordReset": "Lien de réinitialisation envoyé !",
   "@successPasswordReset": {
     "description": "Success message after a password reset email is sent"
   },
@@ -740,7 +740,7 @@
   "pageNotFound": "",
   "youAreOffline": "",
   "helloUser": "",
-  "welcomeBack": "",
+  "welcomeBack": "Bon retour",
   "availableBalanceLabel": "",
   "onHoldBalanceLabel": "",
   "transactionStatusPending": "",
@@ -780,38 +780,38 @@
   "errorWithMessage": "",
   "selectCountryTitle": "",
   "searchCountryHint": "",
-  "enterPhoneNumberHint": "",
-  "otpSentToPhone": "",
-  "phoneVerifiedSuccessfully": "",
+  "enterPhoneNumberHint": "Entrez le numéro de téléphone",
+  "otpSentToPhone": "OTP envoyé sur votre téléphone",
+  "phoneVerifiedSuccessfully": "Téléphone vérifié avec succès !",
   "verifyButton": "",
   "tryAgainButton": "",
-  "welcomeBackTitle": "",
-  "enterPasswordToUnlock": "",
-  "enterPinToUnlock": "",
-  "enterPasswordHint": "",
-  "unlockButton": "",
-  "useBiometric": "",
-  "forgotPasswordTitle": "",
-  "emailSentTitle": "",
-  "emailResetLinkSent": "",
-  "checkEmailForInstructions": "",
-  "didntReceiveEmailTryAgain": "",
-  "resetYourPasswordTitle": "",
-  "enterEmailForResetLink": "",
-  "enterEmailHint": "",
-  "emailVerifiedSuccessfully": "",
-  "verificationEmailSent": "",
-  "verifyYourEmailTitle": "",
-  "weveSentVerificationLinkTo": "",
+  "welcomeBackTitle": "Bon retour",
+  "enterPasswordToUnlock": "Entrez votre mot de passe pour déverrouiller",
+  "enterPinToUnlock": "Entrez votre code PIN pour déverrouiller",
+  "enterPasswordHint": "Entrez votre mot de passe",
+  "unlockButton": "Déverrouiller",
+  "useBiometric": "Utiliser la biométrie",
+  "forgotPasswordTitle": "Mot de passe oublié",
+  "emailSentTitle": "E-mail envoyé !",
+  "emailResetLinkSent": "Nous avons envoyé un lien de réinitialisation à :\n{email}",
+  "checkEmailForInstructions": "Veuillez consulter votre messagerie et suivre les instructions pour réinitialiser votre mot de passe.",
+  "didntReceiveEmailTryAgain": "Pas d'e-mail reçu ? Réessayez",
+  "resetYourPasswordTitle": "Réinitialisez votre mot de passe",
+  "enterEmailForResetLink": "Entrez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+  "enterEmailHint": "Entrez votre e-mail",
+  "emailVerifiedSuccessfully": "E-mail vérifié avec succès !",
+  "verificationEmailSent": "E-mail de vérification envoyé !",
+  "verifyYourEmailTitle": "Vérifiez votre e-mail",
+  "weveSentVerificationLinkTo": "Nous avons envoyé un lien de vérification à :",
   "checkingAutomatically": "",
-  "didntReceiveTheEmail": "",
+  "didntReceiveTheEmail": "Vous n'avez pas reçu l'e-mail ?",
   "checkNowButton": "",
-  "verifyPhoneTitle": "",
-  "verifyYourPhone": "",
-  "weSent6DigitCode": "",
-  "pleaseAgreeToTerms": "",
-  "accountCreatedVerifyEmail": "",
-  "appleSignInComingSoon": "",
+  "verifyPhoneTitle": "Vérifier le téléphone",
+  "verifyYourPhone": "Vérifiez votre téléphone",
+  "weSent6DigitCode": "Nous avons envoyé un code à 6 chiffres à",
+  "pleaseAgreeToTerms": "Veuillez accepter les conditions d'utilisation et la politique de confidentialité",
+  "accountCreatedVerifyEmail": "Compte créé ! Veuillez vérifier votre e-mail.",
+  "appleSignInComingSoon": "Connexion avec Apple bientôt disponible",
   "countryDisplayFormat": "",
   "verificationFailedWithError": "",
   "bvnVerificationTitle": "",
@@ -830,10 +830,10 @@
   "ugandaNinHelperText": "",
   "ugandaNinCardNumberHelperText": "",
   "phoneVerificationAppBarTitle": "",
-  "verifyCodeButton": "",
-  "resendCodeIn": "",
-  "resendCodeButton": "",
-  "sendVerificationCodeButton": "",
+  "verifyCodeButton": "Vérifier le code",
+  "resendCodeIn": "Renvoyer le code dans {seconds}s",
+  "resendCodeButton": "Renvoyer le code",
+  "sendVerificationCodeButton": "Envoyer le code de vérification",
   "verificationFailedTitle": "",
   "verificationFailedMessage": "",
   "verificationInProgressTitle": "",
@@ -884,7 +884,7 @@
   "securePaymentLabel": "",
   "paystackSecurityNote": "",
   "mobileMoneyProviderLabel": "",
-  "phoneNumberLabel": "",
+  "phoneNumberLabel": "Numéro de téléphone",
   "loadingAccountDetails": "",
   "virtualAccountTitle": "",
   "tapToGenerateAccountPrompt": "",
@@ -911,7 +911,7 @@
   "newBalanceLabel": "",
   "somethingWentWrongTryAgain": "",
   "goBackButton": "",
-  "enterOtpTitle": "",
+  "enterOtpTitle": "Saisir l'OTP",
   "enterOtpBody": "",
   "confirmWithdrawalTitle": "",
   "pleaseVerifyDetailsCorrect": "",
@@ -931,13 +931,13 @@
   "enterAccountHolderNameHint": "",
   "couldNotVerifyAccountError": "",
   "withdrawalFailedError": "",
-  "otpVerificationFailedError": "",
+  "otpVerificationFailedError": "Échec de la vérification de l'OTP",
   "aboutTitle": "",
   "qrWalletAppName": "",
   "versionAndBuild": "",
   "aboutAppDescription": "",
-  "termsOfServiceLink": "",
-  "privacyPolicyLink": "",
+  "termsOfServiceLink": "Conditions d'utilisation",
+  "privacyPolicyLink": "Politique de confidentialité",
   "rateUsLink": "",
   "rateUsToast": "",
   "shareAppLink": "",
@@ -993,17 +993,17 @@
   "systemThemeLabel": "",
   "systemThemeSubtitle": "",
   "previewLabel": "",
-  "passwordChangedTitle": "",
-  "passwordChangedBody": "",
+  "passwordChangedTitle": "Mot de passe modifié !",
+  "passwordChangedBody": "Votre mot de passe a été mis à jour avec succès.",
   "changePasswordAction": "",
-  "createNewPasswordSubtitle": "",
+  "createNewPasswordSubtitle": "Créez un nouveau mot de passe",
   "currentPasswordLabel": "",
   "enterCurrentPasswordHint": "",
   "newPasswordLabel": "",
   "enterNewPasswordHint": "",
   "confirmNewPasswordLabel": "",
   "reenterNewPasswordHint": "",
-  "passwordMustContainLabel": "",
+  "passwordMustContainLabel": "Le mot de passe doit contenir :",
   "pinChangedTitle": "",
   "pinChangedBody": "",
   "changePinAction": "",
@@ -1021,15 +1021,15 @@
   "emailAndPasswordMethod": "",
   "emailAndPasswordSubtitle": "",
   "resetPinSecurityAssurance": "",
-  "enterYourPasswordTitle": "",
+  "enterYourPasswordTitle": "Entrez votre mot de passe",
   "verifyByCredentialsBody": "",
-  "emailLabel": "",
-  "passwordLabel": "",
-  "enterYourPasswordHint": "",
+  "emailLabel": "E-mail",
+  "passwordLabel": "Mot de passe",
+  "enterYourPasswordHint": "Entrez votre mot de passe",
   "enter6DigitCodePhone": "",
-  "tooManyAttemptsError": "",
-  "failedToSendOtpError": "",
-  "incorrectCodeError": "",
+  "tooManyAttemptsError": "Trop de tentatives. Veuillez réessayer plus tard.",
+  "failedToSendOtpError": "Échec de l'envoi de l'OTP. Veuillez réessayer.",
+  "incorrectCodeError": "Code incorrect. Veuillez réessayer.",
   "verificationFailedAgainError": "",
   "verifyOtpToPhoneSubtitle": "",
   "noPhoneNumberLinkedSubtitle": "",
@@ -1228,7 +1228,7 @@
   "biometricErrorNotSupported": "",
   "biometricErrorNoBiometricsEnrolled": "",
   "biometricErrorFallback": "",
-  "biometricReasonAuthenticate": "",
+  "biometricReasonAuthenticate": "Authentifiez-vous pour accéder à votre QR Wallet",
   "biometricReasonChangeSecurity": "",
   "biometricReasonConfirmPayment": "",
   "walletErrorTooManyRequests": "",
