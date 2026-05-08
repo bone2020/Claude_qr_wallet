@@ -228,19 +228,19 @@
   "@home": {
     "description": "Bottom navigation tab label for the home screen"
   },
-  "totalBalance": "",
+  "totalBalance": "Solde total",
   "@totalBalance": {
     "description": "Label above the total wallet balance figure"
   },
-  "availableBalance": "",
+  "availableBalance": "Solde disponible",
   "@availableBalance": {
     "description": "Label above the available (spendable) balance figure"
   },
-  "hideBalance": "",
+  "hideBalance": "Masquer le solde",
   "@hideBalance": {
     "description": "Action to obscure the displayed wallet balance"
   },
-  "showBalance": "",
+  "showBalance": "Afficher le solde",
   "@showBalance": {
     "description": "Action to reveal the obscured wallet balance"
   },
@@ -252,11 +252,11 @@
   "@receive": {
     "description": "Action: receive money via QR or wallet ID"
   },
-  "addMoney": "",
+  "addMoney": "Ajouter de l'argent",
   "@addMoney": {
     "description": "Action: top up the wallet"
   },
-  "withdraw": "",
+  "withdraw": "Retirer",
   "@withdraw": {
     "description": "Action: withdraw funds from the wallet"
   },
@@ -288,7 +288,7 @@
   "@enterWalletId": {
     "description": "Action to manually type a recipient wallet ID"
   },
-  "walletId": "",
+  "walletId": "ID du portefeuille",
   "@walletId": {
     "description": "Label for a wallet ID field or display"
   },
@@ -296,11 +296,11 @@
   "@walletIdHint": {
     "description": "Placeholder text in the recipient wallet ID field"
   },
-  "amount": "",
+  "amount": "Montant",
   "@amount": {
     "description": "Label for an amount input field"
   },
-  "amountHint": "",
+  "amountHint": "Saisir le montant",
   "@amountHint": {
     "description": "Placeholder text inside the amount field"
   },
@@ -348,7 +348,7 @@
   "@downloadQrCode": {
     "description": "Action to save the QR code as an image"
   },
-  "walletIdCopied": "",
+  "walletIdCopied": "ID du portefeuille copié !",
   "@walletIdCopied": {
     "description": "Confirmation snackbar after copying the wallet ID"
   },
@@ -356,7 +356,7 @@
   "@tapToCopy": {
     "description": "Hint shown next to a copyable wallet ID"
   },
-  "addMoneyTitle": "",
+  "addMoneyTitle": "Ajouter de l'argent",
   "@addMoneyTitle": {
     "description": "Title of the add money screen (separate from action button)"
   },
@@ -388,7 +388,7 @@
   "@linkBank": {
     "description": "Button to confirm linking a bank account"
   },
-  "transferFrom": "",
+  "transferFrom": "Transférer depuis",
   "@transferFrom": {
     "description": "Label preceding the chosen funding source"
   },
@@ -532,11 +532,11 @@
   "@errorFieldRequired": {
     "description": "Validation error for an empty required field"
   },
-  "errorInsufficientBalance": "",
+  "errorInsufficientBalance": "Solde insuffisant",
   "@errorInsufficientBalance": {
     "description": "Error shown when wallet has too little to complete a send"
   },
-  "errorInvalidAmount": "",
+  "errorInvalidAmount": "Veuillez saisir un montant valide",
   "@errorInvalidAmount": {
     "description": "Validation error when amount is missing or zero/negative"
   },
@@ -564,7 +564,7 @@
   "@successMoneySent": {
     "description": "Success message after a transaction is dispatched"
   },
-  "successMoneyAdded": "",
+  "successMoneyAdded": "Argent ajouté avec succès !",
   "@successMoneyAdded": {
     "description": "Success message after a successful top up"
   },
@@ -732,17 +732,17 @@
   "@languageChanged": {
     "description": "Snackbar shown after a successful language change (Phase 6 NEW)"
   },
-  "currencyAmount": "",
-  "symbolAmount": "",
-  "signedCurrencyAmount": "",
-  "exchangeRateLine": "",
-  "currencyCodeWithSymbol": "",
+  "currencyAmount": "{currency} {amount}",
+  "symbolAmount": "{symbol}{amount}",
+  "signedCurrencyAmount": "{prefix}{currency}{amount}",
+  "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
+  "currencyCodeWithSymbol": "{symbol} ({code})",
   "pageNotFound": "",
   "youAreOffline": "",
   "helloUser": "",
   "welcomeBack": "Bon retour",
-  "availableBalanceLabel": "",
-  "onHoldBalanceLabel": "",
+  "availableBalanceLabel": "Disponible",
+  "onHoldBalanceLabel": "En attente",
   "transactionStatusPending": "",
   "transactionStatusFailed": "",
   "notificationsScreenTitle": "",
@@ -761,7 +761,7 @@
   "currencyConversion": "",
   "originalAmount": "",
   "convertedAmount": "",
-  "exchangeRateLabel": "",
+  "exchangeRateLabel": "Taux de change",
   "transactionItemsLabel": "",
   "positionQrCodeInFrame": "",
   "pleaseEnterValidWalletId": "",
@@ -769,11 +769,11 @@
   "scanRecipientQrToSend": "",
   "transactionPin": "",
   "enterPinToConfirm": "",
-  "pleaseEnterAmount": "",
+  "pleaseEnterAmount": "Veuillez saisir un montant",
   "amountSentTo": "",
   "paymentRequestLabel": "",
   "feeApproximateError": "",
-  "insufficientBalance": "",
+  "insufficientBalance": "Solde insuffisant pour ce transfert",
   "sellerRequestedLabel": "",
   "recipientReceivesLabel": "",
   "sendButtonAmount": "",
@@ -845,14 +845,14 @@
   "qrCodeSavedToGallery": "",
   "errorSavingQrCode": "",
   "maximum20ItemsAllowed": "",
-  "pleaseEnterValidAmount": "",
+  "pleaseEnterValidAmount": "Veuillez saisir un montant valide",
   "errorGeneratingQr": "",
   "errorSharingQr": "",
   "requestPaymentTitle": "",
   "newRequestTooltip": "",
   "createPaymentRequestTitle": "",
   "createPaymentRequestDescription": "",
-  "amountLabel": "",
+  "amountLabel": "Montant",
   "itemsOptional": "",
   "itemsHint": "",
   "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
@@ -867,62 +867,62 @@
   "loadingPlaceholder": "",
   "payRequestShareText": "",
   "approvePaymentTitle": "",
-  "mtnMomoApprovePromptBody": "",
-  "checkPhoneForApprovalPrompt": "",
-  "iveApproved": "",
+  "mtnMomoApprovePromptBody": "Veuillez approuver le paiement de {symbol}{amount} sur votre téléphone MTN MoMo.",
+  "checkPhoneForApprovalPrompt": "Vérifiez votre téléphone pour l'invite d'approbation.",
+  "iveApproved": "J'ai approuvé",
   "labelCopiedToClipboard": "",
   "paymentSuccessful": "",
   "paymentSuccessfulHero": "",
   "paymentFailed": "",
-  "amountWithCurrency": "",
+  "amountWithCurrency": "Montant : {symbol}{amount}",
   "referenceWithValue": "",
   "doneButton": "",
-  "mobileMoneyNotAvailableTitle": "",
-  "mobileMoneyNotAvailablePaymentsBody": "",
-  "enterAmountLabel": "",
+  "mobileMoneyNotAvailableTitle": "Mobile Money non disponible",
+  "mobileMoneyNotAvailablePaymentsBody": "Les paiements Mobile Money ne sont pas disponibles dans votre région. Veuillez utiliser la carte ou le virement bancaire.",
+  "enterAmountLabel": "Saisir le montant",
   "quickSelectLabel": "",
   "securePaymentLabel": "",
-  "paystackSecurityNote": "",
-  "mobileMoneyProviderLabel": "",
+  "paystackSecurityNote": "Propulsé par Paystack. Vos informations de paiement sont sécurisées.",
+  "mobileMoneyProviderLabel": "Opérateur Mobile Money",
   "phoneNumberLabel": "Numéro de téléphone",
   "loadingAccountDetails": "Chargement des détails du compte...",
-  "virtualAccountTitle": "",
+  "virtualAccountTitle": "Compte virtuel",
   "tapToGenerateAccountPrompt": "Appuyez pour générer votre numéro de compte dédié",
   "generateAccountButton": "Générer le compte",
-  "yourVirtualAccountLabel": "",
+  "yourVirtualAccountLabel": "Votre compte virtuel",
   "bankNameLabel": "Nom de la banque",
   "accountNumberLabel": "Numéro de compte",
   "accountNameLabel": "Nom du titulaire",
   "howItWorksLabel": "",
-  "virtualAccountInfoBody": "",
-  "mtnMomoPaymentFailedError": "",
+  "virtualAccountInfoBody": "Ce compte vous est unique. Tout virement vers ce compte crédite automatiquement votre portefeuille.",
+  "mtnMomoPaymentFailedError": "Échec du paiement MTN MoMo",
   "paymentFailedOrRejectedError": "",
   "paymentFailedError": "",
-  "cardTabLabel": "",
-  "mobileMoneyTabLabel": "",
-  "bankTransferTabLabel": "",
-  "continueToPaymentButton": "",
-  "payWithMobileMoneyButton": "",
+  "cardTabLabel": "Carte",
+  "mobileMoneyTabLabel": "Mobile Money",
+  "bankTransferTabLabel": "Virement bancaire",
+  "continueToPaymentButton": "Continuer vers le paiement",
+  "payWithMobileMoneyButton": "Payer avec Mobile Money",
   "verifyingPaymentTitle": "",
   "verifyingPaymentBody": "",
   "referenceColon": "",
-  "hasBeenAddedToWallet": "",
+  "hasBeenAddedToWallet": "a été ajouté à votre portefeuille",
   "referenceLabel": "",
-  "newBalanceLabel": "",
+  "newBalanceLabel": "Nouveau solde",
   "somethingWentWrongTryAgain": "",
   "goBackButton": "",
   "enterOtpTitle": "Saisir l'OTP",
-  "enterOtpBody": "",
-  "confirmWithdrawalTitle": "",
+  "enterOtpBody": "Veuillez saisir l'OTP envoyé à votre téléphone/e-mail enregistré pour finaliser le retrait de {symbol}{amount}",
+  "confirmWithdrawalTitle": "Confirmer le retrait",
   "pleaseVerifyDetailsCorrect": "",
   "confirmButton": "",
-  "withdrawalInitiatedTitle": "",
-  "withdrawalBeingProcessed": "",
-  "refLine": "",
-  "withdrawAction": "",
-  "mobileMoneyNotAvailableWithdrawalsBody": "",
-  "availableBalanceFull": "",
-  "amountToWithdrawLabel": "",
+  "withdrawalInitiatedTitle": "Retrait initié",
+  "withdrawalBeingProcessed": "{symbol}{amount} est en cours de traitement",
+  "refLine": "Réf : {reference}",
+  "withdrawAction": "Retirer",
+  "mobileMoneyNotAvailableWithdrawalsBody": "Les retraits Mobile Money ne sont pas disponibles dans votre région. Veuillez utiliser le virement bancaire.",
+  "availableBalanceFull": "Solde disponible",
+  "amountToWithdrawLabel": "Montant à retirer",
   "selectBankLabel": "Sélectionner une banque",
   "selectABankHint": "Sélectionnez une banque",
   "enterAccountNumberHint": "Saisissez le numéro de compte",
@@ -930,7 +930,7 @@
   "accountVerifiedLabel": "Compte vérifié",
   "enterAccountHolderNameHint": "Saisissez le nom du titulaire",
   "couldNotVerifyAccountError": "Impossible de vérifier le compte",
-  "withdrawalFailedError": "",
+  "withdrawalFailedError": "Échec du retrait",
   "otpVerificationFailedError": "Échec de la vérification de l'OTP",
   "aboutTitle": "",
   "qrWalletAppName": "",
@@ -1130,11 +1130,11 @@
   "ssnitLabel": "SSNIT",
   "ugandaNationalIdLabel": "Carte nationale d'identité (NIN)",
   "tpinFullLabel": "PIN du contribuable (TPIN)",
-  "momoErrorNotConfigured": "",
-  "momoErrorPaymentDeclined": "",
-  "momoErrorInsufficientFunds": "",
-  "momoErrorInvalidPhone": "",
-  "momoErrorPaymentTimeout": "",
+  "momoErrorNotConfigured": "Mobile Money sera bientôt disponible ! Cette fonctionnalité n'est pas encore disponible. Veuillez utiliser la carte ou le virement bancaire à la place.",
+  "momoErrorPaymentDeclined": "Le paiement a été refusé. Veuillez vérifier votre solde Mobile Money et réessayer.",
+  "momoErrorInsufficientFunds": "Fonds insuffisants sur votre compte Mobile Money.",
+  "momoErrorInvalidPhone": "Numéro de téléphone invalide. Veuillez vérifier et réessayer.",
+  "momoErrorPaymentTimeout": "La demande de paiement a expiré. Veuillez vérifier votre téléphone pour l'invite d'approbation et réessayer.",
   "genericErrorNetwork": "Connexion impossible. Veuillez vérifier votre connexion Internet et réessayer.",
   "genericErrorCameraPermission": "L'accès à la caméra est requis pour la vérification. Veuillez activer les autorisations de la caméra dans les paramètres de votre appareil.",
   "genericErrorUserCancelled": "La vérification a été annulée. Vous pouvez réessayer quand vous serez prêt.",
@@ -1231,21 +1231,21 @@
   "biometricReasonAuthenticate": "Authentifiez-vous pour accéder à votre QR Wallet",
   "biometricReasonChangeSecurity": "Authentifiez-vous pour modifier les paramètres de sécurité",
   "biometricReasonConfirmPayment": "Confirmer le paiement de {currencySymbol}{amount} à {recipient}",
-  "walletErrorTooManyRequests": "",
-  "walletErrorFailedToLookupWallet": "",
-  "walletErrorFailedToFetchTransaction": "",
-  "walletErrorFallback": "",
-  "exchangeRateErrorUnsupportedCurrency": "",
-  "exchangeRateErrorUnsupportedCurrencyPair": "",
-  "walletUiErrorUserNotFound": "",
-  "walletUiErrorPleaseSelectMomoProvider": "",
-  "walletUiErrorPaymentStillPending": "",
+  "walletErrorTooManyRequests": "Trop de requêtes. Veuillez réessayer plus tard.",
+  "walletErrorFailedToLookupWallet": "Échec de la recherche du portefeuille",
+  "walletErrorFailedToFetchTransaction": "Échec de la récupération de la transaction",
+  "walletErrorFallback": "L'opération du portefeuille a échoué. Veuillez réessayer.",
+  "exchangeRateErrorUnsupportedCurrency": "Devise non prise en charge",
+  "exchangeRateErrorUnsupportedCurrencyPair": "Devise non prise en charge : {from} ou {to}",
+  "walletUiErrorUserNotFound": "Utilisateur introuvable. Veuillez vous reconnecter.",
+  "walletUiErrorPleaseSelectMomoProvider": "Veuillez sélectionner un opérateur Mobile Money",
+  "walletUiErrorPaymentStillPending": "Paiement toujours en attente. Veuillez vérifier votre téléphone et réessayer.",
   "walletUiErrorPleaseSelectBank": "Veuillez sélectionner une banque",
   "walletUiErrorAccountNumberTooShort": "Le numéro de compte doit comporter au moins {minDigits} chiffres",
   "walletUiErrorPleaseVerifyAccount": "Veuillez d'abord vérifier votre compte",
   "walletUiErrorPleaseEnterAccountName": "Veuillez saisir le nom du titulaire",
-  "walletUiErrorWithdrawalFailedRefunded": "",
-  "walletUiErrorPleaseEnter6DigitOtp": "",
+  "walletUiErrorWithdrawalFailedRefunded": "Échec du retrait. Votre solde a été remboursé.",
+  "walletUiErrorPleaseEnter6DigitOtp": "Veuillez saisir un OTP valide à 6 chiffres",
   "sendUiErrorCouldNotVerifyRecipientWallet": "",
   "sendUiErrorCouldNotReadQrCode": "",
   "sendUiErrorPreviewTimedOut": "",
