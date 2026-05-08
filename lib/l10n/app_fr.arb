@@ -1,10 +1,10 @@
 {
   "@@locale": "fr",
-  "appName": "",
+  "appName": "QR Wallet",
   "@appName": {
     "description": "App name shown in title bars and splash"
   },
-  "appTagline": "",
+  "appTagline": "Paiements fluides, partout",
   "@appTagline": {
     "description": "Tagline shown on splash screen"
   },
@@ -216,7 +216,7 @@
   "@takePhoto": {
     "description": "Button to take a new photo with the camera"
   },
-  "continueText": "",
+  "continueText": "Continuer",
   "@continueText": {
     "description": "Generic continue/next button"
   },
@@ -224,7 +224,7 @@
   "@skip": {
     "description": "Button to skip the current optional step"
   },
-  "home": "",
+  "home": "Accueil",
   "@home": {
     "description": "Bottom navigation tab label for the home screen"
   },
@@ -504,31 +504,31 @@
   "@changePin": {
     "description": "Profile row to change the wallet PIN"
   },
-  "errorGeneric": "",
+  "errorGeneric": "Une erreur s'est produite. Veuillez réessayer.",
   "@errorGeneric": {
     "description": "Fallback error message when the cause is unknown"
   },
-  "errorNetwork": "",
+  "errorNetwork": "Aucune connexion Internet. Veuillez vérifier votre réseau.",
   "@errorNetwork": {
     "description": "Error shown when offline or network is unreachable"
   },
-  "errorInvalidEmail": "",
+  "errorInvalidEmail": "Veuillez saisir une adresse e-mail valide",
   "@errorInvalidEmail": {
     "description": "Validation error when an email field's content is malformed"
   },
-  "errorInvalidPhone": "",
+  "errorInvalidPhone": "Veuillez saisir un numéro de téléphone valide",
   "@errorInvalidPhone": {
     "description": "Validation error when a phone field's content is malformed"
   },
-  "errorPasswordMismatch": "",
+  "errorPasswordMismatch": "Les mots de passe ne correspondent pas",
   "@errorPasswordMismatch": {
     "description": "Validation error when password and confirm password differ"
   },
-  "errorPasswordWeak": "",
+  "errorPasswordWeak": "Le mot de passe doit comporter au moins 8 caractères",
   "@errorPasswordWeak": {
     "description": "Validation error when the password is too short"
   },
-  "errorFieldRequired": "",
+  "errorFieldRequired": "Ce champ est obligatoire",
   "@errorFieldRequired": {
     "description": "Validation error for an empty required field"
   },
@@ -540,15 +540,15 @@
   "@errorInvalidAmount": {
     "description": "Validation error when amount is missing or zero/negative"
   },
-  "errorInvalidOtp": "",
+  "errorInvalidOtp": "OTP invalide. Veuillez réessayer.",
   "@errorInvalidOtp": {
     "description": "Error shown when the entered OTP code is wrong"
   },
-  "errorUserNotFound": "",
+  "errorUserNotFound": "Utilisateur introuvable",
   "@errorUserNotFound": {
     "description": "Error shown when the entered email/phone has no account"
   },
-  "errorWrongPassword": "",
+  "errorWrongPassword": "Mot de passe incorrect",
   "@errorWrongPassword": {
     "description": "Error shown when the password is incorrect on log in"
   },
@@ -576,39 +576,39 @@
   "@successPasswordReset": {
     "description": "Success message after a password reset email is sent"
   },
-  "ok": "",
+  "ok": "OK",
   "@ok": {
     "description": "Confirmation button: acknowledge"
   },
-  "cancel": "",
+  "cancel": "Annuler",
   "@cancel": {
     "description": "Action to abort the current flow"
   },
-  "confirm": "",
+  "confirm": "Confirmer",
   "@confirm": {
     "description": "Confirmation button: proceed"
   },
-  "save": "",
+  "save": "Enregistrer",
   "@save": {
     "description": "Action to persist edits"
   },
-  "done": "",
+  "done": "Terminé",
   "@done": {
     "description": "Action to close the current step as complete"
   },
-  "next": "",
+  "next": "Suivant",
   "@next": {
     "description": "Action to advance to the next step"
   },
-  "back": "",
+  "back": "Retour",
   "@back": {
     "description": "Action to return to the previous step"
   },
-  "retry": "",
+  "retry": "Réessayer",
   "@retry": {
     "description": "Action to attempt the failed operation again"
   },
-  "close": "",
+  "close": "Fermer",
   "@close": {
     "description": "Action to dismiss a dialog or modal"
   },
@@ -737,8 +737,8 @@
   "signedCurrencyAmount": "{prefix}{currency}{amount}",
   "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
   "currencyCodeWithSymbol": "{symbol} ({code})",
-  "pageNotFound": "",
-  "youAreOffline": "",
+  "pageNotFound": "Page introuvable : {uri}",
+  "youAreOffline": "Vous êtes hors ligne",
   "helloUser": "Bonjour, {userName} 👋",
   "welcomeBack": "Bon retour",
   "availableBalanceLabel": "Disponible",
@@ -777,14 +777,14 @@
   "sellerRequestedLabel": "Le vendeur a demandé :",
   "recipientReceivesLabel": "Le destinataire reçoit :",
   "sendButtonAmount": "Envoyer {currency}{amount}",
-  "errorWithMessage": "",
+  "errorWithMessage": "Erreur : {message}",
   "selectCountryTitle": "Sélectionner le pays",
   "searchCountryHint": "Rechercher un pays...",
   "enterPhoneNumberHint": "Entrez le numéro de téléphone",
   "otpSentToPhone": "OTP envoyé sur votre téléphone",
   "phoneVerifiedSuccessfully": "Téléphone vérifié avec succès !",
   "verifyButton": "Vérifier",
-  "tryAgainButton": "",
+  "tryAgainButton": "Réessayer",
   "welcomeBackTitle": "Bon retour",
   "enterPasswordToUnlock": "Entrez votre mot de passe pour déverrouiller",
   "enterPinToUnlock": "Entrez votre code PIN pour déverrouiller",
@@ -805,7 +805,7 @@
   "weveSentVerificationLinkTo": "Nous avons envoyé un lien de vérification à :",
   "checkingAutomatically": "Vérification automatique...",
   "didntReceiveTheEmail": "Vous n'avez pas reçu l'e-mail ?",
-  "checkNowButton": "",
+  "checkNowButton": "Vérifier maintenant",
   "verifyPhoneTitle": "Vérifier le téléphone",
   "verifyYourPhone": "Vérifiez votre téléphone",
   "weSent6DigitCode": "Nous avons envoyé un code à 6 chiffres à",
@@ -829,7 +829,7 @@
   "ssnitHelperText": "Votre numéro SSNIT : 1 lettre suivie de 12 chiffres",
   "ugandaNinHelperText": "Votre NIN comporte 14 caractères alphanumériques",
   "ugandaNinCardNumberHelperText": "Le numéro imprimé sur votre carte d'identité physique",
-  "phoneVerificationAppBarTitle": "",
+  "phoneVerificationAppBarTitle": "Vérification du téléphone",
   "verifyCodeButton": "Vérifier le code",
   "resendCodeIn": "Renvoyer le code dans {seconds}s",
   "resendCodeButton": "Renvoyer le code",
@@ -838,7 +838,7 @@
   "verificationFailedMessage": "Votre vérification d'identité n'a pas réussi. Cela peut être dû à une non-correspondance du visage ou à un problème de document. Veuillez réessayer.",
   "verificationInProgressTitle": "Vérification en cours",
   "verificationInProgressMessage": "Vos documents d'identité sont en cours de vérification. Cela prend généralement quelques secondes mais peut prendre jusqu'à quelques minutes.",
-  "pleaseWait": "",
+  "pleaseWait": "Veuillez patienter...",
   "verificationDoNotCloseApp": "Vous serez automatiquement redirigé une fois la vérification terminée. Ne fermez pas l'application.",
   "saving": "Enregistrement...",
   "storagePermissionRequired": "Autorisation de stockage requise pour enregistrer le QR code",
@@ -858,13 +858,13 @@
   "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
   "generateQrCode": "Générer le QR code",
   "payToUser": "Payer à : {userName}",
-  "shareButton": "",
+  "shareButton": "Partager",
   "qrCodeInfoForCustomer": "Présentez ce QR code au client.\nIl le scanne, confirme le montant, et paie instantanément !",
   "createNewRequest": "Créer une nouvelle demande",
-  "downloadButton": "",
+  "downloadButton": "Télécharger",
   "shareWalletIdSubject": "Mon ID QR Wallet",
   "defaultUserName": "Utilisateur",
-  "loadingPlaceholder": "",
+  "loadingPlaceholder": "Chargement...",
   "payRequestShareText": "Payez {symbol}{amount} à {userName}",
   "approvePaymentTitle": "Approuver le paiement",
   "mtnMomoApprovePromptBody": "Veuillez approuver le paiement de {symbol}{amount} sur votre téléphone MTN MoMo.",
@@ -876,11 +876,11 @@
   "paymentFailed": "Échec du paiement",
   "amountWithCurrency": "Montant : {symbol}{amount}",
   "referenceWithValue": "Référence : {reference}",
-  "doneButton": "",
+  "doneButton": "Terminé",
   "mobileMoneyNotAvailableTitle": "Mobile Money non disponible",
   "mobileMoneyNotAvailablePaymentsBody": "Les paiements Mobile Money ne sont pas disponibles dans votre région. Veuillez utiliser la carte ou le virement bancaire.",
   "enterAmountLabel": "Saisir le montant",
-  "quickSelectLabel": "",
+  "quickSelectLabel": "Sélection rapide",
   "securePaymentLabel": "Paiement sécurisé",
   "paystackSecurityNote": "Propulsé par Paystack. Vos informations de paiement sont sécurisées.",
   "mobileMoneyProviderLabel": "Opérateur Mobile Money",
@@ -909,13 +909,13 @@
   "hasBeenAddedToWallet": "a été ajouté à votre portefeuille",
   "referenceLabel": "Référence",
   "newBalanceLabel": "Nouveau solde",
-  "somethingWentWrongTryAgain": "",
-  "goBackButton": "",
+  "somethingWentWrongTryAgain": "Une erreur s'est produite. Veuillez réessayer.",
+  "goBackButton": "Retour",
   "enterOtpTitle": "Saisir l'OTP",
   "enterOtpBody": "Veuillez saisir l'OTP envoyé à votre téléphone/e-mail enregistré pour finaliser le retrait de {symbol}{amount}",
   "confirmWithdrawalTitle": "Confirmer le retrait",
   "pleaseVerifyDetailsCorrect": "Veuillez vérifier que les détails sont corrects",
-  "confirmButton": "",
+  "confirmButton": "Confirmer",
   "withdrawalInitiatedTitle": "Retrait initié",
   "withdrawalBeingProcessed": "{symbol}{amount} est en cours de traitement",
   "refLine": "Réf : {reference}",
@@ -1038,7 +1038,7 @@
   "chatOnWhatsAppDialogTitle": "Discuter sur WhatsApp",
   "scanWithAnotherPhoneCaption": "Scannez avec un autre téléphone\nou appuyez sur « Ouvrir WhatsApp » ci-dessous",
   "openWhatsAppButton": "Ouvrir WhatsApp",
-  "closeButton": "",
+  "closeButton": "Fermer",
   "helpAndSupportTitle": "Aide et support",
   "contactUsSection": "Nous contacter",
   "emailSupportLabel": "Support par e-mail",
@@ -1062,7 +1062,7 @@
   "removeAccountConfirmTitle": "Supprimer le compte ?",
   "removeAccountConfirmBody": "Êtes-vous sûr de vouloir supprimer ce compte bancaire ?",
   "accountRemovedToast": "Compte supprimé",
-  "failedToRemoveError": "",
+  "failedToRemoveError": "Échec de la suppression : {error}",
   "linkedBankAccountsTitle": "Comptes bancaires liés",
   "noBankAccountsEmptyTitle": "Aucun compte bancaire",
   "noBankAccountsEmptySubtitle": "Ajoutez un compte bancaire pour faciliter les retraits",
@@ -1106,7 +1106,7 @@
   "invalidIdNumberFallback": "Numéro d'identification invalide",
   "tpinLabel": "TPIN",
   "idNumberLabel": "Numéro d'identification",
-  "enterTpinHint": "",
+  "enterTpinHint": "Saisissez votre TPIN à 10 chiffres",
   "enterIdNumberHint": "Saisissez votre numéro d'identification à 13 chiffres",
   "zambianTaxpayerHelperText": "Votre numéro d'identification fiscale zambien",
   "southAfricanIdHelperText": "Votre numéro de carte d'identité sud-africaine",
@@ -1160,45 +1160,45 @@
   "kycErrorDocumentUploadNetwork": "Échec du téléversement du document. Veuillez vérifier votre connexion et réessayer.",
   "kycErrorImageTooLarge": "Le fichier image est trop volumineux. Veuillez utiliser une image plus petite.",
   "kycErrorDocumentUploadGeneric": "Échec du téléversement du document. Veuillez réessayer.",
-  "firebaseAuthErrorNetwork": "",
-  "firebaseAuthErrorTooManyRequests": "",
-  "firebaseAuthErrorUserNotFound": "",
-  "firebaseAuthErrorWrongPassword": "",
-  "firebaseAuthErrorEmailAlreadyInUse": "",
-  "firebaseAuthErrorInvalidEmail": "",
-  "firebaseAuthErrorWeakPassword": "",
-  "firebaseAuthErrorInvalidPhone": "",
-  "firebaseAuthErrorInvalidVerificationCode": "",
-  "firebaseAuthErrorServiceUnavailable": "",
-  "firebaseAuthErrorOperationNotAllowed": "",
-  "firebaseAuthErrorFallback": "",
-  "authErrorFailedToCreateUser": "",
-  "authErrorFailedToSignIn": "",
-  "authErrorUserDataNotFound": "",
-  "authErrorGoogleSignInCancelled": "",
-  "authErrorFailedToSignInWithGoogle": "",
-  "authErrorFailedToSignInWithApple": "",
-  "authErrorAppleSignInCancelled": "",
-  "authErrorAppleSignInFailed": "",
-  "authErrorFailedToVerifyOtp": "",
-  "authErrorUserNotFound": "",
-  "authErrorNoUserLoggedIn": "",
-  "authErrorNoVerificationId": "",
-  "authErrorFirebaseAccountNotFound": "",
-  "authErrorFirebaseWrongPassword": "",
-  "authErrorFirebaseEmailAlreadyInUse": "",
-  "authErrorFirebaseInvalidEmail": "",
-  "authErrorFirebaseWeakPassword": "",
-  "authErrorFirebaseTooManyRequests": "",
-  "authErrorFirebaseInvalidVerificationCode": "",
-  "authErrorFirebaseInvalidVerificationId": "",
-  "authErrorFirebaseCredentialAlreadyInUse": "",
-  "authErrorFirebaseNetworkRequestFailed": "",
-  "authErrorFallback": "",
-  "userErrorUserNotAuthenticated": "",
-  "userErrorNoUpdatesProvided": "",
-  "userErrorIdFrontImageRequired": "",
-  "userErrorFallback": "",
+  "firebaseAuthErrorNetwork": "Impossible de se connecter. Veuillez vérifier votre connexion Internet.",
+  "firebaseAuthErrorTooManyRequests": "Trop de tentatives. Veuillez patienter quelques minutes et réessayer.",
+  "firebaseAuthErrorUserNotFound": "Compte introuvable. Veuillez vérifier vos identifiants ou créer un compte.",
+  "firebaseAuthErrorWrongPassword": "Mot de passe incorrect. Veuillez réessayer.",
+  "firebaseAuthErrorEmailAlreadyInUse": "Cette adresse e-mail est déjà enregistrée. Veuillez vous connecter à la place.",
+  "firebaseAuthErrorInvalidEmail": "Veuillez saisir une adresse e-mail valide.",
+  "firebaseAuthErrorWeakPassword": "Mot de passe trop faible. Veuillez utiliser au moins 6 caractères.",
+  "firebaseAuthErrorInvalidPhone": "Veuillez saisir un numéro de téléphone valide.",
+  "firebaseAuthErrorInvalidVerificationCode": "Code de vérification invalide. Veuillez vérifier et réessayer.",
+  "firebaseAuthErrorServiceUnavailable": "Service temporairement indisponible. Veuillez réessayer plus tard.",
+  "firebaseAuthErrorOperationNotAllowed": "Vous n'avez pas la permission d'effectuer cette action.",
+  "firebaseAuthErrorFallback": "Une erreur s'est produite. Veuillez réessayer.",
+  "authErrorFailedToCreateUser": "Échec de la création de l'utilisateur",
+  "authErrorFailedToSignIn": "Échec de la connexion",
+  "authErrorUserDataNotFound": "Données utilisateur introuvables",
+  "authErrorGoogleSignInCancelled": "Connexion Google annulée",
+  "authErrorFailedToSignInWithGoogle": "Échec de la connexion avec Google",
+  "authErrorFailedToSignInWithApple": "Échec de la connexion avec Apple",
+  "authErrorAppleSignInCancelled": "Connexion Apple annulée",
+  "authErrorAppleSignInFailed": "Échec de la connexion Apple",
+  "authErrorFailedToVerifyOtp": "Échec de la vérification de l'OTP",
+  "authErrorUserNotFound": "Utilisateur introuvable",
+  "authErrorNoUserLoggedIn": "Aucun utilisateur connecté",
+  "authErrorNoVerificationId": "Aucun ID de vérification. Veuillez redemander l'OTP.",
+  "authErrorFirebaseAccountNotFound": "Aucun compte trouvé avec cette adresse e-mail",
+  "authErrorFirebaseWrongPassword": "Mot de passe incorrect",
+  "authErrorFirebaseEmailAlreadyInUse": "Un compte existe déjà avec cette adresse e-mail",
+  "authErrorFirebaseInvalidEmail": "Veuillez saisir une adresse e-mail valide",
+  "authErrorFirebaseWeakPassword": "Le mot de passe doit comporter au moins 6 caractères",
+  "authErrorFirebaseTooManyRequests": "Trop de tentatives. Veuillez réessayer plus tard",
+  "authErrorFirebaseInvalidVerificationCode": "Code OTP invalide. Veuillez réessayer",
+  "authErrorFirebaseInvalidVerificationId": "Session de vérification expirée. Veuillez demander un nouveau code",
+  "authErrorFirebaseCredentialAlreadyInUse": "Ce numéro de téléphone est déjà lié à un autre compte",
+  "authErrorFirebaseNetworkRequestFailed": "Erreur réseau. Veuillez vérifier votre connexion",
+  "authErrorFallback": "Une erreur est survenue. Veuillez réessayer",
+  "userErrorUserNotAuthenticated": "Utilisateur non authentifié",
+  "userErrorNoUpdatesProvided": "Aucune mise à jour fournie",
+  "userErrorIdFrontImageRequired": "L'image recto de la pièce d'identité est obligatoire",
+  "userErrorFallback": "Impossible de finaliser l'action. Veuillez réessayer.",
   "kycErrorPleaseCompleteSmileId": "Veuillez compléter la vérification avec Smile ID",
   "kycErrorPleaseSelectDateOfBirth": "Veuillez sélectionner votre date de naissance",
   "kycErrorPleaseSelectDateOfBirthBeforeSelfie": "Veuillez sélectionner votre date de naissance avant de prendre le selfie",
