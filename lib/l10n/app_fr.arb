@@ -360,31 +360,31 @@
   "@addMoneyTitle": {
     "description": "Title of the add money screen (separate from action button)"
   },
-  "selectBank": "",
+  "selectBank": "Sélectionner une banque",
   "@selectBank": {
     "description": "Action to choose a linked bank for funding"
   },
-  "linkedBanks": "",
+  "linkedBanks": "Banques liées",
   "@linkedBanks": {
     "description": "Section header listing the user's linked bank accounts"
   },
-  "addNewBank": "",
+  "addNewBank": "Ajouter une nouvelle banque",
   "@addNewBank": {
     "description": "Action to link a new bank account"
   },
-  "bankName": "",
+  "bankName": "Nom de la banque",
   "@bankName": {
     "description": "Label for a bank name field"
   },
-  "accountNumber": "",
+  "accountNumber": "Numéro de compte",
   "@accountNumber": {
     "description": "Label for an account number field"
   },
-  "accountName": "",
+  "accountName": "Nom du titulaire",
   "@accountName": {
     "description": "Label for the displayed account holder name"
   },
-  "linkBank": "",
+  "linkBank": "Lier une banque",
   "@linkBank": {
     "description": "Button to confirm linking a bank account"
   },
@@ -468,7 +468,7 @@
   "@notifications": {
     "description": "Section header and screen title for notification settings"
   },
-  "linkedAccounts": "",
+  "linkedAccounts": "Comptes liés",
   "@linkedAccounts": {
     "description": "Profile row leading to linked accounts management"
   },
@@ -885,14 +885,14 @@
   "paystackSecurityNote": "",
   "mobileMoneyProviderLabel": "",
   "phoneNumberLabel": "Numéro de téléphone",
-  "loadingAccountDetails": "",
+  "loadingAccountDetails": "Chargement des détails du compte...",
   "virtualAccountTitle": "",
-  "tapToGenerateAccountPrompt": "",
-  "generateAccountButton": "",
+  "tapToGenerateAccountPrompt": "Appuyez pour générer votre numéro de compte dédié",
+  "generateAccountButton": "Générer le compte",
   "yourVirtualAccountLabel": "",
-  "bankNameLabel": "",
-  "accountNumberLabel": "",
-  "accountNameLabel": "",
+  "bankNameLabel": "Nom de la banque",
+  "accountNumberLabel": "Numéro de compte",
+  "accountNameLabel": "Nom du titulaire",
   "howItWorksLabel": "",
   "virtualAccountInfoBody": "",
   "mtnMomoPaymentFailedError": "",
@@ -923,13 +923,13 @@
   "mobileMoneyNotAvailableWithdrawalsBody": "",
   "availableBalanceFull": "",
   "amountToWithdrawLabel": "",
-  "selectBankLabel": "",
-  "selectABankHint": "",
-  "enterAccountNumberHint": "",
-  "enterAtLeastDigitsToVerify": "",
-  "accountVerifiedLabel": "",
-  "enterAccountHolderNameHint": "",
-  "couldNotVerifyAccountError": "",
+  "selectBankLabel": "Sélectionner une banque",
+  "selectABankHint": "Sélectionnez une banque",
+  "enterAccountNumberHint": "Saisissez le numéro de compte",
+  "enterAtLeastDigitsToVerify": "Saisissez au moins {count} chiffres pour vérifier",
+  "accountVerifiedLabel": "Compte vérifié",
+  "enterAccountHolderNameHint": "Saisissez le nom du titulaire",
+  "couldNotVerifyAccountError": "Impossible de vérifier le compte",
   "withdrawalFailedError": "",
   "otpVerificationFailedError": "Échec de la vérification de l'OTP",
   "aboutTitle": "",
@@ -1059,17 +1059,17 @@
   "faqChangePinAnswer": "",
   "faqForgotPasswordQuestion": "",
   "faqForgotPasswordAnswer": "",
-  "removeAccountConfirmTitle": "",
-  "removeAccountConfirmBody": "",
-  "accountRemovedToast": "",
+  "removeAccountConfirmTitle": "Supprimer le compte ?",
+  "removeAccountConfirmBody": "Êtes-vous sûr de vouloir supprimer ce compte bancaire ?",
+  "accountRemovedToast": "Compte supprimé",
   "failedToRemoveError": "",
-  "linkedBankAccountsTitle": "",
-  "noBankAccountsEmptyTitle": "",
-  "noBankAccountsEmptySubtitle": "",
-  "addBankAccountAction": "",
-  "bankAccountFallback": "",
-  "bankNameHint": "",
-  "nameOnAccountHint": "",
+  "linkedBankAccountsTitle": "Comptes bancaires liés",
+  "noBankAccountsEmptyTitle": "Aucun compte bancaire",
+  "noBankAccountsEmptySubtitle": "Ajoutez un compte bancaire pour faciliter les retraits",
+  "addBankAccountAction": "Ajouter un compte bancaire",
+  "bankAccountFallback": "Compte bancaire",
+  "bankNameHint": "ex. GCB Bank",
+  "nameOnAccountHint": "Nom sur le compte",
   "uploadBusinessLogoTitle": "",
   "logoAppearInQrCaption": "",
   "takePhotoOption": "Prendre une photo",
@@ -1240,10 +1240,10 @@
   "walletUiErrorUserNotFound": "",
   "walletUiErrorPleaseSelectMomoProvider": "",
   "walletUiErrorPaymentStillPending": "",
-  "walletUiErrorPleaseSelectBank": "",
-  "walletUiErrorAccountNumberTooShort": "",
-  "walletUiErrorPleaseVerifyAccount": "",
-  "walletUiErrorPleaseEnterAccountName": "",
+  "walletUiErrorPleaseSelectBank": "Veuillez sélectionner une banque",
+  "walletUiErrorAccountNumberTooShort": "Le numéro de compte doit comporter au moins {minDigits} chiffres",
+  "walletUiErrorPleaseVerifyAccount": "Veuillez d'abord vérifier votre compte",
+  "walletUiErrorPleaseEnterAccountName": "Veuillez saisir le nom du titulaire",
   "walletUiErrorWithdrawalFailedRefunded": "",
   "walletUiErrorPleaseEnter6DigitOtp": "",
   "sendUiErrorCouldNotVerifyRecipientWallet": "",
