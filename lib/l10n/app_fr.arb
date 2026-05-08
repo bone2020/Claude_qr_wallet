@@ -160,15 +160,15 @@
   "@selectIdType": {
     "description": "Prompt to choose an ID document type during KYC"
   },
-  "nationalId": "",
+  "nationalId": "Carte nationale d'identité",
   "@nationalId": {
     "description": "ID type option: national identity card"
   },
-  "driversLicense": "",
+  "driversLicense": "Permis de conduire",
   "@driversLicense": {
     "description": "ID type option: driver's license"
   },
-  "passport": "",
+  "passport": "Passeport",
   "@passport": {
     "description": "ID type option: passport"
   },
@@ -620,59 +620,59 @@
   "@selectVerificationMethodSubtitle": {
     "description": "Subtitle on the KYC method selection screen"
   },
-  "verifyPassport": "",
+  "verifyPassport": "Vérifier le passeport",
   "@verifyPassport": {
     "description": "KYC option title for passport verification"
   },
-  "verifyNin": "",
+  "verifyNin": "Vérifier le NIN",
   "@verifyNin": {
     "description": "KYC option title for Nigerian National Identification Number verification"
   },
-  "verifyBvn": "",
+  "verifyBvn": "Vérifier le BVN",
   "@verifyBvn": {
     "description": "KYC option title for Bank Verification Number verification"
   },
-  "verifyDriversLicense": "",
+  "verifyDriversLicense": "Vérifier le permis de conduire",
   "@verifyDriversLicense": {
     "description": "KYC option title for driver's license verification"
   },
-  "verifyVotersCard": "",
+  "verifyVotersCard": "Vérifier la carte d'électeur",
   "@verifyVotersCard": {
     "description": "KYC option title for voter's card verification"
   },
-  "verifyNationalId": "",
+  "verifyNationalId": "Vérifier la carte d'identité nationale",
   "@verifyNationalId": {
     "description": "KYC option title for national ID verification"
   },
-  "verifySsnit": "",
+  "verifySsnit": "Vérifier le SSNIT",
   "@verifySsnit": {
     "description": "KYC option title for Ghanaian SSNIT verification"
   },
-  "passportDescription": "",
+  "passportDescription": "Vérification du passeport international",
   "@passportDescription": {
     "description": "Helper text under the passport KYC option"
   },
-  "ninDescription": "",
+  "ninDescription": "Numéro d'identification national (11 chiffres)",
   "@ninDescription": {
     "description": "Helper text under the NIN KYC option"
   },
-  "bvnDescription": "",
+  "bvnDescription": "Numéro de vérification bancaire (11 chiffres)",
   "@bvnDescription": {
     "description": "Helper text under the BVN KYC option"
   },
-  "driversLicenseDescription": "",
+  "driversLicenseDescription": "Vérification du permis de conduire",
   "@driversLicenseDescription": {
     "description": "Helper text under the driver's license KYC option"
   },
-  "votersCardDescription": "",
+  "votersCardDescription": "Vérification de la carte d'électeur",
   "@votersCardDescription": {
     "description": "Helper text under the voter's card KYC option"
   },
-  "nationalIdDescription": "",
+  "nationalIdDescription": "Vérification de la carte nationale d'identité",
   "@nationalIdDescription": {
     "description": "Helper text under the national ID KYC option"
   },
-  "ssnitDescription": "",
+  "ssnitDescription": "Numéro SSNIT (1 lettre + 12 chiffres)",
   "@ssnitDescription": {
     "description": "Helper text under the SSNIT KYC option"
   },
@@ -814,21 +814,21 @@
   "appleSignInComingSoon": "Connexion avec Apple bientôt disponible",
   "countryDisplayFormat": "{dialCode} • {symbol} {code}",
   "verificationFailedWithError": "Échec de la vérification : {error}",
-  "bvnVerificationTitle": "",
-  "driversLicenseVerificationTitle": "",
-  "ninVerificationTitle": "",
-  "passportVerificationTitle": "",
-  "ssnitVerificationTitle": "",
-  "votersCardVerificationTitle": "",
-  "nationalIdVerificationTitleWithCountry": "",
-  "ugandaNationalIdAppBarTitle": "",
-  "ugandaNationalIdHeading": "",
-  "ugandaNationalIdDescription": "",
-  "bvnHelperText": "",
-  "ninHelperText": "",
-  "ssnitHelperText": "",
-  "ugandaNinHelperText": "",
-  "ugandaNinCardNumberHelperText": "",
+  "bvnVerificationTitle": "Vérification du BVN",
+  "driversLicenseVerificationTitle": "Vérification du permis de conduire",
+  "ninVerificationTitle": "Vérification du NIN",
+  "passportVerificationTitle": "Vérification du passeport",
+  "ssnitVerificationTitle": "Vérification du SSNIT",
+  "votersCardVerificationTitle": "Vérification de la carte d'électeur",
+  "nationalIdVerificationTitleWithCountry": "Vérification — {countryName}",
+  "ugandaNationalIdAppBarTitle": "Carte nationale d'identité ougandaise",
+  "ugandaNationalIdHeading": "Vérification de la carte nationale d'identité",
+  "ugandaNationalIdDescription": "Vérifiez votre identité avec votre numéro d'identification national ougandais (NIN) et votre numéro de carte.",
+  "bvnHelperText": "Votre numéro de vérification bancaire lié à vos comptes bancaires",
+  "ninHelperText": "Votre numéro d'identification national tel qu'indiqué sur votre fiche NIN",
+  "ssnitHelperText": "Votre numéro SSNIT : 1 lettre suivie de 12 chiffres",
+  "ugandaNinHelperText": "Votre NIN comporte 14 caractères alphanumériques",
+  "ugandaNinCardNumberHelperText": "Le numéro imprimé sur votre carte d'identité physique",
   "phoneVerificationAppBarTitle": "",
   "verifyCodeButton": "Vérifier le code",
   "resendCodeIn": "Renvoyer le code dans {seconds}s",
@@ -1099,37 +1099,37 @@
   "activeTabWithCount": "",
   "resolvedTabWithCount": "",
   "disputesCappedNotice": "",
-  "ugandaNinDescription": "",
-  "tpinDescription": "",
+  "ugandaNinDescription": "Vérifiez votre identité avec votre numéro d'identification national ougandais",
+  "tpinDescription": "Vérifiez votre identité avec votre PIN du contribuable zambien",
   "verifyIdentityDefaultDescription": "Vérifier votre identité",
-  "taxpayerPinLabel": "",
+  "taxpayerPinLabel": "PIN du contribuable (TPIN)",
   "invalidIdNumberFallback": "Numéro d'identification invalide",
-  "tpinLabel": "",
+  "tpinLabel": "TPIN",
   "idNumberLabel": "Numéro d'identification",
   "enterTpinHint": "",
   "enterIdNumberHint": "Saisissez votre numéro d'identification à 13 chiffres",
-  "zambianTaxpayerHelperText": "",
-  "southAfricanIdHelperText": "",
+  "zambianTaxpayerHelperText": "Votre numéro d'identification fiscale zambien",
+  "southAfricanIdHelperText": "Votre numéro de carte d'identité sud-africaine",
   "documentCapturedTitle": "Document capturé",
   "verifyYourDocumentTitle": "Vérifiez votre {documentType}",
   "documentCapturedBody": "Votre {documentType} a été capturé. La vérification commencera lorsque vous continuerez.",
   "idAndSelfieVerificationDescription": "Nous vérifierons votre numéro d'identification et prendrons un selfie pour confirmation",
   "documentBothSidesAndSelfieDescription": "Nous capturerons les deux côtés de votre pièce d'identité et prendrons un selfie",
-  "ninLengthError": "",
-  "bvnLengthError": "",
-  "ssnitFormatError": "",
-  "southAfricanIdLengthError": "",
-  "ugandaNinFormatError": "",
-  "tpinLengthError": "",
+  "ninLengthError": "Le NIN doit comporter exactement 11 chiffres",
+  "bvnLengthError": "Le BVN doit comporter exactement 11 chiffres",
+  "ssnitFormatError": "Le SSNIT doit comporter 1 lettre suivie de 12 chiffres",
+  "southAfricanIdLengthError": "La carte d'identité sud-africaine doit comporter exactement 13 chiffres",
+  "ugandaNinFormatError": "Le NIN ougandais doit comporter exactement 14 caractères alphanumériques",
+  "tpinLengthError": "Le TPIN doit comporter exactement 10 chiffres",
   "smileIdParseError": "Impossible de lire le résultat de la vérification. Veuillez réessayer.",
-  "votersIdLabel": "",
-  "internationalPassportLabel": "",
-  "alienIdLabel": "",
-  "ninFullLabel": "",
-  "bvnFullLabel": "",
-  "ssnitLabel": "",
-  "ugandaNationalIdLabel": "",
-  "tpinFullLabel": "",
+  "votersIdLabel": "Carte d'électeur",
+  "internationalPassportLabel": "Passeport international",
+  "alienIdLabel": "Carte d'étranger",
+  "ninFullLabel": "Numéro d'identification national (NIN)",
+  "bvnFullLabel": "Numéro de vérification bancaire (BVN)",
+  "ssnitLabel": "SSNIT",
+  "ugandaNationalIdLabel": "Carte nationale d'identité (NIN)",
+  "tpinFullLabel": "PIN du contribuable (TPIN)",
   "momoErrorNotConfigured": "",
   "momoErrorPaymentDeclined": "",
   "momoErrorInsufficientFunds": "",
