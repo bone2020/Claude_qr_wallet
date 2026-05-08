@@ -51,6 +51,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   }
 
   Future<void> _processQrCode(String code) async {
+    final loc = AppLocalizations.of(context);
     try {
       String? walletId;
       String? name;
@@ -132,7 +133,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
       } catch (e) {
         // For unverified QR codes, require successful lookup
         if (!isVerifiedQr) {
-          _showError('Could not verify recipient wallet');
+          _showError(loc.sendUiErrorCouldNotVerifyRecipientWallet);
           setState(() => _isProcessing = false);
           return;
         }
@@ -157,7 +158,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
         },
       );
     } catch (e) {
-      _showError('Could not read QR code');
+      _showError(loc.sendUiErrorCouldNotReadQrCode);
       setState(() => _isProcessing = false);
     }
   }

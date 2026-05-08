@@ -9,6 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/models.dart';
 import '../utils/error_handler.dart';
 import 'transaction_localization_resolver.dart';
+import 'wallet_localization_resolver.dart';
+import '../utils/error_handler_localization_resolver.dart';
 import '../utils/network_retry.dart';
 import 'exchange_rate_service.dart';
 
@@ -36,7 +38,10 @@ class WalletService {
       if (!doc.exists) return null;
       return WalletModel.fromJson(doc.data()!);
     } catch (e) {
-      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
+      throw WalletException(
+        ErrorHandler.getUserFriendlyMessage(e),
+        genericErrorKey: ErrorHandler.classifyUserError(e),
+      );
     }
   }
 
@@ -85,11 +90,19 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       if (e.code == 'not-found') {
         return WalletLookupResult.notFound();
       } else if (e.code == 'resource-exhausted') {
-        throw WalletException('Too many requests. Please try again later.');
+        throw WalletException('Too many requests. Please try again later.', walletErrorKey: WalletErrorKey.tooManyRequests);
       }
-      throw WalletException('Failed to lookup wallet: ${e.message}');
+      debugPrint('Failed to lookup wallet (FirebaseFunctions): ${e.message}');
+      throw WalletException(
+        'Failed to look up wallet',
+        walletErrorKey: WalletErrorKey.failedToLookupWallet,
+      );
     } catch (e) {
-      throw WalletException('Failed to lookup wallet: $e');
+      debugPrint('Failed to lookup wallet (generic): $e');
+      throw WalletException(
+        'Failed to look up wallet',
+        walletErrorKey: WalletErrorKey.failedToLookupWallet,
+      );
     }
   }
 
@@ -367,7 +380,10 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
           .map((doc) => TransactionModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
+      throw WalletException(
+        ErrorHandler.getUserFriendlyMessage(e),
+        genericErrorKey: ErrorHandler.classifyUserError(e),
+      );
     }
   }
 
@@ -407,7 +423,10 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
           .map((doc) => TransactionModel.fromJson(doc.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      throw WalletException(ErrorHandler.getUserFriendlyMessage(e));
+      throw WalletException(
+        ErrorHandler.getUserFriendlyMessage(e),
+        genericErrorKey: ErrorHandler.classifyUserError(e),
+      );
     }
   }
 
@@ -442,7 +461,11 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       if (!doc.exists) return null;
       return TransactionModel.fromJson(doc.data()!);
     } catch (e) {
-      throw WalletException('Failed to fetch transaction: $e');
+      debugPrint('Failed to fetch transaction: $e');
+      throw WalletException(
+        'Failed to fetch transaction',
+        walletErrorKey: WalletErrorKey.failedToFetchTransaction,
+      );
     }
   }
 
@@ -542,7 +565,10 @@ class TransactionResult {
 /// Custom exception for wallet operations
 class WalletException implements Exception {
   final String message;
-  WalletException(this.message);
+  final WalletErrorKey? walletErrorKey;
+  final GenericErrorKey? genericErrorKey;
+
+  WalletException(this.message, {this.walletErrorKey, this.genericErrorKey});
 
   @override
   String toString() => message;

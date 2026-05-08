@@ -161,6 +161,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
   // Card Payment
   Future<void> _handleCardPayment() async {
+    final loc = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
@@ -168,7 +169,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     final user = ref.read(currentUserProvider);
 
     if (user == null) {
-      _showError('User not found. Please log in again.');
+      _showError(loc.walletUiErrorUserNotFound);
       return;
     }
 
@@ -209,9 +210,10 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
   // Mobile Money Payment
   Future<void> _handleMobileMoneyPayment() async {
+    final loc = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
     if (_selectedMomoProvider == null) {
-      _showError('Please select a mobile money provider');
+      _showError(loc.walletUiErrorPleaseSelectMomoProvider);
       return;
     }
 
@@ -220,7 +222,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     final user = ref.read(currentUserProvider);
 
     if (user == null) {
-      _showError('User not found. Please log in again.');
+      _showError(loc.walletUiErrorUserNotFound);
       return;
     }
 
@@ -313,6 +315,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
 
   // Check MTN payment status
   Future<void> _checkMtnPaymentStatus(String referenceId, int amount) async {
+    final loc = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     try {
@@ -328,7 +331,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         ref.read(transactionsNotifierProvider.notifier).refreshTransactions();
         _showPaymentSuccessDialog(amount, referenceId);
       } else if (result.status == 'PENDING') {
-        _showError('Payment still pending. Please check your phone and try again.');
+        _showError(loc.walletUiErrorPaymentStillPending);
       } else {
         _showError(result.error ?? AppLocalizations.of(context).paymentFailedOrRejectedError);
       }

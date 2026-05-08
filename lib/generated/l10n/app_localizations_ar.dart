@@ -1764,9 +1764,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get invalidIdNumberFallback => '';
 
   @override
-  String get failedToCompleteVerification => '';
-
-  @override
   String get tpinLabel => '';
 
   @override
@@ -2111,4 +2108,107 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get transactionErrorFallback => '';
+
+  @override
+  String get biometricErrorNotAvailable => '';
+
+  @override
+  String get biometricErrorNotEnrolled => '';
+
+  @override
+  String get biometricErrorLockedOut => '';
+
+  @override
+  String get biometricErrorPermanentlyLockedOut => '';
+
+  @override
+  String get biometricErrorPasscodeNotSet => '';
+
+  @override
+  String get biometricErrorOtherOperatingSystem => '';
+
+  @override
+  String get biometricErrorAuthenticationFailed => '';
+
+  @override
+  String get biometricErrorNotSupported => '';
+
+  @override
+  String get biometricErrorNoBiometricsEnrolled => '';
+
+  @override
+  String get biometricErrorFallback => '';
+
+  @override
+  String get biometricReasonAuthenticate => '';
+
+  @override
+  String get biometricReasonChangeSecurity => '';
+
+  @override
+  String get walletErrorTooManyRequests => '';
+
+  @override
+  String get walletErrorFailedToLookupWallet => '';
+
+  @override
+  String get walletErrorFailedToFetchTransaction => '';
+
+  @override
+  String get walletErrorFallback => '';
+
+  @override
+  String get exchangeRateErrorUnsupportedCurrency => '';
+
+  @override
+  String get walletUiErrorUserNotFound => '';
+
+  @override
+  String get walletUiErrorPleaseSelectMomoProvider => '';
+
+  @override
+  String get walletUiErrorPaymentStillPending => '';
+
+  @override
+  String get walletUiErrorPleaseSelectBank => '';
+
+  @override
+  String get walletUiErrorPleaseVerifyAccount => '';
+
+  @override
+  String get walletUiErrorPleaseEnterAccountName => '';
+
+  @override
+  String get walletUiErrorWithdrawalFailedRefunded => '';
+
+  @override
+  String get walletUiErrorPleaseEnter6DigitOtp => '';
+
+  @override
+  String get sendUiErrorCouldNotVerifyRecipientWallet => '';
+
+  @override
+  String get sendUiErrorCouldNotReadQrCode => '';
+
+  @override
+  String get sendUiErrorPreviewTimedOut => '';
+
+  @override
+  String get sendUiErrorRequestTimedOut => '';
+
+  @override
+  String biometricReasonConfirmPayment(
+      String currencySymbol, String amount, String recipient) {
+    return '';
+  }
+
+  @override
+  String walletUiErrorAccountNumberTooShort(int minDigits) {
+    return '';
+  }
+
+  @override
+  String exchangeRateErrorUnsupportedCurrencyPair(String from, String to) {
+    return '';
+  }
 }

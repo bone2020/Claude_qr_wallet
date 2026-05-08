@@ -124,6 +124,9 @@ class WalletNotifier extends StateNotifier<WalletState> {
       } else {
         state = state.copyWith(isLoading: false, error: 'Wallet not found');
       }
+    } on WalletException catch (we) {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: false, error: we.message);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -297,6 +300,9 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
         isLoading: false,
         hasMore: transactions.length >= 50,
       );
+    } on WalletException catch (we) {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: false, error: we.message);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -327,6 +333,9 @@ class TransactionsNotifier extends StateNotifier<TransactionsState> {
         isLoadingMore: false,
         hasMore: olderTransactions.length >= 30,
       );
+    } on WalletException catch (we) {
+      if (!mounted) return;
+      state = state.copyWith(isLoadingMore: false, error: we.message);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(isLoadingMore: false, error: e.toString());
@@ -485,6 +494,8 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
           error: 'Wallet not found',
         );
       }
+    } on WalletException catch (we) {
+      state = state.copyWith(isLookingUp: false, error: we.message);
     } catch (e) {
       state = state.copyWith(isLookingUp: false, error: e.toString());
     }

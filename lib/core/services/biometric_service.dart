@@ -1,5 +1,8 @@
 import 'package:local_auth/local_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+
+import 'biometric_localization_resolver.dart';
 
 /// Biometric authentication service
 class BiometricService {
@@ -80,12 +83,12 @@ class BiometricService {
       // Check if biometrics are available
       final isSupported = await isDeviceSupported();
       if (!isSupported) {
-        return BiometricResult.failure('Biometric authentication not supported');
+        return BiometricResult.failure('Biometric authentication not supported', errorKey: BiometricErrorKey.notSupported);
       }
 
       final canCheck = await canCheckBiometrics();
       if (!canCheck) {
-        return BiometricResult.failure('No biometrics enrolled on this device');
+        return BiometricResult.failure('No biometrics enrolled on this device', errorKey: BiometricErrorKey.noBiometricsEnrolled);
       }
 
       // Attempt authentication
@@ -101,41 +104,21 @@ class BiometricService {
       if (authenticated) {
         return BiometricResult.success();
       } else {
-        return BiometricResult.failure('Authentication failed');
+        return BiometricResult.failure('Authentication failed', errorKey: BiometricErrorKey.authenticationFailed);
       }
     } on PlatformException catch (e) {
-      return BiometricResult.failure(_getErrorMessage(e));
+      final key = _classifyPlatformException(e);
+      return BiometricResult.failure(
+        e.message ?? _englishOf(key),
+        errorKey: key,
+      );
     } catch (e) {
-      return BiometricResult.failure('An error occurred: $e');
+      debugPrint('Biometric authentication error: $e');
+      return BiometricResult.failure(
+        'Authentication failed',
+        errorKey: BiometricErrorKey.authenticationFailed,
+      );
     }
-  }
-
-  /// Authenticate for login
-  Future<BiometricResult> authenticateForLogin() async {
-    return authenticate(
-      reason: 'Authenticate to access your QR Wallet',
-      biometricOnly: true,
-    );
-  }
-
-  /// Authenticate for transaction confirmation
-  Future<BiometricResult> authenticateForTransaction({
-    required double amount,
-    required String recipient,
-    required String currencySymbol,
-  }) async {
-    return authenticate(
-      reason: 'Confirm payment of $currencySymbol${amount.toStringAsFixed(2)} to $recipient',
-      biometricOnly: true,
-    );
-  }
-
-  /// Authenticate for sensitive settings change
-  Future<BiometricResult> authenticateForSettings() async {
-    return authenticate(
-      reason: 'Authenticate to change security settings',
-      biometricOnly: false, // Allow PIN/password fallback for settings
-    );
   }
 
   // ============================================================
@@ -151,23 +134,52 @@ class BiometricService {
   // HELPER METHODS
   // ============================================================
 
-  /// Get user-friendly error message
-  String _getErrorMessage(PlatformException e) {
+  /// Maps a PlatformException code to a [BiometricErrorKey] enum value.
+  BiometricErrorKey _classifyPlatformException(PlatformException e) {
     switch (e.code) {
       case 'NotAvailable':
-        return 'Biometric authentication is not available';
+        return BiometricErrorKey.notAvailable;
       case 'NotEnrolled':
-        return 'No biometrics enrolled. Please set up fingerprint or face in device settings';
+        return BiometricErrorKey.notEnrolled;
       case 'LockedOut':
-        return 'Too many failed attempts. Please try again later';
+        return BiometricErrorKey.lockedOut;
       case 'PermanentlyLockedOut':
-        return 'Biometric authentication is locked. Please unlock your device first';
+        return BiometricErrorKey.permanentlyLockedOut;
       case 'PasscodeNotSet':
-        return 'Please set up a device passcode to use biometric authentication';
+        return BiometricErrorKey.passcodeNotSet;
       case 'OtherOperatingSystem':
-        return 'Biometric authentication is not supported on this device';
+        return BiometricErrorKey.otherOperatingSystem;
       default:
-        return e.message ?? 'Authentication failed';
+        return BiometricErrorKey.authenticationFailed;
+    }
+  }
+
+  /// English fallback for the transitional [BiometricResult.error] String field.
+  ///
+  /// Kept in sync with [resolveBiometricErrorMessage]. Any English wording change
+  /// must update BOTH this method AND the corresponding ARB key.
+  String _englishOf(BiometricErrorKey key) {
+    switch (key) {
+      case BiometricErrorKey.notAvailable:
+        return 'Biometric authentication is not available';
+      case BiometricErrorKey.notEnrolled:
+        return 'No biometrics enrolled. Please set up fingerprint or face in device settings';
+      case BiometricErrorKey.lockedOut:
+        return 'Too many failed attempts. Please try again later';
+      case BiometricErrorKey.permanentlyLockedOut:
+        return 'Biometric authentication is locked. Please unlock your device first';
+      case BiometricErrorKey.passcodeNotSet:
+        return 'Please set up a device passcode to use biometric authentication';
+      case BiometricErrorKey.otherOperatingSystem:
+        return 'Biometric authentication is not supported on this device';
+      case BiometricErrorKey.authenticationFailed:
+        return 'Authentication failed';
+      case BiometricErrorKey.notSupported:
+        return 'Biometric authentication not supported';
+      case BiometricErrorKey.noBiometricsEnrolled:
+        return 'No biometrics enrolled on this device';
+      case BiometricErrorKey.fallback:
+        return "Couldn't authenticate. Please try again.";
     }
   }
 }
@@ -176,11 +188,13 @@ class BiometricService {
 class BiometricResult {
   final bool success;
   final String? error;
+  final BiometricErrorKey? errorKey;
   final bool cancelled;
 
   BiometricResult._({
     required this.success,
     this.error,
+    this.errorKey,
     this.cancelled = false,
   });
 
@@ -188,8 +202,8 @@ class BiometricResult {
     return BiometricResult._(success: true);
   }
 
-  factory BiometricResult.failure(String error) {
-    return BiometricResult._(success: false, error: error);
+  factory BiometricResult.failure(String error, {BiometricErrorKey? errorKey}) {
+    return BiometricResult._(success: false, error: error, errorKey: errorKey);
   }
 
   factory BiometricResult.cancelled() {

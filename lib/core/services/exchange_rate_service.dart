@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'exchange_rate_localization_resolver.dart';
+
 /// Exchange rate service with Firestore + fallback
 class ExchangeRateService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -109,7 +111,12 @@ class ExchangeRateService {
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
-      throw Exception('Unsupported currency: $fromCurrency or $toCurrency');
+      throw ExchangeRateException(
+        'Unsupported currency: $fromCurrency or $toCurrency',
+        errorKey: ExchangeRateErrorKey.unsupportedCurrencyPair,
+        from: fromCurrency,
+        to: toCurrency,
+      );
     }
     return (amount / fromRate) * toRate;
   }
@@ -132,7 +139,12 @@ class ExchangeRateService {
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
-      throw Exception('Unsupported currency: $fromCurrency or $toCurrency');
+      throw ExchangeRateException(
+        'Unsupported currency: $fromCurrency or $toCurrency',
+        errorKey: ExchangeRateErrorKey.unsupportedCurrencyPair,
+        from: fromCurrency,
+        to: toCurrency,
+      );
     }
     return (amount / fromRate) * toRate;
   }
@@ -146,7 +158,10 @@ class ExchangeRateService {
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
-      throw Exception('Unsupported currency');
+      throw ExchangeRateException(
+        'Unsupported currency',
+        errorKey: ExchangeRateErrorKey.unsupportedCurrency,
+      );
     }
     return toRate / fromRate;
   }
@@ -165,7 +180,10 @@ class ExchangeRateService {
     final fromRate = rates[fromCurrency] ?? _fallbackRates[fromCurrency];
     final toRate = rates[toCurrency] ?? _fallbackRates[toCurrency];
     if (fromRate == null || toRate == null) {
-      throw Exception('Unsupported currency');
+      throw ExchangeRateException(
+        'Unsupported currency',
+        errorKey: ExchangeRateErrorKey.unsupportedCurrency,
+      );
     }
     return toRate / fromRate;
   }
@@ -204,4 +222,22 @@ class ExchangeRateService {
     final rate = getExchangeRate(fromCurrency: fromCurrency, toCurrency: toCurrency);
     return '1 $fromCurrency = ${rate.toStringAsFixed(4)} $toCurrency';
   }
+}
+
+/// Exception thrown by ExchangeRateService for unsupported currencies.
+class ExchangeRateException implements Exception {
+  final String message;
+  final ExchangeRateErrorKey errorKey;
+  final String from;
+  final String to;
+
+  ExchangeRateException(
+    this.message, {
+    required this.errorKey,
+    this.from = '',
+    this.to = '',
+  });
+
+  @override
+  String toString() => message;
 }

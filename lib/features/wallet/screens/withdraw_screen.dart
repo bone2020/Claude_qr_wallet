@@ -194,19 +194,20 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   /// Verifies bank account with Paystack API.
   /// Called either by debounce timer or manual verify button.
   Future<void> _verifyBankAccount() async {
+    final loc = AppLocalizations.of(context);
     // Prevent duplicate calls
     if (_isVerifyingAccount) {
       return;
     }
 
     if (_selectedBank == null) {
-      _showError('Please select a bank');
+      _showError(loc.walletUiErrorPleaseSelectBank);
       return;
     }
 
     final accountNumber = _accountNumberController.text.replaceAll(' ', '');
     if (accountNumber.length < _minDigitsToVerify) {
-      _showError('Account number must be at least $_minDigitsToVerify digits');
+      _showError(loc.walletUiErrorAccountNumberTooShort(_minDigitsToVerify));
       return;
     }
 
@@ -252,6 +253,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
   }
 
   Future<void> _handleWithdraw() async {
+    final loc = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) return;
 
     final amountMajor = double.parse(_amountController.text.replaceAll(',', ''));
@@ -261,20 +263,20 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
     // Validate based on withdrawal type
     if (isBankWithdrawal) {
       if (_selectedBank == null) {
-        _showError('Please select a bank');
+        _showError(loc.walletUiErrorPleaseSelectBank);
         return;
       }
       if (_verifiedAccountName == null && !kDebugMode) {
-        _showError('Please verify your account first');
+        _showError(loc.walletUiErrorPleaseVerifyAccount);
         return;
       }
     } else {
       if (_selectedMomoProvider == null) {
-        _showError('Please select a mobile money provider');
+        _showError(loc.walletUiErrorPleaseSelectMomoProvider);
         return;
       }
       if (_momoAccountName.isEmpty) {
-        _showError('Please enter account name');
+        _showError(loc.walletUiErrorPleaseEnterAccountName);
         return;
       }
     }
@@ -327,7 +329,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             if (statusResult.completed) {
               _showSuccessDialog(amount, result.reference!);
             } else if (statusResult.status == 'FAILED' || statusResult.status == 'REJECTED') {
-              _showError('Withdrawal failed. Your balance has been refunded.');
+              _showError(loc.walletUiErrorWithdrawalFailedRefunded);
             } else {
               // Still pending — show success, status will update later
               _showSuccessDialog(amount, result.reference!);
@@ -374,6 +376,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
 
   /// Shows OTP dialog for bank transfer verification
   Future<bool> _showOtpDialog(String transferCode, int amount) async {
+    final loc = AppLocalizations.of(context);
     final otpController = TextEditingController();
     bool isVerifying = false;
 
@@ -448,7 +451,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                       : () async {
                           final otp = otpController.text.trim();
                           if (otp.length != 6) {
-                            _showError('Please enter a valid 6-digit OTP');
+                            _showError(loc.walletUiErrorPleaseEnter6DigitOtp);
                             return;
                           }
 

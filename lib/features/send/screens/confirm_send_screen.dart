@@ -12,6 +12,7 @@ import '../../../generated/l10n/app_localizations.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/services/biometric_service.dart';
+import '../../../core/services/biometric_localization_resolver.dart';
 import '../../../core/services/secure_storage_service.dart';
 import '../../../core/services/transaction_localization_resolver.dart';
 import 'dart:convert';
@@ -157,6 +158,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
   /// Fetch exact fee and conversion from server
   Future<void> _fetchPreview() async {
+    final loc = AppLocalizations.of(context);
     if (_amountMinor <= 0) return;
 
     setState(() {
@@ -171,7 +173,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         'recipientWalletId': widget.recipientWalletId,
       }).timeout(
         const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Preview timed out'),
+        onTimeout: () => throw Exception(loc.sendUiErrorPreviewTimedOut),
       );
 
       if (!mounted) return;
@@ -387,10 +389,13 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
       if (biometricEnabled) {
         final biometricService = BiometricService();
-        final authResult = await biometricService.authenticateForTransaction(
-          amount: _totalMajor,
-          recipient: widget.recipientName,
-          currencySymbol: _currency,
+        final authResult = await biometricService.authenticate(
+          reason: loc.biometricReasonConfirmPayment(
+            _currency,
+            _totalMajor.toStringAsFixed(2),
+            widget.recipientName,
+          ),
+          biometricOnly: true,
         );
 
         if (!authResult.success) {
@@ -400,7 +405,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           if (!authResult.cancelled) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(authResult.error ?? 'Authentication failed'),
+                content: Text(resolveBiometricResultError(loc, authResult)),
                 backgroundColor: AppColors.error,
               ),
             );
@@ -418,7 +423,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         items: widget.items,
       ).timeout(
         const Duration(seconds: 30),
-        onTimeout: () => throw Exception('Request timed out. Please check your connection and try again.'),
+        onTimeout: () => throw Exception(loc.sendUiErrorRequestTimedOut),
       );
 
       if (!mounted) return;

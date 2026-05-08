@@ -159,7 +159,11 @@ class _AppLockScreenState extends ConsumerState<AppLockScreen> {
   }
 
   Future<void> _authenticateWithBiometric() async {
-    final result = await _biometricService.authenticateForLogin();
+    final loc = AppLocalizations.of(context);
+    final result = await _biometricService.authenticate(
+      reason: loc.biometricReasonAuthenticate,
+      biometricOnly: true,
+    );
 
     if (result.success && mounted) {
       _navigateToMain();

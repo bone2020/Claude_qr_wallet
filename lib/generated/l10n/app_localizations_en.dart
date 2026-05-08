@@ -1837,9 +1837,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get invalidIdNumberFallback => 'Invalid ID number';
 
   @override
-  String get failedToCompleteVerification => 'Failed to complete verification';
-
-  @override
   String get tpinLabel => 'TPIN';
 
   @override
@@ -2256,4 +2253,129 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get transactionErrorFallback =>
       'Couldn\'t complete the transaction. Please try again.';
+
+  @override
+  String get biometricErrorNotAvailable =>
+      'Biometric authentication is not available';
+
+  @override
+  String get biometricErrorNotEnrolled =>
+      'No biometrics enrolled. Please set up fingerprint or face in device settings';
+
+  @override
+  String get biometricErrorLockedOut =>
+      'Too many failed attempts. Please try again later';
+
+  @override
+  String get biometricErrorPermanentlyLockedOut =>
+      'Biometric authentication is locked. Please unlock your device first';
+
+  @override
+  String get biometricErrorPasscodeNotSet =>
+      'Please set up a device passcode to use biometric authentication';
+
+  @override
+  String get biometricErrorOtherOperatingSystem =>
+      'Biometric authentication is not supported on this device';
+
+  @override
+  String get biometricErrorAuthenticationFailed => 'Authentication failed';
+
+  @override
+  String get biometricErrorNotSupported =>
+      'Biometric authentication not supported';
+
+  @override
+  String get biometricErrorNoBiometricsEnrolled =>
+      'No biometrics enrolled on this device';
+
+  @override
+  String get biometricErrorFallback =>
+      'Couldn\'t authenticate. Please try again.';
+
+  @override
+  String get biometricReasonAuthenticate =>
+      'Authenticate to access your QR Wallet';
+
+  @override
+  String get biometricReasonChangeSecurity =>
+      'Authenticate to change security settings';
+
+  @override
+  String get walletErrorTooManyRequests =>
+      'Too many requests. Please try again later.';
+
+  @override
+  String get walletErrorFailedToLookupWallet => 'Failed to look up wallet';
+
+  @override
+  String get walletErrorFailedToFetchTransaction =>
+      'Failed to fetch transaction';
+
+  @override
+  String get walletErrorFallback =>
+      'Wallet operation failed. Please try again.';
+
+  @override
+  String get exchangeRateErrorUnsupportedCurrency => 'Unsupported currency';
+
+  @override
+  String get walletUiErrorUserNotFound =>
+      'User not found. Please log in again.';
+
+  @override
+  String get walletUiErrorPleaseSelectMomoProvider =>
+      'Please select a mobile money provider';
+
+  @override
+  String get walletUiErrorPaymentStillPending =>
+      'Payment still pending. Please check your phone and try again.';
+
+  @override
+  String get walletUiErrorPleaseSelectBank => 'Please select a bank';
+
+  @override
+  String get walletUiErrorPleaseVerifyAccount =>
+      'Please verify your account first';
+
+  @override
+  String get walletUiErrorPleaseEnterAccountName => 'Please enter account name';
+
+  @override
+  String get walletUiErrorWithdrawalFailedRefunded =>
+      'Withdrawal failed. Your balance has been refunded.';
+
+  @override
+  String get walletUiErrorPleaseEnter6DigitOtp =>
+      'Please enter a valid 6-digit OTP';
+
+  @override
+  String get sendUiErrorCouldNotVerifyRecipientWallet =>
+      'Could not verify recipient wallet';
+
+  @override
+  String get sendUiErrorCouldNotReadQrCode => 'Could not read QR code';
+
+  @override
+  String get sendUiErrorPreviewTimedOut => 'Preview timed out';
+
+  @override
+  String get sendUiErrorRequestTimedOut =>
+      'Request timed out. Please check your connection and try again.';
+
+  @override
+  String biometricReasonConfirmPayment(
+      String currencySymbol, String amount, String recipient) {
+    return 'Confirm payment of $currencySymbol$amount to $recipient';
+  }
+
+  @override
+  String walletUiErrorAccountNumberTooShort(int minDigits) {
+    return 'Account number must be at least $minDigits digits';
+  }
+
+  @override
+  String exchangeRateErrorUnsupportedCurrencyPair(String from, String to) {
+    return 'Unsupported currency: $from or $to';
+  }
 }

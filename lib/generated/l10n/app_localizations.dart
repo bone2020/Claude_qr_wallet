@@ -3430,12 +3430,6 @@ abstract class AppLocalizations {
   /// **'Invalid ID number'**
   String get invalidIdNumberFallback;
 
-  /// Generic fallback shown when the SmileID verification call returns no specific error message.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to complete verification'**
-  String get failedToCompleteVerification;
-
   /// Form field label for the Zambian TPIN input (when countryCode == 'ZM').
   ///
   /// In en, this message translates to:
@@ -4119,6 +4113,199 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t complete the transaction. Please try again.'**
   String get transactionErrorFallback;
+
+  /// Biometric authentication unavailable on this device (PlatformException 'NotAvailable').
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric authentication is not available'**
+  String get biometricErrorNotAvailable;
+
+  /// No biometrics enrolled (PlatformException 'NotEnrolled').
+  ///
+  /// In en, this message translates to:
+  /// **'No biometrics enrolled. Please set up fingerprint or face in device settings'**
+  String get biometricErrorNotEnrolled;
+
+  /// Biometric locked out due to repeated failures (PlatformException 'LockedOut').
+  ///
+  /// In en, this message translates to:
+  /// **'Too many failed attempts. Please try again later'**
+  String get biometricErrorLockedOut;
+
+  /// Biometric permanently locked (PlatformException 'PermanentlyLockedOut').
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric authentication is locked. Please unlock your device first'**
+  String get biometricErrorPermanentlyLockedOut;
+
+  /// Device passcode not set (PlatformException 'PasscodeNotSet').
+  ///
+  /// In en, this message translates to:
+  /// **'Please set up a device passcode to use biometric authentication'**
+  String get biometricErrorPasscodeNotSet;
+
+  /// OS does not support biometric (PlatformException 'OtherOperatingSystem').
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric authentication is not supported on this device'**
+  String get biometricErrorOtherOperatingSystem;
+
+  /// Generic biometric authentication failure - also default for unknown PlatformException codes.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication failed'**
+  String get biometricErrorAuthenticationFailed;
+
+  /// Shown when canCheckBiometrics returns false (early-return path before authenticate()).
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric authentication not supported'**
+  String get biometricErrorNotSupported;
+
+  /// Shown when getAvailableBiometrics returns empty (different code path from PlatformException NotEnrolled).
+  ///
+  /// In en, this message translates to:
+  /// **'No biometrics enrolled on this device'**
+  String get biometricErrorNoBiometricsEnrolled;
+
+  /// Generic BiometricResult fallback when no specific case applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t authenticate. Please try again.'**
+  String get biometricErrorFallback;
+
+  /// Reason text shown in OS biometric prompt during app login.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to access your QR Wallet'**
+  String get biometricReasonAuthenticate;
+
+  /// Reason text shown in OS biometric prompt when changing security settings.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to change security settings'**
+  String get biometricReasonChangeSecurity;
+
+  /// Wallet lookup throttled (Cloud Functions resource-exhausted).
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests. Please try again later.'**
+  String get walletErrorTooManyRequests;
+
+  /// Wallet lookup failed for reasons other than throttling. Technical detail logged via debugPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to look up wallet'**
+  String get walletErrorFailedToLookupWallet;
+
+  /// Transaction fetch failed. Technical detail logged via debugPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to fetch transaction'**
+  String get walletErrorFailedToFetchTransaction;
+
+  /// Generic WalletException fallback when no specific case applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet operation failed. Please try again.'**
+  String get walletErrorFallback;
+
+  /// Exchange rate request for an unrecognized currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported currency'**
+  String get exchangeRateErrorUnsupportedCurrency;
+
+  /// Shown when add_money_screen detects no current user.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found. Please log in again.'**
+  String get walletUiErrorUserNotFound;
+
+  /// Validation message shown in add_money/withdraw screens.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a mobile money provider'**
+  String get walletUiErrorPleaseSelectMomoProvider;
+
+  /// Shown when momo polling times out without resolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment still pending. Please check your phone and try again.'**
+  String get walletUiErrorPaymentStillPending;
+
+  /// Validation message shown in withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a bank'**
+  String get walletUiErrorPleaseSelectBank;
+
+  /// Withdraw flow validation: account verification step required.
+  ///
+  /// In en, this message translates to:
+  /// **'Please verify your account first'**
+  String get walletUiErrorPleaseVerifyAccount;
+
+  /// Validation message shown in withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter account name'**
+  String get walletUiErrorPleaseEnterAccountName;
+
+  /// Shown when a withdrawal fails after balance was deducted; the refund is automatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawal failed. Your balance has been refunded.'**
+  String get walletUiErrorWithdrawalFailedRefunded;
+
+  /// OTP input validation in withdraw flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid 6-digit OTP'**
+  String get walletUiErrorPleaseEnter6DigitOtp;
+
+  /// Shown when scan_qr fails to verify the recipient wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not verify recipient wallet'**
+  String get sendUiErrorCouldNotVerifyRecipientWallet;
+
+  /// Shown when QR scanning fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read QR code'**
+  String get sendUiErrorCouldNotReadQrCode;
+
+  /// Shown when send-preview fetch exceeds its timeout in confirm_send_screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview timed out'**
+  String get sendUiErrorPreviewTimedOut;
+
+  /// Shown when sendMoney exceeds its 30-second timeout in confirm_send_screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Request timed out. Please check your connection and try again.'**
+  String get sendUiErrorRequestTimedOut;
+
+  /// Reason text shown in OS biometric prompt when confirming a payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm payment of {currencySymbol}{amount} to {recipient}'**
+  String biometricReasonConfirmPayment(
+      String currencySymbol, String amount, String recipient);
+
+  /// Withdraw flow validation: account number too short.
+  ///
+  /// In en, this message translates to:
+  /// **'Account number must be at least {minDigits} digits'**
+  String walletUiErrorAccountNumberTooShort(int minDigits);
+
+  /// Exchange rate conversion involves at least one unrecognized currency.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported currency: {from} or {to}'**
+  String exchangeRateErrorUnsupportedCurrencyPair(String from, String to);
 }
 
 class _AppLocalizationsDelegate
