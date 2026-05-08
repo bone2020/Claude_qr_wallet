@@ -4059,6 +4059,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please enter the 6-digit code'**
   String get kycErrorPhoneVerificationEnter6DigitCode;
+
+  /// Shown when a transaction is attempted but the user is not signed in.
+  ///
+  /// In en, this message translates to:
+  /// **'User not authenticated'**
+  String get transactionErrorUserNotAuthenticated;
+
+  /// Shown when sendMoney's Cloud Function returns an 'unauthenticated' error code.
+  ///
+  /// In en, this message translates to:
+  /// **'Please log in to send money'**
+  String get transactionErrorPleaseLogInToSendMoney;
+
+  /// Shown when sendMoney's Cloud Function returns a 'not-found' error code.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient wallet not found'**
+  String get transactionErrorRecipientWalletNotFound;
+
+  /// Shown when sendMoney's Cloud Function returns a 'failed-precondition' error code, indicating not enough wallet balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient balance'**
+  String get transactionErrorInsufficientBalance;
+
+  /// Shown when sendMoney's Cloud Function returns an 'invalid-argument' error code without a more specific server message.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid request'**
+  String get transactionErrorInvalidRequest;
+
+  /// Generic transaction-failure message - used when the server returns no specific error or the error code is not specifically classified.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction failed'**
+  String get transactionErrorTransactionFailed;
+
+  /// Shown when addMoney detects that the payment has already been credited (idempotency check).
+  ///
+  /// In en, this message translates to:
+  /// **'Payment already processed'**
+  String get transactionErrorPaymentAlreadyProcessed;
+
+  /// Shown when addMoney's verification step fails or returns no specific error message.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment verification failed'**
+  String get transactionErrorPaymentVerificationFailed;
+
+  /// Shown when addMoney throws a generic exception. Technical detail is logged separately via debugPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit failed'**
+  String get transactionErrorDepositFailed;
+
+  /// Generic TransactionResult fallback when no specific case applies.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t complete the transaction. Please try again.'**
+  String get transactionErrorFallback;
 }
 
 class _AppLocalizationsDelegate

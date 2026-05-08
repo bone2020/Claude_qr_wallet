@@ -2081,4 +2081,34 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get kycErrorPhoneVerificationEnter6DigitCode => '';
+
+  @override
+  String get transactionErrorUserNotAuthenticated => '';
+
+  @override
+  String get transactionErrorPleaseLogInToSendMoney => '';
+
+  @override
+  String get transactionErrorRecipientWalletNotFound => '';
+
+  @override
+  String get transactionErrorInsufficientBalance => '';
+
+  @override
+  String get transactionErrorInvalidRequest => '';
+
+  @override
+  String get transactionErrorTransactionFailed => '';
+
+  @override
+  String get transactionErrorPaymentAlreadyProcessed => '';
+
+  @override
+  String get transactionErrorPaymentVerificationFailed => '';
+
+  @override
+  String get transactionErrorDepositFailed => '';
+
+  @override
+  String get transactionErrorFallback => '';
 }

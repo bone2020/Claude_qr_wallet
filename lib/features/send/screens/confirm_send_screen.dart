@@ -13,6 +13,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/services/exchange_rate_service.dart';
 import '../../../core/services/biometric_service.dart';
 import '../../../core/services/secure_storage_service.dart';
+import '../../../core/services/transaction_localization_resolver.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../../../core/utils/error_handler.dart';
@@ -363,10 +364,11 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   Future<void> _handleSend() async {
+    final loc = AppLocalizations.of(context);
     if (_amountMajor <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context).pleaseEnterAmount),
+          content: Text(loc.pleaseEnterAmount),
           backgroundColor: AppColors.error,
         ),
       );
@@ -431,7 +433,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.error ?? 'Transaction failed'),
+            content: Text(resolveTransactionResultError(loc, result)),
             backgroundColor: AppColors.error,
           ),
         );

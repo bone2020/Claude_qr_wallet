@@ -1208,5 +1208,15 @@
   "kycErrorVerificationSessionExpired": "",
   "kycErrorSomethingWentWrong": "",
   "kycErrorPhoneVerificationNoPhoneNumber": "",
-  "kycErrorPhoneVerificationEnter6DigitCode": ""
+  "kycErrorPhoneVerificationEnter6DigitCode": "",
+  "transactionErrorUserNotAuthenticated": "",
+  "transactionErrorPleaseLogInToSendMoney": "",
+  "transactionErrorRecipientWalletNotFound": "",
+  "transactionErrorInsufficientBalance": "",
+  "transactionErrorInvalidRequest": "",
+  "transactionErrorTransactionFailed": "",
+  "transactionErrorPaymentAlreadyProcessed": "",
+  "transactionErrorPaymentVerificationFailed": "",
+  "transactionErrorDepositFailed": "",
+  "transactionErrorFallback": ""
 }

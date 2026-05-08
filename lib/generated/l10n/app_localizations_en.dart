@@ -2221,4 +2221,39 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get kycErrorPhoneVerificationEnter6DigitCode =>
       'Please enter the 6-digit code';
+
+  @override
+  String get transactionErrorUserNotAuthenticated => 'User not authenticated';
+
+  @override
+  String get transactionErrorPleaseLogInToSendMoney =>
+      'Please log in to send money';
+
+  @override
+  String get transactionErrorRecipientWalletNotFound =>
+      'Recipient wallet not found';
+
+  @override
+  String get transactionErrorInsufficientBalance => 'Insufficient balance';
+
+  @override
+  String get transactionErrorInvalidRequest => 'Invalid request';
+
+  @override
+  String get transactionErrorTransactionFailed => 'Transaction failed';
+
+  @override
+  String get transactionErrorPaymentAlreadyProcessed =>
+      'Payment already processed';
+
+  @override
+  String get transactionErrorPaymentVerificationFailed =>
+      'Payment verification failed';
+
+  @override
+  String get transactionErrorDepositFailed => 'Deposit failed';
+
+  @override
+  String get transactionErrorFallback =>
+      'Couldn\'t complete the transaction. Please try again.';
 }

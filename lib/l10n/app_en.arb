@@ -2919,5 +2919,45 @@
   "kycErrorPhoneVerificationEnter6DigitCode": "Please enter the 6-digit code",
   "@kycErrorPhoneVerificationEnter6DigitCode": {
     "description": "Shown in the phone verification flow when the user submits without entering the OTP."
+  },
+  "transactionErrorUserNotAuthenticated": "User not authenticated",
+  "@transactionErrorUserNotAuthenticated": {
+    "description": "Shown when a transaction is attempted but the user is not signed in."
+  },
+  "transactionErrorPleaseLogInToSendMoney": "Please log in to send money",
+  "@transactionErrorPleaseLogInToSendMoney": {
+    "description": "Shown when sendMoney's Cloud Function returns an 'unauthenticated' error code."
+  },
+  "transactionErrorRecipientWalletNotFound": "Recipient wallet not found",
+  "@transactionErrorRecipientWalletNotFound": {
+    "description": "Shown when sendMoney's Cloud Function returns a 'not-found' error code."
+  },
+  "transactionErrorInsufficientBalance": "Insufficient balance",
+  "@transactionErrorInsufficientBalance": {
+    "description": "Shown when sendMoney's Cloud Function returns a 'failed-precondition' error code, indicating not enough wallet balance."
+  },
+  "transactionErrorInvalidRequest": "Invalid request",
+  "@transactionErrorInvalidRequest": {
+    "description": "Shown when sendMoney's Cloud Function returns an 'invalid-argument' error code without a more specific server message."
+  },
+  "transactionErrorTransactionFailed": "Transaction failed",
+  "@transactionErrorTransactionFailed": {
+    "description": "Generic transaction-failure message - used when the server returns no specific error or the error code is not specifically classified."
+  },
+  "transactionErrorPaymentAlreadyProcessed": "Payment already processed",
+  "@transactionErrorPaymentAlreadyProcessed": {
+    "description": "Shown when addMoney detects that the payment has already been credited (idempotency check)."
+  },
+  "transactionErrorPaymentVerificationFailed": "Payment verification failed",
+  "@transactionErrorPaymentVerificationFailed": {
+    "description": "Shown when addMoney's verification step fails or returns no specific error message."
+  },
+  "transactionErrorDepositFailed": "Deposit failed",
+  "@transactionErrorDepositFailed": {
+    "description": "Shown when addMoney throws a generic exception. Technical detail is logged separately via debugPrint."
+  },
+  "transactionErrorFallback": "Couldn't complete the transaction. Please try again.",
+  "@transactionErrorFallback": {
+    "description": "Generic TransactionResult fallback when no specific case applies."
   }
 }

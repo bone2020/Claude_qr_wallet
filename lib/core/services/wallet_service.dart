@@ -8,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/models.dart';
 import '../utils/error_handler.dart';
+import 'transaction_localization_resolver.dart';
 import '../utils/network_retry.dart';
 import 'exchange_rate_service.dart';
 
@@ -168,7 +169,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     List<String>? items,
   }) async {
     if (_userId == null) {
-      return TransactionResult.failure('User not authenticated');
+      return TransactionResult.failure('User not authenticated', errorKey: TransactionErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -212,29 +213,42 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
 
         return TransactionResult.success(transaction);
       } else {
-        return TransactionResult.failure(data['error'] as String? ?? 'Transaction failed');
+        return TransactionResult.failure(
+          data['error'] as String? ?? 'Transaction failed',
+          errorKey: TransactionErrorKey.transactionFailed,
+        );
       }
     } on FirebaseFunctionsException catch (e) {
       String errorMessage;
+      TransactionErrorKey errorKey;
       switch (e.code) {
         case 'unauthenticated':
           errorMessage = 'Please log in to send money';
+          errorKey = TransactionErrorKey.pleaseLogInToSendMoney;
           break;
         case 'not-found':
           errorMessage = 'Recipient wallet not found';
+          errorKey = TransactionErrorKey.recipientWalletNotFound;
           break;
         case 'failed-precondition':
           errorMessage = 'Insufficient balance';
+          errorKey = TransactionErrorKey.insufficientBalance;
           break;
         case 'invalid-argument':
           errorMessage = e.message ?? 'Invalid request';
+          errorKey = TransactionErrorKey.invalidRequest;
           break;
         default:
           errorMessage = e.message ?? 'Transaction failed';
+          errorKey = TransactionErrorKey.transactionFailed;
       }
-      return TransactionResult.failure(errorMessage);
+      return TransactionResult.failure(errorMessage, errorKey: errorKey);
     } catch (e) {
-      return TransactionResult.failure('Transaction failed: $e');
+      debugPrint('Transaction failed: $e');
+      return TransactionResult.failure(
+        'Transaction failed',
+        errorKey: TransactionErrorKey.transactionFailed,
+      );
     }
   }
 
@@ -246,7 +260,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     String? bankName,
   }) async {
     if (_userId == null) {
-      return TransactionResult.failure('User not authenticated');
+      return TransactionResult.failure('User not authenticated', errorKey: TransactionErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -294,14 +308,24 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
 
         return TransactionResult.success(transaction);
       } else if (data['alreadyProcessed'] == true) {
-        return TransactionResult.failure('Payment already processed');
+        return TransactionResult.failure('Payment already processed', errorKey: TransactionErrorKey.paymentAlreadyProcessed);
       } else {
-        return TransactionResult.failure(data['error'] as String? ?? 'Payment verification failed');
+        return TransactionResult.failure(
+          data['error'] as String? ?? 'Payment verification failed',
+          errorKey: TransactionErrorKey.paymentVerificationFailed,
+        );
       }
     } on FirebaseFunctionsException catch (e) {
-      return TransactionResult.failure(e.message ?? 'Payment verification failed');
+      return TransactionResult.failure(
+        e.message ?? 'Payment verification failed',
+        errorKey: TransactionErrorKey.paymentVerificationFailed,
+      );
     } catch (e) {
-      return TransactionResult.failure('Deposit failed: $e');
+      debugPrint('Deposit failed: $e');
+      return TransactionResult.failure(
+        'Deposit failed',
+        errorKey: TransactionErrorKey.depositFailed,
+      );
     }
   }
 
@@ -497,19 +521,21 @@ class TransactionResult {
   final bool success;
   final TransactionModel? transaction;
   final String? error;
+  final TransactionErrorKey? errorKey;
 
   TransactionResult._({
     required this.success,
     this.transaction,
     this.error,
+    this.errorKey,
   });
 
   factory TransactionResult.success(TransactionModel transaction) {
     return TransactionResult._(success: true, transaction: transaction);
   }
 
-  factory TransactionResult.failure(String error) {
-    return TransactionResult._(success: false, error: error);
+  factory TransactionResult.failure(String error, {TransactionErrorKey? errorKey}) {
+    return TransactionResult._(success: false, error: error, errorKey: errorKey);
   }
 }
 
