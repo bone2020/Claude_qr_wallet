@@ -260,19 +260,19 @@
   "@withdraw": {
     "description": "Action: withdraw funds from the wallet"
   },
-  "recentTransactions": "",
+  "recentTransactions": "المعاملات الأخيرة",
   "@recentTransactions": {
     "description": "Section header on home screen above the latest transactions"
   },
-  "viewAll": "",
+  "viewAll": "عرض الكل",
   "@viewAll": {
     "description": "Link to navigate to the full transactions list"
   },
-  "noTransactions": "",
+  "noTransactions": "لا توجد معاملات بعد",
   "@noTransactions": {
     "description": "Empty state message when no transactions exist"
   },
-  "noTransactionsSubtitle": "",
+  "noTransactionsSubtitle": "سيظهر سجل معاملاتك هنا",
   "@noTransactionsSubtitle": {
     "description": "Subtitle in the empty transactions state"
   },
@@ -312,7 +312,7 @@
   "@noteHint": {
     "description": "Placeholder inside the optional transaction note field"
   },
-  "review": "",
+  "review": "مراجعة",
   "@review": {
     "description": "Button to advance from amount to confirmation screen"
   },
@@ -392,59 +392,59 @@
   "@transferFrom": {
     "description": "Label preceding the chosen funding source"
   },
-  "transactions": "",
+  "transactions": "المعاملات",
   "@transactions": {
     "description": "Bottom navigation label and screen title for the transactions list"
   },
-  "allTransactions": "",
+  "allTransactions": "الكل",
   "@allTransactions": {
     "description": "Filter chip showing all transactions"
   },
-  "sent": "",
+  "sent": "مُرسلة",
   "@sent": {
     "description": "Filter chip and status label for sent transactions"
   },
-  "received": "",
+  "received": "مُستلمة",
   "@received": {
     "description": "Filter chip and status label for received transactions"
   },
-  "pending": "",
+  "pending": "قيد الانتظار",
   "@pending": {
     "description": "Status label for pending transactions"
   },
-  "completed": "",
+  "completed": "مكتملة",
   "@completed": {
     "description": "Status label for completed transactions"
   },
-  "failed": "",
+  "failed": "فاشلة",
   "@failed": {
     "description": "Status label for failed transactions"
   },
-  "transactionDetails": "",
+  "transactionDetails": "تفاصيل المعاملة",
   "@transactionDetails": {
     "description": "Title of the single transaction detail screen"
   },
-  "transactionId": "",
+  "transactionId": "رقم تعريف المعاملة",
   "@transactionId": {
     "description": "Label for the transaction's unique identifier"
   },
-  "date": "",
+  "date": "التاريخ",
   "@date": {
     "description": "Label for a transaction date field"
   },
-  "time": "",
+  "time": "الوقت",
   "@time": {
     "description": "Label for a transaction time field"
   },
-  "status": "",
+  "status": "الحالة",
   "@status": {
     "description": "Label for a transaction status field"
   },
-  "from": "",
+  "from": "من",
   "@from": {
     "description": "Label for the sender of a transaction"
   },
-  "to": "",
+  "to": "إلى",
   "@to": {
     "description": "Label for the recipient of a transaction"
   },
@@ -476,7 +476,7 @@
   "@helpSupport": {
     "description": "Profile row leading to help and support"
   },
-  "myDisputes": "",
+  "myDisputes": "نزاعاتي",
   "@myDisputes": {
     "description": "Profile row leading to the user's dispute list"
   },
@@ -743,8 +743,8 @@
   "welcomeBack": "مرحبًا بعودتك",
   "availableBalanceLabel": "متاح",
   "onHoldBalanceLabel": "قيد الانتظار",
-  "transactionStatusPending": "",
-  "transactionStatusFailed": "",
+  "transactionStatusPending": "قيد الانتظار",
+  "transactionStatusFailed": "فاشلة",
   "notificationsScreenTitle": "",
   "markAllAsRead": "",
   "failedToLoadNotifications": "",
@@ -754,20 +754,20 @@
   "currencySelectorDescription": "",
   "currencyChangedTo": "",
   "failedToChangeCurrency": "",
-  "loadMore": "",
+  "loadMore": "تحميل المزيد",
   "copiedToClipboard": "تم نسخ {label}",
-  "transactionNotFound": "",
-  "reportIssue": "",
+  "transactionNotFound": "المعاملة غير موجودة",
+  "reportIssue": "الإبلاغ عن مشكلة",
   "currencyConversion": "تحويل العملة",
   "originalAmount": "المبلغ الأصلي",
   "convertedAmount": "المبلغ المُحوَّل",
   "exchangeRateLabel": "سعر الصرف",
-  "transactionItemsLabel": "",
+  "transactionItemsLabel": "العناصر",
   "positionQrCodeInFrame": "ضع رمز QR داخل الإطار",
   "pleaseEnterValidWalletId": "يُرجى إدخال رقم تعريف محفظة صحيح",
   "lookingUpWallet": "جارٍ البحث عن المحفظة...",
   "scanRecipientQrToSend": "امسح رمز QR للمستلم لإرسال الأموال",
-  "transactionPin": "",
+  "transactionPin": "رمز PIN المعاملة",
   "enterPinToConfirm": "أدخل رمز PIN المكوّن من 6 أرقام لتأكيد هذا التحويل",
   "pleaseEnterAmount": "يُرجى إدخال مبلغ",
   "amountSentTo": "تم إرسال {currency}{amount} إلى {recipient}",
@@ -893,7 +893,7 @@
   "bankNameLabel": "اسم البنك",
   "accountNumberLabel": "رقم الحساب",
   "accountNameLabel": "اسم صاحب الحساب",
-  "howItWorksLabel": "",
+  "howItWorksLabel": "كيف يعمل",
   "virtualAccountInfoBody": "هذا الحساب خاص بك وحدك. أي تحويل إلى هذا الحساب يضاف تلقائيًا إلى محفظتك.",
   "mtnMomoPaymentFailedError": "فشل الدفع عبر MTN MoMo",
   "paymentFailedOrRejectedError": "فشل الدفع أو تم رفضه",
@@ -974,7 +974,7 @@
   "pushNotificationsSubtitle": "",
   "emailNotificationsLabel": "",
   "emailNotificationsSubtitle": "",
-  "transactionsSection": "",
+  "transactionsSection": "المعاملات",
   "transactionAlertsLabel": "",
   "transactionAlertsSubtitle": "",
   "paymentRemindersLabel": "",
@@ -1087,18 +1087,18 @@
   "addBusinessLogoSubtitle": "",
   "changeButton": "",
   "uploadButton": "",
-  "disputeNotFoundError": "",
+  "disputeNotFoundError": "النزاع غير موجود",
   "descriptionLabel": "الوصف",
   "recipientResponseLabel": "ردّ المستلم",
-  "myDisputesTitle": "",
-  "filedByMeTab": "",
-  "againstMeTab": "",
-  "noActiveDisputesFiled": "",
-  "noActiveDisputesAgainstYou": "",
-  "noResolvedDisputes": "",
-  "activeTabWithCount": "",
-  "resolvedTabWithCount": "",
-  "disputesCappedNotice": "",
+  "myDisputesTitle": "نزاعاتي",
+  "filedByMeTab": "مقدّمة منّي",
+  "againstMeTab": "ضدّي",
+  "noActiveDisputesFiled": "لا توجد نزاعات نشطة مقدّمة.",
+  "noActiveDisputesAgainstYou": "لا توجد نزاعات نشطة ضدّك.",
+  "noResolvedDisputes": "لا توجد نزاعات محلولة.",
+  "activeTabWithCount": "نشطة ({count})",
+  "resolvedTabWithCount": "محلولة ({count})",
+  "disputesCappedNotice": "عرض آخر 50 نزاعًا. قد لا تظهر الإدخالات الأقدم.",
   "ugandaNinDescription": "تحقّق من هويتك باستخدام رقم التعريف الوطني الأوغندي",
   "tpinDescription": "تحقّق من هويتك باستخدام رقم تعريف دافع الضرائب الزامبي",
   "verifyIdentityDefaultDescription": "التحقّق من هويتك",
