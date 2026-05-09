@@ -160,15 +160,15 @@
   "@selectIdType": {
     "description": "Prompt to choose an ID document type during KYC"
   },
-  "nationalId": "",
+  "nationalId": "بطاقة الهوية الوطنية",
   "@nationalId": {
     "description": "ID type option: national identity card"
   },
-  "driversLicense": "",
+  "driversLicense": "رخصة القيادة",
   "@driversLicense": {
     "description": "ID type option: driver's license"
   },
-  "passport": "",
+  "passport": "جواز السفر",
   "@passport": {
     "description": "ID type option: passport"
   },
@@ -620,59 +620,59 @@
   "@selectVerificationMethodSubtitle": {
     "description": "Subtitle on the KYC method selection screen"
   },
-  "verifyPassport": "",
+  "verifyPassport": "التحقّق من جواز السفر",
   "@verifyPassport": {
     "description": "KYC option title for passport verification"
   },
-  "verifyNin": "",
+  "verifyNin": "التحقّق من NIN",
   "@verifyNin": {
     "description": "KYC option title for Nigerian National Identification Number verification"
   },
-  "verifyBvn": "",
+  "verifyBvn": "التحقّق من BVN",
   "@verifyBvn": {
     "description": "KYC option title for Bank Verification Number verification"
   },
-  "verifyDriversLicense": "",
+  "verifyDriversLicense": "التحقّق من رخصة القيادة",
   "@verifyDriversLicense": {
     "description": "KYC option title for driver's license verification"
   },
-  "verifyVotersCard": "",
+  "verifyVotersCard": "التحقّق من بطاقة الناخب",
   "@verifyVotersCard": {
     "description": "KYC option title for voter's card verification"
   },
-  "verifyNationalId": "",
+  "verifyNationalId": "التحقّق من بطاقة الهوية الوطنية",
   "@verifyNationalId": {
     "description": "KYC option title for national ID verification"
   },
-  "verifySsnit": "",
+  "verifySsnit": "التحقّق من SSNIT",
   "@verifySsnit": {
     "description": "KYC option title for Ghanaian SSNIT verification"
   },
-  "passportDescription": "",
+  "passportDescription": "التحقّق من جواز السفر الدولي",
   "@passportDescription": {
     "description": "Helper text under the passport KYC option"
   },
-  "ninDescription": "",
+  "ninDescription": "رقم التعريف الوطني (11 رقمًا)",
   "@ninDescription": {
     "description": "Helper text under the NIN KYC option"
   },
-  "bvnDescription": "",
+  "bvnDescription": "رقم التحقّق المصرفي (11 رقمًا)",
   "@bvnDescription": {
     "description": "Helper text under the BVN KYC option"
   },
-  "driversLicenseDescription": "",
+  "driversLicenseDescription": "التحقّق من رخصة القيادة",
   "@driversLicenseDescription": {
     "description": "Helper text under the driver's license KYC option"
   },
-  "votersCardDescription": "",
+  "votersCardDescription": "التحقّق من بطاقة الناخب",
   "@votersCardDescription": {
     "description": "Helper text under the voter's card KYC option"
   },
-  "nationalIdDescription": "",
+  "nationalIdDescription": "التحقّق من بطاقة الهوية الوطنية",
   "@nationalIdDescription": {
     "description": "Helper text under the national ID KYC option"
   },
-  "ssnitDescription": "",
+  "ssnitDescription": "رقم SSNIT (حرف واحد + 12 رقمًا)",
   "@ssnitDescription": {
     "description": "Helper text under the SSNIT KYC option"
   },
@@ -814,21 +814,21 @@
   "appleSignInComingSoon": "تسجيل الدخول عبر Apple قريبًا",
   "countryDisplayFormat": "{dialCode} • {symbol} {code}",
   "verificationFailedWithError": "فشل التحقّق: {error}",
-  "bvnVerificationTitle": "",
-  "driversLicenseVerificationTitle": "",
-  "ninVerificationTitle": "",
-  "passportVerificationTitle": "",
-  "ssnitVerificationTitle": "",
-  "votersCardVerificationTitle": "",
-  "nationalIdVerificationTitleWithCountry": "",
-  "ugandaNationalIdAppBarTitle": "",
-  "ugandaNationalIdHeading": "",
-  "ugandaNationalIdDescription": "",
-  "bvnHelperText": "",
-  "ninHelperText": "",
-  "ssnitHelperText": "",
-  "ugandaNinHelperText": "",
-  "ugandaNinCardNumberHelperText": "",
+  "bvnVerificationTitle": "التحقّق من BVN",
+  "driversLicenseVerificationTitle": "التحقّق من رخصة القيادة",
+  "ninVerificationTitle": "التحقّق من NIN",
+  "passportVerificationTitle": "التحقّق من جواز السفر",
+  "ssnitVerificationTitle": "التحقّق من SSNIT",
+  "votersCardVerificationTitle": "التحقّق من بطاقة الناخب",
+  "nationalIdVerificationTitleWithCountry": "التحقّق — {countryName}",
+  "ugandaNationalIdAppBarTitle": "بطاقة الهوية الوطنية الأوغندية",
+  "ugandaNationalIdHeading": "التحقّق من بطاقة الهوية الوطنية",
+  "ugandaNationalIdDescription": "تحقّق من هويتك باستخدام رقم التعريف الوطني الأوغندي (NIN) ورقم البطاقة.",
+  "bvnHelperText": "رقم التحقّق المصرفي المرتبط بحساباتك المصرفية",
+  "ninHelperText": "رقم تعريفك الوطني كما هو موضّح على بطاقة NIN الخاصة بك",
+  "ssnitHelperText": "رقم SSNIT الخاص بك: حرف واحد متبوعًا بـ 12 رقمًا",
+  "ugandaNinHelperText": "يتكوّن NIN الخاص بك من 14 حرفًا أبجديًا رقميًا",
+  "ugandaNinCardNumberHelperText": "الرقم المطبوع على بطاقة هويتك الفعلية",
   "phoneVerificationAppBarTitle": "",
   "verifyCodeButton": "التحقّق من الرمز",
   "resendCodeIn": "إعادة الإرسال خلال {seconds} ثانية",
@@ -1099,37 +1099,37 @@
   "activeTabWithCount": "",
   "resolvedTabWithCount": "",
   "disputesCappedNotice": "",
-  "ugandaNinDescription": "",
-  "tpinDescription": "",
+  "ugandaNinDescription": "تحقّق من هويتك باستخدام رقم التعريف الوطني الأوغندي",
+  "tpinDescription": "تحقّق من هويتك باستخدام رقم تعريف دافع الضرائب الزامبي",
   "verifyIdentityDefaultDescription": "التحقّق من هويتك",
-  "taxpayerPinLabel": "",
+  "taxpayerPinLabel": "رقم تعريف دافع الضرائب (TPIN)",
   "invalidIdNumberFallback": "رقم الهوية غير صحيح",
-  "tpinLabel": "",
+  "tpinLabel": "TPIN",
   "idNumberLabel": "رقم الهوية",
   "enterTpinHint": "",
   "enterIdNumberHint": "أدخل رقم هويتك المكوّن من 13 رقمًا",
-  "zambianTaxpayerHelperText": "",
-  "southAfricanIdHelperText": "",
+  "zambianTaxpayerHelperText": "رقم تعريفك الضريبي الزامبي",
+  "southAfricanIdHelperText": "رقم بطاقة هويتك الجنوب إفريقية",
   "documentCapturedTitle": "تم التقاط المستند",
   "verifyYourDocumentTitle": "تحقّق من {documentType}",
   "documentCapturedBody": "تم التقاط {documentType}. ستبدأ عملية التحقّق عند المتابعة.",
   "idAndSelfieVerificationDescription": "سنتحقّق من رقم هويتك ونأخذ صورة سيلفي للتأكيد",
   "documentBothSidesAndSelfieDescription": "سنلتقط كلا وجهي مستند هويتك ونأخذ صورة سيلفي",
-  "ninLengthError": "",
-  "bvnLengthError": "",
-  "ssnitFormatError": "",
-  "southAfricanIdLengthError": "",
-  "ugandaNinFormatError": "",
-  "tpinLengthError": "",
+  "ninLengthError": "يجب أن يتكوّن NIN من 11 رقمًا بالضبط",
+  "bvnLengthError": "يجب أن يتكوّن BVN من 11 رقمًا بالضبط",
+  "ssnitFormatError": "يجب أن يتكوّن SSNIT من حرف واحد متبوعًا بـ 12 رقمًا",
+  "southAfricanIdLengthError": "يجب أن تتكوّن بطاقة الهوية الجنوب إفريقية من 13 رقمًا بالضبط",
+  "ugandaNinFormatError": "يجب أن يتكوّن NIN الأوغندي من 14 حرفًا أبجديًا رقميًا بالضبط",
+  "tpinLengthError": "يجب أن يتكوّن TPIN من 10 أرقام بالضبط",
   "smileIdParseError": "تعذّر قراءة نتيجة التحقّق. يُرجى المحاولة مجددًا.",
-  "votersIdLabel": "",
-  "internationalPassportLabel": "",
-  "alienIdLabel": "",
-  "ninFullLabel": "",
-  "bvnFullLabel": "",
-  "ssnitLabel": "",
-  "ugandaNationalIdLabel": "",
-  "tpinFullLabel": "",
+  "votersIdLabel": "بطاقة الناخب",
+  "internationalPassportLabel": "جواز السفر الدولي",
+  "alienIdLabel": "بطاقة الأجنبي",
+  "ninFullLabel": "رقم التعريف الوطني (NIN)",
+  "bvnFullLabel": "رقم التحقّق المصرفي (BVN)",
+  "ssnitLabel": "SSNIT",
+  "ugandaNationalIdLabel": "بطاقة الهوية الوطنية (NIN)",
+  "tpinFullLabel": "رقم تعريف دافع الضرائب (TPIN)",
   "momoErrorNotConfigured": "",
   "momoErrorPaymentDeclined": "",
   "momoErrorInsufficientFunds": "",
