@@ -855,7 +855,7 @@
   "amountLabel": "Montant",
   "itemsOptional": "Articles (facultatifs)",
   "itemsHint": "ex. : riz jollof, poulet, boissons",
-  "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "itemCount": "{count, plural, =1{1 article} other{{count} articles}}",
   "generateQrCode": "Générer le QR code",
   "payToUser": "Payer à : {userName}",
   "shareButton": "Partager",
