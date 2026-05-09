@@ -8,131 +8,131 @@
   "@appTagline": {
     "description": "Tagline shown on splash screen"
   },
-  "getStarted": "",
+  "getStarted": "ابدأ",
   "@getStarted": {
     "description": "Button on splash screen to begin onboarding"
   },
-  "signUp": "",
+  "signUp": "إنشاء حساب",
   "@signUp": {
     "description": "Sign up button label and screen title"
   },
-  "signUpSubtitle": "",
+  "signUpSubtitle": "سجّل وانطلق إلى المستوى التالي",
   "@signUpSubtitle": {
     "description": "Subtitle shown on the sign up screen"
   },
-  "logIn": "",
+  "logIn": "تسجيل الدخول",
   "@logIn": {
     "description": "Log in button label and screen title"
   },
-  "logInSubtitle": "",
+  "logInSubtitle": "مرحبًا بعودتك! سجّل الدخول للمتابعة",
   "@logInSubtitle": {
     "description": "Subtitle shown on the log in screen"
   },
-  "createAccount": "",
+  "createAccount": "إنشاء حساب",
   "@createAccount": {
     "description": "Button on sign up screen to submit the form"
   },
-  "alreadyHaveAccount": "",
+  "alreadyHaveAccount": "لديك حساب بالفعل؟",
   "@alreadyHaveAccount": {
     "description": "Prompt before the Log in link on the sign up screen"
   },
-  "dontHaveAccount": "",
+  "dontHaveAccount": "ليس لديك حساب؟",
   "@dontHaveAccount": {
     "description": "Prompt before the Sign up link on the log in screen"
   },
-  "orSignUpWith": "",
+  "orSignUpWith": "أو سجّل عبر",
   "@orSignUpWith": {
     "description": "Divider text above social sign up options"
   },
-  "orLogInWith": "",
+  "orLogInWith": "أو سجّل الدخول عبر",
   "@orLogInWith": {
     "description": "Divider text above social log in options"
   },
-  "forgotPassword": "",
+  "forgotPassword": "هل نسيت كلمة المرور؟",
   "@forgotPassword": {
     "description": "Link to password reset on the log in screen"
   },
-  "resetPassword": "",
+  "resetPassword": "إعادة تعيين كلمة المرور",
   "@resetPassword": {
     "description": "Title on the password reset screen"
   },
-  "sendResetLink": "",
+  "sendResetLink": "إرسال رابط إعادة التعيين",
   "@sendResetLink": {
     "description": "Button to email the password reset link"
   },
-  "backToLogin": "",
+  "backToLogin": "العودة إلى تسجيل الدخول",
   "@backToLogin": {
     "description": "Link returning the user to the log in screen"
   },
-  "fullName": "",
+  "fullName": "الاسم الكامل",
   "@fullName": {
     "description": "Label for the full name input field"
   },
-  "fullNameHint": "",
+  "fullNameHint": "أدخل اسمك الكامل",
   "@fullNameHint": {
     "description": "Placeholder text inside the full name field"
   },
-  "email": "",
+  "email": "البريد الإلكتروني",
   "@email": {
     "description": "Label for the email input field"
   },
-  "emailHint": "",
+  "emailHint": "أدخل بريدك الإلكتروني",
   "@emailHint": {
     "description": "Placeholder text inside the email field"
   },
-  "phoneNumber": "",
+  "phoneNumber": "رقم الهاتف",
   "@phoneNumber": {
     "description": "Label for the phone number input field"
   },
-  "phoneNumberHint": "",
+  "phoneNumberHint": "أدخل رقم هاتفك",
   "@phoneNumberHint": {
     "description": "Placeholder text inside the phone number field"
   },
-  "password": "",
+  "password": "كلمة المرور",
   "@password": {
     "description": "Label for the password input field"
   },
-  "passwordHint": "",
+  "passwordHint": "أدخل كلمة المرور",
   "@passwordHint": {
     "description": "Placeholder text inside the password field"
   },
-  "confirmPassword": "",
+  "confirmPassword": "تأكيد كلمة المرور",
   "@confirmPassword": {
     "description": "Label for the confirm password input field"
   },
-  "confirmPasswordHint": "",
+  "confirmPasswordHint": "أكّد كلمة المرور",
   "@confirmPasswordHint": {
     "description": "Placeholder inside the confirm password field"
   },
-  "termsAgreement": "",
+  "termsAgreement": "أوافق على",
   "@termsAgreement": {
     "description": "Prefix before the Terms and Privacy link on sign up"
   },
-  "termsAndPrivacy": "",
+  "termsAndPrivacy": "الشروط وسياسة الخصوصية",
   "@termsAndPrivacy": {
     "description": "Link to the terms and privacy policy"
   },
-  "verifyPhone": "",
+  "verifyPhone": "التحقّق من الهاتف",
   "@verifyPhone": {
     "description": "Title shown when verifying a phone number via OTP"
   },
-  "verifyEmail": "",
+  "verifyEmail": "التحقّق من البريد الإلكتروني",
   "@verifyEmail": {
     "description": "Title shown when verifying an email address"
   },
-  "enterOtp": "",
+  "enterOtp": "أدخل OTP",
   "@enterOtp": {
     "description": "Prompt above the OTP input field"
   },
-  "otpSentTo": "",
+  "otpSentTo": "أرسلنا رمز التحقّق إلى",
   "@otpSentTo": {
     "description": "Confirmation text above the masked email or phone"
   },
-  "resendCode": "",
+  "resendCode": "إعادة إرسال الرمز",
   "@resendCode": {
     "description": "Button to request a new OTP"
   },
-  "resendIn": "",
+  "resendIn": "إعادة الإرسال خلال",
   "@resendIn": {
     "description": "Prefix shown next to the OTP resend countdown timer"
   },
@@ -140,15 +140,15 @@
   "@verify": {
     "description": "Button to submit an OTP for verification"
   },
-  "didntReceiveCode": "",
+  "didntReceiveCode": "لم تستلم الرمز؟",
   "@didntReceiveCode": {
     "description": "Prompt before the resend code link"
   },
-  "completeProfile": "",
+  "completeProfile": "إكمال الملف الشخصي",
   "@completeProfile": {
     "description": "Title on the KYC completion screen"
   },
-  "completeProfileSubtitle": "",
+  "completeProfileSubtitle": "نحتاج إلى بعض المعلومات الإضافية لتأمين حسابك",
   "@completeProfileSubtitle": {
     "description": "Subtitle on the KYC completion screen"
   },
@@ -220,7 +220,7 @@
   "@continueText": {
     "description": "Generic continue/next button"
   },
-  "skip": "",
+  "skip": "تخطّى الآن",
   "@skip": {
     "description": "Button to skip the current optional step"
   },
@@ -492,7 +492,7 @@
   "@darkMode": {
     "description": "Toggle label for dark theme"
   },
-  "biometricLogin": "",
+  "biometricLogin": "تسجيل الدخول بالبصمة",
   "@biometricLogin": {
     "description": "Toggle label for biometric authentication"
   },
@@ -552,11 +552,11 @@
   "@errorWrongPassword": {
     "description": "Error shown when the password is incorrect on log in"
   },
-  "successAccountCreated": "",
+  "successAccountCreated": "تم إنشاء الحساب بنجاح!",
   "@successAccountCreated": {
     "description": "Success message after sign up completes"
   },
-  "successLoggedIn": "",
+  "successLoggedIn": "مرحبًا بعودتك!",
   "@successLoggedIn": {
     "description": "Success message after a successful log in"
   },
@@ -572,7 +572,7 @@
   "@successProfileUpdated": {
     "description": "Success message after editing the profile"
   },
-  "successPasswordReset": "",
+  "successPasswordReset": "تم إرسال رابط إعادة التعيين!",
   "@successPasswordReset": {
     "description": "Success message after a password reset email is sent"
   },
@@ -740,7 +740,7 @@
   "pageNotFound": "",
   "youAreOffline": "",
   "helloUser": "",
-  "welcomeBack": "",
+  "welcomeBack": "مرحبًا بعودتك",
   "availableBalanceLabel": "",
   "onHoldBalanceLabel": "",
   "transactionStatusPending": "",
@@ -780,38 +780,38 @@
   "errorWithMessage": "",
   "selectCountryTitle": "",
   "searchCountryHint": "",
-  "enterPhoneNumberHint": "",
-  "otpSentToPhone": "",
-  "phoneVerifiedSuccessfully": "",
+  "enterPhoneNumberHint": "أدخل رقم الهاتف",
+  "otpSentToPhone": "تم إرسال OTP إلى هاتفك",
+  "phoneVerifiedSuccessfully": "تم التحقّق من الهاتف بنجاح!",
   "verifyButton": "",
   "tryAgainButton": "",
-  "welcomeBackTitle": "",
-  "enterPasswordToUnlock": "",
-  "enterPinToUnlock": "",
-  "enterPasswordHint": "",
-  "unlockButton": "",
-  "useBiometric": "",
-  "forgotPasswordTitle": "",
-  "emailSentTitle": "",
-  "emailResetLinkSent": "",
-  "checkEmailForInstructions": "",
-  "didntReceiveEmailTryAgain": "",
-  "resetYourPasswordTitle": "",
-  "enterEmailForResetLink": "",
-  "enterEmailHint": "",
-  "emailVerifiedSuccessfully": "",
-  "verificationEmailSent": "",
-  "verifyYourEmailTitle": "",
-  "weveSentVerificationLinkTo": "",
+  "welcomeBackTitle": "مرحبًا بعودتك",
+  "enterPasswordToUnlock": "أدخل كلمة المرور لإلغاء القفل",
+  "enterPinToUnlock": "أدخل رمز PIN لإلغاء القفل",
+  "enterPasswordHint": "أدخل كلمة المرور",
+  "unlockButton": "إلغاء القفل",
+  "useBiometric": "استخدام البصمة",
+  "forgotPasswordTitle": "نسيت كلمة المرور",
+  "emailSentTitle": "تم إرسال البريد الإلكتروني!",
+  "emailResetLinkSent": "أرسلنا رابط إعادة التعيين إلى:\n{email}",
+  "checkEmailForInstructions": "يُرجى مراجعة بريدك الإلكتروني واتّباع التعليمات لإعادة تعيين كلمة المرور.",
+  "didntReceiveEmailTryAgain": "لم تستلم بريدًا إلكترونيًا؟ حاول مرة أخرى",
+  "resetYourPasswordTitle": "أعد تعيين كلمة المرور",
+  "enterEmailForResetLink": "أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.",
+  "enterEmailHint": "أدخل بريدك الإلكتروني",
+  "emailVerifiedSuccessfully": "تم التحقّق من البريد الإلكتروني بنجاح!",
+  "verificationEmailSent": "تم إرسال بريد التحقّق!",
+  "verifyYourEmailTitle": "تحقّق من بريدك الإلكتروني",
+  "weveSentVerificationLinkTo": "أرسلنا رابط تحقّق إلى:",
   "checkingAutomatically": "",
-  "didntReceiveTheEmail": "",
+  "didntReceiveTheEmail": "لم تستلم البريد الإلكتروني؟",
   "checkNowButton": "",
-  "verifyPhoneTitle": "",
-  "verifyYourPhone": "",
-  "weSent6DigitCode": "",
-  "pleaseAgreeToTerms": "",
-  "accountCreatedVerifyEmail": "",
-  "appleSignInComingSoon": "",
+  "verifyPhoneTitle": "التحقّق من الهاتف",
+  "verifyYourPhone": "تحقّق من هاتفك",
+  "weSent6DigitCode": "أرسلنا رمزًا من 6 أرقام إلى",
+  "pleaseAgreeToTerms": "يُرجى الموافقة على شروط الخدمة وسياسة الخصوصية",
+  "accountCreatedVerifyEmail": "تم إنشاء الحساب! يُرجى التحقّق من بريدك الإلكتروني.",
+  "appleSignInComingSoon": "تسجيل الدخول عبر Apple قريبًا",
   "countryDisplayFormat": "",
   "verificationFailedWithError": "",
   "bvnVerificationTitle": "",
@@ -830,10 +830,10 @@
   "ugandaNinHelperText": "",
   "ugandaNinCardNumberHelperText": "",
   "phoneVerificationAppBarTitle": "",
-  "verifyCodeButton": "",
-  "resendCodeIn": "",
-  "resendCodeButton": "",
-  "sendVerificationCodeButton": "",
+  "verifyCodeButton": "التحقّق من الرمز",
+  "resendCodeIn": "إعادة الإرسال خلال {seconds} ثانية",
+  "resendCodeButton": "إعادة إرسال الرمز",
+  "sendVerificationCodeButton": "إرسال رمز التحقّق",
   "verificationFailedTitle": "",
   "verificationFailedMessage": "",
   "verificationInProgressTitle": "",
@@ -855,7 +855,7 @@
   "amountLabel": "",
   "itemsOptional": "",
   "itemsHint": "",
-  "itemCount": "{count, plural, =1{1 item} other{{count} items}}",
+  "itemCount": "{count, plural, zero{لا توجد عناصر} one{عنصر واحد} two{عنصران} few{{count} عناصر} many{{count} عنصرًا} other{{count} عنصر}}",
   "generateQrCode": "",
   "payToUser": "",
   "shareButton": "",
@@ -884,7 +884,7 @@
   "securePaymentLabel": "",
   "paystackSecurityNote": "",
   "mobileMoneyProviderLabel": "",
-  "phoneNumberLabel": "",
+  "phoneNumberLabel": "رقم الهاتف",
   "loadingAccountDetails": "",
   "virtualAccountTitle": "",
   "tapToGenerateAccountPrompt": "",
@@ -911,7 +911,7 @@
   "newBalanceLabel": "",
   "somethingWentWrongTryAgain": "",
   "goBackButton": "",
-  "enterOtpTitle": "",
+  "enterOtpTitle": "أدخل OTP",
   "enterOtpBody": "",
   "confirmWithdrawalTitle": "",
   "pleaseVerifyDetailsCorrect": "",
@@ -931,13 +931,13 @@
   "enterAccountHolderNameHint": "",
   "couldNotVerifyAccountError": "",
   "withdrawalFailedError": "",
-  "otpVerificationFailedError": "",
+  "otpVerificationFailedError": "فشل التحقّق من OTP",
   "aboutTitle": "",
   "qrWalletAppName": "",
   "versionAndBuild": "",
   "aboutAppDescription": "",
-  "termsOfServiceLink": "",
-  "privacyPolicyLink": "",
+  "termsOfServiceLink": "شروط الخدمة",
+  "privacyPolicyLink": "سياسة الخصوصية",
   "rateUsLink": "",
   "rateUsToast": "",
   "shareAppLink": "",
@@ -993,17 +993,17 @@
   "systemThemeLabel": "",
   "systemThemeSubtitle": "",
   "previewLabel": "",
-  "passwordChangedTitle": "",
-  "passwordChangedBody": "",
+  "passwordChangedTitle": "تم تغيير كلمة المرور!",
+  "passwordChangedBody": "تم تحديث كلمة المرور بنجاح.",
   "changePasswordAction": "",
-  "createNewPasswordSubtitle": "",
+  "createNewPasswordSubtitle": "أنشئ كلمة مرور جديدة",
   "currentPasswordLabel": "",
   "enterCurrentPasswordHint": "",
   "newPasswordLabel": "",
   "enterNewPasswordHint": "",
   "confirmNewPasswordLabel": "",
   "reenterNewPasswordHint": "",
-  "passwordMustContainLabel": "",
+  "passwordMustContainLabel": "يجب أن تحتوي كلمة المرور على:",
   "pinChangedTitle": "",
   "pinChangedBody": "",
   "changePinAction": "",
@@ -1021,15 +1021,15 @@
   "emailAndPasswordMethod": "",
   "emailAndPasswordSubtitle": "",
   "resetPinSecurityAssurance": "",
-  "enterYourPasswordTitle": "",
+  "enterYourPasswordTitle": "أدخل كلمة المرور",
   "verifyByCredentialsBody": "",
-  "emailLabel": "",
-  "passwordLabel": "",
-  "enterYourPasswordHint": "",
+  "emailLabel": "البريد الإلكتروني",
+  "passwordLabel": "كلمة المرور",
+  "enterYourPasswordHint": "أدخل كلمة المرور",
   "enter6DigitCodePhone": "",
-  "tooManyAttemptsError": "",
-  "failedToSendOtpError": "",
-  "incorrectCodeError": "",
+  "tooManyAttemptsError": "عدد كبير من المحاولات. يُرجى المحاولة لاحقًا.",
+  "failedToSendOtpError": "فشل إرسال OTP. يُرجى المحاولة مجددًا.",
+  "incorrectCodeError": "رمز غير صحيح. يُرجى المحاولة مجددًا.",
   "verificationFailedAgainError": "",
   "verifyOtpToPhoneSubtitle": "",
   "noPhoneNumberLinkedSubtitle": "",
@@ -1228,7 +1228,7 @@
   "biometricErrorNotSupported": "",
   "biometricErrorNoBiometricsEnrolled": "",
   "biometricErrorFallback": "",
-  "biometricReasonAuthenticate": "",
+  "biometricReasonAuthenticate": "استخدم بصمتك للوصول إلى QR Wallet",
   "biometricReasonChangeSecurity": "",
   "biometricReasonConfirmPayment": "",
   "walletErrorTooManyRequests": "",
