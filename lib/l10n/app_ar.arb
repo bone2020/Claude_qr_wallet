@@ -360,31 +360,31 @@
   "@addMoneyTitle": {
     "description": "Title of the add money screen (separate from action button)"
   },
-  "selectBank": "",
+  "selectBank": "اختر بنكًا",
   "@selectBank": {
     "description": "Action to choose a linked bank for funding"
   },
-  "linkedBanks": "",
+  "linkedBanks": "البنوك المرتبطة",
   "@linkedBanks": {
     "description": "Section header listing the user's linked bank accounts"
   },
-  "addNewBank": "",
+  "addNewBank": "إضافة بنك جديد",
   "@addNewBank": {
     "description": "Action to link a new bank account"
   },
-  "bankName": "",
+  "bankName": "اسم البنك",
   "@bankName": {
     "description": "Label for a bank name field"
   },
-  "accountNumber": "",
+  "accountNumber": "رقم الحساب",
   "@accountNumber": {
     "description": "Label for an account number field"
   },
-  "accountName": "",
+  "accountName": "اسم صاحب الحساب",
   "@accountName": {
     "description": "Label for the displayed account holder name"
   },
-  "linkBank": "",
+  "linkBank": "ربط بنك",
   "@linkBank": {
     "description": "Button to confirm linking a bank account"
   },
@@ -468,7 +468,7 @@
   "@notifications": {
     "description": "Section header and screen title for notification settings"
   },
-  "linkedAccounts": "",
+  "linkedAccounts": "الحسابات المرتبطة",
   "@linkedAccounts": {
     "description": "Profile row leading to linked accounts management"
   },
@@ -885,14 +885,14 @@
   "paystackSecurityNote": "",
   "mobileMoneyProviderLabel": "",
   "phoneNumberLabel": "رقم الهاتف",
-  "loadingAccountDetails": "",
+  "loadingAccountDetails": "جارٍ تحميل تفاصيل الحساب...",
   "virtualAccountTitle": "",
-  "tapToGenerateAccountPrompt": "",
-  "generateAccountButton": "",
+  "tapToGenerateAccountPrompt": "اضغط لإنشاء رقم حسابك المخصّص",
+  "generateAccountButton": "إنشاء الحساب",
   "yourVirtualAccountLabel": "",
-  "bankNameLabel": "",
-  "accountNumberLabel": "",
-  "accountNameLabel": "",
+  "bankNameLabel": "اسم البنك",
+  "accountNumberLabel": "رقم الحساب",
+  "accountNameLabel": "اسم صاحب الحساب",
   "howItWorksLabel": "",
   "virtualAccountInfoBody": "",
   "mtnMomoPaymentFailedError": "",
@@ -923,13 +923,13 @@
   "mobileMoneyNotAvailableWithdrawalsBody": "",
   "availableBalanceFull": "",
   "amountToWithdrawLabel": "",
-  "selectBankLabel": "",
-  "selectABankHint": "",
-  "enterAccountNumberHint": "",
-  "enterAtLeastDigitsToVerify": "",
-  "accountVerifiedLabel": "",
-  "enterAccountHolderNameHint": "",
-  "couldNotVerifyAccountError": "",
+  "selectBankLabel": "اختر بنكًا",
+  "selectABankHint": "اختر بنكًا",
+  "enterAccountNumberHint": "أدخل رقم الحساب",
+  "enterAtLeastDigitsToVerify": "أدخل {count} أرقام على الأقل للتحقّق",
+  "accountVerifiedLabel": "تم التحقّق من الحساب",
+  "enterAccountHolderNameHint": "أدخل اسم صاحب الحساب",
+  "couldNotVerifyAccountError": "تعذّر التحقّق من الحساب",
   "withdrawalFailedError": "",
   "otpVerificationFailedError": "فشل التحقّق من OTP",
   "aboutTitle": "",
@@ -1059,17 +1059,17 @@
   "faqChangePinAnswer": "",
   "faqForgotPasswordQuestion": "",
   "faqForgotPasswordAnswer": "",
-  "removeAccountConfirmTitle": "",
-  "removeAccountConfirmBody": "",
-  "accountRemovedToast": "",
+  "removeAccountConfirmTitle": "حذف الحساب؟",
+  "removeAccountConfirmBody": "هل أنت متأكّد من رغبتك في حذف هذا الحساب المصرفي؟",
+  "accountRemovedToast": "تم حذف الحساب",
   "failedToRemoveError": "",
-  "linkedBankAccountsTitle": "",
-  "noBankAccountsEmptyTitle": "",
-  "noBankAccountsEmptySubtitle": "",
-  "addBankAccountAction": "",
-  "bankAccountFallback": "",
-  "bankNameHint": "",
-  "nameOnAccountHint": "",
+  "linkedBankAccountsTitle": "الحسابات المصرفية المرتبطة",
+  "noBankAccountsEmptyTitle": "لا توجد حسابات مصرفية",
+  "noBankAccountsEmptySubtitle": "أضف حسابًا مصرفيًا لتسهيل عمليات السحب",
+  "addBankAccountAction": "إضافة حساب مصرفي",
+  "bankAccountFallback": "حساب مصرفي",
+  "bankNameHint": "مثال: GCB Bank",
+  "nameOnAccountHint": "الاسم على الحساب",
   "uploadBusinessLogoTitle": "",
   "logoAppearInQrCaption": "",
   "takePhotoOption": "التقط صورة",
@@ -1240,10 +1240,10 @@
   "walletUiErrorUserNotFound": "",
   "walletUiErrorPleaseSelectMomoProvider": "",
   "walletUiErrorPaymentStillPending": "",
-  "walletUiErrorPleaseSelectBank": "",
-  "walletUiErrorAccountNumberTooShort": "",
-  "walletUiErrorPleaseVerifyAccount": "",
-  "walletUiErrorPleaseEnterAccountName": "",
+  "walletUiErrorPleaseSelectBank": "يُرجى اختيار بنك",
+  "walletUiErrorAccountNumberTooShort": "يجب أن يتكوّن رقم الحساب من {minDigits} أرقام على الأقل",
+  "walletUiErrorPleaseVerifyAccount": "يُرجى التحقّق من حسابك أولًا",
+  "walletUiErrorPleaseEnterAccountName": "يُرجى إدخال اسم صاحب الحساب",
   "walletUiErrorWithdrawalFailedRefunded": "",
   "walletUiErrorPleaseEnter6DigitOtp": "",
   "sendUiErrorCouldNotVerifyRecipientWallet": "",
