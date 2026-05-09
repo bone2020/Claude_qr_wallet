@@ -228,19 +228,19 @@
   "@home": {
     "description": "Bottom navigation tab label for the home screen"
   },
-  "totalBalance": "",
+  "totalBalance": "الرصيد الإجمالي",
   "@totalBalance": {
     "description": "Label above the total wallet balance figure"
   },
-  "availableBalance": "",
+  "availableBalance": "الرصيد المتاح",
   "@availableBalance": {
     "description": "Label above the available (spendable) balance figure"
   },
-  "hideBalance": "",
+  "hideBalance": "إخفاء الرصيد",
   "@hideBalance": {
     "description": "Action to obscure the displayed wallet balance"
   },
-  "showBalance": "",
+  "showBalance": "إظهار الرصيد",
   "@showBalance": {
     "description": "Action to reveal the obscured wallet balance"
   },
@@ -252,11 +252,11 @@
   "@receive": {
     "description": "Action: receive money via QR or wallet ID"
   },
-  "addMoney": "",
+  "addMoney": "إضافة أموال",
   "@addMoney": {
     "description": "Action: top up the wallet"
   },
-  "withdraw": "",
+  "withdraw": "سحب",
   "@withdraw": {
     "description": "Action: withdraw funds from the wallet"
   },
@@ -288,7 +288,7 @@
   "@enterWalletId": {
     "description": "Action to manually type a recipient wallet ID"
   },
-  "walletId": "",
+  "walletId": "رقم تعريف المحفظة",
   "@walletId": {
     "description": "Label for a wallet ID field or display"
   },
@@ -296,11 +296,11 @@
   "@walletIdHint": {
     "description": "Placeholder text in the recipient wallet ID field"
   },
-  "amount": "",
+  "amount": "المبلغ",
   "@amount": {
     "description": "Label for an amount input field"
   },
-  "amountHint": "",
+  "amountHint": "أدخل المبلغ",
   "@amountHint": {
     "description": "Placeholder text inside the amount field"
   },
@@ -348,7 +348,7 @@
   "@downloadQrCode": {
     "description": "Action to save the QR code as an image"
   },
-  "walletIdCopied": "",
+  "walletIdCopied": "تم نسخ رقم تعريف المحفظة!",
   "@walletIdCopied": {
     "description": "Confirmation snackbar after copying the wallet ID"
   },
@@ -356,7 +356,7 @@
   "@tapToCopy": {
     "description": "Hint shown next to a copyable wallet ID"
   },
-  "addMoneyTitle": "",
+  "addMoneyTitle": "إضافة أموال",
   "@addMoneyTitle": {
     "description": "Title of the add money screen (separate from action button)"
   },
@@ -388,7 +388,7 @@
   "@linkBank": {
     "description": "Button to confirm linking a bank account"
   },
-  "transferFrom": "",
+  "transferFrom": "تحويل من",
   "@transferFrom": {
     "description": "Label preceding the chosen funding source"
   },
@@ -532,11 +532,11 @@
   "@errorFieldRequired": {
     "description": "Validation error for an empty required field"
   },
-  "errorInsufficientBalance": "",
+  "errorInsufficientBalance": "رصيد غير كافٍ",
   "@errorInsufficientBalance": {
     "description": "Error shown when wallet has too little to complete a send"
   },
-  "errorInvalidAmount": "",
+  "errorInvalidAmount": "يُرجى إدخال مبلغ صحيح",
   "@errorInvalidAmount": {
     "description": "Validation error when amount is missing or zero/negative"
   },
@@ -564,7 +564,7 @@
   "@successMoneySent": {
     "description": "Success message after a transaction is dispatched"
   },
-  "successMoneyAdded": "",
+  "successMoneyAdded": "تمت إضافة الأموال بنجاح!",
   "@successMoneyAdded": {
     "description": "Success message after a successful top up"
   },
@@ -732,17 +732,17 @@
   "@languageChanged": {
     "description": "Snackbar shown after a successful language change (Phase 6 NEW)"
   },
-  "currencyAmount": "",
-  "symbolAmount": "",
-  "signedCurrencyAmount": "",
-  "exchangeRateLine": "",
-  "currencyCodeWithSymbol": "",
+  "currencyAmount": "{currency} {amount}",
+  "symbolAmount": "{symbol}{amount}",
+  "signedCurrencyAmount": "{prefix}{currency}{amount}",
+  "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
+  "currencyCodeWithSymbol": "{symbol} ({code})",
   "pageNotFound": "",
   "youAreOffline": "",
   "helloUser": "",
   "welcomeBack": "مرحبًا بعودتك",
-  "availableBalanceLabel": "",
-  "onHoldBalanceLabel": "",
+  "availableBalanceLabel": "متاح",
+  "onHoldBalanceLabel": "قيد الانتظار",
   "transactionStatusPending": "",
   "transactionStatusFailed": "",
   "notificationsScreenTitle": "",
@@ -761,7 +761,7 @@
   "currencyConversion": "",
   "originalAmount": "",
   "convertedAmount": "",
-  "exchangeRateLabel": "",
+  "exchangeRateLabel": "سعر الصرف",
   "transactionItemsLabel": "",
   "positionQrCodeInFrame": "",
   "pleaseEnterValidWalletId": "",
@@ -769,11 +769,11 @@
   "scanRecipientQrToSend": "",
   "transactionPin": "",
   "enterPinToConfirm": "",
-  "pleaseEnterAmount": "",
+  "pleaseEnterAmount": "يُرجى إدخال مبلغ",
   "amountSentTo": "",
   "paymentRequestLabel": "",
   "feeApproximateError": "",
-  "insufficientBalance": "",
+  "insufficientBalance": "الرصيد غير كافٍ لهذا التحويل",
   "sellerRequestedLabel": "",
   "recipientReceivesLabel": "",
   "sendButtonAmount": "",
@@ -845,14 +845,14 @@
   "qrCodeSavedToGallery": "",
   "errorSavingQrCode": "",
   "maximum20ItemsAllowed": "",
-  "pleaseEnterValidAmount": "",
+  "pleaseEnterValidAmount": "يُرجى إدخال مبلغ صحيح",
   "errorGeneratingQr": "",
   "errorSharingQr": "",
   "requestPaymentTitle": "",
   "newRequestTooltip": "",
   "createPaymentRequestTitle": "",
   "createPaymentRequestDescription": "",
-  "amountLabel": "",
+  "amountLabel": "المبلغ",
   "itemsOptional": "",
   "itemsHint": "",
   "itemCount": "{count, plural, zero{لا توجد عناصر} one{عنصر واحد} two{عنصران} few{{count} عناصر} many{{count} عنصرًا} other{{count} عنصر}}",
@@ -867,62 +867,62 @@
   "loadingPlaceholder": "",
   "payRequestShareText": "",
   "approvePaymentTitle": "",
-  "mtnMomoApprovePromptBody": "",
-  "checkPhoneForApprovalPrompt": "",
-  "iveApproved": "",
+  "mtnMomoApprovePromptBody": "يُرجى الموافقة على دفع {symbol}{amount} على هاتفك عبر MTN MoMo.",
+  "checkPhoneForApprovalPrompt": "تحقّق من هاتفك للموافقة على الإشعار.",
+  "iveApproved": "لقد وافقت",
   "labelCopiedToClipboard": "",
   "paymentSuccessful": "",
   "paymentSuccessfulHero": "",
   "paymentFailed": "",
-  "amountWithCurrency": "",
+  "amountWithCurrency": "المبلغ: {symbol}{amount}",
   "referenceWithValue": "",
   "doneButton": "",
-  "mobileMoneyNotAvailableTitle": "",
-  "mobileMoneyNotAvailablePaymentsBody": "",
-  "enterAmountLabel": "",
+  "mobileMoneyNotAvailableTitle": "Mobile Money غير متاح",
+  "mobileMoneyNotAvailablePaymentsBody": "مدفوعات Mobile Money غير متاحة في منطقتك. يُرجى استخدام البطاقة أو التحويل المصرفي.",
+  "enterAmountLabel": "أدخل المبلغ",
   "quickSelectLabel": "",
   "securePaymentLabel": "",
-  "paystackSecurityNote": "",
-  "mobileMoneyProviderLabel": "",
+  "paystackSecurityNote": "مدعوم بواسطة Paystack. معلومات الدفع الخاصة بك آمنة.",
+  "mobileMoneyProviderLabel": "مزوّد Mobile Money",
   "phoneNumberLabel": "رقم الهاتف",
   "loadingAccountDetails": "جارٍ تحميل تفاصيل الحساب...",
-  "virtualAccountTitle": "",
+  "virtualAccountTitle": "الحساب الافتراضي",
   "tapToGenerateAccountPrompt": "اضغط لإنشاء رقم حسابك المخصّص",
   "generateAccountButton": "إنشاء الحساب",
-  "yourVirtualAccountLabel": "",
+  "yourVirtualAccountLabel": "حسابك الافتراضي",
   "bankNameLabel": "اسم البنك",
   "accountNumberLabel": "رقم الحساب",
   "accountNameLabel": "اسم صاحب الحساب",
   "howItWorksLabel": "",
-  "virtualAccountInfoBody": "",
-  "mtnMomoPaymentFailedError": "",
+  "virtualAccountInfoBody": "هذا الحساب خاص بك وحدك. أي تحويل إلى هذا الحساب يضاف تلقائيًا إلى محفظتك.",
+  "mtnMomoPaymentFailedError": "فشل الدفع عبر MTN MoMo",
   "paymentFailedOrRejectedError": "",
   "paymentFailedError": "",
-  "cardTabLabel": "",
-  "mobileMoneyTabLabel": "",
-  "bankTransferTabLabel": "",
-  "continueToPaymentButton": "",
-  "payWithMobileMoneyButton": "",
+  "cardTabLabel": "بطاقة",
+  "mobileMoneyTabLabel": "Mobile Money",
+  "bankTransferTabLabel": "تحويل مصرفي",
+  "continueToPaymentButton": "المتابعة إلى الدفع",
+  "payWithMobileMoneyButton": "ادفع عبر Mobile Money",
   "verifyingPaymentTitle": "",
   "verifyingPaymentBody": "",
   "referenceColon": "",
-  "hasBeenAddedToWallet": "",
+  "hasBeenAddedToWallet": "تم إضافته إلى محفظتك",
   "referenceLabel": "",
-  "newBalanceLabel": "",
+  "newBalanceLabel": "الرصيد الجديد",
   "somethingWentWrongTryAgain": "",
   "goBackButton": "",
   "enterOtpTitle": "أدخل OTP",
-  "enterOtpBody": "",
-  "confirmWithdrawalTitle": "",
+  "enterOtpBody": "يُرجى إدخال OTP المُرسل إلى هاتفك / بريدك الإلكتروني المسجّل لإتمام سحب {symbol}{amount}",
+  "confirmWithdrawalTitle": "تأكيد السحب",
   "pleaseVerifyDetailsCorrect": "",
   "confirmButton": "",
-  "withdrawalInitiatedTitle": "",
-  "withdrawalBeingProcessed": "",
-  "refLine": "",
-  "withdrawAction": "",
-  "mobileMoneyNotAvailableWithdrawalsBody": "",
-  "availableBalanceFull": "",
-  "amountToWithdrawLabel": "",
+  "withdrawalInitiatedTitle": "تم بدء السحب",
+  "withdrawalBeingProcessed": "{symbol}{amount} قيد المعالجة",
+  "refLine": "المرجع: {reference}",
+  "withdrawAction": "سحب",
+  "mobileMoneyNotAvailableWithdrawalsBody": "عمليات السحب عبر Mobile Money غير متاحة في منطقتك. يُرجى استخدام التحويل المصرفي.",
+  "availableBalanceFull": "الرصيد المتاح",
+  "amountToWithdrawLabel": "المبلغ المراد سحبه",
   "selectBankLabel": "اختر بنكًا",
   "selectABankHint": "اختر بنكًا",
   "enterAccountNumberHint": "أدخل رقم الحساب",
@@ -930,7 +930,7 @@
   "accountVerifiedLabel": "تم التحقّق من الحساب",
   "enterAccountHolderNameHint": "أدخل اسم صاحب الحساب",
   "couldNotVerifyAccountError": "تعذّر التحقّق من الحساب",
-  "withdrawalFailedError": "",
+  "withdrawalFailedError": "فشل السحب",
   "otpVerificationFailedError": "فشل التحقّق من OTP",
   "aboutTitle": "",
   "qrWalletAppName": "",
@@ -1130,11 +1130,11 @@
   "ssnitLabel": "SSNIT",
   "ugandaNationalIdLabel": "بطاقة الهوية الوطنية (NIN)",
   "tpinFullLabel": "رقم تعريف دافع الضرائب (TPIN)",
-  "momoErrorNotConfigured": "",
-  "momoErrorPaymentDeclined": "",
-  "momoErrorInsufficientFunds": "",
-  "momoErrorInvalidPhone": "",
-  "momoErrorPaymentTimeout": "",
+  "momoErrorNotConfigured": "خدمة Mobile Money قريبًا! هذه الميزة غير متاحة بعد. يُرجى استخدام البطاقة أو التحويل المصرفي بدلًا من ذلك.",
+  "momoErrorPaymentDeclined": "تم رفض الدفع. يُرجى التحقّق من رصيدك على Mobile Money والمحاولة مجددًا.",
+  "momoErrorInsufficientFunds": "أموال غير كافية في حسابك على Mobile Money.",
+  "momoErrorInvalidPhone": "رقم هاتف غير صحيح. يُرجى التحقّق والمحاولة مجددًا.",
+  "momoErrorPaymentTimeout": "انتهت مهلة طلب الدفع. يُرجى التحقّق من هاتفك لإشعار الموافقة والمحاولة مجددًا.",
   "genericErrorNetwork": "تعذّر الاتصال. يُرجى التحقّق من اتصالك بالإنترنت والمحاولة مجددًا.",
   "genericErrorCameraPermission": "الوصول إلى الكاميرا مطلوب للتحقّق. يُرجى تفعيل أذونات الكاميرا في إعدادات الجهاز.",
   "genericErrorUserCancelled": "تم إلغاء التحقّق. يمكنك المحاولة مجددًا عندما تكون جاهزًا.",
@@ -1231,21 +1231,21 @@
   "biometricReasonAuthenticate": "استخدم بصمتك للوصول إلى QR Wallet",
   "biometricReasonChangeSecurity": "استخدم بصمتك لتغيير إعدادات الأمان",
   "biometricReasonConfirmPayment": "استخدم بصمتك لتأكيد دفع {currencySymbol}{amount} إلى {recipient}",
-  "walletErrorTooManyRequests": "",
-  "walletErrorFailedToLookupWallet": "",
-  "walletErrorFailedToFetchTransaction": "",
-  "walletErrorFallback": "",
-  "exchangeRateErrorUnsupportedCurrency": "",
-  "exchangeRateErrorUnsupportedCurrencyPair": "",
-  "walletUiErrorUserNotFound": "",
-  "walletUiErrorPleaseSelectMomoProvider": "",
-  "walletUiErrorPaymentStillPending": "",
+  "walletErrorTooManyRequests": "عدد كبير من الطلبات. يُرجى المحاولة لاحقًا.",
+  "walletErrorFailedToLookupWallet": "فشل في البحث عن المحفظة",
+  "walletErrorFailedToFetchTransaction": "فشل في استرجاع المعاملة",
+  "walletErrorFallback": "فشلت عملية المحفظة. يُرجى المحاولة مجددًا.",
+  "exchangeRateErrorUnsupportedCurrency": "العملة غير مدعومة",
+  "exchangeRateErrorUnsupportedCurrencyPair": "زوج العملات غير مدعوم: {from} أو {to}",
+  "walletUiErrorUserNotFound": "المستخدم غير موجود. يُرجى تسجيل الدخول مجددًا.",
+  "walletUiErrorPleaseSelectMomoProvider": "يُرجى اختيار مزوّد Mobile Money",
+  "walletUiErrorPaymentStillPending": "الدفع لا يزال قيد الانتظار. يُرجى التحقّق من هاتفك والمحاولة مجددًا.",
   "walletUiErrorPleaseSelectBank": "يُرجى اختيار بنك",
   "walletUiErrorAccountNumberTooShort": "يجب أن يتكوّن رقم الحساب من {minDigits} أرقام على الأقل",
   "walletUiErrorPleaseVerifyAccount": "يُرجى التحقّق من حسابك أولًا",
   "walletUiErrorPleaseEnterAccountName": "يُرجى إدخال اسم صاحب الحساب",
-  "walletUiErrorWithdrawalFailedRefunded": "",
-  "walletUiErrorPleaseEnter6DigitOtp": "",
+  "walletUiErrorWithdrawalFailedRefunded": "فشل السحب. تمت إعادة رصيدك.",
+  "walletUiErrorPleaseEnter6DigitOtp": "يُرجى إدخال OTP صالح مكوّن من 6 أرقام",
   "sendUiErrorCouldNotVerifyRecipientWallet": "",
   "sendUiErrorCouldNotReadQrCode": "",
   "sendUiErrorPreviewTimedOut": "",
