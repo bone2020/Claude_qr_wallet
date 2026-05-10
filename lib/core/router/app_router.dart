@@ -45,6 +45,7 @@ import '../../features/profile/screens/about_screen.dart';
 import '../../features/profile/screens/notification_settings_screen.dart';
 import '../../features/profile/screens/linked_accounts_screen.dart';
 import '../../features/profile/screens/theme_settings_screen.dart';
+import '../../features/profile/screens/language_settings_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
@@ -95,6 +96,7 @@ class AppRoutes {
   static const String about = '/about';
   static const String notificationSettings = '/notification-settings';
   static const String themeSettings = '/theme-settings';
+  static const String languageSettings = '/language-settings';
   static const String notifications = '/notifications';
   static const String appLock = '/app-lock';
   static const String resetPin = '/reset-pin';
@@ -704,6 +706,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.themeSettings,
         name: 'themeSettings',
         builder: (context, state) => const ThemeSettingsScreen(),
+      ),
+
+      // Language Settings Screen
+      GoRoute(
+        path: AppRoutes.languageSettings,
+        name: 'languageSettings',
+        builder: (context, state) => const LanguageSettingsScreen(),
       ),
 
       // Notifications Screen

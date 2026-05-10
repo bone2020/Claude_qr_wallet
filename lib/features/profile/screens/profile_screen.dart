@@ -433,6 +433,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onTap: () => context.push(AppRoutes.themeSettings),
                 ),
                 _buildMenuItem(
+                  icon: Iconsax.global,
+                  title: AppLocalizations.of(context).language,
+                  onTap: () => context.push(AppRoutes.languageSettings),
+                ),
+                _buildMenuItem(
                   icon: Iconsax.notification,
                   title: AppLocalizations.of(context).notifications,
                   onTap: () => context.push(AppRoutes.notificationSettings),
