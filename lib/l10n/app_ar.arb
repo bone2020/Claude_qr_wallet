@@ -1,10 +1,10 @@
 {
   "@@locale": "ar",
-  "appName": "",
+  "appName": "QR Wallet",
   "@appName": {
     "description": "App name shown in title bars and splash"
   },
-  "appTagline": "",
+  "appTagline": "مدفوعات سلسة، في كل مكان",
   "@appTagline": {
     "description": "Tagline shown on splash screen"
   },
@@ -216,7 +216,7 @@
   "@takePhoto": {
     "description": "Button to take a new photo with the camera"
   },
-  "continueText": "",
+  "continueText": "متابعة",
   "@continueText": {
     "description": "Generic continue/next button"
   },
@@ -224,7 +224,7 @@
   "@skip": {
     "description": "Button to skip the current optional step"
   },
-  "home": "",
+  "home": "الرئيسية",
   "@home": {
     "description": "Bottom navigation tab label for the home screen"
   },
@@ -504,31 +504,31 @@
   "@changePin": {
     "description": "Profile row to change the wallet PIN"
   },
-  "errorGeneric": "",
+  "errorGeneric": "حدث خطأ. يُرجى المحاولة مجددًا.",
   "@errorGeneric": {
     "description": "Fallback error message when the cause is unknown"
   },
-  "errorNetwork": "",
+  "errorNetwork": "لا يوجد اتصال بالإنترنت. يُرجى التحقّق من شبكتك.",
   "@errorNetwork": {
     "description": "Error shown when offline or network is unreachable"
   },
-  "errorInvalidEmail": "",
+  "errorInvalidEmail": "يُرجى إدخال بريد إلكتروني صحيح",
   "@errorInvalidEmail": {
     "description": "Validation error when an email field's content is malformed"
   },
-  "errorInvalidPhone": "",
+  "errorInvalidPhone": "يُرجى إدخال رقم هاتف صحيح",
   "@errorInvalidPhone": {
     "description": "Validation error when a phone field's content is malformed"
   },
-  "errorPasswordMismatch": "",
+  "errorPasswordMismatch": "كلمتا المرور غير متطابقتين",
   "@errorPasswordMismatch": {
     "description": "Validation error when password and confirm password differ"
   },
-  "errorPasswordWeak": "",
+  "errorPasswordWeak": "يجب أن تتكوّن كلمة المرور من 8 أحرف على الأقل",
   "@errorPasswordWeak": {
     "description": "Validation error when the password is too short"
   },
-  "errorFieldRequired": "",
+  "errorFieldRequired": "هذا الحقل مطلوب",
   "@errorFieldRequired": {
     "description": "Validation error for an empty required field"
   },
@@ -540,15 +540,15 @@
   "@errorInvalidAmount": {
     "description": "Validation error when amount is missing or zero/negative"
   },
-  "errorInvalidOtp": "",
+  "errorInvalidOtp": "OTP غير صحيح. يُرجى المحاولة مجددًا.",
   "@errorInvalidOtp": {
     "description": "Error shown when the entered OTP code is wrong"
   },
-  "errorUserNotFound": "",
+  "errorUserNotFound": "المستخدم غير موجود",
   "@errorUserNotFound": {
     "description": "Error shown when the entered email/phone has no account"
   },
-  "errorWrongPassword": "",
+  "errorWrongPassword": "كلمة المرور غير صحيحة",
   "@errorWrongPassword": {
     "description": "Error shown when the password is incorrect on log in"
   },
@@ -576,39 +576,39 @@
   "@successPasswordReset": {
     "description": "Success message after a password reset email is sent"
   },
-  "ok": "",
+  "ok": "موافق",
   "@ok": {
     "description": "Confirmation button: acknowledge"
   },
-  "cancel": "",
+  "cancel": "إلغاء",
   "@cancel": {
     "description": "Action to abort the current flow"
   },
-  "confirm": "",
+  "confirm": "تأكيد",
   "@confirm": {
     "description": "Confirmation button: proceed"
   },
-  "save": "",
+  "save": "حفظ",
   "@save": {
     "description": "Action to persist edits"
   },
-  "done": "",
+  "done": "تم",
   "@done": {
     "description": "Action to close the current step as complete"
   },
-  "next": "",
+  "next": "التالي",
   "@next": {
     "description": "Action to advance to the next step"
   },
-  "back": "",
+  "back": "رجوع",
   "@back": {
     "description": "Action to return to the previous step"
   },
-  "retry": "",
+  "retry": "إعادة المحاولة",
   "@retry": {
     "description": "Action to attempt the failed operation again"
   },
-  "close": "",
+  "close": "إغلاق",
   "@close": {
     "description": "Action to dismiss a dialog or modal"
   },
@@ -737,8 +737,8 @@
   "signedCurrencyAmount": "{prefix}{currency}{amount}",
   "exchangeRateLine": "1 {fromCurrency} = {rate} {toCurrency}",
   "currencyCodeWithSymbol": "{symbol} ({code})",
-  "pageNotFound": "",
-  "youAreOffline": "",
+  "pageNotFound": "الصفحة غير موجودة: {uri}",
+  "youAreOffline": "أنت غير متّصل بالإنترنت",
   "helloUser": "مرحبًا، {userName} 👋",
   "welcomeBack": "مرحبًا بعودتك",
   "availableBalanceLabel": "متاح",
@@ -777,14 +777,14 @@
   "sellerRequestedLabel": "طلب البائع:",
   "recipientReceivesLabel": "يستلم المستلم:",
   "sendButtonAmount": "إرسال {currency}{amount}",
-  "errorWithMessage": "",
+  "errorWithMessage": "خطأ: {message}",
   "selectCountryTitle": "اختر البلد",
   "searchCountryHint": "ابحث عن بلد...",
   "enterPhoneNumberHint": "أدخل رقم الهاتف",
   "otpSentToPhone": "تم إرسال OTP إلى هاتفك",
   "phoneVerifiedSuccessfully": "تم التحقّق من الهاتف بنجاح!",
   "verifyButton": "تحقّق",
-  "tryAgainButton": "",
+  "tryAgainButton": "إعادة المحاولة",
   "welcomeBackTitle": "مرحبًا بعودتك",
   "enterPasswordToUnlock": "أدخل كلمة المرور لإلغاء القفل",
   "enterPinToUnlock": "أدخل رمز PIN لإلغاء القفل",
@@ -805,7 +805,7 @@
   "weveSentVerificationLinkTo": "أرسلنا رابط تحقّق إلى:",
   "checkingAutomatically": "جارٍ التحقّق تلقائيًا...",
   "didntReceiveTheEmail": "لم تستلم البريد الإلكتروني؟",
-  "checkNowButton": "",
+  "checkNowButton": "تحقّق الآن",
   "verifyPhoneTitle": "التحقّق من الهاتف",
   "verifyYourPhone": "تحقّق من هاتفك",
   "weSent6DigitCode": "أرسلنا رمزًا من 6 أرقام إلى",
@@ -829,7 +829,7 @@
   "ssnitHelperText": "رقم SSNIT الخاص بك: حرف واحد متبوعًا بـ 12 رقمًا",
   "ugandaNinHelperText": "يتكوّن NIN الخاص بك من 14 حرفًا أبجديًا رقميًا",
   "ugandaNinCardNumberHelperText": "الرقم المطبوع على بطاقة هويتك الفعلية",
-  "phoneVerificationAppBarTitle": "",
+  "phoneVerificationAppBarTitle": "التحقّق من الهاتف",
   "verifyCodeButton": "التحقّق من الرمز",
   "resendCodeIn": "إعادة الإرسال خلال {seconds} ثانية",
   "resendCodeButton": "إعادة إرسال الرمز",
@@ -838,7 +838,7 @@
   "verificationFailedMessage": "لم تنجح عملية التحقّق من هويتك. قد يكون السبب عدم تطابق الوجه أو مشكلة في المستند. يُرجى المحاولة مجددًا.",
   "verificationInProgressTitle": "جارٍ التحقّق",
   "verificationInProgressMessage": "جارٍ التحقّق من مستندات هويتك. تستغرق هذه العملية عادةً بضع ثوانٍ وقد تستغرق بضع دقائق.",
-  "pleaseWait": "",
+  "pleaseWait": "يُرجى الانتظار...",
   "verificationDoNotCloseApp": "ستتم إعادة توجيهك تلقائيًا عند اكتمال التحقّق. لا تغلق التطبيق.",
   "saving": "جارٍ الحفظ...",
   "storagePermissionRequired": "إذن التخزين مطلوب لحفظ رمز QR",
@@ -858,13 +858,13 @@
   "itemCount": "{count, plural, zero{لا توجد عناصر} one{عنصر واحد} two{عنصران} few{{count} عناصر} many{{count} عنصرًا} other{{count} عنصر}}",
   "generateQrCode": "إنشاء رمز QR",
   "payToUser": "ادفع إلى: {userName}",
-  "shareButton": "",
+  "shareButton": "مشاركة",
   "qrCodeInfoForCustomer": "اعرض رمز QR هذا للعميل.\nيقوم بمسحه، ويؤكّد المبلغ، ثم يدفع فورًا!",
   "createNewRequest": "إنشاء طلب جديد",
-  "downloadButton": "",
+  "downloadButton": "تنزيل",
   "shareWalletIdSubject": "رقم تعريف QR Wallet الخاص بي",
   "defaultUserName": "المستخدم",
-  "loadingPlaceholder": "",
+  "loadingPlaceholder": "جارٍ التحميل...",
   "payRequestShareText": "ادفع {symbol}{amount} إلى {userName}",
   "approvePaymentTitle": "الموافقة على الدفع",
   "mtnMomoApprovePromptBody": "يُرجى الموافقة على دفع {symbol}{amount} على هاتفك عبر MTN MoMo.",
@@ -876,11 +876,11 @@
   "paymentFailed": "فشل الدفع",
   "amountWithCurrency": "المبلغ: {symbol}{amount}",
   "referenceWithValue": "المرجع: {reference}",
-  "doneButton": "",
+  "doneButton": "تم",
   "mobileMoneyNotAvailableTitle": "Mobile Money غير متاح",
   "mobileMoneyNotAvailablePaymentsBody": "مدفوعات Mobile Money غير متاحة في منطقتك. يُرجى استخدام البطاقة أو التحويل المصرفي.",
   "enterAmountLabel": "أدخل المبلغ",
-  "quickSelectLabel": "",
+  "quickSelectLabel": "اختيار سريع",
   "securePaymentLabel": "دفع آمن",
   "paystackSecurityNote": "مدعوم بواسطة Paystack. معلومات الدفع الخاصة بك آمنة.",
   "mobileMoneyProviderLabel": "مزوّد Mobile Money",
@@ -909,13 +909,13 @@
   "hasBeenAddedToWallet": "تم إضافته إلى محفظتك",
   "referenceLabel": "المرجع",
   "newBalanceLabel": "الرصيد الجديد",
-  "somethingWentWrongTryAgain": "",
-  "goBackButton": "",
+  "somethingWentWrongTryAgain": "حدث خطأ. يُرجى المحاولة مجددًا.",
+  "goBackButton": "رجوع",
   "enterOtpTitle": "أدخل OTP",
   "enterOtpBody": "يُرجى إدخال OTP المُرسل إلى هاتفك / بريدك الإلكتروني المسجّل لإتمام سحب {symbol}{amount}",
   "confirmWithdrawalTitle": "تأكيد السحب",
   "pleaseVerifyDetailsCorrect": "يُرجى التحقّق من صحة التفاصيل",
-  "confirmButton": "",
+  "confirmButton": "تأكيد",
   "withdrawalInitiatedTitle": "تم بدء السحب",
   "withdrawalBeingProcessed": "{symbol}{amount} قيد المعالجة",
   "refLine": "المرجع: {reference}",
@@ -1038,7 +1038,7 @@
   "chatOnWhatsAppDialogTitle": "الدردشة عبر WhatsApp",
   "scanWithAnotherPhoneCaption": "امسح بهاتف آخر\nأو اضغط على «فتح WhatsApp» أدناه",
   "openWhatsAppButton": "فتح WhatsApp",
-  "closeButton": "",
+  "closeButton": "إغلاق",
   "helpAndSupportTitle": "المساعدة والدعم",
   "contactUsSection": "اتّصل بنا",
   "emailSupportLabel": "الدعم عبر البريد الإلكتروني",
@@ -1062,7 +1062,7 @@
   "removeAccountConfirmTitle": "حذف الحساب؟",
   "removeAccountConfirmBody": "هل أنت متأكّد من رغبتك في حذف هذا الحساب المصرفي؟",
   "accountRemovedToast": "تم حذف الحساب",
-  "failedToRemoveError": "",
+  "failedToRemoveError": "فشل الحذف: {error}",
   "linkedBankAccountsTitle": "الحسابات المصرفية المرتبطة",
   "noBankAccountsEmptyTitle": "لا توجد حسابات مصرفية",
   "noBankAccountsEmptySubtitle": "أضف حسابًا مصرفيًا لتسهيل عمليات السحب",
@@ -1106,7 +1106,7 @@
   "invalidIdNumberFallback": "رقم الهوية غير صحيح",
   "tpinLabel": "TPIN",
   "idNumberLabel": "رقم الهوية",
-  "enterTpinHint": "",
+  "enterTpinHint": "أدخل TPIN المكوّن من 10 أرقام",
   "enterIdNumberHint": "أدخل رقم هويتك المكوّن من 13 رقمًا",
   "zambianTaxpayerHelperText": "رقم تعريفك الضريبي الزامبي",
   "southAfricanIdHelperText": "رقم بطاقة هويتك الجنوب إفريقية",
@@ -1160,45 +1160,45 @@
   "kycErrorDocumentUploadNetwork": "فشل تحميل المستند. يُرجى التحقّق من الاتصال والمحاولة مجددًا.",
   "kycErrorImageTooLarge": "ملف الصورة كبير جدًا. يُرجى استخدام صورة أصغر.",
   "kycErrorDocumentUploadGeneric": "فشل تحميل المستند. يُرجى المحاولة مجددًا.",
-  "firebaseAuthErrorNetwork": "",
-  "firebaseAuthErrorTooManyRequests": "",
-  "firebaseAuthErrorUserNotFound": "",
-  "firebaseAuthErrorWrongPassword": "",
-  "firebaseAuthErrorEmailAlreadyInUse": "",
-  "firebaseAuthErrorInvalidEmail": "",
-  "firebaseAuthErrorWeakPassword": "",
-  "firebaseAuthErrorInvalidPhone": "",
-  "firebaseAuthErrorInvalidVerificationCode": "",
-  "firebaseAuthErrorServiceUnavailable": "",
-  "firebaseAuthErrorOperationNotAllowed": "",
-  "firebaseAuthErrorFallback": "",
-  "authErrorFailedToCreateUser": "",
-  "authErrorFailedToSignIn": "",
-  "authErrorUserDataNotFound": "",
-  "authErrorGoogleSignInCancelled": "",
-  "authErrorFailedToSignInWithGoogle": "",
-  "authErrorFailedToSignInWithApple": "",
-  "authErrorAppleSignInCancelled": "",
-  "authErrorAppleSignInFailed": "",
-  "authErrorFailedToVerifyOtp": "",
-  "authErrorUserNotFound": "",
-  "authErrorNoUserLoggedIn": "",
-  "authErrorNoVerificationId": "",
-  "authErrorFirebaseAccountNotFound": "",
-  "authErrorFirebaseWrongPassword": "",
-  "authErrorFirebaseEmailAlreadyInUse": "",
-  "authErrorFirebaseInvalidEmail": "",
-  "authErrorFirebaseWeakPassword": "",
-  "authErrorFirebaseTooManyRequests": "",
-  "authErrorFirebaseInvalidVerificationCode": "",
-  "authErrorFirebaseInvalidVerificationId": "",
-  "authErrorFirebaseCredentialAlreadyInUse": "",
-  "authErrorFirebaseNetworkRequestFailed": "",
-  "authErrorFallback": "",
-  "userErrorUserNotAuthenticated": "",
-  "userErrorNoUpdatesProvided": "",
-  "userErrorIdFrontImageRequired": "",
-  "userErrorFallback": "",
+  "firebaseAuthErrorNetwork": "تعذّر الاتصال. يُرجى التحقّق من اتصالك بالإنترنت.",
+  "firebaseAuthErrorTooManyRequests": "عدد كبير من المحاولات. يُرجى الانتظار بضع دقائق والمحاولة مجددًا.",
+  "firebaseAuthErrorUserNotFound": "الحساب غير موجود. يُرجى التحقّق من بيانات الدخول أو إنشاء حساب.",
+  "firebaseAuthErrorWrongPassword": "كلمة المرور غير صحيحة. يُرجى المحاولة مجددًا.",
+  "firebaseAuthErrorEmailAlreadyInUse": "هذا البريد الإلكتروني مسجّل بالفعل. يُرجى تسجيل الدخول بدلًا من ذلك.",
+  "firebaseAuthErrorInvalidEmail": "يُرجى إدخال بريد إلكتروني صحيح.",
+  "firebaseAuthErrorWeakPassword": "كلمة المرور ضعيفة جدًا. يُرجى استخدام 6 أحرف على الأقل.",
+  "firebaseAuthErrorInvalidPhone": "يُرجى إدخال رقم هاتف صحيح.",
+  "firebaseAuthErrorInvalidVerificationCode": "رمز التحقّق غير صحيح. يُرجى التحقّق والمحاولة مجددًا.",
+  "firebaseAuthErrorServiceUnavailable": "الخدمة غير متاحة مؤقتًا. يُرجى المحاولة لاحقًا.",
+  "firebaseAuthErrorOperationNotAllowed": "ليس لديك إذن بتنفيذ هذا الإجراء.",
+  "firebaseAuthErrorFallback": "حدث خطأ. يُرجى المحاولة مجددًا.",
+  "authErrorFailedToCreateUser": "فشل إنشاء المستخدم",
+  "authErrorFailedToSignIn": "فشل تسجيل الدخول",
+  "authErrorUserDataNotFound": "بيانات المستخدم غير موجودة",
+  "authErrorGoogleSignInCancelled": "تم إلغاء تسجيل الدخول عبر Google",
+  "authErrorFailedToSignInWithGoogle": "فشل تسجيل الدخول عبر Google",
+  "authErrorFailedToSignInWithApple": "فشل تسجيل الدخول عبر Apple",
+  "authErrorAppleSignInCancelled": "تم إلغاء تسجيل الدخول عبر Apple",
+  "authErrorAppleSignInFailed": "فشل تسجيل الدخول عبر Apple",
+  "authErrorFailedToVerifyOtp": "فشل التحقّق من OTP",
+  "authErrorUserNotFound": "المستخدم غير موجود",
+  "authErrorNoUserLoggedIn": "لا يوجد مستخدم مسجّل الدخول",
+  "authErrorNoVerificationId": "لا يوجد رقم تعريف للتحقّق. يُرجى طلب OTP مجددًا.",
+  "authErrorFirebaseAccountNotFound": "لم يتم العثور على حساب بهذا البريد الإلكتروني",
+  "authErrorFirebaseWrongPassword": "كلمة المرور غير صحيحة",
+  "authErrorFirebaseEmailAlreadyInUse": "يوجد حساب بالفعل بهذا البريد الإلكتروني",
+  "authErrorFirebaseInvalidEmail": "يُرجى إدخال بريد إلكتروني صحيح",
+  "authErrorFirebaseWeakPassword": "يجب أن تتكوّن كلمة المرور من 6 أحرف على الأقل",
+  "authErrorFirebaseTooManyRequests": "عدد كبير من المحاولات. يُرجى المحاولة لاحقًا",
+  "authErrorFirebaseInvalidVerificationCode": "رمز OTP غير صحيح. يُرجى المحاولة مجددًا",
+  "authErrorFirebaseInvalidVerificationId": "انتهت صلاحية جلسة التحقّق. يُرجى طلب رمز جديد",
+  "authErrorFirebaseCredentialAlreadyInUse": "رقم الهاتف هذا مرتبط بالفعل بحساب آخر",
+  "authErrorFirebaseNetworkRequestFailed": "خطأ في الشبكة. يُرجى التحقّق من اتصالك",
+  "authErrorFallback": "حدث خطأ. يُرجى المحاولة مجددًا",
+  "userErrorUserNotAuthenticated": "المستخدم غير مُصادَق عليه",
+  "userErrorNoUpdatesProvided": "لم يتم تقديم أي تحديثات",
+  "userErrorIdFrontImageRequired": "صورة الوجه الأمامي للهوية مطلوبة",
+  "userErrorFallback": "تعذّر إكمال الإجراء. يُرجى المحاولة مجددًا.",
   "kycErrorPleaseCompleteSmileId": "يُرجى إكمال التحقّق عبر Smile ID",
   "kycErrorPleaseSelectDateOfBirth": "يُرجى تحديد تاريخ ميلادك",
   "kycErrorPleaseSelectDateOfBirthBeforeSelfie": "يُرجى تحديد تاريخ ميلادك قبل التقاط السيلفي",
