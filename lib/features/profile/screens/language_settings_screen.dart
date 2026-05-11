@@ -122,7 +122,7 @@ class LanguageSettingsScreen extends ConsumerWidget {
       try {
         await FirebaseFirestore.instance
             .collection('users')
-            .doc(currentUser.uid)
+            .doc(currentUser.id)
             .update({'preferredLanguage': lang.code});
 
         // 3. Refresh local cache + state with the new value.
