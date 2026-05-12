@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../core/services/local_storage_service.dart';
 import 'auth_provider.dart';
 
 /// Supported app languages for Phase 6 v1.
@@ -40,11 +40,10 @@ enum AppLanguage {
   Locale get locale => Locale(code);
 }
 
-/// Persistence key used in [LocalStorageService.saveSetting] / .getSetting.
+/// SharedPreferences key for the user's chosen language code.
 const String _kPreferredLanguageKey = 'preferred_language';
 
 /// Riverpod state notifier holding the user's chosen language.
-///
 /// State is `null` until the user has picked a language. The router
 /// uses this to redirect new users to the first-launch language picker
 /// (see Step 13 of the localization spec).
@@ -52,20 +51,16 @@ const String _kPreferredLanguageKey = 'preferred_language';
 /// Mirrors the structure of [ThemeNotifier] in theme_provider.dart so
 /// future maintainers can follow one pattern, not two.
 class LanguageNotifier extends StateNotifier<AppLanguage?> {
-  final LocalStorageService _localStorage;
-
-  LanguageNotifier(this._localStorage) : super(null) {
+  LanguageNotifier() : super(null) {
     _init();
   }
 
-  /// Read the saved language code from local storage on construction.
+  /// Read the saved language code from SharedPreferences on construction.
   /// Sets state to the matching [AppLanguage], or leaves it null if
   /// no preference has been saved yet.
   Future<void> _init() async {
-    final code = await _localStorage.getSetting<String>(
-      _kPreferredLanguageKey,
-      defaultValue: null,
-    );
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(_kPreferredLanguageKey);
     state = AppLanguage.fromCode(code);
   }
 
@@ -77,7 +72,8 @@ class LanguageNotifier extends StateNotifier<AppLanguage?> {
   /// [AuthNotifier.updateUser] with the new value when the user is
   /// signed in, so the choice persists across devices.
   Future<void> setLanguage(AppLanguage lang) async {
-    await _localStorage.saveSetting(_kPreferredLanguageKey, lang.code);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kPreferredLanguageKey, lang.code);
     state = lang;
   }
 
@@ -92,8 +88,7 @@ class LanguageNotifier extends StateNotifier<AppLanguage?> {
 /// Provider that exposes the current language choice as `AppLanguage?`.
 final languageNotifierProvider =
     StateNotifierProvider<LanguageNotifier, AppLanguage?>((ref) {
-  final localStorage = ref.watch(localStorageServiceProvider);
-  return LanguageNotifier(localStorage);
+  return LanguageNotifier();
 });
 
 /// Convenience: the active [Locale] for MaterialApp.locale.

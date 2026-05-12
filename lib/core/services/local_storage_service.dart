@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../models/models.dart';
 
+
 /// Local storage service using Hive for offline support
 class LocalStorageService {
   static const String _userBoxName = 'user_box';
@@ -44,6 +45,7 @@ class LocalStorageService {
   Future<void> saveUser(UserModel user) async {
     final box = await Hive.openBox<Map>(_userBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.put('current_user', user.toJson());
+    
   }
 
   /// Get cached user data
@@ -58,6 +60,7 @@ class LocalStorageService {
   Future<void> clearUser() async {
    final box = await Hive.openBox<Map>(_userBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.delete('current_user');
+    
   }
 
   // ============================================================
@@ -68,6 +71,7 @@ class LocalStorageService {
   Future<void> saveWallet(WalletModel wallet) async {
     final box = await Hive.openBox<Map>(_walletBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.put('current_wallet', wallet.toJson());
+    
   }
 
   /// Get cached wallet data
@@ -82,6 +86,7 @@ class LocalStorageService {
   Future<void> clearWallet() async {
    final box = await Hive.openBox<Map>(_walletBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.delete('current_wallet');
+    
   }
 
   // ============================================================
@@ -93,6 +98,7 @@ class LocalStorageService {
    final box = await Hive.openBox<List>(_transactionsBoxName, encryptionCipher: _cipher, crashRecovery: true);
     final jsonList = transactions.map((t) => t.toJson()).toList();
     await box.put('transactions', jsonList);
+    
   }
 
   /// Get cached transactions
@@ -123,6 +129,7 @@ class LocalStorageService {
   Future<void> clearTransactions() async {
    final box = await Hive.openBox<List>(_transactionsBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.delete('transactions');
+    
   }
 
   // ============================================================
@@ -133,6 +140,7 @@ class LocalStorageService {
   Future<void> saveSetting(String key, dynamic value) async {
     final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher, crashRecovery: true);
     await box.put(key, value);
+    
   }
 
   /// Get setting
@@ -154,6 +162,7 @@ class LocalStorageService {
   static const String keyLastSyncTime = 'last_sync_time';
   static const String keyBalanceHidden = 'balance_hidden';
   static const String keyCurrency = 'currency';
+  static const String keyPreferredLanguage = 'preferred_language';
 
   // ============================================================
   // AUTHENTICATION TOKENS
@@ -185,13 +194,30 @@ class LocalStorageService {
     await clearTransactions();
     await clearAuthToken();
     
-    // Keep settings like dark mode preference
+   // Preserve UI preferences across clearAll. This method also fires on
+    // every cold start (FirebaseAuth.authStateChanges emits null transiently
+    // before restoring the cached session, not only on real sign-out), so
+    // wiping these would reset user choices on every launch.
+    // keyLastSyncTime is intentionally NOT preserved — sync metadata resets.
     final box = await Hive.openBox(_settingsBoxName, encryptionCipher: _cipher, crashRecovery: true);
-    final darkMode = box.get(keyDarkMode);
-    await box.clear();
-    if (darkMode != null) {
-      await box.put(keyDarkMode, darkMode);
+    const preservedKeys = <String>[
+      keyDarkMode,
+      keyBiometricEnabled,
+      keyNotificationsEnabled,
+      keyBalanceHidden,
+      keyCurrency,
+      keyPreferredLanguage,
+    ];
+    final preserved = <String, dynamic>{};
+    for (final key in preservedKeys) {
+      final value = box.get(key);
+      if (value != null) preserved[key] = value;
     }
+    await box.clear();
+    for (final entry in preserved.entries) {
+      await box.put(entry.key, entry.value);
+    }
+   
   }
 
   /// Get last sync timestamp
