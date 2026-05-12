@@ -61,9 +61,11 @@ class _PhoneVerificationScreenState extends ConsumerState<PhoneVerificationScree
   String? _errorMessage;
 
   @override
-  void initState() {
+void initState() {
     super.initState();
-    _initializePhone();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializePhone();
+    });
   }
 
   @override
