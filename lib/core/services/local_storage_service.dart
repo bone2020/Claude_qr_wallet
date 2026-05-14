@@ -162,7 +162,6 @@ class LocalStorageService {
   static const String keyLastSyncTime = 'last_sync_time';
   static const String keyBalanceHidden = 'balance_hidden';
   static const String keyCurrency = 'currency';
-  static const String keyPreferredLanguage = 'preferred_language';
 
   // ============================================================
   // AUTHENTICATION TOKENS
@@ -206,7 +205,6 @@ class LocalStorageService {
       keyNotificationsEnabled,
       keyBalanceHidden,
       keyCurrency,
-      keyPreferredLanguage,
     ];
     final preserved = <String, dynamic>{};
     for (final key in preservedKeys) {
