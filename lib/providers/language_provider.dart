@@ -51,8 +51,14 @@ const String _kPreferredLanguageKey = 'preferred_language';
 /// Mirrors the structure of [ThemeNotifier] in theme_provider.dart so
 /// future maintainers can follow one pattern, not two.
 class LanguageNotifier extends StateNotifier<AppLanguage?> {
+  /// Completes when the saved language has been read from SharedPreferences
+  /// on construction. The router awaits this before deciding whether to
+  /// redirect to the first-launch picker, so that returning users don't
+  /// briefly flicker through the picker while SharedPreferences loads.
+  late final Future<void> initialized;
+
   LanguageNotifier() : super(null) {
-    _init();
+    initialized = _init();
   }
 
   /// Read the saved language code from SharedPreferences on construction.

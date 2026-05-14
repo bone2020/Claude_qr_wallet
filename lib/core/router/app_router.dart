@@ -8,6 +8,7 @@ import '../widgets/screenshot_protected_screen.dart';
 import '../services/smile_id_service.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/auth/screens/welcome_screen.dart';
+import '../../features/auth/screens/first_launch_language_screen.dart';
 import '../../features/auth/screens/sign_up_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/otp_verification_screen.dart';
@@ -52,10 +53,12 @@ import '../../features/wallet/screens/payment_result_screen.dart';
 import '../../features/settings/screens/currency_selector_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../generated/l10n/app_localizations.dart';
+import '../../providers/language_provider.dart';
 
 /// Route names
 class AppRoutes {
   static const String splash = '/';
+  static const String firstLaunchLanguage = '/first-launch-language';
   static const String welcome = '/welcome';
   static const String signUp = '/sign-up';
   static const String login = '/login';
@@ -202,6 +205,39 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Splash screen manages its own routing logic
       if (location == AppRoutes.splash) return null;
 
+      // --- FIRST-LAUNCH LANGUAGE GATE (Phase 6 Step 13) ---
+      // Block all other navigation until the user has picked a language.
+      // Await the LanguageNotifier init Future so we don't race with the
+      // initial SharedPreferences read (which would flash the picker for
+      // returning users). The Future completes once; subsequent awaits
+      // are instant.
+      try {
+        await ref
+            .read(languageNotifierProvider.notifier)
+            .initialized
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('Route guard: language init wait failed: $e');
+        // Proceed with current state — if still null, the next check
+        // will redirect to the picker, which is the safe default.
+      }
+      final hasPickedLanguage = ref.read(hasPickedLanguageProvider);
+      if (!hasPickedLanguage) {
+        // Until a language is picked, the picker is the ONLY valid
+        // destination. Return null when already on it to short-circuit
+        // the rest of the redirect chain — otherwise the auth gate below
+        // would redirect us to /welcome, the language gate would bounce
+        // us back, and GoRouter's redirectLimit would trip with a
+        // misleading "page not found" error.
+        if (location == AppRoutes.firstLaunchLanguage) return null;
+        return AppRoutes.firstLaunchLanguage;
+      }
+      // Language is picked. If user somehow landed on the picker
+      // (deep link, back-stack quirk), send them onward.
+      if (location == AppRoutes.firstLaunchLanguage) {
+        return AppRoutes.splash;
+      }
+
       // --- UNAUTHENTICATED USER ---
       if (currentUser == null) {
         if (publicRoutes.contains(location)) return null;
@@ -290,6 +326,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.splash,
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
+      ),
+
+      // First-Launch Language Picker (Phase 6 Step 13)
+      GoRoute(
+        path: AppRoutes.firstLaunchLanguage,
+        name: 'firstLaunchLanguage',
+        builder: (context, state) => const FirstLaunchLanguageScreen(),
       ),
 
       // App Lock Screen
