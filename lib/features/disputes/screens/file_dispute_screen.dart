@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../providers/dispute_provider.dart';
 
 class FileDisputeScreen extends ConsumerStatefulWidget {
@@ -32,12 +33,15 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
   bool _isSubmitting = false;
   String? _errorMessage;
 
-  static const _issueTypes = {
-    'money_sent_not_received': 'Money sent but not received',
-    'service_not_delivered': 'Service not delivered',
-    'item_not_delivered': 'Item not delivered',
-    'other': 'Other',
-  };
+  Map<String, String> _issueTypes(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'money_sent_not_received': l10n.fileDisputeIssueTypeMoneySentNotReceived,
+      'service_not_delivered': l10n.fileDisputeIssueTypeServiceNotDelivered,
+      'item_not_delivered': l10n.fileDisputeIssueTypeItemNotDelivered,
+      'other': l10n.fileDisputeIssueTypeOther,
+    };
+  }
 
   @override
   void initState() {
@@ -53,23 +57,24 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final description = _descriptionController.text.trim();
     if (description.length < 10) {
-      setState(() => _errorMessage = 'Description must be at least 10 characters.');
+      setState(() => _errorMessage = l10n.fileDisputeErrorDescriptionTooShort);
       return;
     }
     final amount = double.tryParse(_amountController.text);
     if (amount == null || amount <= 0) {
-      setState(() => _errorMessage = 'Please enter a valid amount.');
+      setState(() => _errorMessage = l10n.fileDisputeErrorInvalidAmount);
       return;
     }
     final maxAmount = widget.transactionAmount / 100;
     if (amount > maxAmount) {
-      setState(() => _errorMessage = 'Amount cannot exceed ${maxAmount.toStringAsFixed(2)}.');
+      setState(() => _errorMessage = l10n.fileDisputeErrorAmountExceedsMax(maxAmount.toStringAsFixed(2)));
       return;
     }
     if (!_feeAcknowledged) {
-      setState(() => _errorMessage = 'Please acknowledge the dispute fee.');
+      setState(() => _errorMessage = l10n.fileDisputeErrorFeeNotAcknowledged);
       return;
     }
 
@@ -90,7 +95,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Dispute filed: ${result['disputeId']}'),
+          content: Text(l10n.fileDisputeSuccessSnackbar(result['disputeId'].toString())),
           backgroundColor: AppColors.success,
         ),
       );
@@ -106,9 +111,11 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Report Issue'),
+        title: Text(l10n.fileDisputeTitle),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -121,48 +128,48 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Transaction: ${widget.transactionId}',
+                l10n.fileDisputeTransactionLabel(widget.transactionId),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               if (widget.recipientName != null) ...[
                 const SizedBox(height: 4),
-                Text('To: ${widget.recipientName}', style: Theme.of(context).textTheme.bodySmall),
+                Text(l10n.fileDisputeRecipientLabel(widget.recipientName!), style: Theme.of(context).textTheme.bodySmall),
               ],
               const SizedBox(height: 20),
 
-              Text('Issue Type', style: Theme.of(context).textTheme.titleSmall),
+              Text(l10n.fileDisputeIssueTypeLabel, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _issueType,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
-                items: _issueTypes.entries
+                items: _issueTypes(context).entries
                     .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
                     .toList(),
                 onChanged: (v) => setState(() => _issueType = v ?? _issueType),
               ),
               const SizedBox(height: 20),
 
-              Text('Amount in Dispute (${widget.transactionCurrency})', style: Theme.of(context).textTheme.titleSmall),
+              Text(l10n.fileDisputeAmountLabel(widget.transactionCurrency), style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: 'Max: ${(widget.transactionAmount / 100).toStringAsFixed(2)}',
+                  hintText: l10n.fileDisputeAmountHint((widget.transactionAmount / 100).toStringAsFixed(2)),
                 ),
               ),
               const SizedBox(height: 20),
 
-              Text('Description', style: Theme.of(context).textTheme.titleSmall),
+              Text(l10n.fileDisputeDescriptionLabel, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _descriptionController,
                 maxLines: 4,
                 maxLength: 500,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Describe what happened (min 10 characters)...',
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: l10n.fileDisputeDescriptionHint,
                 ),
               ),
               const SizedBox(height: 16),
@@ -170,9 +177,9 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
               CheckboxListTile(
                 value: _feeAcknowledged,
                 onChanged: (v) => setState(() => _feeAcknowledged = v ?? false),
-                title: const Text(
-                  'I understand a dispute fee will be charged. It will be refunded if the dispute is upheld.',
-                  style: TextStyle(fontSize: 13),
+                title: Text(
+                  l10n.fileDisputeFeeAcknowledgement,
+                  style: const TextStyle(fontSize: 13),
                 ),
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
@@ -200,7 +207,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
                 ),
                 child: _isSubmitting
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Submit Dispute'),
+                    : Text(l10n.fileDisputeSubmitButton),
               ),
             ],
           ),

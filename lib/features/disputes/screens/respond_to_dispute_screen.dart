@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../generated/l10n/app_localizations.dart';
 import '../providers/dispute_provider.dart';
 
 class RespondToDisputeScreen extends ConsumerStatefulWidget {
@@ -26,9 +27,10 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     final response = _controller.text.trim();
     if (response.length < 10) {
-      setState(() => _error = 'Response must be at least 10 characters.');
+      setState(() => _error = l10n.respondToDisputeErrorTooShort);
       return;
     }
 
@@ -45,7 +47,7 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Response submitted'), backgroundColor: AppColors.success),
+        SnackBar(content: Text(l10n.respondToDisputeSuccessSnackbar), backgroundColor: AppColors.success),
       );
       context.pop(true);
     } catch (e) {
@@ -56,9 +58,11 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Respond to Dispute'),
+        title: Text(l10n.respondToDisputeTitle),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
       ),
       body: SafeArea(
@@ -67,9 +71,9 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Dispute: ${widget.disputeId}', style: Theme.of(context).textTheme.bodySmall),
+              Text(l10n.respondToDisputeIdLabel(widget.disputeId), style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 20),
-              Text('Your Response', style: Theme.of(context).textTheme.titleSmall),
+              Text(l10n.respondToDisputeResponseLabel, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               Expanded(
                 child: TextFormField(
@@ -78,9 +82,9 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
                   expands: true,
                   maxLength: 1000,
                   textAlignVertical: TextAlignVertical.top,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Explain your side of the story (min 10 characters)...',
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    hintText: l10n.respondToDisputeResponseHint,
                     alignLabelWithHint: true,
                   ),
                 ),
@@ -103,7 +107,7 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
                 ),
                 child: _isSubmitting
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Submit Response'),
+                    : Text(l10n.respondToDisputeSubmitButton),
               ),
             ],
           ),

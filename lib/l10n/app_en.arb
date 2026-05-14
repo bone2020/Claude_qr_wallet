@@ -3107,5 +3107,144 @@
         "type": "String"
       }
     }
+  },
+  "fileDisputeTitle": "Report Issue",
+  "@fileDisputeTitle": {
+    "description": "AppBar title on the file-dispute screen."
+  },
+  "fileDisputeTransactionLabel": "Transaction: {transactionId}",
+  "@fileDisputeTransactionLabel": {
+    "description": "Body label showing the ID of the transaction being disputed.",
+    "placeholders": {
+      "transactionId": {
+        "type": "String"
+      }
+    }
+  },
+  "fileDisputeRecipientLabel": "To: {recipientName}",
+  "@fileDisputeRecipientLabel": {
+    "description": "Body label showing the recipient of the transaction being disputed.",
+    "placeholders": {
+      "recipientName": {
+        "type": "String"
+      }
+    }
+  },
+  "fileDisputeIssueTypeLabel": "Issue Type",
+  "@fileDisputeIssueTypeLabel": {
+    "description": "Section label above the issue-type dropdown on the file-dispute screen."
+  },
+  "fileDisputeIssueTypeMoneySentNotReceived": "Money sent but not received",
+  "@fileDisputeIssueTypeMoneySentNotReceived": {
+    "description": "Dropdown option for issue type 'money_sent_not_received' on the file-dispute screen."
+  },
+  "fileDisputeIssueTypeServiceNotDelivered": "Service not delivered",
+  "@fileDisputeIssueTypeServiceNotDelivered": {
+    "description": "Dropdown option for issue type 'service_not_delivered' on the file-dispute screen."
+  },
+  "fileDisputeIssueTypeItemNotDelivered": "Item not delivered",
+  "@fileDisputeIssueTypeItemNotDelivered": {
+    "description": "Dropdown option for issue type 'item_not_delivered' on the file-dispute screen."
+  },
+  "fileDisputeIssueTypeOther": "Other",
+  "@fileDisputeIssueTypeOther": {
+    "description": "Dropdown option for issue type 'other' on the file-dispute screen."
+  },
+  "fileDisputeAmountLabel": "Amount in Dispute ({currency})",
+  "@fileDisputeAmountLabel": {
+    "description": "Section label above the amount field on the file-dispute screen.",
+    "placeholders": {
+      "currency": {
+        "type": "String"
+      }
+    }
+  },
+  "fileDisputeAmountHint": "Max: {maxAmount}",
+  "@fileDisputeAmountHint": {
+    "description": "Hint text inside the amount field showing the maximum allowable dispute amount.",
+    "placeholders": {
+      "maxAmount": {
+        "type": "String"
+      }
+    }
+  },
+  "fileDisputeDescriptionLabel": "Description",
+  "@fileDisputeDescriptionLabel": {
+    "description": "Section label above the description text area on the file-dispute screen."
+  },
+  "fileDisputeDescriptionHint": "Describe what happened (min 10 characters)...",
+  "@fileDisputeDescriptionHint": {
+    "description": "Hint text inside the description text area on the file-dispute screen."
+  },
+  "fileDisputeFeeAcknowledgement": "I understand a dispute fee will be charged. It will be refunded if the dispute is upheld.",
+  "@fileDisputeFeeAcknowledgement": {
+    "description": "Checkbox label confirming the user accepts the dispute filing fee."
+  },
+  "fileDisputeSubmitButton": "Submit Dispute",
+  "@fileDisputeSubmitButton": {
+    "description": "Submit button label on the file-dispute screen."
+  },
+  "fileDisputeErrorDescriptionTooShort": "Description must be at least 10 characters.",
+  "@fileDisputeErrorDescriptionTooShort": {
+    "description": "Validation error shown when the description is shorter than 10 characters."
+  },
+  "fileDisputeErrorInvalidAmount": "Please enter a valid amount.",
+  "@fileDisputeErrorInvalidAmount": {
+    "description": "Validation error shown when the dispute amount is not a positive number."
+  },
+  "fileDisputeErrorAmountExceedsMax": "Amount cannot exceed {maxAmount}.",
+  "@fileDisputeErrorAmountExceedsMax": {
+    "description": "Validation error shown when the dispute amount exceeds the original transaction amount.",
+    "placeholders": {
+      "maxAmount": {
+        "type": "String"
+      }
+    }
+  },
+  "fileDisputeErrorFeeNotAcknowledged": "Please acknowledge the dispute fee.",
+  "@fileDisputeErrorFeeNotAcknowledged": {
+    "description": "Validation error shown when the user has not checked the dispute fee acknowledgement."
+  },
+  "fileDisputeSuccessSnackbar": "Dispute filed: {disputeId}",
+  "@fileDisputeSuccessSnackbar": {
+    "description": "SnackBar shown after a dispute is successfully filed, showing the generated dispute ID.",
+    "placeholders": {
+      "disputeId": {
+        "type": "String"
+      }
+    }
+  },
+  "respondToDisputeTitle": "Respond to Dispute",
+  "@respondToDisputeTitle": {
+    "description": "AppBar title on the respond-to-dispute screen."
+  },
+  "respondToDisputeIdLabel": "Dispute: {disputeId}",
+  "@respondToDisputeIdLabel": {
+    "description": "Body label showing the ID of the dispute being responded to.",
+    "placeholders": {
+      "disputeId": {
+        "type": "String"
+      }
+    }
+  },
+  "respondToDisputeResponseLabel": "Your Response",
+  "@respondToDisputeResponseLabel": {
+    "description": "Section label above the response text area on the respond-to-dispute screen."
+  },
+  "respondToDisputeResponseHint": "Explain your side of the story (min 10 characters)...",
+  "@respondToDisputeResponseHint": {
+    "description": "Hint text inside the response text area on the respond-to-dispute screen."
+  },
+  "respondToDisputeSubmitButton": "Submit Response",
+  "@respondToDisputeSubmitButton": {
+    "description": "Submit button label on the respond-to-dispute screen."
+  },
+  "respondToDisputeErrorTooShort": "Response must be at least 10 characters.",
+  "@respondToDisputeErrorTooShort": {
+    "description": "Validation error shown when the response is shorter than 10 characters."
+  },
+  "respondToDisputeSuccessSnackbar": "Response submitted",
+  "@respondToDisputeSuccessSnackbar": {
+    "description": "SnackBar shown after a dispute response is successfully submitted."
   }
 }
