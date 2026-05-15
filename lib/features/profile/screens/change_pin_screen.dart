@@ -46,6 +46,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
   }
 
   Future<void> _verifyCurrentPin(String pin) async {
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -82,7 +83,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
       if (enteredPinHash != storedPinHash) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Incorrect PIN';
+          _errorMessage = l10n.pinErrorIncorrectPin;
           _currentPinController.clear();
         });
         return;
@@ -95,7 +96,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Error: ${e.toString()}';
+        _errorMessage = l10n.pinErrorWrapperGeneric(e.toString());
       });
     }
   }
@@ -108,9 +109,10 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
   }
 
   Future<void> _confirmNewPin(String pin) async {
+    final l10n = AppLocalizations.of(context);
     if (pin != _newPinController.text) {
       setState(() {
-        _errorMessage = 'PINs do not match';
+        _errorMessage = l10n.pinsDoNotMatchError;
         _confirmPinController.clear();
       });
       return;
@@ -193,7 +195,7 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to update PIN: ${e.toString()}';
+        _errorMessage = l10n.changePinErrorFailedToUpdate(e.toString());
       });
     }
   }
@@ -212,27 +214,29 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
     }
   }
 
-  String get _stepTitle {
+  String _stepTitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     switch (_currentStep) {
       case 0:
-        return 'Enter Current PIN';
+        return l10n.enterCurrentPinStepTitle;
       case 1:
-        return 'Enter New PIN';
+        return l10n.enterNewPinStepTitle;
       case 2:
-        return 'Confirm New PIN';
+        return l10n.confirmNewPinStepTitle;
       default:
         return '';
     }
   }
 
-  String get _stepSubtitle {
+  String _stepSubtitle(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     switch (_currentStep) {
       case 0:
-        return 'Enter your current 6-digit transaction PIN';
+        return l10n.enterCurrentPinSubtitle;
       case 1:
-        return 'Create a new 6-digit PIN';
+        return l10n.createNewPinSubtitle;
       case 2:
-        return 'Re-enter your new PIN to confirm';
+        return l10n.reenterNewPinSubtitle;
       default:
         return '';
     }
@@ -300,10 +304,10 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
               const SizedBox(height: AppDimensions.spaceXXL),
 
               // Title and subtitle
-              Text(_stepTitle, style: AppTextStyles.headlineSmall()),
+              Text(_stepTitle(context), style: AppTextStyles.headlineSmall()),
               const SizedBox(height: AppDimensions.spaceXS),
               Text(
-                _stepSubtitle,
+                _stepSubtitle(context),
                 style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                 textAlign: TextAlign.center,
               ),

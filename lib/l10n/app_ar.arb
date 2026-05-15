@@ -1275,5 +1275,18 @@
   "respondToDisputeResponseHint": "اشرح وجهة نظرك (10 أحرف على الأقل)...",
   "respondToDisputeSubmitButton": "إرسال الرد",
   "respondToDisputeErrorTooShort": "يجب أن يحتوي الرد على 10 أحرف على الأقل.",
-  "respondToDisputeSuccessSnackbar": "تم إرسال الرد"
+  "respondToDisputeSuccessSnackbar": "تم إرسال الرد",
+  "enterCurrentPinStepTitle": "أدخل رمز PIN الحالي",
+  "enterCurrentPinSubtitle": "أدخل رمز PIN المعاملة الحالي المكون من 6 أرقام",
+  "pinErrorIncorrectPin": "رمز PIN غير صحيح",
+  "pinErrorWrapperGeneric": "خطأ: {message}",
+  "changePinErrorFailedToUpdate": "فشل تحديث رمز PIN: {message}",
+  "pinsDoNotMatchError": "رموز PIN غير متطابقة",
+  "resetPinErrorEmailPasswordRequired": "يرجى إدخال بريدك الإلكتروني وكلمة المرور",
+  "resetPinErrorIncorrectPassword": "كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.",
+  "resetPinErrorNoPhoneLinked": "لا يوجد رقم هاتف مرتبط بحسابك. يرجى استخدام التحقق عبر البريد الإلكتروني.",
+  "resetPinErrorAutoVerificationFailed": "فشل التحقق التلقائي. يرجى إدخال رمز OTP يدويًا.",
+  "resetPinErrorEnter6DigitCode": "يرجى إدخال الرمز المكون من 6 أرقام",
+  "resetPinErrorVerificationExpired": "انتهت صلاحية التحقق. يرجى طلب رمز جديد.",
+  "resetPinErrorFailedToReset": "فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى."
 }

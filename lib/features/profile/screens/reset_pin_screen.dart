@@ -53,11 +53,12 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Future<void> _verifyWithEmail() async {
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your email and password');
+      setState(() => _errorMessage = l10n.resetPinErrorEmailPasswordRequired);
       return;
     }
 
@@ -75,7 +76,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
       setState(() {
         _isLoading = false;
         if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          _errorMessage = 'Incorrect password. Please try again.';
+          _errorMessage = l10n.resetPinErrorIncorrectPassword;
         } else if (e.code == 'too-many-requests') {
           _errorMessage = AppLocalizations.of(context).tooManyAttemptsError;
         } else {
@@ -88,7 +89,8 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Future<void> _sendPhoneOtp() async {
-  final user = FirebaseAuth.instance.currentUser;
+    final l10n = AppLocalizations.of(context);
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     // Check Firebase Auth phone first, fall back to Firestore phone from sign-up
@@ -97,7 +99,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
     final phoneNumber = (authPhone != null && authPhone.isNotEmpty) ? authPhone : firestorePhone;
     if (phoneNumber == null || phoneNumber.isEmpty) { 
 
-      setState(() => _errorMessage = 'No phone number linked to your account. Please use email verification.');
+      setState(() => _errorMessage = l10n.resetPinErrorNoPhoneLinked);
       return;
     }
 
@@ -112,7 +114,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
             await user.reauthenticateWithCredential(credential);
             if (mounted) setState(() { _isLoading = false; _currentStep = 2; });
           } catch (e) {
-            if (mounted) setState(() { _isLoading = false; _errorMessage = 'Auto-verification failed. Please enter the OTP manually.'; });
+            if (mounted) setState(() { _isLoading = false; _errorMessage = l10n.resetPinErrorAutoVerificationFailed; });
           }
         },
         verificationFailed: (FirebaseAuthException e) {
@@ -136,9 +138,10 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Future<void> _verifyPhoneOtp() async {
+    final l10n = AppLocalizations.of(context);
     final otp = _otpController.text.trim();
-    if (otp.length != 6) { setState(() => _errorMessage = 'Please enter the 6-digit code'); return; }
-    if (_verificationId == null) { setState(() => _errorMessage = 'Verification expired. Please request a new code.'); return; }
+    if (otp.length != 6) { setState(() => _errorMessage = l10n.resetPinErrorEnter6DigitCode); return; }
+    if (_verificationId == null) { setState(() => _errorMessage = l10n.resetPinErrorVerificationExpired); return; }
 
     setState(() { _isLoading = true; _errorMessage = null; });
 
@@ -167,8 +170,9 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
   }
 
   Future<void> _confirmNewPin(String pin) async {
+    final l10n = AppLocalizations.of(context);
     if (pin != _newPinController.text) {
-      setState(() { _errorMessage = 'PINs do not match'; _confirmPinController.clear(); });
+      setState(() { _errorMessage = l10n.pinsDoNotMatchError; _confirmPinController.clear(); });
       return;
     }
 
@@ -218,7 +222,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() { _isLoading = false; _errorMessage = 'Failed to reset PIN. Please try again.'; });
+      setState(() { _isLoading = false; _errorMessage = l10n.resetPinErrorFailedToReset; });
     }
   }
 

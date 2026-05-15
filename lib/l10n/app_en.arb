@@ -3246,5 +3246,67 @@
   "respondToDisputeSuccessSnackbar": "Response submitted",
   "@respondToDisputeSuccessSnackbar": {
     "description": "SnackBar shown after a dispute response is successfully submitted."
+  },
+  "enterCurrentPinStepTitle": "Enter Current PIN",
+  "@enterCurrentPinStepTitle": {
+    "description": "Step title in the change PIN flow when entering the current PIN."
+  },
+  "enterCurrentPinSubtitle": "Enter your current 6-digit transaction PIN",
+  "@enterCurrentPinSubtitle": {
+    "description": "Subtitle below the Enter Current PIN step heading."
+  },
+  "pinErrorIncorrectPin": "Incorrect PIN",
+  "@pinErrorIncorrectPin": {
+    "description": "Validation error shown when the user enters a PIN that doesn't match the stored one."
+  },
+  "pinErrorWrapperGeneric": "Error: {message}",
+  "@pinErrorWrapperGeneric": {
+    "description": "Generic error prefix wrapping an exception message during PIN verification.",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "changePinErrorFailedToUpdate": "Failed to update PIN: {message}",
+  "@changePinErrorFailedToUpdate": {
+    "description": "Error wrapping the underlying exception when updating the PIN fails.",
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "pinsDoNotMatchError": "PINs do not match",
+  "@pinsDoNotMatchError": {
+    "description": "Validation error shown when the confirmation PIN doesn't match the newly chosen PIN. Used in both change-pin and reset-pin flows."
+  },
+  "resetPinErrorEmailPasswordRequired": "Please enter your email and password",
+  "@resetPinErrorEmailPasswordRequired": {
+    "description": "Validation error on the reset PIN email-verification step when email or password is empty."
+  },
+  "resetPinErrorIncorrectPassword": "Incorrect password. Please try again.",
+  "@resetPinErrorIncorrectPassword": {
+    "description": "Error shown on the reset PIN email-verification step when the password is wrong."
+  },
+  "resetPinErrorNoPhoneLinked": "No phone number linked to your account. Please use email verification.",
+  "@resetPinErrorNoPhoneLinked": {
+    "description": "Error shown when the user tries to use phone verification but no phone number is on their account."
+  },
+  "resetPinErrorAutoVerificationFailed": "Auto-verification failed. Please enter the OTP manually.",
+  "@resetPinErrorAutoVerificationFailed": {
+    "description": "Error shown when SMS auto-retrieval fails during reset PIN phone verification."
+  },
+  "resetPinErrorEnter6DigitCode": "Please enter the 6-digit code",
+  "@resetPinErrorEnter6DigitCode": {
+    "description": "Validation error when the user submits an OTP shorter than 6 digits during reset PIN phone verification."
+  },
+  "resetPinErrorVerificationExpired": "Verification expired. Please request a new code.",
+  "@resetPinErrorVerificationExpired": {
+    "description": "Error shown when the OTP verification window has expired during reset PIN."
+  },
+  "resetPinErrorFailedToReset": "Failed to reset PIN. Please try again.",
+  "@resetPinErrorFailedToReset": {
+    "description": "Generic error shown when the resetPin Cloud Function call fails."
   }
 }
