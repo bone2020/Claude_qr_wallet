@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../models/user_model.dart';
 import '../utils/error_handler.dart';
+import '../utils/error_handler_localization_resolver.dart';
 import '../utils/network_retry.dart';
 import 'user_localization_resolver.dart';
 
@@ -61,7 +62,7 @@ class UserService {
     String? country,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
+      return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -73,7 +74,7 @@ class UserService {
       if (country != null) updates['country'] = country;
 
       if (updates.isEmpty) {
-        return UserResult.failure('No updates provided', errorKey: UserErrorKey.noUpdatesProvided);
+        return UserResult.failure(UserErrorKey.noUpdatesProvided);
       }
 
       await NetworkRetry.execute(
@@ -89,14 +90,15 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+      debugPrint('user_service error: $e');
+      return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 
   /// Upload and update profile photo
   Future<UserResult> updateProfilePhoto(File imageFile) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
+      return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -125,7 +127,8 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+      debugPrint('user_service error: $e');
+      return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 
@@ -156,12 +159,12 @@ class UserService {
     String? smileIdResult,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
+      return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     // Require ID front image unless verified via Smile ID
     if (idFront == null && !smileIdVerified) {
-      return UserResult.failure('ID front image is required', errorKey: UserErrorKey.idFrontImageRequired);
+      return UserResult.failure(UserErrorKey.idFrontImageRequired);
     }
 
     try {
@@ -238,7 +241,8 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure(ErrorHandler.getKycErrorMessage('document_upload', e));
+      debugPrint('user_service error: $e');
+      return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 
@@ -288,7 +292,7 @@ class UserService {
     File? selfie,
   }) async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
+      return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -358,7 +362,8 @@ class UserService {
       final updatedUser = await getCurrentUser();
       return UserResult.success(updatedUser!);
     } catch (e) {
-      return UserResult.failure(ErrorHandler.getKycErrorMessage('biometric_kyc', e));
+      debugPrint('user_service error: $e');
+      return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 
@@ -428,7 +433,7 @@ class UserService {
   /// Delete user account
   Future<UserResult> deleteAccount() async {
     if (_userId == null) {
-      return UserResult.failure('User not authenticated', errorKey: UserErrorKey.userNotAuthenticated);
+      return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -466,7 +471,8 @@ class UserService {
 
       return UserResult.success(null);
     } catch (e) {
-      return UserResult.failure(ErrorHandler.getUserFriendlyMessage(e));
+      debugPrint('user_service error: $e');
+      return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 }
@@ -475,22 +481,26 @@ class UserService {
 class UserResult {
   final bool success;
   final UserModel? user;
-  final String? error;
   final UserErrorKey? errorKey;
+  final GenericErrorKey? genericErrorKey;
 
   UserResult._({
     required this.success,
     this.user,
-    this.error,
     this.errorKey,
+    this.genericErrorKey,
   });
 
   factory UserResult.success(UserModel? user) {
     return UserResult._(success: true, user: user);
   }
 
-  factory UserResult.failure(String error, {UserErrorKey? errorKey}) {
-    return UserResult._(success: false, error: error, errorKey: errorKey);
+  factory UserResult.failure(UserErrorKey errorKey) {
+    return UserResult._(success: false, errorKey: errorKey);
+  }
+
+  factory UserResult.genericFailure(GenericErrorKey genericErrorKey) {
+    return UserResult._(success: false, genericErrorKey: genericErrorKey);
   }
 }
 

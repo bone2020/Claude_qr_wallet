@@ -1,4 +1,5 @@
 import '../../generated/l10n/app_localizations.dart';
+import '../utils/error_handler_localization_resolver.dart';
 import 'user_service.dart';
 
 /// Identifies the kind of user-result error carried by [UserResult.errorKey].
@@ -28,5 +29,8 @@ String resolveUserResultError(AppLocalizations loc, UserResult result) {
   if (result.errorKey != null) {
     return resolveUserErrorMessage(loc, result.errorKey!);
   }
-  return result.error ?? loc.userErrorFallback;
+  if (result.genericErrorKey != null) {
+    return resolveGenericErrorMessage(loc, result.genericErrorKey!);
+  }
+  return loc.userErrorFallback;
 }
