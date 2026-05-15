@@ -83,12 +83,12 @@ class BiometricService {
       // Check if biometrics are available
       final isSupported = await isDeviceSupported();
       if (!isSupported) {
-        return BiometricResult.failure('Biometric authentication not supported', errorKey: BiometricErrorKey.notSupported);
+        return BiometricResult.failure(BiometricErrorKey.notSupported);
       }
 
       final canCheck = await canCheckBiometrics();
       if (!canCheck) {
-        return BiometricResult.failure('No biometrics enrolled on this device', errorKey: BiometricErrorKey.noBiometricsEnrolled);
+        return BiometricResult.failure(BiometricErrorKey.noBiometricsEnrolled);
       }
 
       // Attempt authentication
@@ -104,20 +104,14 @@ class BiometricService {
       if (authenticated) {
         return BiometricResult.success();
       } else {
-        return BiometricResult.failure('Authentication failed', errorKey: BiometricErrorKey.authenticationFailed);
+        return BiometricResult.failure(BiometricErrorKey.authenticationFailed);
       }
     } on PlatformException catch (e) {
-      final key = _classifyPlatformException(e);
-      return BiometricResult.failure(
-        e.message ?? _englishOf(key),
-        errorKey: key,
-      );
+      debugPrint('Biometric PlatformException: ${e.code} - ${e.message}');
+      return BiometricResult.failure(_classifyPlatformException(e));
     } catch (e) {
       debugPrint('Biometric authentication error: $e');
-      return BiometricResult.failure(
-        'Authentication failed',
-        errorKey: BiometricErrorKey.authenticationFailed,
-      );
+      return BiometricResult.failure(BiometricErrorKey.authenticationFailed);
     }
   }
 
@@ -187,13 +181,11 @@ class BiometricService {
 /// Result wrapper for biometric authentication
 class BiometricResult {
   final bool success;
-  final String? error;
   final BiometricErrorKey? errorKey;
   final bool cancelled;
 
   BiometricResult._({
     required this.success,
-    this.error,
     this.errorKey,
     this.cancelled = false,
   });
@@ -202,8 +194,8 @@ class BiometricResult {
     return BiometricResult._(success: true);
   }
 
-  factory BiometricResult.failure(String error, {BiometricErrorKey? errorKey}) {
-    return BiometricResult._(success: false, error: error, errorKey: errorKey);
+  factory BiometricResult.failure(BiometricErrorKey errorKey) {
+    return BiometricResult._(success: false, errorKey: errorKey);
   }
 
   factory BiometricResult.cancelled() {

@@ -41,5 +41,5 @@ String resolveBiometricResultError(AppLocalizations loc, BiometricResult result)
   if (result.errorKey != null) {
     return resolveBiometricErrorMessage(loc, result.errorKey!);
   }
-  return result.error ?? loc.biometricErrorFallback;
+  return loc.biometricErrorFallback;
 }
