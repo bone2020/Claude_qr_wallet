@@ -2477,4 +2477,52 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get respondToDisputeSuccessSnackbar => 'Response submitted';
+
+  @override
+  String get enterCurrentPinStepTitle => 'Enter Current PIN';
+
+  @override
+  String get enterCurrentPinSubtitle =>
+      'Enter your current 6-digit transaction PIN';
+
+  @override
+  String get pinErrorIncorrectPin => 'Incorrect PIN';
+
+  @override
+  String get pinErrorWrapperGeneric =>
+      'Something went wrong. Please try again.';
+
+  @override
+  String get changePinErrorFailedToUpdate =>
+      'Failed to update PIN. Please try again.';
+
+  @override
+  String get pinsDoNotMatchError => 'PINs do not match';
+
+  @override
+  String get resetPinErrorEmailPasswordRequired =>
+      'Please enter your email and password';
+
+  @override
+  String get resetPinErrorIncorrectPassword =>
+      'Incorrect password. Please try again.';
+
+  @override
+  String get resetPinErrorNoPhoneLinked =>
+      'No phone number linked to your account. Please use email verification.';
+
+  @override
+  String get resetPinErrorAutoVerificationFailed =>
+      'Auto-verification failed. Please enter the OTP manually.';
+
+  @override
+  String get resetPinErrorEnter6DigitCode => 'Please enter the 6-digit code';
+
+  @override
+  String get resetPinErrorVerificationExpired =>
+      'Verification expired. Please request a new code.';
+
+  @override
+  String get resetPinErrorFailedToReset =>
+      'Failed to reset PIN. Please try again.';
 }

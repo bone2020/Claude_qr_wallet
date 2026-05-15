@@ -3259,23 +3259,13 @@
   "@pinErrorIncorrectPin": {
     "description": "Validation error shown when the user enters a PIN that doesn't match the stored one."
   },
-  "pinErrorWrapperGeneric": "Error: {message}",
+  "pinErrorWrapperGeneric": "Something went wrong. Please try again.",
   "@pinErrorWrapperGeneric": {
-    "description": "Generic error prefix wrapping an exception message during PIN verification.",
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
+    "description": "Generic error shown when PIN verification fails due to an unexpected error. Does not include developer diagnostic text."
   },
-  "changePinErrorFailedToUpdate": "Failed to update PIN: {message}",
+  "changePinErrorFailedToUpdate": "Failed to update PIN. Please try again.",
   "@changePinErrorFailedToUpdate": {
-    "description": "Error wrapping the underlying exception when updating the PIN fails.",
-    "placeholders": {
-      "message": {
-        "type": "String"
-      }
-    }
+    "description": "User-facing error shown when the changePin Cloud Function call fails. Does not include developer diagnostic text."
   },
   "pinsDoNotMatchError": "PINs do not match",
   "@pinsDoNotMatchError": {

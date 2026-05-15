@@ -4462,6 +4462,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Response submitted'**
   String get respondToDisputeSuccessSnackbar;
+
+  /// Step title in the change PIN flow when entering the current PIN.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Current PIN'**
+  String get enterCurrentPinStepTitle;
+
+  /// Subtitle below the Enter Current PIN step heading.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your current 6-digit transaction PIN'**
+  String get enterCurrentPinSubtitle;
+
+  /// Validation error shown when the user enters a PIN that doesn't match the stored one.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect PIN'**
+  String get pinErrorIncorrectPin;
+
+  /// Generic error shown when PIN verification fails due to an unexpected error. Does not include developer diagnostic text.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get pinErrorWrapperGeneric;
+
+  /// User-facing error shown when the changePin Cloud Function call fails. Does not include developer diagnostic text.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update PIN. Please try again.'**
+  String get changePinErrorFailedToUpdate;
+
+  /// Validation error shown when the confirmation PIN doesn't match the newly chosen PIN. Used in both change-pin and reset-pin flows.
+  ///
+  /// In en, this message translates to:
+  /// **'PINs do not match'**
+  String get pinsDoNotMatchError;
+
+  /// Validation error on the reset PIN email-verification step when email or password is empty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your email and password'**
+  String get resetPinErrorEmailPasswordRequired;
+
+  /// Error shown on the reset PIN email-verification step when the password is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password. Please try again.'**
+  String get resetPinErrorIncorrectPassword;
+
+  /// Error shown when the user tries to use phone verification but no phone number is on their account.
+  ///
+  /// In en, this message translates to:
+  /// **'No phone number linked to your account. Please use email verification.'**
+  String get resetPinErrorNoPhoneLinked;
+
+  /// Error shown when SMS auto-retrieval fails during reset PIN phone verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-verification failed. Please enter the OTP manually.'**
+  String get resetPinErrorAutoVerificationFailed;
+
+  /// Validation error when the user submits an OTP shorter than 6 digits during reset PIN phone verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the 6-digit code'**
+  String get resetPinErrorEnter6DigitCode;
+
+  /// Error shown when the OTP verification window has expired during reset PIN.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification expired. Please request a new code.'**
+  String get resetPinErrorVerificationExpired;
+
+  /// Generic error shown when the resetPin Cloud Function call fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to reset PIN. Please try again.'**
+  String get resetPinErrorFailedToReset;
 }
 
 class _AppLocalizationsDelegate

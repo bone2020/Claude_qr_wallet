@@ -2522,4 +2522,53 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get respondToDisputeSuccessSnackbar => 'Réponse envoyée';
+
+  @override
+  String get enterCurrentPinStepTitle => 'Saisir le code PIN actuel';
+
+  @override
+  String get enterCurrentPinSubtitle =>
+      'Saisissez votre code PIN de transaction actuel à 6 chiffres';
+
+  @override
+  String get pinErrorIncorrectPin => 'Code PIN incorrect';
+
+  @override
+  String get pinErrorWrapperGeneric =>
+      'Une erreur s\'est produite. Veuillez réessayer.';
+
+  @override
+  String get changePinErrorFailedToUpdate =>
+      'Échec de la mise à jour du code PIN. Veuillez réessayer.';
+
+  @override
+  String get pinsDoNotMatchError => 'Les codes PIN ne correspondent pas';
+
+  @override
+  String get resetPinErrorEmailPasswordRequired =>
+      'Veuillez saisir votre e-mail et votre mot de passe';
+
+  @override
+  String get resetPinErrorIncorrectPassword =>
+      'Mot de passe incorrect. Veuillez réessayer.';
+
+  @override
+  String get resetPinErrorNoPhoneLinked =>
+      'Aucun numéro de téléphone associé à votre compte. Veuillez utiliser la vérification par e-mail.';
+
+  @override
+  String get resetPinErrorAutoVerificationFailed =>
+      'Échec de la vérification automatique. Veuillez saisir le code OTP manuellement.';
+
+  @override
+  String get resetPinErrorEnter6DigitCode =>
+      'Veuillez saisir le code à 6 chiffres';
+
+  @override
+  String get resetPinErrorVerificationExpired =>
+      'La vérification a expiré. Veuillez demander un nouveau code.';
+
+  @override
+  String get resetPinErrorFailedToReset =>
+      'Échec de la réinitialisation du code PIN. Veuillez réessayer.';
 }

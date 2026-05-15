@@ -96,7 +96,8 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = l10n.pinErrorWrapperGeneric(e.toString());
+       debugPrint('change_pin _confirmNewPin error: $e');
+        _errorMessage = l10n.changePinErrorFailedToUpdate;
       });
     }
   }
@@ -192,10 +193,11 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
         ),
       );
     } catch (e) {
+      debugPrint('change_pin _confirmNewPin error: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = l10n.changePinErrorFailedToUpdate(e.toString());
+        _errorMessage = l10n.changePinErrorFailedToUpdate;
       });
     }
   }
@@ -299,46 +301,56 @@ class _ChangePinScreenState extends ConsumerState<ChangePinScreen> {
           padding: const EdgeInsets.all(AppDimensions.screenPaddingH),
           child: Column(
             children: [
-              // Step indicator
-              _buildStepIndicator(),
-              const SizedBox(height: AppDimensions.spaceXXL),
+              // Top section — scrollable when content exceeds available height
+              // (e.g. when keyboard is open + a long error message is showing)
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Step indicator
+                      _buildStepIndicator(),
+                      const SizedBox(height: AppDimensions.spaceXXL),
 
-              // Title and subtitle
-              Text(_stepTitle(context), style: AppTextStyles.headlineSmall()),
-              const SizedBox(height: AppDimensions.spaceXS),
-              Text(
-                _stepSubtitle(context),
-                style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
-                textAlign: TextAlign.center,
+                      // Title and subtitle
+                      Text(_stepTitle(context), style: AppTextStyles.headlineSmall()),
+                      const SizedBox(height: AppDimensions.spaceXS),
+                      Text(
+                        _stepSubtitle(context),
+                        style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppDimensions.spaceXXL),
+
+                      // PIN input
+                      if (_isLoading)
+                        const CircularProgressIndicator(color: AppColors.primary)
+                      else
+                        Pinput(
+                          controller: _currentController,
+                          length: 6,
+                          obscureText: true,
+                          obscuringCharacter: '●',
+                          defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,
+                          focusedPinTheme: focusedPinTheme,
+                          onCompleted: _onPinCompleted,
+                          keyboardType: TextInputType.number,
+                        ),
+
+                      // Error message
+                      if (_errorMessage != null) ...[
+                        const SizedBox(height: AppDimensions.spaceMD),
+                        Text(
+                          _errorMessage!,
+                          style: AppTextStyles.bodySmall(color: AppColors.error),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: AppDimensions.spaceXXL),
 
-              // PIN input
-              if (_isLoading)
-                const CircularProgressIndicator(color: AppColors.primary)
-              else
-                Pinput(
-                  controller: _currentController,
-                  length: 6,
-                  obscureText: true,
-                  obscuringCharacter: '●',
-                  defaultPinTheme: _errorMessage != null ? errorPinTheme : defaultPinTheme,
-                  focusedPinTheme: focusedPinTheme,
-                  onCompleted: _onPinCompleted,
-                  keyboardType: TextInputType.number,
-                ),
-
-              // Error message
-              if (_errorMessage != null) ...[
-                const SizedBox(height: AppDimensions.spaceMD),
-                Text(
-                  _errorMessage!,
-                  style: AppTextStyles.bodySmall(color: AppColors.error),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-
-              const Spacer(),
+              // Bottom section — pinned at the bottom of the screen
 
               // Forgot PIN link (only shown at step 0)
               if (_currentStep == 0)

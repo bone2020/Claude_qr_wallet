@@ -2459,4 +2459,52 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get respondToDisputeSuccessSnackbar => 'تم إرسال الرد';
+
+  @override
+  String get enterCurrentPinStepTitle => 'أدخل رمز PIN الحالي';
+
+  @override
+  String get enterCurrentPinSubtitle =>
+      'أدخل رمز PIN المعاملة الحالي المكون من 6 أرقام';
+
+  @override
+  String get pinErrorIncorrectPin => 'رمز PIN غير صحيح';
+
+  @override
+  String get pinErrorWrapperGeneric => 'حدث خطأ ما. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get changePinErrorFailedToUpdate =>
+      'فشل تحديث رمز PIN. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get pinsDoNotMatchError => 'رموز PIN غير متطابقة';
+
+  @override
+  String get resetPinErrorEmailPasswordRequired =>
+      'يرجى إدخال بريدك الإلكتروني وكلمة المرور';
+
+  @override
+  String get resetPinErrorIncorrectPassword =>
+      'كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get resetPinErrorNoPhoneLinked =>
+      'لا يوجد رقم هاتف مرتبط بحسابك. يرجى استخدام التحقق عبر البريد الإلكتروني.';
+
+  @override
+  String get resetPinErrorAutoVerificationFailed =>
+      'فشل التحقق التلقائي. يرجى إدخال رمز OTP يدويًا.';
+
+  @override
+  String get resetPinErrorEnter6DigitCode =>
+      'يرجى إدخال الرمز المكون من 6 أرقام';
+
+  @override
+  String get resetPinErrorVerificationExpired =>
+      'انتهت صلاحية التحقق. يرجى طلب رمز جديد.';
+
+  @override
+  String get resetPinErrorFailedToReset =>
+      'فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى.';
 }
