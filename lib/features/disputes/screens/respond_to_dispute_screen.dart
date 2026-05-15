@@ -27,7 +27,7 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
   }
 
   Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final response = _controller.text.trim();
     if (response.length < 10) {
       setState(() => _error = l10n.respondToDisputeErrorTooShort);
@@ -58,7 +58,7 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(

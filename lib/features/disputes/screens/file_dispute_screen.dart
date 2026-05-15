@@ -34,7 +34,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
   String? _errorMessage;
 
   Map<String, String> _issueTypes(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return {
       'money_sent_not_received': l10n.fileDisputeIssueTypeMoneySentNotReceived,
       'service_not_delivered': l10n.fileDisputeIssueTypeServiceNotDelivered,
@@ -57,7 +57,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
   }
 
   Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final description = _descriptionController.text.trim();
     if (description.length < 10) {
       setState(() => _errorMessage = l10n.fileDisputeErrorDescriptionTooShort);
@@ -111,7 +111,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(

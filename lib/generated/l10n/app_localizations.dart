@@ -4306,6 +4306,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unsupported currency: {from} or {to}'**
   String exchangeRateErrorUnsupportedCurrencyPair(String from, String to);
+
+  /// AppBar title on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Issue'**
+  String get fileDisputeTitle;
+
+  /// Body label showing the ID of the transaction being disputed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction: {transactionId}'**
+  String fileDisputeTransactionLabel(String transactionId);
+
+  /// Body label showing the recipient of the transaction being disputed.
+  ///
+  /// In en, this message translates to:
+  /// **'To: {recipientName}'**
+  String fileDisputeRecipientLabel(String recipientName);
+
+  /// Section label above the issue-type dropdown on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Issue Type'**
+  String get fileDisputeIssueTypeLabel;
+
+  /// Dropdown option for issue type 'money_sent_not_received' on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Money sent but not received'**
+  String get fileDisputeIssueTypeMoneySentNotReceived;
+
+  /// Dropdown option for issue type 'service_not_delivered' on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Service not delivered'**
+  String get fileDisputeIssueTypeServiceNotDelivered;
+
+  /// Dropdown option for issue type 'item_not_delivered' on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Item not delivered'**
+  String get fileDisputeIssueTypeItemNotDelivered;
+
+  /// Dropdown option for issue type 'other' on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get fileDisputeIssueTypeOther;
+
+  /// Section label above the amount field on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount in Dispute ({currency})'**
+  String fileDisputeAmountLabel(String currency);
+
+  /// Hint text inside the amount field showing the maximum allowable dispute amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Max: {maxAmount}'**
+  String fileDisputeAmountHint(String maxAmount);
+
+  /// Section label above the description text area on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get fileDisputeDescriptionLabel;
+
+  /// Hint text inside the description text area on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe what happened (min 10 characters)...'**
+  String get fileDisputeDescriptionHint;
+
+  /// Checkbox label confirming the user accepts the dispute filing fee.
+  ///
+  /// In en, this message translates to:
+  /// **'I understand a dispute fee will be charged. It will be refunded if the dispute is upheld.'**
+  String get fileDisputeFeeAcknowledgement;
+
+  /// Submit button label on the file-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Dispute'**
+  String get fileDisputeSubmitButton;
+
+  /// Validation error shown when the description is shorter than 10 characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Description must be at least 10 characters.'**
+  String get fileDisputeErrorDescriptionTooShort;
+
+  /// Validation error shown when the dispute amount is not a positive number.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid amount.'**
+  String get fileDisputeErrorInvalidAmount;
+
+  /// Validation error shown when the dispute amount exceeds the original transaction amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount cannot exceed {maxAmount}.'**
+  String fileDisputeErrorAmountExceedsMax(String maxAmount);
+
+  /// Validation error shown when the user has not checked the dispute fee acknowledgement.
+  ///
+  /// In en, this message translates to:
+  /// **'Please acknowledge the dispute fee.'**
+  String get fileDisputeErrorFeeNotAcknowledged;
+
+  /// SnackBar shown after a dispute is successfully filed, showing the generated dispute ID.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute filed: {disputeId}'**
+  String fileDisputeSuccessSnackbar(String disputeId);
+
+  /// AppBar title on the respond-to-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Respond to Dispute'**
+  String get respondToDisputeTitle;
+
+  /// Body label showing the ID of the dispute being responded to.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute: {disputeId}'**
+  String respondToDisputeIdLabel(String disputeId);
+
+  /// Section label above the response text area on the respond-to-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Response'**
+  String get respondToDisputeResponseLabel;
+
+  /// Hint text inside the response text area on the respond-to-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain your side of the story (min 10 characters)...'**
+  String get respondToDisputeResponseHint;
+
+  /// Submit button label on the respond-to-dispute screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Response'**
+  String get respondToDisputeSubmitButton;
+
+  /// Validation error shown when the response is shorter than 10 characters.
+  ///
+  /// In en, this message translates to:
+  /// **'Response must be at least 10 characters.'**
+  String get respondToDisputeErrorTooShort;
+
+  /// SnackBar shown after a dispute response is successfully submitted.
+  ///
+  /// In en, this message translates to:
+  /// **'Response submitted'**
+  String get respondToDisputeSuccessSnackbar;
 }
 
 class _AppLocalizationsDelegate

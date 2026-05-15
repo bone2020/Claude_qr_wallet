@@ -2378,4 +2378,103 @@ class AppLocalizationsEn extends AppLocalizations {
   String exchangeRateErrorUnsupportedCurrencyPair(String from, String to) {
     return 'Unsupported currency: $from or $to';
   }
+
+  @override
+  String get fileDisputeTitle => 'Report Issue';
+
+  @override
+  String fileDisputeTransactionLabel(String transactionId) {
+    return 'Transaction: $transactionId';
+  }
+
+  @override
+  String fileDisputeRecipientLabel(String recipientName) {
+    return 'To: $recipientName';
+  }
+
+  @override
+  String get fileDisputeIssueTypeLabel => 'Issue Type';
+
+  @override
+  String get fileDisputeIssueTypeMoneySentNotReceived =>
+      'Money sent but not received';
+
+  @override
+  String get fileDisputeIssueTypeServiceNotDelivered => 'Service not delivered';
+
+  @override
+  String get fileDisputeIssueTypeItemNotDelivered => 'Item not delivered';
+
+  @override
+  String get fileDisputeIssueTypeOther => 'Other';
+
+  @override
+  String fileDisputeAmountLabel(String currency) {
+    return 'Amount in Dispute ($currency)';
+  }
+
+  @override
+  String fileDisputeAmountHint(String maxAmount) {
+    return 'Max: $maxAmount';
+  }
+
+  @override
+  String get fileDisputeDescriptionLabel => 'Description';
+
+  @override
+  String get fileDisputeDescriptionHint =>
+      'Describe what happened (min 10 characters)...';
+
+  @override
+  String get fileDisputeFeeAcknowledgement =>
+      'I understand a dispute fee will be charged. It will be refunded if the dispute is upheld.';
+
+  @override
+  String get fileDisputeSubmitButton => 'Submit Dispute';
+
+  @override
+  String get fileDisputeErrorDescriptionTooShort =>
+      'Description must be at least 10 characters.';
+
+  @override
+  String get fileDisputeErrorInvalidAmount => 'Please enter a valid amount.';
+
+  @override
+  String fileDisputeErrorAmountExceedsMax(String maxAmount) {
+    return 'Amount cannot exceed $maxAmount.';
+  }
+
+  @override
+  String get fileDisputeErrorFeeNotAcknowledged =>
+      'Please acknowledge the dispute fee.';
+
+  @override
+  String fileDisputeSuccessSnackbar(String disputeId) {
+    return 'Dispute filed: $disputeId';
+  }
+
+  @override
+  String get respondToDisputeTitle => 'Respond to Dispute';
+
+  @override
+  String respondToDisputeIdLabel(String disputeId) {
+    return 'Dispute: $disputeId';
+  }
+
+  @override
+  String get respondToDisputeResponseLabel => 'Your Response';
+
+  @override
+  String get respondToDisputeResponseHint =>
+      'Explain your side of the story (min 10 characters)...';
+
+  @override
+  String get respondToDisputeSubmitButton => 'Submit Response';
+
+  @override
+  String get respondToDisputeErrorTooShort =>
+      'Response must be at least 10 characters.';
+
+  @override
+  String get respondToDisputeSuccessSnackbar => 'Response submitted';
 }
