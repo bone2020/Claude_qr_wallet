@@ -252,9 +252,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                 Container(
                   padding: const EdgeInsets.all(AppDimensions.spaceMD),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -320,7 +320,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         width: 120,
         height: 120,
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.1),
+          color: AppColors.primary.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: const Icon(
@@ -330,7 +330,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         ),
       )
           .animate(onPlay: (controller) => controller.repeat())
-          .shimmer(delay: 1000.ms, duration: 1800.ms, color: AppColors.primary.withOpacity(0.3)),
+          .shimmer(delay: 1000.ms, duration: 1800.ms, color: AppColors.primary.withValues(alpha: 0.3)),
     );
   }
 
@@ -363,7 +363,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.2),
+            color: AppColors.primary.withValues(alpha: 0.2),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -394,7 +394,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: AppColors.primary.withOpacity(0.7),
+              color: AppColors.primary.withValues(alpha: 0.7),
             ),
           ),
           const SizedBox(width: AppDimensions.spaceSM),
@@ -447,7 +447,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       child: OutlinedButton(
         onPressed: _isCheckingVerification ? null : () => _checkEmailVerified(showLoading: true, showError: true),
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
           ),

@@ -89,7 +89,7 @@ class LanguageSettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withOpacity(0.1)
+                    ? AppColors.primary.withValues(alpha: 0.1)
                     : AppColors.backgroundDark,
                 borderRadius: BorderRadius.circular(10),
               ),

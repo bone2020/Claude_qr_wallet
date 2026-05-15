@@ -246,7 +246,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
             height: 64,
             decoration: BoxDecoration(
               color: (isCredit ? AppColors.success : AppColors.error)
-                  .withOpacity(0.1),
+                  .withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -304,7 +304,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
         vertical: AppDimensions.spaceXS,
       ),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
       ),
       child: Row(
@@ -426,7 +426,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
+        color: AppColors.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
       ),
       child: Column(

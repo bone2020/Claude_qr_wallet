@@ -534,7 +534,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 Container(
                   padding: const EdgeInsets.all(AppDimensions.spaceSM),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.1),
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                   ),
                   child: Row(
@@ -611,7 +611,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -865,7 +865,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.8),
+            AppColors.primary.withValues(alpha: 0.8),
             AppColors.primary,
           ],
           begin: Alignment.topLeft,
@@ -1105,9 +1105,9 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
-        color: AppColors.success.withOpacity(0.1),
+        color: AppColors.success.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

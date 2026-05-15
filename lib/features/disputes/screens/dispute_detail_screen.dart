@@ -117,7 +117,7 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
         child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
       ),
     );

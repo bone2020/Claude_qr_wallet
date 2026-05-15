@@ -156,7 +156,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
           width: 120,
           height: 120,
           decoration: BoxDecoration(
-            color: (_isSuccess ? AppColors.success : AppColors.error).withOpacity(0.1),
+            color: (_isSuccess ? AppColors.success : AppColors.error).withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(
@@ -201,7 +201,7 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
           Container(
             padding: const EdgeInsets.all(AppDimensions.spaceMD),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.1),
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
             ),
             child: Text(

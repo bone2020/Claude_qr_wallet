@@ -93,7 +93,7 @@ class _RespondToDisputeScreenState extends ConsumerState<RespondToDisputeScreen>
               if (_error != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: AppColors.error.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: AppColors.error.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                   child: Text(_error!, style: const TextStyle(color: AppColors.error), textAlign: TextAlign.center),
                 ),
                 const SizedBox(height: 12),

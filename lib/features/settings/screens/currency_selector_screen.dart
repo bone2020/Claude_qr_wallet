@@ -119,7 +119,7 @@ class _CurrencyTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppDimensions.spaceSM),
       child: Material(
-        color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceDark,
+        color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
         child: InkWell(
           onTap: isLoading ? null : onTap,

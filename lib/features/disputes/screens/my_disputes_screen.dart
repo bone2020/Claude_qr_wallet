@@ -254,7 +254,7 @@ class _NestedActiveResolvedTabs extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.orange.withOpacity(0.1),
+              color: Colors.orange.withValues(alpha: 0.1),
               child: Text(
                 AppLocalizations.of(context).disputesCappedNotice,
                 style: TextStyle(color: Colors.orange[800], fontSize: 12),
@@ -330,7 +330,7 @@ class _DisputeList extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
+                    color: color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(

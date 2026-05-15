@@ -217,9 +217,9 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.1),
+                      color: AppColors.info.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
@@ -262,7 +262,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: (isImportant ? AppColors.warning : AppColors.primary).withOpacity(0.1),
+              color: (isImportant ? AppColors.warning : AppColors.primary).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(

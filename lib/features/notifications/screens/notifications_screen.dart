@@ -245,7 +245,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           decoration: BoxDecoration(
             color: notification.isRead
                 ? Colors.transparent
-                : AppColors.primary.withOpacity(0.05),
+                : AppColors.primary.withValues(alpha: 0.05),
             border: Border(
               bottom: BorderSide(
                 color: AppColors.surfaceDark,
@@ -259,7 +259,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: _getNotificationColor(notification.type).withOpacity(0.1),
+                  color: _getNotificationColor(notification.type).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(

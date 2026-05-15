@@ -758,7 +758,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
       ),
       child: Row(
@@ -960,7 +960,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.8),
+            AppColors.primary.withValues(alpha: 0.8),
             AppColors.primary,
           ],
           begin: Alignment.topLeft,
@@ -1086,7 +1086,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           Container(
             padding: const EdgeInsets.all(AppDimensions.spaceSM),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.1),
+              color: AppColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
             ),
             child: Row(
@@ -1114,7 +1114,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Center(

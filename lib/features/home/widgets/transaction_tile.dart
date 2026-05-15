@@ -44,11 +44,11 @@ class TransactionTile extends StatelessWidget {
   }
 
   Color get _iconBackgroundColor {
-    if (status == 'pending') return AppColors.warning.withOpacity(0.1);
-    if (status == 'failed') return AppColors.error.withOpacity(0.1);
+    if (status == 'pending') return AppColors.warning.withValues(alpha: 0.1);
+    if (status == 'failed') return AppColors.error.withValues(alpha: 0.1);
     return _isCredit
-        ? AppColors.success.withOpacity(0.1)
-        : AppColors.error.withOpacity(0.1);
+        ? AppColors.success.withValues(alpha: 0.1)
+        : AppColors.error.withValues(alpha: 0.1);
   }
 
   Color get _iconColor {
@@ -148,7 +148,7 @@ class TransactionTile extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.warning.withOpacity(0.1),
+                            color: AppColors.warning.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -165,7 +165,7 @@ class TransactionTile extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(

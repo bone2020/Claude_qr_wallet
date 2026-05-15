@@ -28,7 +28,7 @@ class KycVerificationCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppDimensions.spaceLG),
       decoration: BoxDecoration(
         color: isVerified
-            ? AppColors.success.withOpacity(0.1)
+            ? AppColors.success.withValues(alpha: 0.1)
             : AppColors.surfaceDark,
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
         border: Border.all(
@@ -126,7 +126,7 @@ class KycIdTypeCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
               ),
               child: Icon(icon, color: AppColors.primary),

@@ -214,7 +214,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   Widget _buildOverlay() {
     return ColorFiltered(
       colorFilter: ColorFilter.mode(
-        Colors.black.withOpacity(0.5),
+        Colors.black.withValues(alpha: 0.5),
         BlendMode.srcOut,
       ),
       child: Stack(
@@ -254,7 +254,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
                 ),
                 child: const Icon(Icons.close, color: Colors.white),
@@ -270,7 +270,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: _torchEnabled ? AppColors.primary : Colors.black.withOpacity(0.5),
+                  color: _torchEnabled ? AppColors.primary : Colors.black.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
                 ),
                 child: Icon(
@@ -296,7 +296,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+            colors: [Colors.transparent, Colors.black.withValues(alpha: 0.8)],
           ),
         ),
         child: SafeArea(
@@ -308,7 +308,7 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
                   vertical: AppDimensions.spaceXS,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.2),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
                 ),
                 child: Row(

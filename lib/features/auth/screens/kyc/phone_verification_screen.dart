@@ -231,7 +231,7 @@ void initState() {
       height: 56,
       textStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(8),
       ),
     );
@@ -357,7 +357,7 @@ void initState() {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

@@ -465,7 +465,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             height: 40,
                             decoration: BoxDecoration(
                               color: _accountBlocked
-                                  ? AppColors.error.withOpacity(0.1)
+                                  ? AppColors.error.withValues(alpha: 0.1)
                                   : AppColors.inputBackgroundDark,
                               borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                             ),
@@ -501,7 +501,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppColors.error.withOpacity(0.1),
+                                color: AppColors.error.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -592,7 +592,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           width: 100,
           height: 100,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             shape: BoxShape.circle,
             border: Border.all(
               color: AppColors.primary,
@@ -756,7 +756,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             value: value,
             onChanged: onChanged,
             activeColor: AppColors.primary,
-            activeTrackColor: AppColors.primary.withOpacity(0.3),
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
             inactiveThumbColor: AppColors.textSecondaryDark,
             inactiveTrackColor: AppColors.inputBorderDark,
           ),

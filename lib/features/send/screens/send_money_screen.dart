@@ -274,7 +274,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                             vertical: AppDimensions.spaceXS,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.success.withOpacity(0.1),
+                            color: AppColors.success.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                           ),
                           child: Row(
@@ -304,7 +304,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
                             vertical: AppDimensions.spaceXS,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                           ),
                           child: Row(
@@ -387,7 +387,7 @@ class _SendMoneyScreenState extends ConsumerState<SendMoneyScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
               ),
               child: const Icon(

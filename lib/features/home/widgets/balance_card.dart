@@ -65,12 +65,12 @@ class BalanceCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(AppDimensions.radiusXL),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
+          color: AppColors.primary.withValues(alpha: 0.2),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -167,7 +167,7 @@ class BalanceCard extends StatelessWidget {
                       vertical: AppDimensions.spaceXS,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
+                      color: AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                     ),
                     child: Column(
@@ -193,7 +193,7 @@ class BalanceCard extends StatelessWidget {
                       vertical: AppDimensions.spaceXS,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.warning.withOpacity(0.1),
+                      color: AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                     ),
                     child: Column(
@@ -226,7 +226,7 @@ class BalanceCard extends StatelessWidget {
                 vertical: AppDimensions.spaceXS,
               ),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
               ),
               child: Row(

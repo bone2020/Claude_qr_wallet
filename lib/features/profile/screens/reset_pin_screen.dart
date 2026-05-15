@@ -199,7 +199,7 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), shape: BoxShape.circle),
                 child: const Icon(Iconsax.tick_circle, color: AppColors.success, size: 48),
               ),
               const SizedBox(height: AppDimensions.spaceMD),
@@ -309,13 +309,13 @@ class _ResetPinScreenState extends ConsumerState<ResetPinScreen> {
         decoration: BoxDecoration(
           color: AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
-          border: Border.all(color: enabled ? AppColors.inputBorderDark : AppColors.inputBorderDark.withOpacity(0.5)),
+          border: Border.all(color: enabled ? AppColors.inputBorderDark : AppColors.inputBorderDark.withValues(alpha: 0.5)),
         ),
         child: Row(children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: enabled ? AppColors.primary.withOpacity(0.1) : AppColors.textTertiaryDark.withOpacity(0.1),
+              color: enabled ? AppColors.primary.withValues(alpha: 0.1) : AppColors.textTertiaryDark.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
             ),
             child: Icon(icon, color: enabled ? AppColors.primary : AppColors.textTertiaryDark, size: 24),

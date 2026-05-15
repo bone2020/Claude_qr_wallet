@@ -270,7 +270,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         Container(
           padding: const EdgeInsets.all(AppDimensions.spaceLG),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
           ),
           child: Column(
@@ -425,12 +425,12 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                       vertical: AppDimensions.spaceXS,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.05),
+                      color: AppColors.primary.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.circle, size: 6, color: AppColors.primary.withOpacity(0.5)),
+                        Icon(Icons.circle, size: 6, color: AppColors.primary.withValues(alpha: 0.5)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -511,7 +511,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
               borderRadius: BorderRadius.circular(AppDimensions.radiusXL),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.2),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
@@ -619,7 +619,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
         Container(
           padding: const EdgeInsets.all(AppDimensions.spaceMD),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
           ),
           child: Column(

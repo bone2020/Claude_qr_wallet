@@ -190,7 +190,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(_errorMessage!, style: const TextStyle(color: AppColors.error), textAlign: TextAlign.center),

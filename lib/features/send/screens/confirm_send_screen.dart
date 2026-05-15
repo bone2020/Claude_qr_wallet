@@ -476,7 +476,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -592,7 +592,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
             ),
             child: Center(
@@ -643,9 +643,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -716,12 +716,12 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           ),
           decoration: BoxDecoration(
             color: widget.amountLocked
-                ? AppColors.surfaceDark.withOpacity(0.5)
+                ? AppColors.surfaceDark.withValues(alpha: 0.5)
                 : AppColors.surfaceDark,
             borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
             border: Border.all(
               color: widget.amountLocked
-                  ? AppColors.primary.withOpacity(0.3)
+                  ? AppColors.primary.withValues(alpha: 0.3)
                   : AppColors.inputBorderDark,
             ),
           ),
@@ -831,9 +831,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       return Container(
         padding: const EdgeInsets.all(AppDimensions.spaceMD),
         decoration: BoxDecoration(
-          color: AppColors.info.withOpacity(0.1),
+          color: AppColors.info.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          border: Border.all(color: AppColors.info.withOpacity(0.3)),
+          border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -865,9 +865,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spaceMD),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.1),
+        color: AppColors.info.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-        border: Border.all(color: AppColors.info.withOpacity(0.3)),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
