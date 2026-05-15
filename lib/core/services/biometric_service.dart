@@ -147,35 +147,6 @@ class BiometricService {
         return BiometricErrorKey.authenticationFailed;
     }
   }
-
-  /// English fallback for the transitional [BiometricResult.error] String field.
-  ///
-  /// Kept in sync with [resolveBiometricErrorMessage]. Any English wording change
-  /// must update BOTH this method AND the corresponding ARB key.
-  String _englishOf(BiometricErrorKey key) {
-    switch (key) {
-      case BiometricErrorKey.notAvailable:
-        return 'Biometric authentication is not available';
-      case BiometricErrorKey.notEnrolled:
-        return 'No biometrics enrolled. Please set up fingerprint or face in device settings';
-      case BiometricErrorKey.lockedOut:
-        return 'Too many failed attempts. Please try again later';
-      case BiometricErrorKey.permanentlyLockedOut:
-        return 'Biometric authentication is locked. Please unlock your device first';
-      case BiometricErrorKey.passcodeNotSet:
-        return 'Please set up a device passcode to use biometric authentication';
-      case BiometricErrorKey.otherOperatingSystem:
-        return 'Biometric authentication is not supported on this device';
-      case BiometricErrorKey.authenticationFailed:
-        return 'Authentication failed';
-      case BiometricErrorKey.notSupported:
-        return 'Biometric authentication not supported';
-      case BiometricErrorKey.noBiometricsEnrolled:
-        return 'No biometrics enrolled on this device';
-      case BiometricErrorKey.fallback:
-        return "Couldn't authenticate. Please try again.";
-    }
-  }
 }
 
 /// Result wrapper for biometric authentication
