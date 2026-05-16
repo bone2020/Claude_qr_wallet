@@ -196,8 +196,9 @@ class _PhoneOtpScreenState extends ConsumerState<PhoneOtpScreen> {
         final markResult = await authNotifier.markPhoneVerified();
         if (!mounted) return;
         if (!markResult.success) {
+          final errorMsg = resolveAuthResultError(AppLocalizations.of(context), markResult);
           setState(() {
-            _errorMessage = markResult.error ?? 'Failed to record phone verification. Please try again.';
+            _errorMessage = errorMsg;
           });
           return;
         }

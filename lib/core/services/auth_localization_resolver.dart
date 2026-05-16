@@ -1,4 +1,5 @@
 import '../../generated/l10n/app_localizations.dart';
+import '../utils/error_handler_localization_resolver.dart';
 import 'auth_service.dart';
 
 /// Identifies the kind of auth error carried by [AuthResult.errorKey].
@@ -95,5 +96,8 @@ String resolveAuthResultError(AppLocalizations loc, AuthResult result) {
   if (result.errorKey != null) {
     return resolveAuthErrorMessage(loc, result.errorKey!);
   }
-  return result.error ?? loc.authErrorFallback;
+  if (result.genericErrorKey != null) {
+    return resolveGenericErrorMessage(loc, result.genericErrorKey!);
+  }
+  return loc.authErrorFallback;
 }

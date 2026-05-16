@@ -279,10 +279,7 @@ class AuthNotifier extends StateNotifier<AuthStateData> {
   /// Verify OTP code
   Future<AuthResult> verifyPhoneOtp(String otp) async {
     if (_verificationId == null) {
-      return AuthResult.failure(
-        'No verification ID. Please request OTP again.',
-        errorKey: AuthErrorKey.noVerificationId,
-      );
+      return AuthResult.failure(AuthErrorKey.noVerificationId);
     }
     final result = await _authService.verifyOtp(
       verificationId: _verificationId!,
