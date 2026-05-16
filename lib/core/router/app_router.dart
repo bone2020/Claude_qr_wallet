@@ -37,6 +37,8 @@ import '../../features/transactions/screens/transactions_screen.dart';
 import '../../features/transactions/screens/transaction_details_screen.dart';
 import '../../features/disputes/screens/my_disputes_screen.dart';
 import '../../features/disputes/screens/dispute_detail_screen.dart';
+import '../../features/disputes/screens/file_dispute_screen.dart';
+import '../../features/disputes/screens/respond_to_dispute_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/change_password_screen.dart';
 import '../../features/profile/screens/change_pin_screen.dart';
@@ -90,6 +92,8 @@ class AppRoutes {
   static const String transactionDetails = '/transaction-details';
   static const String myDisputes = '/my-disputes';
   static const String disputeDetail = '/dispute-detail';
+  static const String fileDispute = '/file-dispute';
+  static const String respondToDispute = '/respond-to-dispute';
   static const String profile = '/profile';
   static const String editProfile = '/edit-profile';
   static const String linkedAccounts = '/linked-accounts';
@@ -683,6 +687,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final disputeId = state.pathParameters['disputeId'] ?? '';
           return DisputeDetailScreen(disputeId: disputeId);
+        },
+      ),
+
+      // File Dispute (Phase B)
+      // Entry point: transaction_details_screen Report Issue button.
+      // Constructor params arrive via state.extra map (transactionId,
+      // transactionAmount, transactionCurrency, recipientName).
+      GoRoute(
+        path: AppRoutes.fileDispute,
+        name: 'fileDispute',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return FileDisputeScreen(
+            transactionId: extras?['transactionId'] ?? '',
+            transactionAmount: extras?['transactionAmount'] ?? 0,
+            transactionCurrency: extras?['transactionCurrency'] ?? '',
+            recipientName: extras?['recipientName'],
+          );
+        },
+      ),
+
+      // Respond to Dispute (Phase B)
+      // Path: /respond-to-dispute/:disputeId — same pattern as disputeDetail.
+      // Entry point: Respond button in dispute_detail_screen, gated to the
+      // dispute's recipient when status == 'filed' and < 2 prior responses.
+      GoRoute(
+        path: '${AppRoutes.respondToDispute}/:disputeId',
+        name: 'respondToDispute',
+        builder: (context, state) {
+          final disputeId = state.pathParameters['disputeId'] ?? '';
+          return RespondToDisputeScreen(disputeId: disputeId);
         },
       ),
 

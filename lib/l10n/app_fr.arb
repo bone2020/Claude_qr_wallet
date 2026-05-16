@@ -1290,5 +1290,10 @@
   "resetPinErrorVerificationExpired": "La vérification a expiré. Veuillez demander un nouveau code.",
   "resetPinErrorFailedToReset": "Échec de la réinitialisation du code PIN. Veuillez réessayer.",
   "transactionErrorNoRecipientSelected": "Aucun destinataire sélectionné",
-  "transactionErrorInvalidAmount": "Montant invalide"
+  "transactionErrorInvalidAmount": "Montant invalide",
+  "respondButton": "Répondre",
+  "updateResponseButton": "Mettre à jour la réponse",
+  "respondedLabel": "Répondu",
+  "firstResponseLabel": "Première réponse",
+  "secondResponseLabel": "Deuxième réponse"
 }

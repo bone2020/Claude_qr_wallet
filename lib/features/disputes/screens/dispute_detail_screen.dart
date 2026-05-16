@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/constants.dart';
+import '../../../core/router/app_router.dart';
 import '../providers/dispute_provider.dart';
 import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
@@ -66,22 +67,110 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
                           Text(AppLocalizations.of(context).descriptionLabel, style: Theme.of(context).textTheme.titleSmall),
                           const SizedBox(height: 8),
                           Text(_dispute!['description'] ?? '', style: Theme.of(context).textTheme.bodyMedium),
-                          if (_dispute!['recipientResponse'] != null) ...[
-                            const Divider(height: 32),
-                            Text(AppLocalizations.of(context).recipientResponseLabel, style: Theme.of(context).textTheme.titleSmall),
-                            const SizedBox(height: 8),
-                            Text(_dispute!['recipientResponse'], style: Theme.of(context).textTheme.bodyMedium),
-                          ],
+                          ..._buildResponseSections(context),
                           if (_dispute!['resolutionType'] != null) ...[
                             const Divider(height: 32),
                             _infoTile('Resolution', _dispute!['resolutionType']),
                             if (_dispute!['amountRecovered'] != null)
                               _infoTile('Amount Recovered', '${((_dispute!['amountRecovered'] ?? 0) / 100).toStringAsFixed(2)}'),
                           ],
+                          ..._buildRespondEntry(context),
                         ],
                       ),
                     ),
     );
+  }
+
+  // Phase B: extract the recipient's response history. Prefer the new
+  // recipientResponses array (post-Phase-B backend). Fall back to the legacy
+  // recipientResponse single field if the array hasn't been populated yet,
+  // so disputes that pre-date the backend deploy still render correctly.
+  List<Map<String, dynamic>> _extractResponses() {
+    final newArray = _dispute?['recipientResponses'];
+    if (newArray is List && newArray.isNotEmpty) {
+      return newArray
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
+    }
+    final legacy = _dispute?['recipientResponse'];
+    if (legacy is String && legacy.isNotEmpty) {
+      return [{'response': legacy}];
+    }
+    return [];
+  }
+
+  // Phase B: render each response as its own section with a localized label.
+  // The Flutter side renders whatever the backend returns; the backend
+  // enforces the cap of 2.
+  List<Widget> _buildResponseSections(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final responses = _extractResponses();
+    if (responses.isEmpty) return const [];
+
+    final widgets = <Widget>[];
+    for (var i = 0; i < responses.length; i++) {
+      widgets.add(const Divider(height: 32));
+      final label = i == 0 ? l10n.firstResponseLabel : l10n.secondResponseLabel;
+      widgets.add(Text(label, style: Theme.of(context).textTheme.titleSmall));
+      widgets.add(const SizedBox(height: 8));
+      widgets.add(Text(
+        (responses[i]['response'] as String?) ?? '',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ));
+    }
+    return widgets;
+  }
+
+  // Phase B: Respond entry button at the bottom of the detail screen.
+  // Visibility / state per Decisions 1, 2, 3:
+  //   Decision 3 (alpha) — I am the recipient iff the backend included
+  //     recipientUid in the sanitized payload. userViewDispute returns
+  //     recipientUid only when the caller is the dispute's recipient.
+  //   Decision 2 — button only shows while status == 'filed'. Anything
+  //     past 'filed' hides the button (mirrors backend rule).
+  //   Decision 1 — cap of 2 responses. Below cap: enabled, label switches
+  //     'Respond' -> 'Update Response' after first response. At cap:
+  //     button is still rendered but disabled, labelled 'Responded'.
+  List<Widget> _buildRespondEntry(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    final isRecipient = _dispute?['recipientUid'] != null;
+    if (!isRecipient) return const [];
+
+    final status = _dispute?['status'] as String? ?? '';
+    if (status != 'filed') return const [];
+
+    final responses = _extractResponses();
+    final count = responses.length;
+
+    final String label;
+    final VoidCallback? onPressed;
+    if (count >= 2) {
+      label = l10n.respondedLabel;
+      onPressed = null;
+    } else {
+      label = count == 0 ? l10n.respondButton : l10n.updateResponseButton;
+      onPressed = () async {
+        final result = await context.push(
+          '${AppRoutes.respondToDispute}/${widget.disputeId}',
+        );
+        if (result == true && mounted) {
+          _loadDispute();
+        }
+      };
+    }
+
+    return [
+      const SizedBox(height: 32),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          child: Text(label),
+        ),
+      ),
+    ];
   }
 
   Widget _statusBadge(String status) {

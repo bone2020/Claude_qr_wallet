@@ -3306,5 +3306,25 @@
   "transactionErrorInvalidAmount": "Invalid amount",
   "@transactionErrorInvalidAmount": {
     "description": "Validation error shown when sendMoney is invoked with amount <= 0."
+  },
+  "respondButton": "Respond",
+  "@respondButton": {
+    "description": "Label for the button that opens the response form on the dispute detail screen, shown to the dispute recipient before they have submitted any response."
+  },
+  "updateResponseButton": "Update Response",
+  "@updateResponseButton": {
+    "description": "Label for the button on the dispute detail screen after the recipient has already submitted one response. Tapping it lets them submit a second response."
+  },
+  "respondedLabel": "Responded",
+  "@respondedLabel": {
+    "description": "Label for the disabled button on the dispute detail screen after the recipient has submitted the maximum number of responses (2)."
+  },
+  "firstResponseLabel": "First Response",
+  "@firstResponseLabel": {
+    "description": "Section heading on the dispute detail screen above the first response submitted by the recipient."
+  },
+  "secondResponseLabel": "Second Response",
+  "@secondResponseLabel": {
+    "description": "Section heading on the dispute detail screen above the second response submitted by the recipient."
   }
 }
