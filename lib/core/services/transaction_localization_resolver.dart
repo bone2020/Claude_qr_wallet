@@ -1,5 +1,6 @@
 import '../../generated/l10n/app_localizations.dart';
 import 'wallet_service.dart';
+import '../utils/error_handler_localization_resolver.dart';
 
 /// Identifies the kind of transaction error carried by [TransactionResult.errorKey].
 ///
@@ -21,6 +22,10 @@ enum TransactionErrorKey {
   paymentVerificationFailed,
   depositFailed,
 
+  // Validation errors (wallet_provider)
+  noRecipientSelected,
+  invalidAmount,
+
   // Catch-all
   fallback,
 }
@@ -40,6 +45,8 @@ String resolveTransactionErrorMessage(AppLocalizations loc, TransactionErrorKey 
     TransactionErrorKey.paymentAlreadyProcessed => loc.transactionErrorPaymentAlreadyProcessed,
     TransactionErrorKey.paymentVerificationFailed => loc.transactionErrorPaymentVerificationFailed,
     TransactionErrorKey.depositFailed => loc.transactionErrorDepositFailed,
+    TransactionErrorKey.noRecipientSelected => loc.transactionErrorNoRecipientSelected,
+    TransactionErrorKey.invalidAmount => loc.transactionErrorInvalidAmount,
     TransactionErrorKey.fallback => loc.transactionErrorFallback,
   };
 }
@@ -56,5 +63,8 @@ String resolveTransactionResultError(AppLocalizations loc, TransactionResult res
   if (result.errorKey != null) {
     return resolveTransactionErrorMessage(loc, result.errorKey!);
   }
-  return result.error ?? loc.transactionErrorFallback;
+  if (result.genericErrorKey != null) {
+    return resolveGenericErrorMessage(loc, result.genericErrorKey!);
+  }
+  return loc.transactionErrorFallback;
 }

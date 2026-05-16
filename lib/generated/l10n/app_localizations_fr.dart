@@ -2571,4 +2571,11 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get resetPinErrorFailedToReset =>
       'Échec de la réinitialisation du code PIN. Veuillez réessayer.';
+
+  @override
+  String get transactionErrorNoRecipientSelected =>
+      'Aucun destinataire sélectionné';
+
+  @override
+  String get transactionErrorInvalidAmount => 'Montant invalide';
 }

@@ -3298,5 +3298,13 @@
   "resetPinErrorFailedToReset": "Failed to reset PIN. Please try again.",
   "@resetPinErrorFailedToReset": {
     "description": "Generic error shown when the resetPin Cloud Function call fails."
+  },
+  "transactionErrorNoRecipientSelected": "No recipient selected",
+  "@transactionErrorNoRecipientSelected": {
+    "description": "Validation error shown when sendMoney is invoked without a recipient."
+  },
+  "transactionErrorInvalidAmount": "Invalid amount",
+  "@transactionErrorInvalidAmount": {
+    "description": "Validation error shown when sendMoney is invoked with amount <= 0."
   }
 }

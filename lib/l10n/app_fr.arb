@@ -1288,5 +1288,7 @@
   "resetPinErrorAutoVerificationFailed": "Échec de la vérification automatique. Veuillez saisir le code OTP manuellement.",
   "resetPinErrorEnter6DigitCode": "Veuillez saisir le code à 6 chiffres",
   "resetPinErrorVerificationExpired": "La vérification a expiré. Veuillez demander un nouveau code.",
-  "resetPinErrorFailedToReset": "Échec de la réinitialisation du code PIN. Veuillez réessayer."
+  "resetPinErrorFailedToReset": "Échec de la réinitialisation du code PIN. Veuillez réessayer.",
+  "transactionErrorNoRecipientSelected": "Aucun destinataire sélectionné",
+  "transactionErrorInvalidAmount": "Montant invalide"
 }

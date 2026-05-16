@@ -2507,4 +2507,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get resetPinErrorFailedToReset =>
       'فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String get transactionErrorNoRecipientSelected => 'لم يتم تحديد مستلم';
+
+  @override
+  String get transactionErrorInvalidAmount => 'مبلغ غير صالح';
 }

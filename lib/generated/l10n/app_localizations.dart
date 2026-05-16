@@ -4540,6 +4540,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to reset PIN. Please try again.'**
   String get resetPinErrorFailedToReset;
+
+  /// Validation error shown when sendMoney is invoked without a recipient.
+  ///
+  /// In en, this message translates to:
+  /// **'No recipient selected'**
+  String get transactionErrorNoRecipientSelected;
+
+  /// Validation error shown when sendMoney is invoked with amount <= 0.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid amount'**
+  String get transactionErrorInvalidAmount;
 }
 
 class _AppLocalizationsDelegate

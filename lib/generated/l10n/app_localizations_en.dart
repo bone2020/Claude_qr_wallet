@@ -2525,4 +2525,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get resetPinErrorFailedToReset =>
       'Failed to reset PIN. Please try again.';
+
+  @override
+  String get transactionErrorNoRecipientSelected => 'No recipient selected';
+
+  @override
+  String get transactionErrorInvalidAmount => 'Invalid amount';
 }

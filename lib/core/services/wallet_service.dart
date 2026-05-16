@@ -182,7 +182,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     List<String>? items,
   }) async {
     if (_userId == null) {
-      return TransactionResult.failure('User not authenticated', errorKey: TransactionErrorKey.userNotAuthenticated);
+      return TransactionResult.failure(TransactionErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -226,42 +226,21 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
 
         return TransactionResult.success(transaction);
       } else {
-        return TransactionResult.failure(
-          data['error'] as String? ?? 'Transaction failed',
-          errorKey: TransactionErrorKey.transactionFailed,
-        );
+        return TransactionResult.failure(TransactionErrorKey.transactionFailed);
       }
     } on FirebaseFunctionsException catch (e) {
-      String errorMessage;
-      TransactionErrorKey errorKey;
-      switch (e.code) {
-        case 'unauthenticated':
-          errorMessage = 'Please log in to send money';
-          errorKey = TransactionErrorKey.pleaseLogInToSendMoney;
-          break;
-        case 'not-found':
-          errorMessage = 'Recipient wallet not found';
-          errorKey = TransactionErrorKey.recipientWalletNotFound;
-          break;
-        case 'failed-precondition':
-          errorMessage = 'Insufficient balance';
-          errorKey = TransactionErrorKey.insufficientBalance;
-          break;
-        case 'invalid-argument':
-          errorMessage = e.message ?? 'Invalid request';
-          errorKey = TransactionErrorKey.invalidRequest;
-          break;
-        default:
-          errorMessage = e.message ?? 'Transaction failed';
-          errorKey = TransactionErrorKey.transactionFailed;
-      }
-      return TransactionResult.failure(errorMessage, errorKey: errorKey);
+      debugPrint('FirebaseFunctionsException in sendMoney code=${e.code} message=${e.message}');
+      final key = switch (e.code) {
+        'unauthenticated' => TransactionErrorKey.pleaseLogInToSendMoney,
+        'not-found' => TransactionErrorKey.recipientWalletNotFound,
+        'failed-precondition' => TransactionErrorKey.insufficientBalance,
+        'invalid-argument' => TransactionErrorKey.invalidRequest,
+        _ => TransactionErrorKey.transactionFailed,
+      };
+      return TransactionResult.failure(key);
     } catch (e) {
       debugPrint('Transaction failed: $e');
-      return TransactionResult.failure(
-        'Transaction failed',
-        errorKey: TransactionErrorKey.transactionFailed,
-      );
+      return TransactionResult.failure(TransactionErrorKey.transactionFailed);
     }
   }
 
@@ -273,7 +252,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     String? bankName,
   }) async {
     if (_userId == null) {
-      return TransactionResult.failure('User not authenticated', errorKey: TransactionErrorKey.userNotAuthenticated);
+      return TransactionResult.failure(TransactionErrorKey.userNotAuthenticated);
     }
 
     try {
@@ -321,24 +300,16 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
 
         return TransactionResult.success(transaction);
       } else if (data['alreadyProcessed'] == true) {
-        return TransactionResult.failure('Payment already processed', errorKey: TransactionErrorKey.paymentAlreadyProcessed);
+        return TransactionResult.failure(TransactionErrorKey.paymentAlreadyProcessed);
       } else {
-        return TransactionResult.failure(
-          data['error'] as String? ?? 'Payment verification failed',
-          errorKey: TransactionErrorKey.paymentVerificationFailed,
-        );
+        return TransactionResult.failure(TransactionErrorKey.paymentVerificationFailed);
       }
     } on FirebaseFunctionsException catch (e) {
-      return TransactionResult.failure(
-        e.message ?? 'Payment verification failed',
-        errorKey: TransactionErrorKey.paymentVerificationFailed,
-      );
+      debugPrint('FirebaseFunctionsException in addMoney code=${e.code} message=${e.message}');
+      return TransactionResult.failure(TransactionErrorKey.paymentVerificationFailed);
     } catch (e) {
       debugPrint('Deposit failed: $e');
-      return TransactionResult.failure(
-        'Deposit failed',
-        errorKey: TransactionErrorKey.depositFailed,
-      );
+      return TransactionResult.failure(TransactionErrorKey.depositFailed);
     }
   }
 
@@ -543,22 +514,26 @@ class WalletLookupResult {
 class TransactionResult {
   final bool success;
   final TransactionModel? transaction;
-  final String? error;
   final TransactionErrorKey? errorKey;
+  final GenericErrorKey? genericErrorKey;
 
   TransactionResult._({
     required this.success,
     this.transaction,
-    this.error,
     this.errorKey,
+    this.genericErrorKey,
   });
 
   factory TransactionResult.success(TransactionModel transaction) {
     return TransactionResult._(success: true, transaction: transaction);
   }
 
-  factory TransactionResult.failure(String error, {TransactionErrorKey? errorKey}) {
-    return TransactionResult._(success: false, error: error, errorKey: errorKey);
+  factory TransactionResult.failure(TransactionErrorKey errorKey) {
+    return TransactionResult._(success: false, errorKey: errorKey);
+  }
+
+  factory TransactionResult.genericFailure(GenericErrorKey genericErrorKey) {
+    return TransactionResult._(success: false, genericErrorKey: genericErrorKey);
   }
 }
 

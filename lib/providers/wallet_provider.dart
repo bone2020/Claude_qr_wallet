@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/currency_service.dart';
 import '../core/services/exchange_rate_service.dart';
 import '../core/services/services.dart';
+import '../core/services/transaction_localization_resolver.dart';
 import '../models/models.dart';
 import 'auth_provider.dart';
+import '../core/utils/error_handler.dart';
+import 'package:flutter/foundation.dart';
 
 // ============================================================
 // SERVICE PROVIDERS
@@ -393,7 +396,6 @@ class SendMoneyState {
   final String? note;
   final bool isLoading;
   final bool isLookingUp;
-  final String? error;
   final TransactionModel? completedTransaction;
 
   SendMoneyState({
@@ -407,7 +409,6 @@ class SendMoneyState {
     this.note,
     this.isLoading = false,
     this.isLookingUp = false,
-    this.error,
     this.completedTransaction,
   });
 
@@ -422,7 +423,6 @@ class SendMoneyState {
     String? note,
     bool? isLoading,
     bool? isLookingUp,
-    String? error,
     TransactionModel? completedTransaction,
   }) {
     return SendMoneyState(
@@ -436,7 +436,6 @@ class SendMoneyState {
       note: note ?? this.note,
       isLoading: isLoading ?? this.isLoading,
       isLookingUp: isLookingUp ?? this.isLookingUp,
-      error: error,
       completedTransaction: completedTransaction ?? this.completedTransaction,
     );
   }
@@ -462,7 +461,7 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
       return;
     }
 
-    state = state.copyWith(isLookingUp: true, error: null);
+    state = state.copyWith(isLookingUp: true);
 
     try {
       final result = await _walletService.lookupWallet(walletId);
@@ -491,13 +490,14 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
         state = state.copyWith(
           recipientName: null,
           isLookingUp: false,
-          error: 'Wallet not found',
         );
       }
     } on WalletException catch (we) {
-      state = state.copyWith(isLookingUp: false, error: we.message);
+      debugPrint('wallet_provider lookupWallet WalletException: ${we.message}');
+      state = state.copyWith(isLookingUp: false);
     } catch (e) {
-      state = state.copyWith(isLookingUp: false, error: e.toString());
+      debugPrint('wallet_provider lookupWallet error: $e');
+      state = state.copyWith(isLookingUp: false);
     }
   }
 
@@ -529,14 +529,14 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
   /// Send money
   Future<TransactionResult> sendMoney() async {
     if (state.recipientWalletId == null) {
-      return TransactionResult.failure('No recipient selected');
+      return TransactionResult.failure(TransactionErrorKey.noRecipientSelected);
     }
 
     if (state.amount <= 0) {
-      return TransactionResult.failure('Invalid amount');
+      return TransactionResult.failure(TransactionErrorKey.invalidAmount);
     }
 
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true);
 
     try {
       final result = await _walletService.sendMoney(
@@ -551,13 +551,14 @@ class SendMoneyNotifier extends StateNotifier<SendMoneyState> {
           completedTransaction: result.transaction,
         );
       } else {
-        state = state.copyWith(isLoading: false, error: result.error);
+        state = state.copyWith(isLoading: false);
       }
 
       return result;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      return TransactionResult.failure(e.toString());
+      debugPrint('wallet_provider.sendMoney error: $e');
+      state = state.copyWith(isLoading: false);
+      return TransactionResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
 

@@ -1288,5 +1288,7 @@
   "resetPinErrorAutoVerificationFailed": "فشل التحقق التلقائي. يرجى إدخال رمز OTP يدويًا.",
   "resetPinErrorEnter6DigitCode": "يرجى إدخال الرمز المكون من 6 أرقام",
   "resetPinErrorVerificationExpired": "انتهت صلاحية التحقق. يرجى طلب رمز جديد.",
-  "resetPinErrorFailedToReset": "فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى."
+  "resetPinErrorFailedToReset": "فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى.",
+  "transactionErrorNoRecipientSelected": "لم يتم تحديد مستلم",
+  "transactionErrorInvalidAmount": "مبلغ غير صالح"
 }
