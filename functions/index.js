@@ -14171,17 +14171,25 @@ exports.userFileDispute = functions
     const callerUserDoc = await db.collection('users').doc(callerUid).get();
     const callerPhone = callerUserDoc.exists ? callerUserDoc.data().phoneNumber || '' : '';
 
-    // Get recipient info
-    const recipientUid = tx.receiverWalletId || '';
+   // Get recipient info: resolve wallet ID -> user UID -> user profile
+    let recipientUid = '';
     let recipientEmail = '', recipientDisplayName = '', recipientPhone = '';
-    if (recipientUid) {
+    const recipientWalletId = tx.receiverWalletId || '';
+    if (recipientWalletId) {
       try {
-        const recipientUserDoc = await db.collection('users').doc(recipientUid).get();
-        if (recipientUserDoc.exists) {
-          const rd = recipientUserDoc.data();
-          recipientEmail = rd.email || '';
-          recipientDisplayName = rd.fullName || rd.legalName || '';
-          recipientPhone = rd.phoneNumber || '';
+        const walletQuery = await db.collection('wallets')
+          .where('walletId', '==', recipientWalletId)
+          .limit(1)
+          .get();
+        if (!walletQuery.empty) {
+          recipientUid = walletQuery.docs[0].id;
+          const recipientUserDoc = await db.collection('users').doc(recipientUid).get();
+          if (recipientUserDoc.exists) {
+            const rd = recipientUserDoc.data();
+            recipientEmail = rd.email || '';
+            recipientDisplayName = rd.fullName || rd.legalName || '';
+            recipientPhone = rd.phoneNumber || '';
+          }
         }
       } catch (e) { /* recipient lookup failure non-blocking */ }
     }
@@ -14343,9 +14351,25 @@ exports.userViewDispute = functions
     resolvedAt: d.resolvedAt,
     resolutionType: d.resolutionType,
     amountRecovered: d.amountRecovered,
+    // Legacy single-field shape — kept for back-compat with older Flutter clients.
     recipientResponse: d.recipientResponse,
     recipientResponseAt: d.recipientResponseAt,
   };
+
+  // Phase B: surface response history as an array. If the new-shape array exists
+  // in storage, return it as-is. Otherwise synthesize a single-entry array from
+  // the legacy single field (for disputes that pre-date Phase B). If neither is
+  // present, return an empty array.
+  if (Array.isArray(d.recipientResponses) && d.recipientResponses.length > 0) {
+    sanitized.recipientResponses = d.recipientResponses;
+  } else if (d.recipientResponse) {
+    sanitized.recipientResponses = [{
+      response: d.recipientResponse,
+      respondedAt: d.recipientResponseAt || null,
+    }];
+  } else {
+    sanitized.recipientResponses = [];
+  }
   if (isFiler) {
     sanitized.filedBy = d.filedBy;
     sanitized.recipientDisplayName = d.recipientDisplayName;
@@ -14469,14 +14493,65 @@ exports.userRespondToDispute = functions
       throw new functions.https.HttpsError('permission-denied', 'Only the recipient can respond.');
     }
 
-    const TERMINAL = ['resolved', 'closed_stuck'];
-    if (TERMINAL.includes(dispute.status)) {
-      throw new functions.https.HttpsError('failed-precondition', 'Dispute is already resolved.');
+    // Phase B: responses are only accepted while the dispute is in 'filed' status.
+    // Once admin investigation begins, responses are no longer accepted because
+    // they would distract from the in-progress investigation. The Flutter UI
+    // mirrors this rule by hiding the Respond button outside 'filed'.
+    if (dispute.status !== 'filed') {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Responses are only accepted before investigation begins.'
+      );
     }
 
+    // Phase B: count existing responses across both the legacy single-field shape
+    // and the new array shape. Hard cap at 2 responses per dispute.
+    const existingArray = Array.isArray(dispute.recipientResponses) ? dispute.recipientResponses : null;
+    const legacyResponseCount = dispute.recipientResponse ? 1 : 0;
+    const currentCount = existingArray ? existingArray.length : legacyResponseCount;
+
+    if (currentCount >= 2) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'Maximum of 2 responses already submitted.'
+      );
+    }
+
+    const trimmed = response.trim();
+    // FieldValue.serverTimestamp() cannot be used inside an array element.
+    // Use Timestamp.now() (function-server clock) for the in-array timestamp,
+    // and use the same value for the legacy mirrored field for consistency.
+    const respondedAt = admin.firestore.Timestamp.now();
+    const newEntry = { response: trimmed, respondedAt };
+
+    // Build the new array.
+    //  - If a new-shape array already exists, append to it.
+    //  - Else if only the legacy single field exists, promote it into the array
+    //    as the first entry, then append the new entry.
+    //  - Else this is the very first response — start a fresh single-entry array.
+    let newArray;
+    if (existingArray) {
+      newArray = [...existingArray, newEntry];
+    } else if (dispute.recipientResponse) {
+      newArray = [
+        {
+          response: (dispute.recipientResponse || '').trim(),
+          respondedAt: dispute.recipientResponseAt || null,
+        },
+        newEntry,
+      ];
+    } else {
+      newArray = [newEntry];
+    }
+
+    // Write the new array. Also keep the legacy single-field fields in sync with
+    // the LATEST response so any Flutter client still reading the old shape
+    // continues to see the most recent response. The legacy fields are no longer
+    // authoritative — the array is — but they remain populated for back-compat.
     await disputeRef.update({
-      recipientResponse: response.trim(),
-      recipientResponseAt: admin.firestore.FieldValue.serverTimestamp(),
+      recipientResponses: newArray,
+      recipientResponse: trimmed,
+      recipientResponseAt: respondedAt,
     });
 
     // Notify assigned admin if one exists
@@ -14495,11 +14570,11 @@ exports.userRespondToDispute = functions
       userId: callerUid,
       operation: 'userRespondToDispute',
       result: 'success',
-      metadata: { disputeId },
+      metadata: { disputeId, responseNumber: newArray.length },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    return { success: true, disputeId };
+    return { success: true, disputeId, responseNumber: newArray.length };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
     logError('userRespondToDispute failed', { disputeId, caller: callerUid, error: error.message });
