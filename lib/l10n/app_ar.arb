@@ -1290,5 +1290,10 @@
   "resetPinErrorVerificationExpired": "انتهت صلاحية التحقق. يرجى طلب رمز جديد.",
   "resetPinErrorFailedToReset": "فشل في إعادة تعيين رمز PIN. يرجى المحاولة مرة أخرى.",
   "transactionErrorNoRecipientSelected": "لم يتم تحديد مستلم",
-  "transactionErrorInvalidAmount": "مبلغ غير صالح"
+  "transactionErrorInvalidAmount": "مبلغ غير صالح",
+  "respondButton": "رد",
+  "updateResponseButton": "تحديث الرد",
+  "respondedLabel": "تم الرد",
+  "firstResponseLabel": "الرد الأول",
+  "secondResponseLabel": "الرد الثاني"
 }

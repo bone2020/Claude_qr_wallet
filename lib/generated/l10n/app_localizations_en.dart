@@ -2531,4 +2531,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get transactionErrorInvalidAmount => 'Invalid amount';
+
+  @override
+  String get respondButton => 'Respond';
+
+  @override
+  String get updateResponseButton => 'Update Response';
+
+  @override
+  String get respondedLabel => 'Responded';
+
+  @override
+  String get firstResponseLabel => 'First Response';
+
+  @override
+  String get secondResponseLabel => 'Second Response';
 }

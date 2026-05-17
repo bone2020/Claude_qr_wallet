@@ -2513,4 +2513,19 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get transactionErrorInvalidAmount => 'مبلغ غير صالح';
+
+  @override
+  String get respondButton => 'رد';
+
+  @override
+  String get updateResponseButton => 'تحديث الرد';
+
+  @override
+  String get respondedLabel => 'تم الرد';
+
+  @override
+  String get firstResponseLabel => 'الرد الأول';
+
+  @override
+  String get secondResponseLabel => 'الرد الثاني';
 }

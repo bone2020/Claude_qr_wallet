@@ -2578,4 +2578,19 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get transactionErrorInvalidAmount => 'Montant invalide';
+
+  @override
+  String get respondButton => 'Répondre';
+
+  @override
+  String get updateResponseButton => 'Mettre à jour la réponse';
+
+  @override
+  String get respondedLabel => 'Répondu';
+
+  @override
+  String get firstResponseLabel => 'Première réponse';
+
+  @override
+  String get secondResponseLabel => 'Deuxième réponse';
 }
