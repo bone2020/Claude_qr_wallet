@@ -4552,6 +4552,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid amount'**
   String get transactionErrorInvalidAmount;
+
+  /// Label for the button that opens the response form on the dispute detail screen, shown to the dispute recipient before they have submitted any response.
+  ///
+  /// In en, this message translates to:
+  /// **'Respond'**
+  String get respondButton;
+
+  /// Label for the button on the dispute detail screen after the recipient has already submitted one response. Tapping it lets them submit a second response.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Response'**
+  String get updateResponseButton;
+
+  /// Label for the disabled button on the dispute detail screen after the recipient has submitted the maximum number of responses (2).
+  ///
+  /// In en, this message translates to:
+  /// **'Responded'**
+  String get respondedLabel;
+
+  /// Section heading on the dispute detail screen above the first response submitted by the recipient.
+  ///
+  /// In en, this message translates to:
+  /// **'First Response'**
+  String get firstResponseLabel;
+
+  /// Section heading on the dispute detail screen above the second response submitted by the recipient.
+  ///
+  /// In en, this message translates to:
+  /// **'Second Response'**
+  String get secondResponseLabel;
 }
 
 class _AppLocalizationsDelegate
