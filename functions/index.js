@@ -14045,6 +14045,79 @@ async function placeOpportunisticHoldStub({ recipientUid, currency, requestedAmo
 }
 
 /**
+ * Phase 5i: Get or create a platform-owned dispute recovery escrow wallet
+ * for the given currency. These wallets hold money during the verification
+ * window between manager decision and final release.
+ *
+ * Document path: wallets/dispute_recovery_<CURRENCY>
+ * isPlatform: true marker is used by Firestore rules to gate access.
+ *
+ * @param {string} currency - The currency code (e.g., 'GHS', 'KES'). Case-insensitive.
+ * @returns {Promise<FirebaseFirestore.DocumentReference>} Reference to the recovery wallet doc.
+ */
+async function getOrCreateRecoveryWallet(currency) {
+  const docId = `dispute_recovery_${String(currency).toUpperCase()}`;
+  const ref = db.collection('wallets').doc(docId);
+  const snap = await ref.get();
+  if (snap.exists) return ref;
+
+  await ref.set({
+    walletId: `PLATFORM-DISPUTE-RECOVERY-${String(currency).toUpperCase()}`,
+    balance: 0,
+    availableBalance: 0,
+    heldBalance: 0,
+    currency: String(currency).toUpperCase(),
+    isPlatform: true,
+    purpose: 'dispute_recovery_escrow',
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return ref;
+}
+
+/**
+ * Phase 5i: Generate the closing-remarks summary text for a dispute
+ * being closed. Picks template based on close reason.
+ *
+ * @param {object} dispute - The dispute doc data.
+ * @param {string} reason - A short string code identifying the close path.
+ *   Supported: 'released_to_payee_refund', 'released_to_payee_buyer_owes',
+ *   'reverse_to_payer_refund', 'reverse_to_payer_buyer_owes',
+ *   'stuck_account_closed', 'stuck_no_progress', 'buyer_cancelled',
+ *   'partial_buyer_choice'. Any other value returns a generic message.
+ * @returns {string} Human-readable closing-remarks text.
+ */
+function generateClosingRemarks(dispute, reason) {
+  switch (reason) {
+    case 'released_to_payee_refund':
+      return `Verification confirmed buyer's claim. ${dispute.amountOwed} ${dispute.disputedCurrency} released from escrow to filer.`;
+    case 'released_to_payee_buyer_owes':
+      return `Verification confirmed seller's claim. ${dispute.amountOwed} ${dispute.disputedCurrency} released from escrow to recipient.`;
+    case 'reverse_to_payer_refund':
+      return `Verification reversed decision — buyer's claim not substantiated. ${dispute.amountInEscrow} ${dispute.disputedCurrency} returned to recipient.`;
+    case 'reverse_to_payer_buyer_owes':
+      return `Verification reversed decision — seller's claim not substantiated. ${dispute.amountInEscrow} ${dispute.disputedCurrency} returned to filer.`;
+    case 'stuck_account_closed': {
+      const closedDate = dispute.accountClosureDetectedAt?.toDate().toISOString().split('T')[0];
+      return `Recovery impossible — ${dispute.decisionDirection === 'refund_to_buyer' ? 'recipient' : 'filer'} account closed on ${closedDate}. Buyer advised to contact authorities. Evidence package available on request.`;
+    }
+    case 'stuck_no_progress':
+      return `Recovery progress stalled — no deductions or deposits in 90 days. Buyer may contact support for evidence package or to escalate.`;
+    case 'buyer_cancelled':
+      return `Closed at buyer's request. Reason: ${dispute.cancellationReason}. Confirmed by support after verification.`;
+    case 'partial_buyer_choice': {
+      const released = dispute.partialReleasedAmount || 0;
+      const owed = dispute.amountOwed || 0;
+      const forgiven = Math.max(0, owed - released);
+      return `Closed at buyer's request after partial release. ${released} ${dispute.disputedCurrency} released to filer; remaining ${forgiven} ${dispute.disputedCurrency} forgiven.`;
+    }
+    default:
+      return 'Dispute closed.';
+  }
+}
+
+/**
  * User: File a dispute against a transaction.
  * Validates 7-day window, max 3 active disputes, computes tiered fee.
  * Places opportunistic hold on recipient's wallet (stub for now).

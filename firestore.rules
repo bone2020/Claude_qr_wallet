@@ -156,6 +156,14 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(['isAdmin', 'role']);
       allow update, delete: if false;
 
+      // Phase 5i: platform-owned dispute recovery escrow wallets.
+      // Path pattern: wallets/dispute_recovery_<CURRENCY>
+      // Only Cloud Functions (Admin SDK) can read or write. No client access.
+      // The existing read rule above already denies clients (auth.uid never
+      // matches 'dispute_recovery_<CURRENCY>'); this rule is belt-and-braces
+      // documentation of intent.
+      allow read, write: if walletId.matches('dispute_recovery_.*') && false;
+
       // Platform wallet subcollections — Cloud Functions only
       match /balances/{docId} {
         allow read, write: if false;
