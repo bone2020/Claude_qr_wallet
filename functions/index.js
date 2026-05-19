@@ -14338,6 +14338,45 @@ exports.userFileDispute = functions
         amountUnrecovered: null,
         currentHoldAmount: holdAmount,
         holdHistory: [],
+        // Phase 5i: escrow & solved-state tracking — initialized to defaults.
+        // Populated by adminManagerDecision when the dispute transitions to 'solved'.
+        amountInEscrow: 0,
+        amountOwed: 0,
+        decisionDirection: null,
+        solvedAt: null,
+        lastRecoveryDeductionAt: null,
+        awaitingReleaseAt: null,
+        fullyCollectedAt: null,
+        // Phase 5i: two-person release proposal — initialized null until proposed.
+        releaseProposal: null,
+        releaseConfirmedBy: null,
+        releaseConfirmedAt: null,
+        releaseRejectedBy: null,
+        releaseRejectedAt: null,
+        releaseRejectionReason: null,
+        releaseDirection: null,
+        closingRemarks: null,
+        // Phase 5i: stuck detection — set by disputeAccountClosureCheckScheduled
+        // and disputeNoProgressCheckScheduled when triggered.
+        accountClosureDetectedAt: null,
+        accountClosureDetectedBy: null,
+        stuckReason: null,
+        // Phase 5i: buyer self-service flags — set when buyer requests
+        // partial release or cancellation via userRequestPartialRelease /
+        // userCancelDispute.
+        partialReleaseRequested: false,
+        partialReleaseRequestedAt: null,
+        partialReleasedAmount: null,
+        partialReleasedAt: null,
+        cancellationRequested: false,
+        cancellationRequestedAt: null,
+        cancellationReason: null,
+        cancellationConfirmedBy: null,
+        cancellationConfirmedAt: null,
+        // Phase 5i: seller response history. The existing recipientResponse and
+        // recipientResponseAt fields above mirror the LATEST entry; this array
+        // accumulates all responses (cap of 2 enforced by userRespondToDispute).
+        recipientResponseHistory: [],
         feeCharged: fee,
         feeRefunded: false,
         feeDeductedFrom: freshFeeDeductedFrom,
@@ -14371,6 +14410,25 @@ exports.userFileDispute = functions
       metadata: { disputeId, originalTransactionId, issueType, fee, feeDeductedFrom },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Phase 5i (Section 4.4): notify the seller (recipient) that a dispute has been filed.
+    // The seller has the right to respond before investigation begins.
+    // SMS is best-effort — failure does not block dispute filing.
+    if (recipientPhone) {
+      try {
+        await sendCustomerSms({
+          phoneNumber: recipientPhone,
+          message: `A dispute has been filed against transaction ${originalTransactionId}. Dispute ID: ${disputeId}. Open the app to view details and respond.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      } catch (smsError) {
+        logWarning('userFileDispute: failed to SMS recipient', {
+          disputeId,
+          recipientUid,
+          error: smsError.message,
+        });
+      }
+    }
 
     return {
       success: true,
