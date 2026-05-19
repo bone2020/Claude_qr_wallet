@@ -15516,7 +15516,7 @@ exports.adminSuperAdminDisputeDecision = functions
   const { disputeId, decision, amount, notes, idempotencyKey } = data || {};
 
   if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
-  const VALID_DECISIONS = ['refund_full', 'refund_partial', 'release'];
+  const VALID_DECISIONS = ['refund_full', 'refund_partial', 'release', 'buyer_owes_seller_full', 'buyer_owes_seller_partial'];
   if (!decision || !VALID_DECISIONS.includes(decision)) {
     throw new functions.https.HttpsError('invalid-argument', `decision must be one of: ${VALID_DECISIONS.join(', ')}`);
   }
@@ -15543,10 +15543,10 @@ exports.adminSuperAdminDisputeDecision = functions
         `Dispute status is '${dispute.status}', expected 'super_admin_escalation'.`);
     }
 
-    if (decision === 'refund_partial') {
+    if (decision === 'refund_partial' || decision === 'buyer_owes_seller_partial') {
       if (!amount || typeof amount !== 'number' || amount <= 0 || amount >= dispute.disputedAmount) {
         throw new functions.https.HttpsError('invalid-argument',
-          `Partial refund amount must be between 0 and ${dispute.disputedAmount} (exclusive).`);
+          `Partial decision amount must be between 0 and ${dispute.disputedAmount} (exclusive).`);
       }
     }
 
@@ -15617,6 +15617,180 @@ exports.adminSuperAdminDisputeDecision = functions
           relatedTo: `dispute:${disputeId}`,
         });
       }
+    } else if (decision === 'buyer_owes_seller_full' || decision === 'buyer_owes_seller_partial') {
+      // Phase 5i: BUYER owes SELLER — buyer's claim found unsubstantiated.
+      // Money flows: buyer's wallet → escrow → (eventually) seller's wallet via two-admin release.
+      const requestedPayment = decision === 'buyer_owes_seller_partial' ? amount : dispute.disputedAmount;
+
+      // Ensure escrow wallet exists before atomic transaction
+      const escrowRef = await getOrCreateRecoveryWallet(dispute.disputedCurrency);
+
+      let actualPayment = 0;
+      let unrecovered = 0;
+      let finalResolutionType;
+
+      // Atomic money movement
+      await db.runTransaction(async (transaction) => {
+        const buyerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
+        const buyerWalletSnap = await transaction.get(buyerWalletRef);
+
+        // Read buyer's available balance INSIDE the transaction (TOCTOU safety —
+        // no opportunistic hold was placed on the buyer at filing time, so we
+        // read fresh now).
+        const buyerAvailable = buyerWalletSnap.exists
+          ? (buyerWalletSnap.data().availableBalance != null
+              ? buyerWalletSnap.data().availableBalance
+              : (buyerWalletSnap.data().balance || 0))
+          : 0;
+
+        actualPayment = Math.min(requestedPayment, Math.max(0, buyerAvailable));
+        unrecovered = Math.max(0, requestedPayment - actualPayment);
+
+        if (unrecovered === 0) {
+          finalResolutionType = 'buyer_owes_full';
+        } else if (actualPayment > 0) {
+          finalResolutionType = 'buyer_owes_partial_with_debt';
+        } else {
+          finalResolutionType = 'buyer_owes_pending_debt';
+        }
+
+        // Deduct from buyer's wallet (no prior hold, direct deduction from balance + availableBalance)
+        if (actualPayment > 0) {
+          transaction.update(buyerWalletRef, {
+            balance: admin.firestore.FieldValue.increment(-actualPayment),
+            availableBalance: admin.firestore.FieldValue.increment(-actualPayment),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Deposit actualPayment into escrow wallet
+          transaction.update(escrowRef, {
+            balance: admin.firestore.FieldValue.increment(actualPayment),
+            availableBalance: admin.firestore.FieldValue.increment(actualPayment),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        // Lift seller's existing dispute hold (the seller won; the hold from filing time
+        // is no longer needed since they won't be paying anyone).
+        const sellerHold = dispute.currentHoldAmount || 0;
+        if (sellerHold > 0 && dispute.recipientUid) {
+          const sellerWalletRef = db.collection('wallets').doc(dispute.recipientUid);
+          transaction.update(sellerWalletRef, {
+            heldBalance: admin.firestore.FieldValue.increment(-sellerHold),
+            availableBalance: admin.firestore.FieldValue.increment(sellerHold),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        // Create wallet_debts doc if buyer didn't have enough
+        if (unrecovered > 0) {
+          const debtRef = db.collection('wallet_debts').doc();
+          transaction.set(debtRef, {
+            debtId: debtRef.id,
+            disputeId,
+            // Phase 5i: source = who owes (will be deducted from). In this direction,
+            // sourceUid is the buyer. Legacy recipientUid is overloaded to mean the
+            // same thing here, so contact info also flips: recipientEmail/Phone is
+            // the buyer's, filerEmail/Phone is the seller's.
+            sourceUid: dispute.filedBy.uid,
+            recipientUid: dispute.filedBy.uid,
+            recipientEmail: dispute.filedBy.email || '',
+            recipientPhoneNumber: dispute.filedBy.phoneNumber || '',
+            filerUid: dispute.recipientUid,
+            filerEmail: dispute.recipientEmail || '',
+            filerPhoneNumber: dispute.recipientPhoneNumber || '',
+            amountOwed: unrecovered,
+            amountRecovered: 0,
+            currency: dispute.disputedCurrency,
+            status: 'active',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastDeductionAt: null,
+            closedAt: null,
+            createdBy: 'adminSuperAdminDisputeDecision',
+            // Recovery Watch reads this and auto-deducts as funds become available.
+          });
+        }
+
+        // Update dispute doc — Phase 5i: status moves to 'solved' (intermediate
+        // state meaning money is now in escrow). Final state 'closed' is reached
+        // later via the two-admin release flow.
+        transaction.update(disputeRef, {
+          status: 'solved',
+          resolutionType: finalResolutionType,
+          amountRecovered: actualPayment,
+          amountUnrecovered: unrecovered,
+          // Phase 5i: new escrow tracking fields
+          amountInEscrow: actualPayment,
+          amountOwed: requestedPayment,
+          decisionDirection: 'pay_to_seller',
+          solvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          // Legacy compat:
+          resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecision: decision,
+          superAdminDecidedAt: admin.firestore.FieldValue.serverTimestamp(),
+          superAdminDecidedBy: superAdminInfo,
+          decidedByRole: 'super_admin',
+          managerDecisionAmount: requestedPayment,
+          managerNotes: notes.trim(),
+          feeRefunded: false,  // Q6: no fee refund in buyer-owes direction
+          _awaitingMoneyMovement: false,
+          _recoveryWatchActive: unrecovered > 0,
+        });
+      });
+
+      newStatus = 'solved';
+
+      // Lift wallet_blocks for this dispute (seller's hold lifted — they won)
+      const blocksSnap = await db.collection('wallet_blocks')
+        .where('disputeId', '==', disputeId)
+        .where('liftedAt', '==', null)
+        .get();
+      const blockBatch = db.batch();
+      blocksSnap.docs.forEach(blockDoc => {
+        blockBatch.update(blockDoc.ref, {
+          liftedAt: admin.firestore.FieldValue.serverTimestamp(),
+          liftReason: 'dispute_solved_buyer_owes',
+        });
+      });
+      if (!blocksSnap.empty) await blockBatch.commit();
+
+      // Update dispute_history for buyer — they lost (counts as rejected)
+      await db.collection('dispute_history').doc(dispute.filedBy.uid).set({
+        totalRejected: admin.firestore.FieldValue.increment(1),
+        totalActiveCount: admin.firestore.FieldValue.increment(-1),
+      }, { merge: true });
+
+      // SMS to buyer (lost the dispute, money taken)
+      if (unrecovered === 0) {
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} decided against you. ${actualPayment} ${dispute.disputedCurrency} deducted to dispute escrow.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      } else {
+        await sendCustomerSms({
+          phoneNumber: dispute.filedBy.phoneNumber,
+          message: `Dispute ${disputeId} decided against you. ${actualPayment} ${dispute.disputedCurrency} deducted to dispute escrow. You owe ${unrecovered} ${dispute.disputedCurrency} more which will be deducted from future deposits.`,
+          relatedTo: `dispute:${disputeId}`,
+        });
+      }
+
+      // SMS to seller (won the dispute, money coming after verification)
+      if (dispute.recipientPhoneNumber) {
+        if (unrecovered === 0) {
+          await sendCustomerSms({
+            phoneNumber: dispute.recipientPhoneNumber,
+            message: `Dispute ${disputeId} decided in your favor. ${actualPayment} ${dispute.disputedCurrency} placed in escrow pending verification. Our team will contact you before releasing funds.`,
+            relatedTo: `dispute:${disputeId}`,
+          });
+        } else {
+          await sendCustomerSms({
+            phoneNumber: dispute.recipientPhoneNumber,
+            message: `Dispute ${disputeId} decided in your favor. ${actualPayment} ${dispute.disputedCurrency} placed in escrow. Remaining ${unrecovered} ${dispute.disputedCurrency} will be collected from filer's wallet as funds become available, then all released to you after verification.`,
+            relatedTo: `dispute:${disputeId}`,
+          });
+        }
+      }
     } else {
       // refund_full or refund_partial — same money flow as adminManagerDecision
       const requestedRefund = decision === 'refund_partial' ? amount : dispute.disputedAmount;
@@ -15646,6 +15820,11 @@ exports.adminSuperAdminDisputeDecision = functions
         finalResolutionType = 'refund_pending_debt';
       }
 
+      // Phase 5i: ensure dispute recovery escrow wallet exists for this currency
+      // before the atomic transaction starts. getOrCreateRecoveryWallet performs
+      // its own reads/writes and cannot be safely nested inside db.runTransaction.
+      const escrowRef = await getOrCreateRecoveryWallet(dispute.disputedCurrency);
+
       await db.runTransaction(async (transaction) => {
         if (actualRefund > 0 && dispute.recipientUid) {
           const recipientWalletRef = db.collection('wallets').doc(dispute.recipientUid);
@@ -15656,23 +15835,30 @@ exports.adminSuperAdminDisputeDecision = functions
           });
         }
 
-        if (netToFiler > 0) {
-          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
-          transaction.update(filerWalletRef, {
-            balance: admin.firestore.FieldValue.increment(netToFiler),
-            availableBalance: admin.firestore.FieldValue.increment(netToFiler),
+        // Phase 5i: Deposit actualRefund into escrow wallet instead of crediting
+        // filer's wallet directly. Money stays in escrow until two-admin release
+        // verification approves disbursement.
+        if (actualRefund > 0) {
+          transaction.update(escrowRef, {
+            balance: admin.firestore.FieldValue.increment(actualRefund),
+            availableBalance: admin.firestore.FieldValue.increment(actualRefund),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
+        }
 
-          if (feeRefunded && feeCharged > 0) {
-            const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
-              ? dispute.disputedAmount / dispute.usdEquivalent
-              : 1);
-            transaction.update(filerWalletRef, {
-              balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
-              availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
-            });
-          }
+        // Phase 5i: Fee refund (when fee was paid at filing time) still goes to
+        // filer's wallet directly. The fee is between filer and platform —
+        // separate from the disputed money in escrow.
+        if (feeRefunded && feeCharged > 0) {
+          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
+          const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+            ? dispute.disputedAmount / dispute.usdEquivalent
+            : 1);
+          transaction.update(filerWalletRef, {
+            balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
         }
 
         if (unrecovered > 0 && dispute.recipientUid) {
@@ -15680,6 +15866,11 @@ exports.adminSuperAdminDisputeDecision = functions
           transaction.set(debtRef, {
             debtId: debtRef.id,
             disputeId,
+            // Phase 5i: explicit "deduct from this wallet" field. In the refund
+            // direction sourceUid == recipientUid (seller is the source). In the
+            // buyer-owes direction sourceUid is the buyer's UID.
+            // Recovery Watch reads sourceUid to know which wallet to scan.
+            sourceUid: dispute.recipientUid,
             recipientUid: dispute.recipientUid,
             recipientEmail: dispute.recipientEmail || '',
             recipientPhoneNumber: dispute.recipientPhoneNumber || '',
@@ -15697,11 +15888,21 @@ exports.adminSuperAdminDisputeDecision = functions
           });
         }
 
+        // Update dispute doc — Phase 5i: status moves to 'solved' (intermediate
+        // state meaning money is now in escrow). Final state 'closed' is reached
+        // later via the two-admin release flow.
         transaction.update(disputeRef, {
-          status: 'resolved',
+          status: 'solved',  // Phase 5i: was 'resolved'
           resolutionType: finalResolutionType,
           amountRecovered: actualRefund,
           amountUnrecovered: unrecovered,
+          // Phase 5i: new escrow tracking fields
+          amountInEscrow: actualRefund,
+          amountOwed: requestedRefund,
+          decisionDirection: 'refund_to_buyer',
+          solvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          // Legacy compatibility: keep resolvedAt set here so any existing reads
+          // of this field still find a non-null value past super-admin decision.
           resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           superAdminDecision: decision,
           superAdminDecidedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -15736,15 +15937,17 @@ exports.adminSuperAdminDisputeDecision = functions
 
       // SMS notifications (same as adminManagerDecision — customer doesn't see who decided)
       if (unrecovered === 0) {
+        // Fully recovered into escrow
         await sendCustomerSms({
           phoneNumber: dispute.filedBy.phoneNumber,
-          message: `Dispute ${disputeId} resolved. Refund of ${actualRefund} ${dispute.disputedCurrency} sent to your wallet.`,
+          message: `Dispute ${disputeId} decided in your favor. ${actualRefund} ${dispute.disputedCurrency} placed in escrow pending verification. Our team will contact you before releasing funds.`,
           relatedTo: `dispute:${disputeId}`,
         });
       } else {
+        // Partial recovery into escrow — debt watch active for remainder
         await sendCustomerSms({
           phoneNumber: dispute.filedBy.phoneNumber,
-          message: `Dispute ${disputeId} resolved. Refunded ${actualRefund} ${dispute.disputedCurrency}. Remaining ${unrecovered} ${dispute.disputedCurrency} will be deducted from recipient's wallet as funds become available, then released to you after our team confirms with both parties.`,
+          message: `Dispute ${disputeId} decided in your favor. ${actualRefund} ${dispute.disputedCurrency} placed in escrow. Remaining ${unrecovered} ${dispute.disputedCurrency} will be collected from recipient's wallet as funds become available, then all released to you after verification.`,
           relatedTo: `dispute:${disputeId}`,
         });
       }
@@ -15752,8 +15955,8 @@ exports.adminSuperAdminDisputeDecision = functions
         await sendCustomerSms({
           phoneNumber: dispute.recipientPhoneNumber,
           message: unrecovered > 0
-            ? `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted. You owe ${unrecovered} ${dispute.disputedCurrency} which will be deducted from future deposits.`
-            : `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted from your wallet.`,
+            ? `Dispute ${disputeId} decided against you. ${actualRefund} ${dispute.disputedCurrency} deducted to dispute escrow. You owe ${unrecovered} ${dispute.disputedCurrency} more which will be deducted from future deposits.`
+            : `Dispute ${disputeId} decided against you. ${actualRefund} ${dispute.disputedCurrency} deducted to dispute escrow.`,
           relatedTo: `dispute:${disputeId}`,
         });
       }
