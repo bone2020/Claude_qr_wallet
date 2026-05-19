@@ -15153,6 +15153,11 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
         finalResolutionType = 'refund_pending_debt';  // nothing held, full debt watch
       }
 
+      // Phase 5i: ensure dispute recovery escrow wallet exists for this currency
+      // before the atomic transaction starts. getOrCreateRecoveryWallet performs
+      // its own reads/writes and cannot be safely nested inside db.runTransaction.
+      const escrowRef = await getOrCreateRecoveryWallet(dispute.disputedCurrency);
+
       // Atomic money movement
       await db.runTransaction(async (transaction) => {
         // Recipient: take from heldBalance + balance (money leaves recipient permanently)
@@ -15165,25 +15170,30 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
           });
         }
 
-        // Filer: credit netToFiler (after fee adjustment)
-        if (netToFiler > 0) {
-          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
-          transaction.update(filerWalletRef, {
-            balance: admin.firestore.FieldValue.increment(netToFiler),
-            availableBalance: admin.firestore.FieldValue.increment(netToFiler),
+        // Phase 5i: Deposit actualRefund into escrow wallet instead of crediting
+        // filer's wallet directly. Money stays in escrow until two-admin release
+        // verification approves disbursement.
+        if (actualRefund > 0) {
+          transaction.update(escrowRef, {
+            balance: admin.firestore.FieldValue.increment(actualRefund),
+            availableBalance: admin.firestore.FieldValue.increment(actualRefund),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
+        }
 
-          // If fee was deducted from filer's wallet at filing, refund it now
-          if (feeRefunded && feeCharged > 0) {
-            const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
-              ? dispute.disputedAmount / dispute.usdEquivalent
-              : 1);
-            transaction.update(filerWalletRef, {
-              balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
-              availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
-            });
-          }
+        // Phase 5i: Fee refund (when fee was paid at filing time) still goes to
+        // filer's wallet directly. The fee is between filer and platform —
+        // separate from the disputed money in escrow.
+        if (feeRefunded && feeCharged > 0) {
+          const filerWalletRef = db.collection('wallets').doc(dispute.filedBy.uid);
+          const feeInSourceCurrency = feeCharged * (dispute.usdEquivalent > 0
+            ? dispute.disputedAmount / dispute.usdEquivalent
+            : 1);
+          transaction.update(filerWalletRef, {
+            balance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            availableBalance: admin.firestore.FieldValue.increment(feeInSourceCurrency),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
         }
 
         // Create wallet_debts doc if there's an unrecovered amount
@@ -15210,12 +15220,21 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
           });
         }
 
-        // Update dispute doc
+        // Update dispute doc — Phase 5i: status moves to 'solved' (intermediate
+        // state meaning money is now in escrow). Final state 'closed' is reached
+        // later via the two-admin release flow.
         transaction.update(disputeRef, {
-          status: 'resolved',
+          status: 'solved',  // Phase 5i: was 'resolved'
           resolutionType: finalResolutionType,
           amountRecovered: actualRefund,
           amountUnrecovered: unrecovered,
+          // Phase 5i: new escrow tracking fields
+          amountInEscrow: actualRefund,
+          amountOwed: requestedRefund,
+          decisionDirection: 'refund_to_buyer',
+          solvedAt: admin.firestore.FieldValue.serverTimestamp(),
+          // Legacy compatibility: keep resolvedAt set here so any existing reads
+          // of this field still find a non-null value past manager decision.
           resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
           reviewingManager: managerInfo,
           managerDecision: decision,
@@ -15249,17 +15268,17 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
 
       // SMS notifications
       if (unrecovered === 0) {
-        // Fully recovered
+        // Fully recovered into escrow
         await sendCustomerSms({
           phoneNumber: dispute.filedBy.phoneNumber,
-          message: `Dispute ${disputeId} resolved. Refund of ${actualRefund} ${dispute.disputedCurrency} sent to your wallet.`,
+          message: `Dispute ${disputeId} decided in your favor. ${actualRefund} ${dispute.disputedCurrency} placed in escrow pending verification. Our team will contact you before releasing funds.`,
           relatedTo: `dispute:${disputeId}`,
         });
       } else {
-        // Partial recovery — debt watch active
+        // Partial recovery into escrow — debt watch active for remainder
         await sendCustomerSms({
           phoneNumber: dispute.filedBy.phoneNumber,
-          message: `Dispute ${disputeId} resolved. Refunded ${actualRefund} ${dispute.disputedCurrency}. Remaining ${unrecovered} ${dispute.disputedCurrency} will be deducted from recipient's wallet as funds become available, then released to you after our team confirms with both parties.`,
+          message: `Dispute ${disputeId} decided in your favor. ${actualRefund} ${dispute.disputedCurrency} placed in escrow. Remaining ${unrecovered} ${dispute.disputedCurrency} will be collected from recipient's wallet as funds become available, then all released to you after verification.`,
           relatedTo: `dispute:${disputeId}`,
         });
       }
@@ -15267,8 +15286,8 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
         await sendCustomerSms({
           phoneNumber: dispute.recipientPhoneNumber,
           message: unrecovered > 0
-            ? `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted. You owe ${unrecovered} ${dispute.disputedCurrency} which will be deducted from future deposits.`
-            : `Dispute ${disputeId} resolved against you. ${actualRefund} ${dispute.disputedCurrency} was deducted from your wallet.`,
+            ? `Dispute ${disputeId} decided against you. ${actualRefund} ${dispute.disputedCurrency} deducted to dispute escrow. You owe ${unrecovered} ${dispute.disputedCurrency} more which will be deducted from future deposits.`
+            : `Dispute ${disputeId} decided against you. ${actualRefund} ${dispute.disputedCurrency} deducted to dispute escrow.`,
           relatedTo: `dispute:${disputeId}`,
         });
       }
