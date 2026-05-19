@@ -15202,6 +15202,11 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
           transaction.set(debtRef, {
             debtId: debtRef.id,
             disputeId,
+            // Phase 5i: explicit "deduct from this wallet" field. In the refund
+            // direction sourceUid == recipientUid (seller is the source). In the
+            // buyer-owes direction (added later) sourceUid will be the buyer's UID.
+            // Recovery Watch reads sourceUid to know which wallet to scan.
+            sourceUid: dispute.recipientUid,
             recipientUid: dispute.recipientUid,
             recipientEmail: dispute.recipientEmail || '',
             recipientPhoneNumber: dispute.recipientPhoneNumber || '',
