@@ -16297,8 +16297,17 @@ exports.processWalletDepositForDebts = functions.firestore
     const availableIncrease = afterAvailable - beforeAvailable;
     if (balanceIncrease <= 0 || availableIncrease <= 0) return null;
 
+    // Skip platform-owned wallets — they should never be debt sources, and the
+    // escrow wallets receiving funds will trigger this watcher recursively if we
+    // don't guard against them.
+    if (after.isPlatform === true) return null;
+
     const depositAmount = availableIncrease;
 
+    // Phase 5i: query by sourceUid (new) AND recipientUid (legacy) so we cover
+    // both new-style debts (with sourceUid populated) and legacy debts (which
+    // only have recipientUid). For legacy debts where sourceUid is absent,
+    // recipientUid IS the source (refund direction), so the query is correct.
     const debtsSnap = await db.collection('wallet_debts')
       .where('recipientUid', '==', userUid)
       .where('status', 'in', ['active', 'partially_paid'])
@@ -16316,10 +16325,23 @@ exports.processWalletDepositForDebts = functions.firestore
       const owed = debt.amountOwed || 0;
       if (owed <= 0) continue;
 
+      // Phase 5i: effectiveSourceUid handles both new and legacy debts.
+      // Defensive: if for any reason this doesn't match the wallet that fired,
+      // skip this debt (the recipientUid query above should make this match
+      // always, but belt-and-braces).
+      const effectiveSourceUid = debt.sourceUid || debt.recipientUid;
+      if (effectiveSourceUid !== userUid) continue;
+
       const deductAmount = Math.min(remainingDeposit, owed);
+
+      // Phase 5i: ensure escrow wallet exists for this debt's currency.
+      // Must be retrieved BEFORE the transaction since
+      // getOrCreateRecoveryWallet does its own reads/writes.
+      const escrowRef = await getOrCreateRecoveryWallet(debt.currency);
 
       try {
         const result = await db.runTransaction(async (transaction) => {
+          // Re-read source wallet for TOCTOU safety
           const walletRef = db.collection('wallets').doc(userUid);
           const walletSnap = await transaction.get(walletRef);
           if (!walletSnap.exists) return null;
@@ -16327,47 +16349,69 @@ exports.processWalletDepositForDebts = functions.firestore
           const currentAvailable = walletData.availableBalance || 0;
           if (currentAvailable < deductAmount) return null;
 
+          // Re-read debt for TOCTOU safety
           const debtSnap = await transaction.get(debtDoc.ref);
           if (!debtSnap.exists) return null;
           const freshDebt = debtSnap.data();
           if ((freshDebt.amountOwed || 0) < deductAmount) return null;
 
+          // Phase 5i: Read the dispute doc to check if this deduction completes
+          // the owed amount, in which case we'll transition to 'awaiting_release'.
+          // disputeRef may be missing for orphan/legacy debts — handle gracefully.
+          const disputeRef = db.collection('disputes').doc(freshDebt.disputeId);
+          const disputeSnap = await transaction.get(disputeRef);
+          const dispute = disputeSnap.exists ? disputeSnap.data() : null;
+
+          // Phase 5i: Move money from source wallet to escrow wallet.
+          // Source: availableBalance and balance both decrement.
+          // Escrow: availableBalance and balance both increment.
           transaction.update(walletRef, {
             availableBalance: admin.firestore.FieldValue.increment(-deductAmount),
-            heldBalance: admin.firestore.FieldValue.increment(deductAmount),
+            balance: admin.firestore.FieldValue.increment(-deductAmount),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           });
 
+          transaction.update(escrowRef, {
+            availableBalance: admin.firestore.FieldValue.increment(deductAmount),
+            balance: admin.firestore.FieldValue.increment(deductAmount),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          // Update the wallet_debt — amountOwed reduces, amountRecovered grows.
           const newOwed = (freshDebt.amountOwed || 0) - deductAmount;
-          const newStatus = newOwed <= 0 ? 'closed' : 'partially_paid';
+          const newDebtStatus = newOwed <= 0 ? 'closed' : 'partially_paid';
           transaction.update(debtDoc.ref, {
             amountOwed: newOwed,
             amountRecovered: admin.firestore.FieldValue.increment(deductAmount),
-            status: newStatus,
+            status: newDebtStatus,
             lastDeductionAt: admin.firestore.FieldValue.serverTimestamp(),
             ...(newOwed <= 0 ? { closedAt: admin.firestore.FieldValue.serverTimestamp() } : {}),
           });
 
-          const recoveryRef = db.collection('debt_recoveries').doc();
-          transaction.set(recoveryRef, {
-            recoveryId: recoveryRef.id,
-            debtId: debt.debtId,
-            disputeId: debt.disputeId,
-            recipientUid: userUid,
-            filerUid: debt.filerUid,
-            amount: deductAmount,
-            currency: debt.currency,
-            status: 'held_pending_confirmation',
-            deductedAt: admin.firestore.FieldValue.serverTimestamp(),
-            releasedAt: null, releasedBy: null,
-            cancelledAt: null, cancelReason: null,
-            filerConfirmed: false, filerConfirmedAt: null,
-            recipientConfirmed: false, recipientConfirmedAt: null,
-            notes: null,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+          // Phase 5i: Update dispute doc. amountInEscrow grows by deductAmount.
+          // lastRecoveryDeductionAt set to now. If dispute exists and the new
+          // escrow total reaches dispute.amountOwed, transition to awaiting_release.
+          let didCompleteEscrow = false;
+          if (dispute) {
+            const currentEscrow = dispute.amountInEscrow || 0;
+            const newEscrowTotal = currentEscrow + deductAmount;
+            const targetOwed = dispute.amountOwed || 0;
+            didCompleteEscrow = (targetOwed > 0) && (newEscrowTotal >= targetOwed) && (dispute.status === 'solved');
 
-          return { recoveryId: recoveryRef.id, deductAmount, newOwed, debt };
+            const disputeUpdate = {
+              amountInEscrow: admin.firestore.FieldValue.increment(deductAmount),
+              lastRecoveryDeductionAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            if (didCompleteEscrow) {
+              disputeUpdate.status = 'awaiting_release';
+              disputeUpdate.awaitingReleaseAt = admin.firestore.FieldValue.serverTimestamp();
+              disputeUpdate.fullyCollectedAt = admin.firestore.FieldValue.serverTimestamp();
+              disputeUpdate._recoveryWatchActive = false;
+            }
+            transaction.update(disputeRef, disputeUpdate);
+          }
+
+          return { deductAmount, newOwed, debt, didCompleteEscrow, hasDispute: dispute !== null };
         });
 
         if (result) {
@@ -16381,49 +16425,55 @@ exports.processWalletDepositForDebts = functions.firestore
       }
     }
 
+    // Phase 5i: notifications. No admin email per-tranche; admin acts once at
+    // the end via the new two-admin release flow.
     for (const event of recoveryEvents) {
       try {
         const debt = event.debt;
         const remainingDebt = event.newOwed;
 
+        // SMS to the SOURCE party (whoever just had money taken from their wallet).
+        // In legacy/refund direction this is the original recipient (seller).
+        // In buyer-owes direction this is the buyer.
+        // The legacy field debt.recipientPhoneNumber is correct in both directions
+        // because in buyer-owes case sub-step 4b populated recipientPhoneNumber
+        // with the buyer's phone (the source).
         if (debt.recipientPhoneNumber) {
           await sendCustomerSms({
             phoneNumber: debt.recipientPhoneNumber,
-            message: `QR Wallet: ${event.deductAmount} ${debt.currency} deducted to repay dispute debt. ${remainingDebt > 0 ? `${remainingDebt} ${debt.currency} remaining.` : 'Debt fully paid.'}`,
-            relatedTo: `recovery:${event.recoveryId}`,
-          });
-        }
-        if (debt.filerPhoneNumber) {
-          await sendCustomerSms({
-            phoneNumber: debt.filerPhoneNumber,
-            message: `QR Wallet: ${event.deductAmount} ${debt.currency} recovered for your dispute ${debt.disputeId}. Pending confirmation by our team.`,
-            relatedTo: `recovery:${event.recoveryId}`,
+            message: `QR Wallet: ${event.deductAmount} ${debt.currency} moved to dispute escrow for ${debt.disputeId}. ${remainingDebt > 0 ? `${remainingDebt} ${debt.currency} remaining.` : 'Fully collected.'}`,
+            relatedTo: `dispute:${debt.disputeId}`,
           });
         }
 
-        const staffSnap = await db.collection('admin_users')
-          .where('role', 'in', ['admin', 'admin_supervisor', 'admin_manager'])
-          .get();
-        for (const staff of staffSnap.docs) {
-          await sendProposalEmail({
-            to: staff.id, toName: staff.data().displayName || null,
-            subject: `Recovery deduction held — ${event.deductAmount} ${debt.currency} for dispute ${debt.disputeId}`,
-            htmlBody: `<p>An automatic deduction of <strong>${event.deductAmount} ${debt.currency}</strong> has been placed in hold for dispute <strong>${debt.disputeId}</strong>.</p>
-<p><strong>Recipient:</strong> ${debt.recipientEmail}<br><strong>Filer:</strong> ${debt.filerEmail}<br><strong>Remaining debt:</strong> ${remainingDebt} ${debt.currency}</p>
-<p>Customer care should now contact both parties to confirm before release. Recovery ID: ${event.recoveryId}</p>`,
-            textBody: `Recovery: ${event.deductAmount} ${debt.currency} held for dispute ${debt.disputeId}. ID: ${event.recoveryId}.`,
-            relatedTo: `recovery:${event.recoveryId}`,
+        // SMS to the PAYEE party (whoever is owed the money).
+        if (debt.filerPhoneNumber) {
+          await sendCustomerSms({
+            phoneNumber: debt.filerPhoneNumber,
+            message: event.didCompleteEscrow
+              ? `QR Wallet: ${event.deductAmount} ${debt.currency} added to dispute ${debt.disputeId} escrow. Fully collected — pending team verification before release.`
+              : `QR Wallet: ${event.deductAmount} ${debt.currency} added to dispute ${debt.disputeId} escrow. ${remainingDebt} ${debt.currency} still to collect.`,
+            relatedTo: `dispute:${debt.disputeId}`,
           });
         }
 
         await db.collection('audit_logs').add({
-          userId: 'system', operation: 'debt_recovery_deduction', result: 'success',
-          metadata: { recoveryId: event.recoveryId, debtId: debt.debtId, amount: event.deductAmount },
+          userId: 'system',
+          operation: 'dispute_recovery_deduction',
+          result: 'success',
+          metadata: {
+            debtId: debt.debtId,
+            disputeId: debt.disputeId,
+            amount: event.deductAmount,
+            currency: debt.currency,
+            didCompleteEscrow: event.didCompleteEscrow,
+            sourceUid: userUid,
+          },
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
         });
       } catch (notifyError) {
         logError('processWalletDepositForDebts: notification failed', {
-          recoveryId: event.recoveryId, error: notifyError.message,
+          debtId: event.debt.debtId, error: notifyError.message,
         });
       }
     }
