@@ -1396,6 +1396,268 @@ function StuckTab() {
   );
 }
 
+// Phase 5i E3: ProposeReleaseModal — admin proposes a release direction for a
+// dispute in 'awaiting_release' state. Both contact checkboxes must be ticked
+// before submission is enabled. Submits to adminProposeDisputeRelease which
+// requires admin_manager role or higher.
+function ProposeReleaseModal({ dispute, onClose, onProposed }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const [direction, setDirection] = useState('');
+  const [notes, setNotes] = useState('');
+  const [buyerContacted, setBuyerContacted] = useState(false);
+  const [sellerContacted, setSellerContacted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const notesValid = notes.trim().length >= 50;
+  const canSubmit =
+    !submitting &&
+    direction &&
+    notesValid &&
+    buyerContacted &&
+    sellerContacted;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminProposeDisputeRelease')({
+        disputeId,
+        releaseDirection: direction,
+        notes: notes.trim(),
+        buyerContacted: true,
+        sellerContacted: true,
+        idempotencyKey: uuidv4(),
+      });
+      if (onProposed) onProposed();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Proposal failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`Propose Release — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-1 mb-4">
+        <DetailsRow label="Status"><StatusBadge status={dispute.status} /></DetailsRow>
+        <DetailsRow label="Filer">
+          <div>{dispute.filer?.name || dispute.filerName || '—'}</div>
+          <div className="text-xs text-gray-500">{dispute.filer?.email || dispute.filerEmail || ''}</div>
+        </DetailsRow>
+        <DetailsRow label="Recipient">
+          <div>{dispute.recipient?.name || dispute.recipientName || '—'}</div>
+          <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
+        </DetailsRow>
+        <DetailsRow label="Amount in Escrow">
+          {dispute.amountInEscrow != null
+            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            : '—'}
+        </DetailsRow>
+        <DetailsRow label="Manager's Decision Direction">{dispute.decisionDirection || '—'}</DetailsRow>
+        <DetailsRow label="Description">{dispute.description}</DetailsRow>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-sm text-gray-700 font-medium block mb-2">Proposed Release Direction</label>
+        <div className="space-y-2">
+          <label className="flex items-start gap-2 p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            <input
+              type="radio"
+              name="direction"
+              value="release_to_payee"
+              checked={direction === 'release_to_payee'}
+              onChange={() => setDirection('release_to_payee')}
+              className="mt-1"
+            />
+            <div>
+              <div className="text-sm font-medium text-gray-900">Release as decided</div>
+              <div className="text-xs text-gray-500">Funds go to the party the manager decided in favour of.</div>
+            </div>
+          </label>
+          <label className="flex items-start gap-2 p-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            <input
+              type="radio"
+              name="direction"
+              value="reverse_to_payer"
+              checked={direction === 'reverse_to_payer'}
+              onChange={() => setDirection('reverse_to_payer')}
+              className="mt-1"
+            />
+            <div>
+              <div className="text-sm font-medium text-gray-900">Reverse the decision</div>
+              <div className="text-xs text-gray-500">Funds return to the original payer; original decision is overturned.</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-gray-700 font-medium">Notes</label>
+          <span className={`text-xs ${notesValid ? 'text-gray-500' : 'text-amber-600'}`}>
+            {notes.length} / 50 minimum
+          </span>
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={4}
+          placeholder="Document the reasoning behind this proposed release direction..."
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div className="mb-4 space-y-2">
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={buyerContacted}
+            onChange={(e) => setBuyerContacted(e.target.checked)}
+            className="mt-1"
+          />
+          <span className="text-sm text-gray-700">
+            I have contacted the buyer about this proposed release and they have been informed of the outcome.
+          </span>
+        </label>
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={sellerContacted}
+            onChange={(e) => setSellerContacted(e.target.checked)}
+            className="mt-1"
+          />
+          <span className="text-sm text-gray-700">
+            I have contacted the seller about this proposed release and they have been informed of the outcome.
+          </span>
+        </label>
+      </div>
+
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {submitting ? 'Submitting...' : 'Submit Proposal'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Phase 5i E3: AwaitingReleaseTab — table of disputes in 'awaiting_release' state
+// that don't yet have an active proposal. Each row opens the ProposeReleaseModal.
+// Disputes WITH an active proposal belong to E4's PendingProposalTab — they are
+// filtered out here via the releaseProposal == null check.
+function AwaitingReleaseTab() {
+  const { disputes, loading, error, refresh } = useDisputes('awaiting_release');
+  const [target, setTarget] = useState(null);
+
+  const eligible = disputes.filter(
+    (d) => d.releaseProposal == null,
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Disputes whose escrow is fully funded and waiting for an admin to propose a release direction.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recipient</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Escrow</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Decision</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Awaiting Since</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {eligible.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No disputes awaiting a release proposal.'}
+                </td>
+              </tr>
+            ) : (
+              eligible.map((d) => {
+                const id = d.disputeId || d.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setTarget(d)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.filer?.email || d.filerEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{d.recipient?.name || d.recipientName || '—'}</div>
+                      <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {d.amountInEscrow != null
+                        ? `${symbol(d.disputedCurrency)}${(d.amountInEscrow / 100).toFixed(2)}`
+                        : '—'}
+                      <div className="text-xs text-gray-400">{d.disputedCurrency || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">{d.decisionDirection || '—'}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(d.awaitingReleaseAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {target && (
+        <ProposeReleaseModal
+          dispute={target}
+          onClose={() => setTarget(null)}
+          onProposed={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
 function DisputesPage() {
   const { user, isAdmin, isAdminSupervisor, isAdminManager, isSuperAdmin } = useAuth();
 
@@ -1404,6 +1666,7 @@ function DisputesPage() {
   if (isAdmin) tabs.push({ id: 'assigned', label: 'My Assigned Cases' });
   if (isAdminSupervisor) tabs.push({ id: 'supervisor', label: 'Supervisor Review' });
   if (isAdminManager) tabs.push({ id: 'manager', label: 'Manager Decision' });
+  if (isAdminManager) tabs.push({ id: 'awaiting_release', label: 'Awaiting Release' });
   if (isSuperAdmin) tabs.push({ id: 'escalated', label: 'Escalated to Super Admin' });
   if (isSuperAdmin) tabs.push({ id: 'stuck', label: 'Stuck Cases' });
 
@@ -1444,6 +1707,7 @@ function DisputesPage() {
           {activeTab === 'assigned' && <MyAssignedCasesTab currentUid={user?.uid} />}
           {activeTab === 'supervisor' && <SupervisorReviewTab />}
           {activeTab === 'manager' && <ManagerDecisionTab />}
+          {activeTab === 'awaiting_release' && <AwaitingReleaseTab />}
           {activeTab === 'escalated' && <EscalatedTab />}
           {activeTab === 'stuck' && <StuckTab />}
         </div>
