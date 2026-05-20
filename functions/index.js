@@ -14202,7 +14202,7 @@ exports.userFileDispute = functions
     // Max 3 active disputes
     const activeDisputesSnap = await db.collection('disputes')
       .where('filedBy.uid', '==', callerUid)
-      .where('status', 'not-in', ['resolved', 'closed_stuck'])
+      .where('status', 'not-in', ['resolved', 'closed', 'closed_returned', 'closed_stuck'])
       .limit(4)
       .get();
     if (activeDisputesSnap.size >= 3) {
@@ -14540,7 +14540,11 @@ exports.userGetMyDisputes = functions
     'supervisor_review',
     'manager_review',
     'super_admin_escalation',
+    'solved',
+    'awaiting_release',
     'resolved',
+    'closed',
+    'closed_returned',
     'closed_stuck',
   ];
   if (queryStatus !== undefined && queryStatus !== null) {
@@ -15061,7 +15065,7 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
         });
       }
     } else if (decision === 'release') {
-      newStatus = 'resolved';
+      newStatus = 'closed';
 
       // Lift any wallet hold on recipient atomically
       const currentHold = dispute.currentHoldAmount || 0;
@@ -15076,7 +15080,7 @@ exports.adminManagerDecision = functions.runWith({ enforceAppCheck: true }).http
         }
 
         transaction.update(disputeRef, {
-          status: 'resolved',
+          status: 'closed',
           resolutionType: 'released',
           amountRecovered: 0,
           amountUnrecovered: 0,
@@ -15558,6 +15562,7 @@ exports.adminSuperAdminDisputeDecision = functions
     let newStatus = 'resolved';
 
     if (decision === 'release') {
+      newStatus = 'closed';
       // Lift any wallet hold on recipient
       const currentHold = dispute.currentHoldAmount || 0;
       await db.runTransaction(async (transaction) => {
@@ -15571,7 +15576,7 @@ exports.adminSuperAdminDisputeDecision = functions
         }
 
         transaction.update(disputeRef, {
-          status: 'resolved',
+          status: 'closed',
           resolutionType: 'released',
           amountRecovered: 0,
           amountUnrecovered: 0,
@@ -15996,7 +16001,7 @@ exports.adminListDisputes = functions.runWith({ enforceAppCheck: true }).https.o
   const caller = await verifyAdmin(context, 'auditor');
   const { status: filterStatus, assignedToMe, limit: requestedLimit, startAfter } = data || {};
 
-  const VALID_STATUSES = ['filed', 'investigating', 'supervisor_review', 'manager_review', 'super_admin_escalation', 'resolved', 'closed_stuck'];
+  const VALID_STATUSES = ['filed', 'investigating', 'supervisor_review', 'manager_review', 'super_admin_escalation', 'solved', 'awaiting_release', 'resolved', 'closed', 'closed_returned', 'closed_stuck'];
   if (filterStatus && !VALID_STATUSES.includes(filterStatus)) {
     throw new functions.https.HttpsError('invalid-argument', `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`);
   }
@@ -16107,7 +16112,7 @@ exports.disputeEscalationCheckScheduled = functions.pubsub
   .schedule('every 60 minutes')
   .timeZone('UTC')
   .onRun(async (context) => {
-    const TERMINAL = ['resolved', 'closed_stuck'];
+    const TERMINAL = ['resolved', 'closed', 'closed_returned', 'closed_stuck'];
     const now = Date.now();
     const HOUR = 60 * 60 * 1000;
     const DAY = 24 * HOUR;
