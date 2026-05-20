@@ -14485,6 +14485,19 @@ exports.userViewDispute = functions
     // Legacy single-field shape — kept for back-compat with older Flutter clients.
     recipientResponse: d.recipientResponse,
     recipientResponseAt: d.recipientResponseAt,
+    // Phase 5i: escrow & closing-remarks fields — buyer/seller-safe subset.
+    // Admin-internal fields (releaseProposal, managerNotes, internal flags,
+    // admin identities) are intentionally NOT surfaced here.
+    amountInEscrow: d.amountInEscrow,
+    amountOwed: d.amountOwed,
+    decisionDirection: d.decisionDirection,
+    solvedAt: d.solvedAt,
+    awaitingReleaseAt: d.awaitingReleaseAt,
+    fullyCollectedAt: d.fullyCollectedAt,
+    releaseDirection: d.releaseDirection,
+    releaseConfirmedAt: d.releaseConfirmedAt,
+    closingRemarks: d.closingRemarks,
+    feeRefunded: d.feeRefunded,
   };
 
   // Phase B: surface response history as an array. If the new-shape array exists
