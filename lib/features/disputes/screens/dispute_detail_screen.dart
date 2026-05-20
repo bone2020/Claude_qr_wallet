@@ -59,6 +59,7 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
                         children: [
                           _statusBadge(_dispute!['status'] ?? 'unknown'),
                           const SizedBox(height: 20),
+                          ..._buildPhase5iStateSection(context),
                           _infoTile('Issue Type', _dispute!['issueType'] ?? ''),
                           _infoTile('Amount', '${_dispute!['disputedCurrency'] ?? ''} ${((_dispute!['disputedAmount'] ?? 0) / 100).toStringAsFixed(2)}'),
                           _infoTile('Fee Charged', '\$${(_dispute!['feeCharged'] ?? 0).toStringAsFixed(2)} USD'),
@@ -170,6 +171,174 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
           child: Text(label),
         ),
       ),
+    ];
+  }
+
+  // Phase 5i D2b: state-specific section rendered between the status badge and
+  // the existing info tiles. Returns empty for legacy states so old disputes
+  // display unchanged. New states render a progress card / banner / closing
+  // remarks block as appropriate.
+  List<Widget> _buildPhase5iStateSection(BuildContext context) {
+    final status = _dispute?['status'] as String? ?? '';
+    switch (status) {
+      case 'solved':
+        return _buildSolvedSection();
+      case 'awaiting_release':
+        return _buildAwaitingReleaseSection();
+      case 'closed':
+      case 'closed_returned':
+        return _buildClosedSection();
+      default:
+        return const [];
+    }
+  }
+
+  // Phase 5i D2b: progress card shown while the dispute is in 'solved' state
+  // (decision made, money being collected into escrow). Shows the decision
+  // direction, a progress bar, and "X of Y collected (N%)" text.
+  List<Widget> _buildSolvedSection() {
+    final inEscrow = (_dispute?['amountInEscrow'] ?? 0).toDouble();
+    final owed = (_dispute?['amountOwed'] ?? 0).toDouble();
+    final currency = _dispute?['disputedCurrency'] as String? ?? '';
+    final direction = _dispute?['decisionDirection'] as String?;
+
+    final progress = owed > 0 ? (inEscrow / owed).clamp(0.0, 1.0) : 0.0;
+    final percentText = '${(progress * 100).toStringAsFixed(0)}%';
+
+    String directionLabel;
+    switch (direction) {
+      case 'refund_to_buyer':
+        directionLabel = 'Decision: Refund to buyer';
+        break;
+      case 'pay_to_seller':
+        directionLabel = 'Decision: Payment to seller';
+        break;
+      default:
+        directionLabel = 'Decision made — recovering funds';
+    }
+
+    return [
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              directionLabel,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$currency ${(inEscrow / 100).toStringAsFixed(2)} of $currency ${(owed / 100).toStringAsFixed(2)} collected ($percentText)',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  // Phase 5i D2b: banner shown while the dispute is in 'awaiting_release' state
+  // (escrow fully collected, support is verifying with both parties before the
+  // two-admin release).
+  List<Widget> _buildAwaitingReleaseSection() {
+    return [
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.hourglass_top, color: AppColors.primary, size: 24),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Funds fully collected',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Our team is verifying with both parties before final release.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  // Phase 5i D2b: terminal-state card shown for 'closed' (decision upheld,
+  // money released) and 'closed_returned' (decision reversed, money returned
+  // to the original payer). Renders the backend-generated closingRemarks text
+  // if present, with a header that distinguishes the two outcomes.
+  List<Widget> _buildClosedSection() {
+    final status = _dispute?['status'] as String?;
+    final remarks = _dispute?['closingRemarks'] as String?;
+    final isReversed = status == 'closed_returned';
+
+    final headerColor = isReversed ? Colors.grey : AppColors.success;
+    final headerIcon = isReversed ? Icons.swap_horiz : Icons.check_circle_outline;
+    final headerText = isReversed ? 'Decision reversed' : 'Dispute closed';
+
+    return [
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: headerColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(headerIcon, color: headerColor, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  headerText,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: headerColor,
+                  ),
+                ),
+              ],
+            ),
+            if (remarks != null && remarks.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                remarks,
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
     ];
   }
 
