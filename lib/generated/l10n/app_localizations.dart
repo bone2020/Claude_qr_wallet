@@ -4582,6 +4582,103 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Second Response'**
   String get secondResponseLabel;
+
+  /// Status label shown on a dispute that has been filed but is not yet under formal investigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted'**
+  String get disputeStatusSubmitted;
+
+  /// Status label shown on a dispute that is being investigated by support, supervisor, or manager.
+  ///
+  /// In en, this message translates to:
+  /// **'Under Review'**
+  String get disputeStatusUnderReview;
+
+  /// Status label shown on a dispute that has been escalated to a super-admin for higher-level review.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalated'**
+  String get disputeStatusEscalated;
+
+  /// Status label shown on a dispute where the manager has made a decision and money is being collected into escrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision Made'**
+  String get disputeStatusDecisionMade;
+
+  /// Status label shown on a dispute where the escrow is fully funded and support is verifying with both parties before final release.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting Release'**
+  String get disputeStatusAwaitingRelease;
+
+  /// Legacy status label shown on disputes resolved under the pre-Phase-5i system; kept for backward compatibility with older disputes.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolved'**
+  String get disputeStatusResolved;
+
+  /// Status label shown on a dispute that has been terminated, money released to the party owed. Also used for the 'closed_stuck' terminal status.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get disputeStatusClosed;
+
+  /// Status label shown on a dispute that was decided one way then reversed during verification, with money returning to the original payer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reversed'**
+  String get disputeStatusReversed;
+
+  /// Header text on the solved-state progress card when the decision direction is to refund the buyer.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision: Refund to buyer'**
+  String get disputeDecisionRefundToBuyer;
+
+  /// Header text on the solved-state progress card when the decision direction is to pay the seller.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision: Payment to seller'**
+  String get disputeDecisionPayToSeller;
+
+  /// Fallback header text on the solved-state progress card when the decision direction is not recognized.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision made — recovering funds'**
+  String get disputeDecisionRecoveringFunds;
+
+  /// Header text on the awaiting-release banner shown when the escrow is fully funded.
+  ///
+  /// In en, this message translates to:
+  /// **'Funds fully collected'**
+  String get disputeFundsFullyCollected;
+
+  /// Subtext on the awaiting-release banner explaining what is happening before final release.
+  ///
+  /// In en, this message translates to:
+  /// **'Our team is verifying with both parties before final release.'**
+  String get disputeAwaitingReleaseMessage;
+
+  /// Header text on the terminal-state card for a dispute that closed cleanly with money released as decided.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute closed'**
+  String get disputeClosedHeader;
+
+  /// Header text on the terminal-state card for a dispute whose decision was reversed during verification.
+  ///
+  /// In en, this message translates to:
+  /// **'Decision reversed'**
+  String get disputeDecisionReversedHeader;
+
+  /// Progress text shown below the LinearProgressIndicator on the solved-state card, showing how much of the owed amount has been collected into escrow.
+  ///
+  /// In en, this message translates to:
+  /// **'{collected} of {total} collected ({percent})'**
+  String disputeCollectedProgress(
+      String collected, String total, String percent);
 }
 
 class _AppLocalizationsDelegate

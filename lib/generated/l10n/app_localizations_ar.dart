@@ -2528,4 +2528,57 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get secondResponseLabel => 'الرد الثاني';
+
+  @override
+  String get disputeStatusSubmitted => 'تم التقديم';
+
+  @override
+  String get disputeStatusUnderReview => 'قيد المراجعة';
+
+  @override
+  String get disputeStatusEscalated => 'تم التصعيد';
+
+  @override
+  String get disputeStatusDecisionMade => 'تم اتخاذ القرار';
+
+  @override
+  String get disputeStatusAwaitingRelease => 'في انتظار الإفراج';
+
+  @override
+  String get disputeStatusResolved => 'تم الحل';
+
+  @override
+  String get disputeStatusClosed => 'مغلق';
+
+  @override
+  String get disputeStatusReversed => 'تم العكس';
+
+  @override
+  String get disputeDecisionRefundToBuyer => 'القرار: استرداد للمشتري';
+
+  @override
+  String get disputeDecisionPayToSeller => 'القرار: دفع للبائع';
+
+  @override
+  String get disputeDecisionRecoveringFunds =>
+      'تم اتخاذ القرار — جاري استرداد الأموال';
+
+  @override
+  String get disputeFundsFullyCollected => 'تم جمع الأموال بالكامل';
+
+  @override
+  String get disputeAwaitingReleaseMessage =>
+      'يقوم فريقنا بالتحقق مع كلا الطرفين قبل الإفراج النهائي.';
+
+  @override
+  String get disputeClosedHeader => 'تم إغلاق النزاع';
+
+  @override
+  String get disputeDecisionReversedHeader => 'تم عكس القرار';
+
+  @override
+  String disputeCollectedProgress(
+      String collected, String total, String percent) {
+    return '$collected من $total تم جمعها ($percent)';
+  }
 }

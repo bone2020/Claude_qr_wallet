@@ -2546,4 +2546,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get secondResponseLabel => 'Second Response';
+
+  @override
+  String get disputeStatusSubmitted => 'Submitted';
+
+  @override
+  String get disputeStatusUnderReview => 'Under Review';
+
+  @override
+  String get disputeStatusEscalated => 'Escalated';
+
+  @override
+  String get disputeStatusDecisionMade => 'Decision Made';
+
+  @override
+  String get disputeStatusAwaitingRelease => 'Awaiting Release';
+
+  @override
+  String get disputeStatusResolved => 'Resolved';
+
+  @override
+  String get disputeStatusClosed => 'Closed';
+
+  @override
+  String get disputeStatusReversed => 'Reversed';
+
+  @override
+  String get disputeDecisionRefundToBuyer => 'Decision: Refund to buyer';
+
+  @override
+  String get disputeDecisionPayToSeller => 'Decision: Payment to seller';
+
+  @override
+  String get disputeDecisionRecoveringFunds =>
+      'Decision made — recovering funds';
+
+  @override
+  String get disputeFundsFullyCollected => 'Funds fully collected';
+
+  @override
+  String get disputeAwaitingReleaseMessage =>
+      'Our team is verifying with both parties before final release.';
+
+  @override
+  String get disputeClosedHeader => 'Dispute closed';
+
+  @override
+  String get disputeDecisionReversedHeader => 'Decision reversed';
+
+  @override
+  String disputeCollectedProgress(
+      String collected, String total, String percent) {
+    return '$collected of $total collected ($percent)';
+  }
 }

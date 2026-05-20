@@ -2593,4 +2593,58 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get secondResponseLabel => 'Deuxième réponse';
+
+  @override
+  String get disputeStatusSubmitted => 'Soumis';
+
+  @override
+  String get disputeStatusUnderReview => 'En cours d\'examen';
+
+  @override
+  String get disputeStatusEscalated => 'Escaladé';
+
+  @override
+  String get disputeStatusDecisionMade => 'Décision rendue';
+
+  @override
+  String get disputeStatusAwaitingRelease => 'En attente de libération';
+
+  @override
+  String get disputeStatusResolved => 'Résolu';
+
+  @override
+  String get disputeStatusClosed => 'Fermé';
+
+  @override
+  String get disputeStatusReversed => 'Annulé';
+
+  @override
+  String get disputeDecisionRefundToBuyer =>
+      'Décision : Remboursement à l\'acheteur';
+
+  @override
+  String get disputeDecisionPayToSeller => 'Décision : Paiement au vendeur';
+
+  @override
+  String get disputeDecisionRecoveringFunds =>
+      'Décision rendue — récupération des fonds';
+
+  @override
+  String get disputeFundsFullyCollected => 'Fonds intégralement collectés';
+
+  @override
+  String get disputeAwaitingReleaseMessage =>
+      'Notre équipe vérifie auprès des deux parties avant la libération finale.';
+
+  @override
+  String get disputeClosedHeader => 'Litige clos';
+
+  @override
+  String get disputeDecisionReversedHeader => 'Décision annulée';
+
+  @override
+  String disputeCollectedProgress(
+      String collected, String total, String percent) {
+    return '$collected sur $total collectés ($percent)';
+  }
 }
