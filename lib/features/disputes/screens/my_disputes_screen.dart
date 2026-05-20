@@ -27,29 +27,31 @@ const _resolvedStatuses = {
 
 const _serverLimitPerCall = 50;
 
-// Phase 5c-B status labels (user-facing)
-String disputeStatusLabel(String status) {
+// Phase 5c-B status labels (user-facing). Localized via AppLocalizations in
+// Phase 5i D3b.
+String disputeStatusLabel(BuildContext context, String status) {
+  final l10n = AppLocalizations.of(context);
   switch (status) {
     case 'filed':
-      return 'Submitted';
+      return l10n.disputeStatusSubmitted;
     case 'investigating':
     case 'supervisor_review':
     case 'manager_review':
-      return 'Under Review';
+      return l10n.disputeStatusUnderReview;
     case 'super_admin_escalation':
-      return 'Escalated';
+      return l10n.disputeStatusEscalated;
     case 'solved':
-      return 'Decision Made';
+      return l10n.disputeStatusDecisionMade;
     case 'awaiting_release':
-      return 'Awaiting Release';
+      return l10n.disputeStatusAwaitingRelease;
     case 'resolved':
-      return 'Resolved';
+      return l10n.disputeStatusResolved;
     case 'closed':
-      return 'Closed';
+      return l10n.disputeStatusClosed;
     case 'closed_returned':
-      return 'Reversed';
+      return l10n.disputeStatusReversed;
     case 'closed_stuck':
-      return 'Closed';
+      return l10n.disputeStatusClosed;
     default:
       return status;
   }
@@ -354,7 +356,7 @@ class _DisputeList extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    disputeStatusLabel(status),
+                    disputeStatusLabel(context, status),
                     style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ),
