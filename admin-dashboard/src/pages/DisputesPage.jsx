@@ -1658,6 +1658,300 @@ function AwaitingReleaseTab() {
   );
 }
 
+// Phase 5i E4: ConfirmReleaseModal — confirms a pending release proposal.
+// Backend rejects if caller is the proposer themselves (different-admin rule).
+// Calls adminConfirmDisputeRelease. Once confirmed, money moves from escrow
+// and dispute closes as 'closed' or 'closed_returned'.
+function ConfirmReleaseModal({ dispute, onClose, onConfirmed }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const proposal = dispute.releaseProposal || {};
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminConfirmDisputeRelease')({
+        disputeId,
+        idempotencyKey: uuidv4(),
+      });
+      if (onConfirmed) onConfirmed();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Confirmation failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`Confirm Release — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-1 mb-4">
+        <DetailsRow label="Proposed By">
+          <div>{proposal.proposedBy?.displayName || proposal.proposedBy?.email || '—'}</div>
+          <div className="text-xs text-gray-500">{proposal.proposedBy?.email || ''}</div>
+        </DetailsRow>
+        <DetailsRow label="Proposed Direction">{proposal.releaseDirection || '—'}</DetailsRow>
+        <DetailsRow label="Proposed Notes">
+          <div className="whitespace-pre-wrap">{proposal.notes || '—'}</div>
+        </DetailsRow>
+        <DetailsRow label="Buyer Contacted">{proposal.buyerContacted ? 'yes' : 'no'}</DetailsRow>
+        <DetailsRow label="Seller Contacted">{proposal.sellerContacted ? 'yes' : 'no'}</DetailsRow>
+        <DetailsRow label="Proposal Expires">{formatDate(proposal.expiresAt)}</DetailsRow>
+        <DetailsRow label="Amount in Escrow">
+          {dispute.amountInEscrow != null
+            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            : '—'}
+        </DetailsRow>
+      </div>
+
+      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+        Confirming will release the escrowed funds according to the proposed direction. This action moves money and cannot be undone.
+      </div>
+
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {submitting ? 'Confirming...' : 'Confirm Release'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Phase 5i E4: RejectReleaseModal — rejects a pending release proposal with
+// a reason (≥30 chars). Backend rejects if caller is the proposer (different-
+// admin rule). Calls adminRejectDisputeRelease. After rejection the dispute
+// returns to 'awaiting_release' status with releaseProposal cleared and the
+// rejection details preserved on the dispute doc, allowing another admin to
+// propose again.
+function RejectReleaseModal({ dispute, onClose, onRejected }) {
+  const disputeId = dispute.disputeId || dispute.id;
+  const proposal = dispute.releaseProposal || {};
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const reasonValid = reason.trim().length >= 30;
+  const canSubmit = !submitting && reasonValid;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await httpsCallable(functions, 'adminRejectDisputeRelease')({
+        disputeId,
+        reason: reason.trim(),
+        idempotencyKey: uuidv4(),
+      });
+      if (onRejected) onRejected();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Rejection failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`Reject Proposal — ${disputeId}`} onClose={onClose} maxWidth="max-w-2xl">
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="space-y-1 mb-4">
+        <DetailsRow label="Proposed By">
+          <div>{proposal.proposedBy?.displayName || proposal.proposedBy?.email || '—'}</div>
+          <div className="text-xs text-gray-500">{proposal.proposedBy?.email || ''}</div>
+        </DetailsRow>
+        <DetailsRow label="Proposed Direction">{proposal.releaseDirection || '—'}</DetailsRow>
+        <DetailsRow label="Proposed Notes">
+          <div className="whitespace-pre-wrap">{proposal.notes || '—'}</div>
+        </DetailsRow>
+        <DetailsRow label="Proposal Expires">{formatDate(proposal.expiresAt)}</DetailsRow>
+      </div>
+
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm text-gray-700 font-medium">Rejection Reason</label>
+          <span className={`text-xs ${reasonValid ? 'text-gray-500' : 'text-amber-600'}`}>
+            {reason.length} / 30 minimum
+          </span>
+        </div>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={4}
+          placeholder="Explain why this proposal should not be confirmed. Another admin will see this reason if they propose again..."
+          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">
+        Rejecting clears the proposal but leaves the dispute open for another admin to propose a different direction.
+      </div>
+
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 md:py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {submitting ? 'Rejecting...' : 'Submit Rejection'}
+        </button>
+        <button
+          onClick={onClose}
+          disabled={submitting}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm"
+        >
+          Cancel
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Phase 5i E4: PendingProposalTab — table of disputes with an active release
+// proposal that was NOT made by the current admin. Each row has two action
+// buttons (Confirm / Reject) that open the corresponding modal. The current
+// admin's own proposals are filtered out — the backend's different-admin
+// enforcement would reject those actions anyway.
+function PendingProposalTab() {
+  const { user } = useAuth();
+  const { disputes, loading, error, refresh } = useDisputes('awaiting_release');
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+
+  const eligible = disputes.filter(
+    (d) =>
+      d.releaseProposal != null &&
+      d.releaseProposal.proposedBy?.uid !== user?.uid,
+  );
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Release proposals from other admins awaiting your confirmation or rejection. Your own proposals do not appear here.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposed By</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Direction</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Escrow</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposed</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
+              <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {eligible.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No pending proposals from other admins.'}
+                </td>
+              </tr>
+            ) : (
+              eligible.map((d) => {
+                const id = d.disputeId || d.id;
+                const proposal = d.releaseProposal || {};
+                return (
+                  <tr key={id} className="hover:bg-indigo-50">
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2 text-sm text-gray-700">
+                      <div>{proposal.proposedBy?.displayName || proposal.proposedBy?.email || '—'}</div>
+                      <div className="text-xs text-gray-400">{proposal.proposedBy?.email || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">{proposal.releaseDirection || '—'}</td>
+                    <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
+                      {d.amountInEscrow != null
+                        ? `${symbol(d.disputedCurrency)}${(d.amountInEscrow / 100).toFixed(2)}`
+                        : '—'}
+                      <div className="text-xs text-gray-400">{d.disputedCurrency || ''}</div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(proposal.proposedAt)}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(proposal.expiresAt)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex gap-1 justify-end">
+                        <button
+                          onClick={() => setConfirmTarget(d)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setRejectTarget(d)}
+                          className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {confirmTarget && (
+        <ConfirmReleaseModal
+          dispute={confirmTarget}
+          onClose={() => setConfirmTarget(null)}
+          onConfirmed={refresh}
+        />
+      )}
+      {rejectTarget && (
+        <RejectReleaseModal
+          dispute={rejectTarget}
+          onClose={() => setRejectTarget(null)}
+          onRejected={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
 function DisputesPage() {
   const { user, isAdmin, isAdminSupervisor, isAdminManager, isSuperAdmin } = useAuth();
 
@@ -1667,6 +1961,7 @@ function DisputesPage() {
   if (isAdminSupervisor) tabs.push({ id: 'supervisor', label: 'Supervisor Review' });
   if (isAdminManager) tabs.push({ id: 'manager', label: 'Manager Decision' });
   if (isAdminManager) tabs.push({ id: 'awaiting_release', label: 'Awaiting Release' });
+  if (isAdminManager) tabs.push({ id: 'pending_proposal', label: 'Pending Proposals' });
   if (isSuperAdmin) tabs.push({ id: 'escalated', label: 'Escalated to Super Admin' });
   if (isSuperAdmin) tabs.push({ id: 'stuck', label: 'Stuck Cases' });
 
@@ -1708,6 +2003,7 @@ function DisputesPage() {
           {activeTab === 'supervisor' && <SupervisorReviewTab />}
           {activeTab === 'manager' && <ManagerDecisionTab />}
           {activeTab === 'awaiting_release' && <AwaitingReleaseTab />}
+          {activeTab === 'pending_proposal' && <PendingProposalTab />}
           {activeTab === 'escalated' && <EscalatedTab />}
           {activeTab === 'stuck' && <StuckTab />}
         </div>
