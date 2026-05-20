@@ -182,12 +182,12 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
     final status = _dispute?['status'] as String? ?? '';
     switch (status) {
       case 'solved':
-        return _buildSolvedSection();
+        return _buildSolvedSection(context);
       case 'awaiting_release':
-        return _buildAwaitingReleaseSection();
+        return _buildAwaitingReleaseSection(context);
       case 'closed':
       case 'closed_returned':
-        return _buildClosedSection();
+        return _buildClosedSection(context);
       default:
         return const [];
     }
@@ -195,8 +195,10 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
 
   // Phase 5i D2b: progress card shown while the dispute is in 'solved' state
   // (decision made, money being collected into escrow). Shows the decision
-  // direction, a progress bar, and "X of Y collected (N%)" text.
-  List<Widget> _buildSolvedSection() {
+  // direction, a progress bar, and "X of Y collected (N%)" text. Localized
+  // in D3b.
+  List<Widget> _buildSolvedSection(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final inEscrow = (_dispute?['amountInEscrow'] ?? 0).toDouble();
     final owed = (_dispute?['amountOwed'] ?? 0).toDouble();
     final currency = _dispute?['disputedCurrency'] as String? ?? '';
@@ -208,13 +210,13 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
     String directionLabel;
     switch (direction) {
       case 'refund_to_buyer':
-        directionLabel = 'Decision: Refund to buyer';
+        directionLabel = l10n.disputeDecisionRefundToBuyer;
         break;
       case 'pay_to_seller':
-        directionLabel = 'Decision: Payment to seller';
+        directionLabel = l10n.disputeDecisionPayToSeller;
         break;
       default:
-        directionLabel = 'Decision made — recovering funds';
+        directionLabel = l10n.disputeDecisionRecoveringFunds;
     }
 
     return [
@@ -243,7 +245,11 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              '$currency ${(inEscrow / 100).toStringAsFixed(2)} of $currency ${(owed / 100).toStringAsFixed(2)} collected ($percentText)',
+              l10n.disputeCollectedProgress(
+                '$currency ${(inEscrow / 100).toStringAsFixed(2)}',
+                '$currency ${(owed / 100).toStringAsFixed(2)}',
+                percentText,
+              ),
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -255,8 +261,9 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
 
   // Phase 5i D2b: banner shown while the dispute is in 'awaiting_release' state
   // (escrow fully collected, support is verifying with both parties before the
-  // two-admin release).
-  List<Widget> _buildAwaitingReleaseSection() {
+  // two-admin release). Localized in D3b.
+  List<Widget> _buildAwaitingReleaseSection(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return [
       Container(
         padding: const EdgeInsets.all(16),
@@ -268,18 +275,18 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
           children: [
             const Icon(Icons.hourglass_top, color: AppColors.primary, size: 24),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Funds fully collected',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    l10n.disputeFundsFullyCollected,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'Our team is verifying with both parties before final release.',
-                    style: TextStyle(fontSize: 12),
+                    l10n.disputeAwaitingReleaseMessage,
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ],
               ),
@@ -294,15 +301,19 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
   // Phase 5i D2b: terminal-state card shown for 'closed' (decision upheld,
   // money released) and 'closed_returned' (decision reversed, money returned
   // to the original payer). Renders the backend-generated closingRemarks text
-  // if present, with a header that distinguishes the two outcomes.
-  List<Widget> _buildClosedSection() {
+  // if present, with a header that distinguishes the two outcomes. Localized
+  // in D3b (closingRemarks remains backend-provided, not localized client-side).
+  List<Widget> _buildClosedSection(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final status = _dispute?['status'] as String?;
     final remarks = _dispute?['closingRemarks'] as String?;
     final isReversed = status == 'closed_returned';
 
     final headerColor = isReversed ? Colors.grey : AppColors.success;
     final headerIcon = isReversed ? Icons.swap_horiz : Icons.check_circle_outline;
-    final headerText = isReversed ? 'Decision reversed' : 'Dispute closed';
+    final headerText = isReversed
+        ? l10n.disputeDecisionReversedHeader
+        : l10n.disputeClosedHeader;
 
     return [
       Container(
@@ -343,46 +354,47 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
   }
 
   Widget _statusBadge(String status) {
+    final l10n = AppLocalizations.of(context);
     Color color;
     String label;
     switch (status) {
       case 'filed':
         color = Colors.orange;
-        label = 'Submitted';
+        label = l10n.disputeStatusSubmitted;
         break;
       case 'investigating':
       case 'supervisor_review':
       case 'manager_review':
         color = AppColors.primary;
-        label = 'Under Review';
+        label = l10n.disputeStatusUnderReview;
         break;
       case 'super_admin_escalation':
         color = AppColors.error;
-        label = 'Escalated';
+        label = l10n.disputeStatusEscalated;
         break;
       case 'solved':
         color = AppColors.primary;
-        label = 'Decision Made';
+        label = l10n.disputeStatusDecisionMade;
         break;
       case 'awaiting_release':
         color = AppColors.primary;
-        label = 'Awaiting Release';
+        label = l10n.disputeStatusAwaitingRelease;
         break;
       case 'resolved':
         color = AppColors.success;
-        label = 'Resolved';
+        label = l10n.disputeStatusResolved;
         break;
       case 'closed':
         color = AppColors.success;
-        label = 'Closed';
+        label = l10n.disputeStatusClosed;
         break;
       case 'closed_returned':
         color = Colors.grey;
-        label = 'Reversed';
+        label = l10n.disputeStatusReversed;
         break;
       case 'closed_stuck':
         color = Colors.grey;
-        label = 'Closed';
+        label = l10n.disputeStatusClosed;
         break;
       default:
         color = AppColors.primary;
