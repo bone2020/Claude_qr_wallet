@@ -191,9 +191,25 @@ class _DisputeDetailScreenState extends ConsumerState<DisputeDetailScreen> {
         color = AppColors.error;
         label = 'Escalated';
         break;
+      case 'solved':
+        color = AppColors.primary;
+        label = 'Decision Made';
+        break;
+      case 'awaiting_release':
+        color = AppColors.primary;
+        label = 'Awaiting Release';
+        break;
       case 'resolved':
         color = AppColors.success;
         label = 'Resolved';
+        break;
+      case 'closed':
+        color = AppColors.success;
+        label = 'Closed';
+        break;
+      case 'closed_returned':
+        color = Colors.grey;
+        label = 'Reversed';
         break;
       case 'closed_stuck':
         color = Colors.grey;

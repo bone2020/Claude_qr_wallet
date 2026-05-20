@@ -15,9 +15,13 @@ const _activeStatuses = {
   'supervisor_review',
   'manager_review',
   'super_admin_escalation',
+  'solved',
+  'awaiting_release',
 };
 const _resolvedStatuses = {
   'resolved',
+  'closed',
+  'closed_returned',
   'closed_stuck',
 };
 
@@ -34,8 +38,16 @@ String disputeStatusLabel(String status) {
       return 'Under Review';
     case 'super_admin_escalation':
       return 'Escalated';
+    case 'solved':
+      return 'Decision Made';
+    case 'awaiting_release':
+      return 'Awaiting Release';
     case 'resolved':
       return 'Resolved';
+    case 'closed':
+      return 'Closed';
+    case 'closed_returned':
+      return 'Reversed';
     case 'closed_stuck':
       return 'Closed';
     default:
@@ -53,8 +65,16 @@ Color disputeStatusColor(String status) {
       return AppColors.primary;
     case 'super_admin_escalation':
       return AppColors.error;
+    case 'solved':
+      return AppColors.primary;
+    case 'awaiting_release':
+      return AppColors.primary;
     case 'resolved':
       return AppColors.success;
+    case 'closed':
+      return AppColors.success;
+    case 'closed_returned':
+      return Colors.grey;
     case 'closed_stuck':
       return Colors.grey;
     default:
