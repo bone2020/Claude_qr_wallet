@@ -1295,5 +1295,80 @@
   "updateResponseButton": "Mettre à jour la réponse",
   "respondedLabel": "Répondu",
   "firstResponseLabel": "Première réponse",
-  "secondResponseLabel": "Deuxième réponse"
+  "secondResponseLabel": "Deuxième réponse",
+  "disputeStatusSubmitted": "Soumis",
+  "@disputeStatusSubmitted": {
+    "description": "Status label shown on a dispute that has been filed but is not yet under formal investigation."
+  },
+  "disputeStatusUnderReview": "En cours d'examen",
+  "@disputeStatusUnderReview": {
+    "description": "Status label shown on a dispute that is being investigated by support, supervisor, or manager."
+  },
+  "disputeStatusEscalated": "Escaladé",
+  "@disputeStatusEscalated": {
+    "description": "Status label shown on a dispute that has been escalated to a super-admin for higher-level review."
+  },
+  "disputeStatusDecisionMade": "Décision rendue",
+  "@disputeStatusDecisionMade": {
+    "description": "Status label shown on a dispute where the manager has made a decision and money is being collected into escrow."
+  },
+  "disputeStatusAwaitingRelease": "En attente de libération",
+  "@disputeStatusAwaitingRelease": {
+    "description": "Status label shown on a dispute where the escrow is fully funded and support is verifying with both parties before final release."
+  },
+  "disputeStatusResolved": "Résolu",
+  "@disputeStatusResolved": {
+    "description": "Legacy status label shown on disputes resolved under the pre-Phase-5i system; kept for backward compatibility with older disputes."
+  },
+  "disputeStatusClosed": "Fermé",
+  "@disputeStatusClosed": {
+    "description": "Status label shown on a dispute that has been terminated, money released to the party owed. Also used for the 'closed_stuck' terminal status."
+  },
+  "disputeStatusReversed": "Annulé",
+  "@disputeStatusReversed": {
+    "description": "Status label shown on a dispute that was decided one way then reversed during verification, with money returning to the original payer."
+  },
+  "disputeDecisionRefundToBuyer": "Décision : Remboursement à l'acheteur",
+  "@disputeDecisionRefundToBuyer": {
+    "description": "Header text on the solved-state progress card when the decision direction is to refund the buyer."
+  },
+  "disputeDecisionPayToSeller": "Décision : Paiement au vendeur",
+  "@disputeDecisionPayToSeller": {
+    "description": "Header text on the solved-state progress card when the decision direction is to pay the seller."
+  },
+  "disputeDecisionRecoveringFunds": "Décision rendue — récupération des fonds",
+  "@disputeDecisionRecoveringFunds": {
+    "description": "Fallback header text on the solved-state progress card when the decision direction is not recognized."
+  },
+  "disputeFundsFullyCollected": "Fonds intégralement collectés",
+  "@disputeFundsFullyCollected": {
+    "description": "Header text on the awaiting-release banner shown when the escrow is fully funded."
+  },
+  "disputeAwaitingReleaseMessage": "Notre équipe vérifie auprès des deux parties avant la libération finale.",
+  "@disputeAwaitingReleaseMessage": {
+    "description": "Subtext on the awaiting-release banner explaining what is happening before final release."
+  },
+  "disputeClosedHeader": "Litige clos",
+  "@disputeClosedHeader": {
+    "description": "Header text on the terminal-state card for a dispute that closed cleanly with money released as decided."
+  },
+  "disputeDecisionReversedHeader": "Décision annulée",
+  "@disputeDecisionReversedHeader": {
+    "description": "Header text on the terminal-state card for a dispute whose decision was reversed during verification."
+  },
+  "disputeCollectedProgress": "{collected} sur {total} collectés ({percent})",
+  "@disputeCollectedProgress": {
+    "description": "Progress text shown below the LinearProgressIndicator on the solved-state card, showing how much of the owed amount has been collected into escrow.",
+    "placeholders": {
+      "collected": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  }
 }

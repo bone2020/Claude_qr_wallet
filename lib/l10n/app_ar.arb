@@ -1295,5 +1295,80 @@
   "updateResponseButton": "تحديث الرد",
   "respondedLabel": "تم الرد",
   "firstResponseLabel": "الرد الأول",
-  "secondResponseLabel": "الرد الثاني"
+  "secondResponseLabel": "الرد الثاني",
+  "disputeStatusSubmitted": "تم التقديم",
+  "@disputeStatusSubmitted": {
+    "description": "Status label shown on a dispute that has been filed but is not yet under formal investigation."
+  },
+  "disputeStatusUnderReview": "قيد المراجعة",
+  "@disputeStatusUnderReview": {
+    "description": "Status label shown on a dispute that is being investigated by support, supervisor, or manager."
+  },
+  "disputeStatusEscalated": "تم التصعيد",
+  "@disputeStatusEscalated": {
+    "description": "Status label shown on a dispute that has been escalated to a super-admin for higher-level review."
+  },
+  "disputeStatusDecisionMade": "تم اتخاذ القرار",
+  "@disputeStatusDecisionMade": {
+    "description": "Status label shown on a dispute where the manager has made a decision and money is being collected into escrow."
+  },
+  "disputeStatusAwaitingRelease": "في انتظار الإفراج",
+  "@disputeStatusAwaitingRelease": {
+    "description": "Status label shown on a dispute where the escrow is fully funded and support is verifying with both parties before final release."
+  },
+  "disputeStatusResolved": "تم الحل",
+  "@disputeStatusResolved": {
+    "description": "Legacy status label shown on disputes resolved under the pre-Phase-5i system; kept for backward compatibility with older disputes."
+  },
+  "disputeStatusClosed": "مغلق",
+  "@disputeStatusClosed": {
+    "description": "Status label shown on a dispute that has been terminated, money released to the party owed. Also used for the 'closed_stuck' terminal status."
+  },
+  "disputeStatusReversed": "تم العكس",
+  "@disputeStatusReversed": {
+    "description": "Status label shown on a dispute that was decided one way then reversed during verification, with money returning to the original payer."
+  },
+  "disputeDecisionRefundToBuyer": "القرار: استرداد للمشتري",
+  "@disputeDecisionRefundToBuyer": {
+    "description": "Header text on the solved-state progress card when the decision direction is to refund the buyer."
+  },
+  "disputeDecisionPayToSeller": "القرار: دفع للبائع",
+  "@disputeDecisionPayToSeller": {
+    "description": "Header text on the solved-state progress card when the decision direction is to pay the seller."
+  },
+  "disputeDecisionRecoveringFunds": "تم اتخاذ القرار — جاري استرداد الأموال",
+  "@disputeDecisionRecoveringFunds": {
+    "description": "Fallback header text on the solved-state progress card when the decision direction is not recognized."
+  },
+  "disputeFundsFullyCollected": "تم جمع الأموال بالكامل",
+  "@disputeFundsFullyCollected": {
+    "description": "Header text on the awaiting-release banner shown when the escrow is fully funded."
+  },
+  "disputeAwaitingReleaseMessage": "يقوم فريقنا بالتحقق مع كلا الطرفين قبل الإفراج النهائي.",
+  "@disputeAwaitingReleaseMessage": {
+    "description": "Subtext on the awaiting-release banner explaining what is happening before final release."
+  },
+  "disputeClosedHeader": "تم إغلاق النزاع",
+  "@disputeClosedHeader": {
+    "description": "Header text on the terminal-state card for a dispute that closed cleanly with money released as decided."
+  },
+  "disputeDecisionReversedHeader": "تم عكس القرار",
+  "@disputeDecisionReversedHeader": {
+    "description": "Header text on the terminal-state card for a dispute whose decision was reversed during verification."
+  },
+  "disputeCollectedProgress": "{collected} من {total} تم جمعها ({percent})",
+  "@disputeCollectedProgress": {
+    "description": "Progress text shown below the LinearProgressIndicator on the solved-state card, showing how much of the owed amount has been collected into escrow.",
+    "placeholders": {
+      "collected": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "String"
+      }
+    }
+  }
 }
