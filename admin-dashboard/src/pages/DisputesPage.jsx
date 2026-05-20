@@ -17,7 +17,11 @@ const STATUS_OPTIONS = [
   'supervisor_review',
   'manager_review',
   'super_admin_escalation',
+  'solved',
+  'awaiting_release',
   'resolved',
+  'closed',
+  'closed_returned',
   'closed_stuck',
 ];
 
@@ -41,8 +45,16 @@ const statusBadgeClass = (status) => {
       return 'bg-amber-100 text-amber-800';
     case 'super_admin_escalation':
       return 'bg-red-100 text-red-700';
+    case 'solved':
+      return 'bg-teal-100 text-teal-700';
+    case 'awaiting_release':
+      return 'bg-orange-100 text-orange-700';
     case 'resolved':
       return 'bg-green-100 text-green-700';
+    case 'closed':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'closed_returned':
+      return 'bg-slate-100 text-slate-700';
     case 'closed_stuck':
       return 'bg-gray-200 text-gray-700';
     default:
