@@ -16811,6 +16811,371 @@ exports.adminCancelRecovery = functions.runWith({ enforceAppCheck: true }).https
 });
 
 /**
+ * Phase 5i: Admin proposes a release direction for a dispute in awaiting_release state.
+ *
+ * Records the proposal on the dispute document. Does NOT move money — a different
+ * admin must call adminConfirmDisputeRelease to actually execute the release.
+ *
+ * The proposing admin MUST have contacted both buyer and seller before proposing
+ * (buyerContacted and sellerContacted checkboxes are required true).
+ *
+ * Caller role: admin_manager or super_admin.
+ *
+ * Inputs (data):
+ *   - disputeId: string (required)
+ *   - releaseDirection: 'release_to_payee' | 'reverse_to_payer' (required)
+ *   - notes: string >= 50 chars (required) — admin's reasoning
+ *   - buyerContacted: boolean (must be true) — confirms admin spoke to buyer
+ *   - sellerContacted: boolean (must be true) — confirms admin spoke to seller
+ *   - idempotencyKey: string >= 16 chars (required)
+ *
+ * Preconditions:
+ *   - dispute.status === 'awaiting_release'
+ *   - dispute.releaseProposal === null (no proposal pending)
+ *
+ * Effects:
+ *   - dispute.releaseProposal populated
+ *   - audit_logs + admin_activity entries
+ *   - No customer SMS (internal admin action)
+ */
+exports.adminProposeDisputeRelease = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+  const { disputeId, releaseDirection, notes, buyerContacted, sellerContacted, idempotencyKey } = data || {};
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  const VALID_DIRECTIONS = ['release_to_payee', 'reverse_to_payer'];
+  if (!releaseDirection || !VALID_DIRECTIONS.includes(releaseDirection)) {
+    throw new functions.https.HttpsError('invalid-argument', `releaseDirection must be one of: ${VALID_DIRECTIONS.join(', ')}`);
+  }
+  if (!notes || typeof notes !== 'string' || notes.trim().length < 50) {
+    throw new functions.https.HttpsError('invalid-argument', 'notes must be at least 50 characters.');
+  }
+  if (buyerContacted !== true) {
+    throw new functions.https.HttpsError('invalid-argument', 'buyerContacted must be confirmed (true). Admin must have contacted the buyer before proposing release.');
+  }
+  if (sellerContacted !== true) {
+    throw new functions.https.HttpsError('invalid-argument', 'sellerContacted must be confirmed (true). Admin must have contacted the seller before proposing release.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminProposeDisputeRelease');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded for adminProposeDisputeRelease.');
+  }
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+    if (dispute.status !== 'awaiting_release') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Dispute status is '${dispute.status}', expected 'awaiting_release'.`);
+    }
+    if (dispute.releaseProposal !== null && dispute.releaseProposal !== undefined) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'A release proposal is already pending. Use adminConfirmDisputeRelease or adminRejectDisputeRelease to resolve it before proposing a new one.');
+    }
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+    const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + TWENTY_FOUR_HOURS_MS);
+    await disputeRef.update({
+      releaseProposal: {
+        proposedBy: { uid: caller.uid, email: callerEmail, displayName: callerDisplayName, role: caller.role },
+        proposedAt: admin.firestore.FieldValue.serverTimestamp(),
+        releaseDirection,
+        notes: notes.trim(),
+        buyerContacted: true,
+        sellerContacted: true,
+        expiresAt,
+      },
+    });
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'adminProposeDisputeRelease',
+      result: 'success',
+      metadata: { disputeId, releaseDirection, notes: notes.trim() },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'propose_dispute_release',
+      details: `Proposed ${releaseDirection} for dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true, disputeId, releaseDirection, expiresAt: expiresAt.toMillis() };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminProposeDisputeRelease failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to propose dispute release: ' + error.message);
+  }
+});
+
+/**
+ * Phase 5i: A DIFFERENT admin confirms a pending release proposal. Money MOVES.
+ *
+ * Reads the dispute's releaseProposal, checks that the confirmer is not the same
+ * person who proposed, and executes the money movement based on the proposal's
+ * releaseDirection and the dispute's original decisionDirection.
+ *
+ * After this, the dispute is CLOSED (status 'closed' or 'closed_returned').
+ *
+ * Caller role: admin_manager or super_admin.
+ *
+ * Inputs (data):
+ *   - disputeId: string (required)
+ *   - idempotencyKey: string >= 16 chars (required)
+ *
+ * Preconditions:
+ *   - dispute.status === 'awaiting_release'
+ *   - dispute.releaseProposal exists
+ *   - caller.uid !== dispute.releaseProposal.proposedBy.uid (different admin required)
+ *
+ * Effects:
+ *   - Money moves from escrow wallet to destination wallet (computed from
+ *     dispute.decisionDirection × releaseProposal.releaseDirection)
+ *   - dispute.status updated to 'closed' or 'closed_returned'
+ *   - dispute.releaseConfirmedBy, releaseConfirmedAt set
+ *   - dispute.releaseDirection set (copied from proposal)
+ *   - dispute.closingRemarks set via generateClosingRemarks
+ *   - audit_logs + admin_activity entries
+ *   - SMS to both parties about final outcome
+ */
+exports.adminConfirmDisputeRelease = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+  const { disputeId, idempotencyKey } = data || {};
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminConfirmDisputeRelease');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded for adminConfirmDisputeRelease.');
+  }
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+    if (dispute.status !== 'awaiting_release') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Dispute status is '${dispute.status}', expected 'awaiting_release'.`);
+    }
+    const proposal = dispute.releaseProposal;
+    if (!proposal || !proposal.proposedBy) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'No release proposal pending. Use adminProposeDisputeRelease first.');
+    }
+    if (proposal.proposedBy.uid === caller.uid) {
+      throw new functions.https.HttpsError('permission-denied',
+        'The admin who proposed the release cannot also confirm it. A different admin must confirm.');
+    }
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const confirmerInfo = { uid: caller.uid, email: callerEmail, displayName: callerDisplayName, role: caller.role };
+    // Determine destination wallet from the dispute and proposal directions
+    const payeeUid = dispute.decisionDirection === 'refund_to_buyer' ? dispute.filedBy.uid : dispute.recipientUid;
+    const sourceUid = dispute.decisionDirection === 'refund_to_buyer' ? dispute.recipientUid : dispute.filedBy.uid;
+    const destinationUid = proposal.releaseDirection === 'release_to_payee' ? payeeUid : sourceUid;
+    // Determine closing-remarks reason code based on the 4-way matrix
+    let remarksReason;
+    if (dispute.decisionDirection === 'refund_to_buyer') {
+      remarksReason = proposal.releaseDirection === 'release_to_payee' ? 'released_to_payee_refund' : 'reverse_to_payer_refund';
+    } else {
+      remarksReason = proposal.releaseDirection === 'release_to_payee' ? 'released_to_payee_buyer_owes' : 'reverse_to_payer_buyer_owes';
+    }
+    const finalStatus = proposal.releaseDirection === 'release_to_payee' ? 'closed' : 'closed_returned';
+    const amountToRelease = dispute.amountInEscrow || 0;
+    // Get the escrow wallet ref BEFORE the transaction
+    const escrowRef = await getOrCreateRecoveryWallet(dispute.disputedCurrency);
+    await db.runTransaction(async (transaction) => {
+      // Move money from escrow to destination wallet
+      if (amountToRelease > 0) {
+        transaction.update(escrowRef, {
+          balance: admin.firestore.FieldValue.increment(-amountToRelease),
+          availableBalance: admin.firestore.FieldValue.increment(-amountToRelease),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        const destinationWalletRef = db.collection('wallets').doc(destinationUid);
+        transaction.update(destinationWalletRef, {
+          balance: admin.firestore.FieldValue.increment(amountToRelease),
+          availableBalance: admin.firestore.FieldValue.increment(amountToRelease),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+      // Build closing remarks (need to read fresh dispute snapshot? No — we have
+      // all the fields needed already, and generateClosingRemarks reads from the
+      // dispute object we pass in).
+      const closingRemarks = generateClosingRemarks(dispute, remarksReason);
+      // Update dispute doc — final state
+      transaction.update(disputeRef, {
+        status: finalStatus,
+        releaseDirection: proposal.releaseDirection,
+        releaseConfirmedBy: confirmerInfo,
+        releaseConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        closingRemarks,
+        _recoveryWatchActive: false,
+        _awaitingMoneyMovement: false,
+      });
+    });
+    // Audit + admin_activity
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'adminConfirmDisputeRelease',
+      result: 'success',
+      metadata: {
+        disputeId,
+        releaseDirection: proposal.releaseDirection,
+        decisionDirection: dispute.decisionDirection,
+        destinationUid,
+        amount: amountToRelease,
+        currency: dispute.disputedCurrency,
+        finalStatus,
+        proposedBy: proposal.proposedBy.uid,
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'confirm_dispute_release',
+      details: `Confirmed ${proposal.releaseDirection} for dispute ${disputeId} (${amountToRelease} ${dispute.disputedCurrency} to ${destinationUid})`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    // SMS to both parties — final outcome
+    const buyerPhone = dispute.filedBy?.phoneNumber;
+    const sellerPhone = dispute.recipientPhoneNumber;
+    const buyerWon = proposal.releaseDirection === 'release_to_payee'
+      ? (dispute.decisionDirection === 'refund_to_buyer')
+      : (dispute.decisionDirection === 'pay_to_seller');
+    if (buyerPhone) {
+      const buyerMsg = buyerWon
+        ? `Dispute ${disputeId} closed in your favor. ${amountToRelease} ${dispute.disputedCurrency} released from escrow.`
+        : `Dispute ${disputeId} closed in favor of the other party. The escrow held in this case has been released.`;
+      try {
+        await sendCustomerSms({ phoneNumber: buyerPhone, message: buyerMsg, relatedTo: `dispute:${disputeId}` });
+      } catch (smsError) {
+        logWarning('adminConfirmDisputeRelease: failed to SMS buyer', { disputeId, error: smsError.message });
+      }
+    }
+    if (sellerPhone) {
+      const sellerMsg = buyerWon
+        ? `Dispute ${disputeId} closed against you. ${amountToRelease} ${dispute.disputedCurrency} released from escrow to the other party.`
+        : `Dispute ${disputeId} closed in your favor. ${amountToRelease} ${dispute.disputedCurrency} released from escrow.`;
+      try {
+        await sendCustomerSms({ phoneNumber: sellerPhone, message: sellerMsg, relatedTo: `dispute:${disputeId}` });
+      } catch (smsError) {
+        logWarning('adminConfirmDisputeRelease: failed to SMS seller', { disputeId, error: smsError.message });
+      }
+    }
+    return { success: true, disputeId, finalStatus, releaseDirection: proposal.releaseDirection, destinationUid, amount: amountToRelease };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminConfirmDisputeRelease failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to confirm dispute release: ' + error.message);
+  }
+});
+
+/**
+ * Phase 5i: A DIFFERENT admin rejects a pending release proposal. No money moves.
+ *
+ * Clears the proposal from the dispute doc, records the rejection, and returns
+ * the dispute to plain awaiting_release state. A different admin can then propose
+ * a new release direction.
+ *
+ * Caller role: admin_manager or super_admin.
+ *
+ * Inputs (data):
+ *   - disputeId: string (required)
+ *   - reason: string >= 30 chars (required) — admin's reasoning for rejection
+ *   - idempotencyKey: string >= 16 chars (required)
+ *
+ * Preconditions:
+ *   - dispute.status === 'awaiting_release'
+ *   - dispute.releaseProposal exists
+ *   - caller.uid !== dispute.releaseProposal.proposedBy.uid (different admin required)
+ *
+ * Effects:
+ *   - dispute.releaseProposal cleared (set to null)
+ *   - dispute.releaseRejectedBy, releaseRejectedAt, releaseRejectionReason set
+ *   - dispute.status remains 'awaiting_release'
+ *   - audit_logs + admin_activity entries
+ *   - No customer SMS (internal admin action; customers don't see rejection cycles)
+ */
+exports.adminRejectDisputeRelease = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  const caller = await verifyAdmin(context, 'admin_manager');
+  const { disputeId, reason, idempotencyKey } = data || {};
+  if (!disputeId) throw new functions.https.HttpsError('invalid-argument', 'disputeId is required.');
+  if (!reason || typeof reason !== 'string' || reason.trim().length < 30) {
+    throw new functions.https.HttpsError('invalid-argument', 'reason must be at least 30 characters.');
+  }
+  if (!idempotencyKey || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16) {
+    throw new functions.https.HttpsError('invalid-argument', 'idempotencyKey must be at least 16 characters.');
+  }
+  const withinLimit = await checkRateLimitPersistent(caller.uid, 'adminRejectDisputeRelease');
+  if (!withinLimit) {
+    throw new functions.https.HttpsError('resource-exhausted', 'Rate limit exceeded for adminRejectDisputeRelease.');
+  }
+  try {
+    const disputeRef = db.collection('disputes').doc(disputeId);
+    const disputeSnap = await disputeRef.get();
+    if (!disputeSnap.exists) throw new functions.https.HttpsError('not-found', `Dispute ${disputeId} not found.`);
+    const dispute = disputeSnap.data();
+    if (dispute.status !== 'awaiting_release') {
+      throw new functions.https.HttpsError('failed-precondition',
+        `Dispute status is '${dispute.status}', expected 'awaiting_release'.`);
+    }
+    const proposal = dispute.releaseProposal;
+    if (!proposal || !proposal.proposedBy) {
+      throw new functions.https.HttpsError('failed-precondition',
+        'No release proposal pending to reject.');
+    }
+    if (proposal.proposedBy.uid === caller.uid) {
+      throw new functions.https.HttpsError('permission-denied',
+        'The admin who proposed the release cannot also reject it. A different admin must reject.');
+    }
+    const callerRecord = await admin.auth().getUser(caller.uid);
+    const callerEmail = callerRecord.email || 'unknown';
+    const callerDisplayName = callerRecord.displayName || callerEmail;
+    const rejecterInfo = { uid: caller.uid, email: callerEmail, displayName: callerDisplayName, role: caller.role };
+    await disputeRef.update({
+      releaseProposal: null,
+      releaseRejectedBy: rejecterInfo,
+      releaseRejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+      releaseRejectionReason: reason.trim(),
+    });
+    await db.collection('audit_logs').add({
+      userId: caller.uid,
+      operation: 'adminRejectDisputeRelease',
+      result: 'success',
+      metadata: { disputeId, reason: reason.trim(), proposedBy: proposal.proposedBy.uid, rejectedReleaseDirection: proposal.releaseDirection },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection('admin_activity').add({
+      uid: caller.uid,
+      email: callerEmail,
+      role: caller.role,
+      action: 'reject_dispute_release',
+      details: `Rejected ${proposal.releaseDirection} proposal for dispute ${disputeId}`,
+      ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return { success: true, disputeId, rejectedReleaseDirection: proposal.releaseDirection };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('adminRejectDisputeRelease failed', { disputeId, caller: caller.uid, error: error.message });
+    throw new functions.https.HttpsError('internal', 'Failed to reject dispute release: ' + error.message);
+  }
+});
+
+/**
  * Admin: List recovery events with optional filters and pagination.
  * Auditor+ can access.
  */
