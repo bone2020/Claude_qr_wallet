@@ -1952,6 +1952,117 @@ function PendingProposalTab() {
   );
 }
 
+// Phase 5i E5: ClosedHistoryTab — read-only audit view of disputes that
+// reached terminal Phase 5i states. Lists 'closed' (released as decided) and
+// 'closed_returned' (decision reversed). Merges two useDisputes calls since
+// the hook accepts only one status string at a time. Sorted by releaseConfirmedAt
+// descending (most-recently-closed first); falls back to filedAt for any
+// legacy/unusual dispute lacking the confirm timestamp. Row click opens the
+// existing DisputeDetailsModal, which already surfaces all Phase 5i audit fields
+// (E2). No new modals or cloud function calls.
+function ClosedHistoryTab() {
+  const closed = useDisputes('closed');
+  const reversed = useDisputes('closed_returned');
+  const [target, setTarget] = useState(null);
+
+  const all = [...closed.disputes, ...reversed.disputes].sort((a, b) => {
+    const aKey = a.releaseConfirmedAt || a.filedAt || '';
+    const bKey = b.releaseConfirmedAt || b.filedAt || '';
+    // Descending order
+    if (aKey < bKey) return 1;
+    if (aKey > bKey) return -1;
+    return 0;
+  });
+
+  const loading = closed.loading || reversed.loading;
+  const error = closed.error || reversed.error;
+  const refresh = () => {
+    closed.refresh();
+    reversed.refresh();
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          Closed disputes — both released-as-decided and reversed decisions. Read-only audit view.
+        </p>
+        <button
+          onClick={refresh}
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dispute</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Outcome</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Filer / Recipient</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Direction</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Proposed By</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Confirmed By</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Closed At</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {all.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400 text-sm">
+                  {loading ? 'Loading...' : 'No closed disputes yet.'}
+                </td>
+              </tr>
+            ) : (
+              all.map((d) => {
+                const id = d.disputeId || d.id;
+                return (
+                  <tr
+                    key={id}
+                    onClick={() => setTarget(d)}
+                    className="hover:bg-indigo-50 cursor-pointer"
+                  >
+                    <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
+                    <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      <div>{d.filer?.name || d.filerName || '—'}</div>
+                      <div className="text-gray-400">→ {d.recipient?.name || d.recipientName || '—'}</div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">{d.releaseDirection || '—'}</td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      {d.releaseProposal?.proposedBy?.email || d.releaseProposal?.proposedBy?.uid || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-700">
+                      {d.releaseConfirmedBy?.email || d.releaseConfirmedBy?.uid || '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{formatDate(d.releaseConfirmedAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {target && (
+        <DisputeDetailsModal
+          dispute={target}
+          onClose={() => setTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function DisputesPage() {
   const { user, isAdmin, isAdminSupervisor, isAdminManager, isSuperAdmin } = useAuth();
 
@@ -1962,6 +2073,7 @@ function DisputesPage() {
   if (isAdminManager) tabs.push({ id: 'manager', label: 'Manager Decision' });
   if (isAdminManager) tabs.push({ id: 'awaiting_release', label: 'Awaiting Release' });
   if (isAdminManager) tabs.push({ id: 'pending_proposal', label: 'Pending Proposals' });
+  if (isAdmin) tabs.push({ id: 'closed_history', label: 'Closed History' });
   if (isSuperAdmin) tabs.push({ id: 'escalated', label: 'Escalated to Super Admin' });
   if (isSuperAdmin) tabs.push({ id: 'stuck', label: 'Stuck Cases' });
 
@@ -2004,6 +2116,7 @@ function DisputesPage() {
           {activeTab === 'manager' && <ManagerDecisionTab />}
           {activeTab === 'awaiting_release' && <AwaitingReleaseTab />}
           {activeTab === 'pending_proposal' && <PendingProposalTab />}
+          {activeTab === 'closed_history' && <ClosedHistoryTab />}
           {activeTab === 'escalated' && <EscalatedTab />}
           {activeTab === 'stuck' && <StuckTab />}
         </div>
