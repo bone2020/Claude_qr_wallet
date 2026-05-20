@@ -133,6 +133,64 @@ function DisputeDetailsModal({ dispute, onClose }) {
         <DetailsRow label="Manager Decision">
           {dispute.managerDecision?.decision} {dispute.managerDecision?.notes && `— ${dispute.managerDecision.notes}`}
         </DetailsRow>
+        {/* Phase 5i E2: escrow tracking, release flow, and closing remarks fields. */}
+        <DetailsRow label="Amount in Escrow">
+          {dispute.amountInEscrow != null
+            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            : '—'}
+        </DetailsRow>
+        <DetailsRow label="Amount Owed">
+          {dispute.amountOwed != null
+            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountOwed / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            : '—'}
+        </DetailsRow>
+        <DetailsRow label="Decision Direction">{dispute.decisionDirection || '—'}</DetailsRow>
+        <DetailsRow label="Phase 5i Timeline">
+          <div className="space-y-0.5 text-xs">
+            <div>Solved: {formatDate(dispute.solvedAt)}</div>
+            <div>Awaiting release: {formatDate(dispute.awaitingReleaseAt)}</div>
+            <div>Funds fully collected: {formatDate(dispute.fullyCollectedAt)}</div>
+            <div>Release confirmed: {formatDate(dispute.releaseConfirmedAt)}</div>
+            <div>Release rejected: {formatDate(dispute.releaseRejectedAt)}</div>
+          </div>
+        </DetailsRow>
+        <DetailsRow label="Final Release Direction">{dispute.releaseDirection || '—'}</DetailsRow>
+        <DetailsRow label="Closing Remarks">{dispute.closingRemarks || '—'}</DetailsRow>
+        <DetailsRow label="Release Proposal">
+          {dispute.releaseProposal ? (
+            <div className="space-y-0.5 text-xs">
+              <div>By: {dispute.releaseProposal.proposedBy?.email || dispute.releaseProposal.proposedBy?.uid || '—'}</div>
+              <div>Direction: {dispute.releaseProposal.releaseDirection || '—'}</div>
+              <div>Notes: {dispute.releaseProposal.notes || '—'}</div>
+              <div>Buyer contacted: {dispute.releaseProposal.buyerContacted ? 'yes' : 'no'}</div>
+              <div>Seller contacted: {dispute.releaseProposal.sellerContacted ? 'yes' : 'no'}</div>
+              <div>Expires: {formatDate(dispute.releaseProposal.expiresAt)}</div>
+            </div>
+          ) : (
+            '—'
+          )}
+        </DetailsRow>
+        <DetailsRow label="Release Confirmation">
+          {dispute.releaseConfirmedBy ? (
+            <div>
+              {dispute.releaseConfirmedBy.email || dispute.releaseConfirmedBy.uid || 'admin'} on {formatDate(dispute.releaseConfirmedAt)}
+            </div>
+          ) : (
+            '—'
+          )}
+        </DetailsRow>
+        <DetailsRow label="Release Rejection">
+          {dispute.releaseRejectedBy ? (
+            <div className="space-y-0.5 text-xs">
+              <div>By: {dispute.releaseRejectedBy.email || dispute.releaseRejectedBy.uid || 'admin'}</div>
+              <div>At: {formatDate(dispute.releaseRejectedAt)}</div>
+              <div>Reason: {dispute.releaseRejectionReason || '—'}</div>
+            </div>
+          ) : (
+            '—'
+          )}
+        </DetailsRow>
+        <DetailsRow label="Fee Refunded">{dispute.feeRefunded ? 'yes' : 'no'}</DetailsRow>
       </div>
       <div className="mt-5 flex justify-end">
         <button
