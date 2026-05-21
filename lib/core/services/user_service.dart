@@ -147,13 +147,33 @@ class UserService {
     // Errors are propagated to the caller - KYC is not complete if this fails
   }
 
-  /// Upload KYC documents
+ /// Upload KYC documents.
+  ///
+  /// New parameters (added by audit fix §4.1 Phase 2.0):
+  ///
+  /// - [livenessImages]: optional list of liveness frame files captured by the
+  ///   Smile ID SDK. When provided, each frame is uploaded to Storage and its
+  ///   path is returned via [UserResult.kycMediaPaths.livenessStoragePaths].
+  ///   Required by the server-side BIOMETRIC_KYC submission flow.
+  /// - [mediaScope]: optional path-prefix segment used to isolate this upload
+  ///   attempt from previous attempts. When non-null, uploads land under
+  ///   `kyc_documents/{userId}/{mediaScope}/`. When null, uploads fall back to
+  ///   the legacy flat layout `kyc_documents/{userId}/`. Callers that want
+  ///   per-attempt isolation (and audit traceability matching Smile ID jobs)
+  ///   should pass the Smile ID job ID extracted from the SDK result.
+  ///
+  /// Returns [UserResult.success] with a populated [KycMediaPaths] containing
+  /// the storage paths of all files that were uploaded. Callers that need to
+  /// invoke the server-side submitBiometricKycVerification callable should
+  /// read these paths off the result.
   Future<UserResult> uploadKycDocuments({
     File? idFront,
     File? idBack,
     required String idType,
     required DateTime dateOfBirth,
     File? selfie,
+    List<File>? livenessImages,
+    String? mediaScope,
     String? idNumber,
     bool smileIdVerified = false,
     String? smileIdResult,
@@ -168,6 +188,20 @@ class UserService {
     }
 
     try {
+      // Per-attempt path prefix. When mediaScope is provided (typically a
+      // Smile ID job ID) uploads land in a per-attempt subfolder so retries
+      // don't overwrite or partial-mix with previous attempts. When mediaScope
+      // is null/empty, paths fall back to the legacy flat layout for
+      // backward compatibility with screens that haven't adopted scoping yet.
+      final String prefix = (mediaScope != null && mediaScope.isNotEmpty)
+          ? 'kyc_documents/$_userId/$mediaScope'
+          : 'kyc_documents/$_userId';
+
+      String? idFrontStoragePath;
+      String? idBackStoragePath;
+      String? selfieStoragePath;
+      final livenessStoragePaths = <String>[];
+
       final kycData = <String, dynamic>{
         'idType': idType,
         'dateOfBirth': dateOfBirth.toIso8601String(),
@@ -176,39 +210,48 @@ class UserService {
         'smileIdVerified': smileIdVerified,
         if (idNumber != null) 'idNumber': idNumber,
         if (smileIdResult != null) 'smileIdResult': smileIdResult,
+        if (mediaScope != null && mediaScope.isNotEmpty) 'mediaScope': mediaScope,
       };
 
       // Upload ID front (if provided)
       if (idFront != null) {
-        final frontRef = _storage
-            .ref()
-            .child('kyc_documents')
-            .child(_userId!)
-            .child('id_front.jpg');
+        idFrontStoragePath = '$prefix/id_front.jpg';
+        final frontRef = _storage.ref().child(idFrontStoragePath);
         final frontUpload = await frontRef.putFile(idFront);
         kycData['idFrontUrl'] = await frontUpload.ref.getDownloadURL();
+        kycData['idFrontStoragePath'] = idFrontStoragePath;
       }
 
       // Upload ID back (if provided)
       if (idBack != null) {
-        final backRef = _storage
-            .ref()
-            .child('kyc_documents')
-            .child(_userId!)
-            .child('id_back.jpg');
+        idBackStoragePath = '$prefix/id_back.jpg';
+        final backRef = _storage.ref().child(idBackStoragePath);
         final backUpload = await backRef.putFile(idBack);
         kycData['idBackUrl'] = await backUpload.ref.getDownloadURL();
+        kycData['idBackStoragePath'] = idBackStoragePath;
       }
 
       // Upload selfie (if provided)
       if (selfie != null) {
-        final selfieRef = _storage
-            .ref()
-            .child('kyc_documents')
-            .child(_userId!)
-            .child('selfie.jpg');
+        selfieStoragePath = '$prefix/selfie.jpg';
+        final selfieRef = _storage.ref().child(selfieStoragePath);
         final selfieUpload = await selfieRef.putFile(selfie);
         kycData['selfieUrl'] = await selfieUpload.ref.getDownloadURL();
+        kycData['selfieStoragePath'] = selfieStoragePath;
+      }
+
+      // Upload liveness frames (if provided). Each frame produces a stable
+      // path of the form `$prefix/liveness_$i.jpg`. The backend
+      // submitBiometricKycVerification callable expects a non-empty array
+      // of these paths to fulfill Smile ID's BIOMETRIC_KYC liveness signal.
+      if (livenessImages != null && livenessImages.isNotEmpty) {
+        for (var i = 0; i < livenessImages.length; i++) {
+          final path = '$prefix/liveness_$i.jpg';
+          final ref = _storage.ref().child(path);
+          await ref.putFile(livenessImages[i]);
+          livenessStoragePaths.add(path);
+        }
+        kycData['livenessStoragePaths'] = livenessStoragePaths;
       }
 
       // Store KYC data in subcollection with retry
@@ -239,7 +282,15 @@ class UserService {
       }
 
       final updatedUser = await getCurrentUser();
-      return UserResult.success(updatedUser!);
+      return UserResult.success(
+        updatedUser!,
+        kycMediaPaths: KycMediaPaths(
+          selfieStoragePath: selfieStoragePath,
+          livenessStoragePaths: livenessStoragePaths,
+          idFrontStoragePath: idFrontStoragePath,
+          idBackStoragePath: idBackStoragePath,
+        ),
+      );
     } catch (e) {
       debugPrint('user_service error: $e');
       return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
@@ -477,22 +528,54 @@ class UserService {
   }
 }
 
+/// Storage paths for KYC media files uploaded by [UserService.uploadKycDocuments].
+///
+/// Returned via [UserResult.kycMediaPaths] when the upload succeeds. These paths
+/// reference files in Firebase Storage and are intended to be passed verbatim
+/// to server-side callable functions (e.g. submitBiometricKycVerification) so
+/// the backend can download the original files and forward them to identity
+/// providers like Smile ID.
+///
+/// When the upload is scoped (i.e. the caller passed `mediaScope`), all paths
+/// share the per-attempt prefix `kyc_documents/{userId}/{mediaScope}/`. When
+/// the upload is not scoped, paths fall back to the legacy flat layout
+/// `kyc_documents/{userId}/`.
+class KycMediaPaths {
+  final String? selfieStoragePath;
+  final List<String> livenessStoragePaths;
+  final String? idFrontStoragePath;
+  final String? idBackStoragePath;
+
+  const KycMediaPaths({
+    this.selfieStoragePath,
+    this.livenessStoragePaths = const [],
+    this.idFrontStoragePath,
+    this.idBackStoragePath,
+  });
+}
+
 /// Result wrapper for user operations
 class UserResult {
   final bool success;
   final UserModel? user;
   final UserErrorKey? errorKey;
   final GenericErrorKey? genericErrorKey;
+  final KycMediaPaths? kycMediaPaths;
 
   UserResult._({
     required this.success,
     this.user,
     this.errorKey,
     this.genericErrorKey,
+    this.kycMediaPaths,
   });
 
-  factory UserResult.success(UserModel? user) {
-    return UserResult._(success: true, user: user);
+  factory UserResult.success(UserModel? user, {KycMediaPaths? kycMediaPaths}) {
+    return UserResult._(
+      success: true,
+      user: user,
+      kycMediaPaths: kycMediaPaths,
+    );
   }
 
   factory UserResult.failure(UserErrorKey errorKey) {
