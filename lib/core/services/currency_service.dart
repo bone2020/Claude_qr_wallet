@@ -34,11 +34,11 @@ class CurrencyService {
 
   // Default currency if none found
   static const CurrencyModel defaultCurrency = CurrencyModel(
-    code: 'NGN',
-    symbol: '₦',
-    name: 'Nigerian Naira',
-    countryCode: '+234',
-    flag: '🇳🇬',
+    code: 'GHS',
+    symbol: 'GH₵',
+    name: 'Ghanaian Cedi',
+    countryCode: '+233',
+    flag: '🇬🇭',
   );
 
   // Get currency by country dial code (for sign-up)
