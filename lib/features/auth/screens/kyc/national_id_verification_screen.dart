@@ -50,10 +50,23 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   SmileIdFiles? _smileIdFiles;
   String? _userId;
 
-  // South Africa requires ID number
-  // ZM and ZW no longer require an ID number — switched from database lookup (TPIN / NATIONAL_ID_NO_PHOTO)
-  // to document verification (NATIONAL_ID). SA still uses database lookup and requires an ID number.
-  bool get _requiresIdNumber => widget.countryCode == 'ZA';
+  // Document verification is now used for ALL countries supported by the
+  // national_id flow. ZM and ZW were previously migrated from database lookup
+  // (TPIN / NATIONAL_ID_NO_PHOTO) to document verification pending SmileID
+  // entitlement activation. ZA was migrated in the same direction as part of
+  // cross-check audit section 4.1, Option α (2026-05-21) -- SA database-lookup
+  // entitlement was not active, and ZA users were the only remaining live path
+  // through the SmartSelfie + database-only flow (which produced result code
+  // 0810 and could not finalize KYC under the tightened Phase 1 webhook).
+  //
+  // This getter is preserved as `false` rather than removed so the downstream
+  // conditional branches (UI, phone verification payload, uploadKycDocuments
+  // args, submitBiometricKycVerification call) remain structurally intact and
+  // easy to re-enable if SmileID entitlement is later granted. A future
+  // cleanup pass (Phase 2C) can remove the now-unused branches and the
+  // `_SmileIdSmartSelfieScreen` / `_SmileIdBiometricKycScreen` internal
+  // classes.
+  bool get _requiresIdNumber => false;
 
   String get _documentType {
     switch (widget.countryCode) {
