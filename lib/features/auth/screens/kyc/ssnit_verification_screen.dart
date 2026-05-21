@@ -155,12 +155,33 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
         if (!mounted) return;
       }
 
+      // Extract the Smile ID job ID from the on-device SDK result.
+      // Used as the per-attempt media scope for the upload (so retries
+      // don't overwrite previous attempts) and as the smileJobId field on
+      // the user doc (used by polling/audit). If the result can't be parsed,
+      // the upload falls back to the legacy flat-path layout and we skip the
+      // user-doc smileJobId field -- both are non-fatal.
+      String? smileJobId;
+      if (_verificationResult != null && _verificationResult != 'already_enrolled_pending') {
+        try {
+          final jsonResult = json.decode(_verificationResult!);
+          smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
+          if (smileJobId == null) {
+            final selfieFile = jsonResult['selfieFile']?.toString() ?? '';
+            final jobMatch = RegExp(r'job-[a-f0-9\-]+').firstMatch(selfieFile);
+            if (jobMatch != null) smileJobId = jobMatch.group(0);
+          }
+        } catch (_) {}
+      }
+
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: 'SSNIT',
         idNumber: _idNumberController.text.trim().toUpperCase(),
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,
+        livenessImages: _smileIdFiles?.livenessImages,
+        mediaScope: smileJobId,
         idFront: null,
         idBack: null,
         smileIdVerified: false,
@@ -169,63 +190,87 @@ class _SsnitVerificationScreenState extends ConsumerState<SsnitVerificationScree
 
       if (!mounted) return;
 
-      if (result.success) {
-        if (result.user != null) {
-          ref.read(authNotifierProvider.notifier).updateUser(result.user!);
-        }
+      if (!result.success) {
+        _showError(resolveUserResultError(loc, result));
+        return;
+      }
 
-        // Set kycStatus to pending_review (webhook will finalize to verified)
+      // Verify the upload produced the storage paths required by the
+      // server-side BIOMETRIC_KYC submission. If the SDK didn't capture
+      // liveness frames or the upload didn't populate them, fail closed
+      // -- the verification cannot succeed downstream without these.
+      final paths = result.kycMediaPaths;
+      if (paths == null ||
+          paths.selfieStoragePath == null ||
+          paths.livenessStoragePaths.isEmpty) {
+        _showError('Verification media incomplete. Please try again.');
+        return;
+      }
+
+      if (result.user != null) {
+        ref.read(authNotifierProvider.notifier).updateUser(result.user!);
+      }
+
+      // Save SmileID userId and jobId for polling.
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null && _userId != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'smileUserId': _userId,
+            if (smileJobId != null) 'smileJobId': smileJobId,
+          });
+        }
+      } catch (e) {
+        debugPrint('Error saving SmileID job info: $e');
+      }
+
+      // Submit Biometric KYC via server-side API.
+      //
+      // Per audit 4.1 Phase 2 design decision 2 (reordered): this call runs
+      // BEFORE completeKycVerification so user.kycStatus only becomes
+      // 'pending_review' if Smile ID actually accepted the submission.
+      //
+      // Per audit 4.1 Phase 2 design decision 3 (fail-closed): if submission
+      // fails, surface the error and stay on this screen so the user can
+      // retry. Do NOT navigate to the verification-pending screen because
+      // there is no in-flight Smile ID job to wait on.
+      try {
+        final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
+        await submitKyc.call({
+          'smileUserId': _userId,
+          'country': widget.countryCode,
+          'idType': 'SSNIT',
+          'idNumber': _idNumberController.text.trim().toUpperCase(),
+          'selfieStoragePath': paths.selfieStoragePath,
+          'livenessStoragePaths': paths.livenessStoragePaths,
+          'dob': _dateOfBirth!.toIso8601String(),
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showError('Verification submission failed. Please try again.');
+        debugPrint('submitBiometricKycVerification failed: $e');
+        return;
+      }
+
+      if (!mounted) return;
+
+      // Submission succeeded -> safe to mark KYC as pending_review.
+      // If completeKycVerification itself fails (rare), proceed anyway:
+      // the Smile ID webhook will finalize user.kycStatus when the
+      // BIOMETRIC_KYC result arrives, so the user is not left stranded.
+      try {
         final completeKyc = FirebaseFunctions.instance.httpsCallable('completeKycVerification');
         await completeKyc.call();
-
-        // Save SmileID userId and jobId for polling
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user != null && _userId != null) {
-            String? smileJobId;
-            if (_verificationResult != null && _verificationResult != 'already_enrolled_pending') {
-              try {
-                final jsonResult = json.decode(_verificationResult!);
-                smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
-                // Extract job ID from file paths if not found
-                if (smileJobId == null) {
-                  final selfieFile = jsonResult['selfieFile']?.toString() ?? '';
-                  final jobMatch = RegExp(r'job-[a-f0-9\-]+').firstMatch(selfieFile);
-                  if (jobMatch != null) smileJobId = jobMatch.group(0);
-                }
-              } catch (_) {}
-            }
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .update({
-              'smileUserId': _userId,
-              if (smileJobId != null) 'smileJobId': smileJobId,
-            });
-          }
-        } catch (e) {
-          debugPrint('Error saving SmileID job info: $e');
-        }
-
-        // Submit Biometric KYC via server-side API
-        try {
-          final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
-          await submitKyc.call({
-            'smileUserId': _userId,
-            'country': widget.countryCode,
-            'idType': 'SSNIT',
-            'idNumber': _idNumberController.text.trim().toUpperCase(),
-          });
-        } catch (e) {
-          debugPrint('Error submitting biometric KYC: $e');
-        }
-
-        await PushNotificationService().saveTokenToFirestore();
-        if (!mounted) return;
-        context.go(AppRoutes.verificationPending);
-      } else {
-        _showError(resolveUserResultError(loc, result));
+      } catch (e) {
+        debugPrint('completeKycVerification failed after submit succeeded: $e');
       }
+
+      await PushNotificationService().saveTokenToFirestore();
+      if (!mounted) return;
+      context.go(AppRoutes.verificationPending);
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString());
