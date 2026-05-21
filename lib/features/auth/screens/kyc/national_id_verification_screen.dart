@@ -8,22 +8,18 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:smile_id/smile_id.dart';
-import 'package:smile_id/products/biometric/smile_id_biometric_kyc.dart';
 import 'package:smile_id/products/document/smile_id_document_verification.dart';
-import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
 import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
-import '../../../../core/services/smile_id_localization_resolver.dart';
 import '../../../../core/services/user_service.dart';
 import '../../../../core/services/user_localization_resolver.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
 import '../../../../core/services/push_notification_service.dart';
-import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 const String _smileIdCallbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
 
@@ -41,7 +37,6 @@ class NationalIdVerificationScreen extends ConsumerStatefulWidget {
 
 class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerificationScreen> {
   final _smileIdService = SmileIDService.instance;
-  final _idNumberController = TextEditingController();
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
@@ -49,24 +44,6 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
   String? _verificationResult;
   SmileIdFiles? _smileIdFiles;
   String? _userId;
-
-  // Document verification is now used for ALL countries supported by the
-  // national_id flow. ZM and ZW were previously migrated from database lookup
-  // (TPIN / NATIONAL_ID_NO_PHOTO) to document verification pending SmileID
-  // entitlement activation. ZA was migrated in the same direction as part of
-  // cross-check audit section 4.1, Option α (2026-05-21) -- SA database-lookup
-  // entitlement was not active, and ZA users were the only remaining live path
-  // through the SmartSelfie + database-only flow (which produced result code
-  // 0810 and could not finalize KYC under the tightened Phase 1 webhook).
-  //
-  // This getter is preserved as `false` rather than removed so the downstream
-  // conditional branches (UI, phone verification payload, uploadKycDocuments
-  // args, submitBiometricKycVerification call) remain structurally intact and
-  // easy to re-enable if SmileID entitlement is later granted. A future
-  // cleanup pass (Phase 2C) can remove the now-unused branches and the
-  // `_SmileIdSmartSelfieScreen` / `_SmileIdBiometricKycScreen` internal
-  // classes.
-  bool get _requiresIdNumber => false;
 
   String get _documentType {
     switch (widget.countryCode) {
@@ -113,71 +90,31 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
     _generateUserId();
   }
 
-  @override
-  void dispose() {
-    _idNumberController.dispose();
-    super.dispose();
-  }
-
   void _generateUserId() {
     final user = ref.read(currentUserProvider);
     _userId = _smileIdService.generateUserId();
   }
 
   Future<void> _startVerification() async {
-    // Validate ID number if required (South Africa)
-    if (_requiresIdNumber) {
-      final idNumber = _idNumberController.text.trim();
-      final validation = _smileIdService.validateIdNumber(idNumber, 'NATIONAL_ID', widget.countryCode);
-      if (!validation.isValid) {
-        final loc = AppLocalizations.of(context);
-        final key = validation.errorKey;
-        _showError(key != null
-            ? resolveIdValidationErrorMessage(loc, key)
-            : loc.invalidIdNumberFallback);
-        return;
-      }
-
-      // Use SmartSelfie for database-only verification (ZA, ZM, ZW)
-      final result = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => _SmileIdSmartSelfieScreen(
-            userId: _userId!,
-          ),
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _SmileIdDocumentScreen(
+          userId: _userId!,
+          countryCode: widget.countryCode,
+          documentType: _documentType,
+          captureBothSides: true,
         ),
-      );
+      ),
+    );
 
-      if (result != null) {
-        setState(() {
-          _isCaptured = true;
-          _verificationResult = result;
-          _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
-        });
-        _showSuccess('Selfie captured successfully');
-      }
-    } else {
-      // Use Document Verification for other countries
-      final result = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(
-          builder: (context) => _SmileIdDocumentScreen(
-            userId: _userId!,
-            countryCode: widget.countryCode,
-            documentType: _documentType,
-            captureBothSides: true,
-          ),
-        ),
-      );
-
-      if (result != null) {
-        setState(() {
-          _isCaptured = true;
-          _verificationResult = result;
-          _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
-        });
-        _showSuccess('Document captured successfully');
-      }
+    if (result != null) {
+      setState(() {
+        _isCaptured = true;
+        _verificationResult = result;
+        _smileIdFiles = SmileIDService.instance.parseResultFiles(result);
+      });
+      _showSuccess('Document captured successfully');
     }
   }
 
@@ -234,7 +171,6 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
             'countryCode': widget.countryCode,
             'firstName': null,
             'lastName': null,
-            'idNumber': _requiresIdNumber ? _idNumberController.text.trim() : null,
             'documentVerified': true,
           },
         );
@@ -245,11 +181,10 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: _documentType,
-        idNumber: _requiresIdNumber ? _idNumberController.text.trim() : null,
         dateOfBirth: _dateOfBirth!,
         selfie: _smileIdFiles?.selfie,
-        idFront: _requiresIdNumber ? null : _smileIdFiles?.documentFront,
-        idBack: _requiresIdNumber ? null : _smileIdFiles?.documentBack,
+        idFront: _smileIdFiles?.documentFront,
+        idBack: _smileIdFiles?.documentBack,
         smileIdVerified: false,
         smileIdResult: _verificationResult,
       );
@@ -292,21 +227,6 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
           }
         } catch (e) {
           debugPrint('Error saving SmileID job info: $e');
-        }
-
-        // Submit Biometric KYC via server-side API (database-only path)
-        if (_requiresIdNumber) {
-          try {
-            final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
-            await submitKyc.call({
-              'smileUserId': _userId,
-              'country': widget.countryCode,
-              'idType': _documentType,
-              'idNumber': _idNumberController.text.trim(),
-            });
-          } catch (e) {
-            debugPrint('Error submitting biometric KYC: $e');
-          }
         }
 
         await PushNotificationService().saveTokenToFirestore();
@@ -371,27 +291,11 @@ class _NationalIdVerificationScreenState extends ConsumerState<NationalIdVerific
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
-                    if (_requiresIdNumber) ...[
-                      KycIdNumberInput(
-                        controller: _idNumberController,
-                        label: widget.countryCode == 'ZM' ? AppLocalizations.of(context).tpinLabel : AppLocalizations.of(context).idNumberLabel,
-                        hint: widget.countryCode == 'ZM'
-                            ? AppLocalizations.of(context).enterTpinHint
-                            : AppLocalizations.of(context).enterIdNumberHint,
-                        helperText: widget.countryCode == 'ZM'
-                            ? AppLocalizations.of(context).zambianTaxpayerHelperText
-                            : AppLocalizations.of(context).southAfricanIdHelperText,
-                      ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
-                      const SizedBox(height: AppDimensions.spaceXL),
-                    ],
-
                     KycVerificationCard(
                       title: _isCaptured ? AppLocalizations.of(context).documentCapturedTitle : AppLocalizations.of(context).verifyYourDocumentTitle(_countryName),
                       description: _isCaptured
                           ? AppLocalizations.of(context).documentCapturedBody(_countryName)
-                          : _requiresIdNumber
-                              ? AppLocalizations.of(context).idAndSelfieVerificationDescription
-                              : AppLocalizations.of(context).documentBothSidesAndSelfieDescription,
+                          : AppLocalizations.of(context).documentBothSidesAndSelfieDescription,
                       isVerified: _isCaptured,
                       onStartVerification: _startVerification,
                     ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
@@ -477,105 +381,6 @@ class _SmileIdDocumentScreen extends StatelessWidget {
         onError: (error) async {
           // "Already enrolled" means SmileID has seen this user before
           // Still require webhook verification — don't bypass
-          if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled_pending');
-            }
-            return;
-          }
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
-                backgroundColor: AppColors.error,
-              ),
-            );
-            Navigator.pop(context);
-          }
-        },
-      ),
-    );
-  }
-}
-
-/// Internal Smile ID Biometric KYC Screen
-class _SmileIdBiometricScreen extends StatelessWidget {
-  final String userId;
-  final String countryCode;
-  final String idType;
-  final String idNumber;
-
-  const _SmileIdBiometricScreen({
-    required this.userId,
-    required this.countryCode,
-    required this.idType,
-    required this.idNumber,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SmileIDBiometricKYC(
-        country: countryCode,
-        idType: idType,
-        idNumber: idNumber,
-        userId: userId,
-        extraPartnerParams: {"callback_url": _smileIdCallbackUrl},
-        allowAgentMode: false,
-        showAttribution: true,
-        showInstructions: true,
-        onSuccess: (result) {
-          Navigator.pop(context, result);
-        },
-        onError: (error) async {
-          // "Already enrolled" means SmileID has seen this user before
-          // Still require webhook verification — don't bypass
-          if (ErrorHandler.isAlreadyEnrolledError(error)) {
-            if (context.mounted) {
-              Navigator.pop(context, 'already_enrolled_pending');
-            }
-            return;
-          }
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(AppLocalizations.of(context).verificationFailedWithError(error)),
-                backgroundColor: AppColors.error,
-              ),
-            );
-            Navigator.pop(context);
-          }
-        },
-      ),
-    );
-  }
-}
-
-/// Internal SmartSelfie Enrollment Screen (selfie only, no document)
-/// Used for database-only verification (ZA, ZM, ZW)
-class _SmileIdSmartSelfieScreen extends StatelessWidget {
-  final String userId;
-
-  const _SmileIdSmartSelfieScreen({
-    required this.userId,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SmileIDSmartSelfieEnrollment(
-        userId: userId,
-        allowNewEnroll: true,
-        allowAgentMode: false,
-        showAttribution: true,
-        showInstructions: true,
-        extraPartnerParams: {
-          "callback_url": _smileIdCallbackUrl,
-        },
-        onSuccess: (result) {
-          Navigator.pop(context, result);
-        },
-        onError: (error) {
           if (ErrorHandler.isAlreadyEnrolledError(error)) {
             if (context.mounted) {
               Navigator.pop(context, 'already_enrolled_pending');
