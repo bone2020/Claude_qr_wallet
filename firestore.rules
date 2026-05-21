@@ -138,23 +138,26 @@ service cloud.firestore {
       }
     }
 
-    // Wallets - read own only, create during signup, updates via Cloud Functions
+    // Wallets — read own only; all writes via Cloud Functions (Admin SDK).
     match /wallets/{walletId} {
       allow read: if isAuthenticated() && request.auth.uid == walletId;
-      // Create requires: balance must be 0, heldBalance must be 0,
-      // availableBalance must be 0, userId must match auth, walletId must be present.
-      // heldBalance and availableBalance are part of the wallet holds feature
-      // (added Phase 1). Any new wallet must initialize all three balance fields
-      // to zero. After creation, all balance changes go through Cloud Functions only.
-      allow create: if isAuthenticated()
-        && request.auth.uid == walletId
-        && request.resource.data.balance == 0
-        && request.resource.data.heldBalance == 0
-        && request.resource.data.availableBalance == 0
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.keys().hasAll(['walletId', 'currency', 'balance', 'heldBalance', 'availableBalance'])
-        && !request.resource.data.keys().hasAny(['isAdmin', 'role']);
-      allow update, delete: if false;
+      // Writes: server-only. Wallets are created exclusively by Cloud
+      // Functions (createWalletForUser, completeKycVerification) AFTER
+      // KYC verification (kycStatus == 'verified'), via the Admin SDK
+      // which bypasses these rules. The previous create rule allowed any
+      // authed user to create their own zero-balance wallet without a
+      // KYC check, leaving a defense-in-depth gap even though the Cloud
+      // Function correctly enforces KYC at creation time. Cross-check
+      // audit section 4.8 (2026-05-21) flagged this. Resolved by
+      // forbidding all client writes, consistent with how every other
+      // money-touching collection in this file is structured.
+      //
+      // Verified no client-side wallet creates exist in lib/ — all
+      // references are reads/queries via .get()/.snapshots()/.where().
+      // The .delete() in lib/core/services/user_service.dart's
+      // deleteAccount() was already blocked by the previous
+      // `allow update, delete: if false` rule; behavior unchanged.
+      allow create, update, delete: if false;
 
       // Phase 5i: platform-owned dispute recovery escrow wallets.
       // Path pattern: wallets/dispute_recovery_<CURRENCY>
