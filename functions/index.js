@@ -11220,8 +11220,21 @@ exports.smileIdWebhook = functions
     // SmileID uses values like "Passed", "Failed", "Not Applicable", "Not Done", "Completed".
     const isPass = (v) => v === 'Pass' || v === 'Passed' || v === 'Completed';
     const isPassOrNa = (v) => isPass(v) || v === 'Not Applicable';
-    const livenessPass = isPassOrNa(livenessResult);
-    const selfiePass = isPass(selfieCheck) || isPass(selfieToIdCompare);
+    // Strict pass for liveness. Treating "Not Applicable" as a pass (the
+    // previous behavior via isPassOrNa) accepted jobs where the liveness
+    // signal was missing entirely, which a regulated fintech KYC flow
+    // should not. The isPassOrNa helper is preserved because documentPass
+    // below still uses it (documentPass is computed but not part of the
+    // face-match gate). See cross-check audit section 4.1 (2026-05-21).
+    const livenessPass = isPass(livenessResult);
+    // Selfie-against-ID compare must pass -- a generic Selfie_Check (image
+    // quality / valid face image) is NOT a substitute for the actual face-
+    // to-government-ID match. The humanReviewPass fallback in faceMatchPassed
+    // (below) still handles cases where Smile ID flags a job for a human
+    // reviewer who then confirms the match. See cross-check audit section
+    // 4.1 -- Phase 1.5 hardening consistent with the Option A choice
+    // (require government-ID match).
+    const selfiePass = isPass(selfieToIdCompare);
     const humanReviewPass = isPass(humanReview);
     const documentPass = isPassOrNa(documentCheck);
     const faceMatchPassed = livenessPass && (selfiePass || humanReviewPass);
@@ -11269,14 +11282,22 @@ exports.smileIdWebhook = functions
       }, { merge: true });
 
     // Verification passed: face match + valid result code.
-    // 0220/0120 = document/enhanced-doc verification success.
-    // 1012 = Biometric KYC success (Selfie matched ID + ID verified).
-    // 0810 = SmartSelfie enrollment success.
+    // 0220/0120 = document/enhanced-doc verification success (selfie matched ID document).
+    // 1012 = Biometric KYC success (selfie matched government ID record).
+    //
+    // INTENTIONALLY EXCLUDED:
+    // 0810 = SmartSelfie enrollment success. Enrollment by itself only
+    // confirms a selfie was captured; it does NOT match the user against
+    // any government ID or document. KYC requires identity verification,
+    // not just face capture. The on-device SmartSelfie enrollment is the
+    // first step; submitBiometricKycVerification (which submits a
+    // BIOMETRIC_KYC job that produces a 1012 result on success) is what
+    // actually verifies identity. See cross-check audit section 4.1
+    // (2026-05-21).
     const validResultCode =
       resultCode === '0220' ||
       resultCode === '0120' ||
-      resultCode === '1012' ||
-      resultCode === '0810';
+      resultCode === '1012';
 
     // Definitive failure codes — set kycStatus to 'failed' so the waiting
     // screen can show a failure dialog instead of spinning forever.
@@ -11492,9 +11513,36 @@ exports.checkSmileIdJobStatus = functions
     const livenessCheck = actions.Liveness_Check || actions.liveness_check || '';
     const docCheck = actions.Document_Verification || actions.document_verification || '';
 
-    const isApproved = resultCode === '0810' ||
-                       (selfieCheck.toLowerCase() === 'passed' &&
-                        (docCheck.toLowerCase() === 'passed' || docCheck === ''));
+    // Determine if verification passed. Mirrors smileIdWebhook so this
+    // poll path cannot be used to bypass the webhook's tightened gate.
+    //
+    // KYC requires:
+    //   - Valid result code: 0220 (document verification), 0120 (document
+    //     verification), or 1012 (BIOMETRIC_KYC -- selfie matched government
+    //     ID). 0810 (SmartSelfie enrollment success) is INTENTIONALLY
+    //     EXCLUDED; enrollment alone does not match the user against any
+    //     government ID.
+    //   - Strict liveness pass (no empty/missing liveness signal).
+    //   - Selfie-against-ID compare passed (Selfie_To_ID_Card_Compare), or
+    //     Smile ID human reviewer confirmed the match.
+    //
+    // Before this change, this poll accepted resultCode '0810' alone, plus
+    // a fallback that passed when docCheck was empty -- both of which the
+    // SmartSelfie enrollment path triggers. That bypassed the BIOMETRIC_KYC
+    // government-ID match required by Option A (cross-check audit section
+    // 4.1, 2026-05-21).
+    const selfieToIdCompare = actions.Selfie_To_ID_Card_Compare || actions.selfie_to_id_card_compare || '';
+    const humanReview = actions.Human_Review_Compare || actions.human_review_compare || '';
+    const isApprovedPassStr = (s) => {
+      const lower = String(s || '').toLowerCase();
+      return lower === 'pass' || lower === 'passed' || lower === 'completed';
+    };
+    const validResultCode = resultCode === '0220' ||
+                            resultCode === '0120' ||
+                            resultCode === '1012';
+    const livenessPass = isApprovedPassStr(livenessCheck);
+    const selfieIdMatchPass = isApprovedPassStr(selfieToIdCompare) || isApprovedPassStr(humanReview);
+    const isApproved = validResultCode && livenessPass && selfieIdMatchPass;
 
     if (isApproved) {
       // APPROVED — update user and create wallet
