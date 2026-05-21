@@ -318,12 +318,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // disputes — Cloud Functions only (with exception for filer+recipient to READ their own)
+    // disputes — Cloud Functions only. NO direct client reads.
+    //
+    // All client access goes through callables:
+    //   user app:        userGetMyDisputes, userViewDispute
+    //   admin dashboard: adminListDisputes, adminAssignDispute,
+    //                    adminSubmitInvestigation, adminProposeDisputeRelease,
+    //                    adminConfirmDisputeRelease, adminRejectDisputeRelease,
+    //                    adminManagerDecision, adminSuperAdminDisputeDecision
+    //
+    // The previous filer+recipient READ carve-out exposed admin-internal fields
+    // (releaseProposal.proposedBy, managerNotes, reviewingManager,
+    // superAdminDecidedBy, releaseRejectionReason, _awaitingMoneyMovement,
+    // _recoveryWatchActive) that userViewDispute deliberately sanitizes before
+    // returning to clients. The Phase 5i design treats hiding the proposer
+    // identity and admin notes as a hard security boundary; this rule enforces
+    // it. See cross-check audit section 4.5 (2026-05-21).
+    //
+    // Verified clean on 2026-05-21: zero direct Firestore reads on disputes
+    // from lib/ or admin-dashboard/src/. Do NOT re-add the filer+recipient
+    // carve-out without re-confirming no client-side direct reads exist.
     match /disputes/{disputeId} {
-      allow read: if request.auth != null
-        && (resource.data.filedBy.uid == request.auth.uid
-            || resource.data.recipientUid == request.auth.uid);
-      allow write: if false;
+      allow read, write: if false;
     }
 
     // wallet_blocks — Cloud Functions only
