@@ -37,6 +37,23 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // ============================================================
+// CLOUD FUNCTIONS DEPLOYMENT URL (Phase 5.1)
+// ============================================================
+// Derives the Cloud Functions base URL from the runtime environment
+// instead of hardcoding the region in every webhook callback URL.
+// `process.env.GCLOUD_PROJECT` is auto-set by the Firebase Functions
+// runtime. `FUNCTIONS_REGION` has no auto-set equivalent in v1, so
+// we fall back to 'us-central1' which matches the current deploy
+// (verified via `firebase functions:list` on 2026-05-21 — all
+// functions in us-central1).
+//
+// If functions are ever migrated to a different region, update the
+// fallback string below; do NOT re-hardcode region in URLs.
+const FUNCTIONS_REGION = process.env.FUNCTIONS_REGION || 'us-central1';
+const PROJECT_ID = process.env.GCLOUD_PROJECT || 'qr-wallet-1993';
+const FUNCTIONS_BASE_URL = `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net`;
+
+// ============================================================
 // STANDARDIZED ERROR CODE FRAMEWORK
 // ============================================================
 
@@ -10218,8 +10235,8 @@ const MOMO_CONFIG = {
   get callbackUrl() {
     const secret = MOMO_WEBHOOK_SECRET.value;
     return secret
-      ? `https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook?token=${secret}`
-      : 'https://us-central1-qr-wallet-1993.cloudfunctions.net/momoWebhook';
+      ? `${FUNCTIONS_BASE_URL}/momoWebhook?token=${secret}`
+      : `${FUNCTIONS_BASE_URL}/momoWebhook`;
   },
 };
 
@@ -11639,7 +11656,7 @@ exports.submitBiometricKycVerification = functions
   });
 
   const jobId = `job_${SMILE_ID_PARTNER_ID.value}_${crypto.randomUUID()}`;
-  const callbackUrl = 'https://us-central1-qr-wallet-1993.cloudfunctions.net/smileIdWebhook';
+  const callbackUrl = `${FUNCTIONS_BASE_URL}/smileIdWebhook`;
   const sidServer = SMILE_ID_BASE_URL.value.includes('testapi') ? 0 : 1;
 
   // Track temp files for cleanup in finally block
