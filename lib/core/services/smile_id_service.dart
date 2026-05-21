@@ -48,7 +48,14 @@ class SmileIDService {
       {'value': 'ALIEN_ID', 'label': 'Alien ID', 'requiresNumber': false, 'smileIdType': 'ALIEN_CARD'},
     ],
     'ZA': [
-      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': true, 'smileIdType': 'NATIONAL_ID'},
+      // ZA NATIONAL_ID: was 'requiresNumber: true' (SmileID BiometricKYC database
+      // lookup). Migrated to document verification (same flow as ZM and ZW)
+      // pending SmileID entitlement activation for South African National ID
+      // database lookups. See cross-check audit section 4.1, Option α (2026-05-21).
+      // The actual flow selection is in national_id_verification_screen.dart's
+      // `_requiresIdNumber` getter; this field is documentation-only and is not
+      // read programmatically.
+      {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
     ],
