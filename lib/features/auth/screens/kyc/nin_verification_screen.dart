@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,6 +15,8 @@ import '../../../../generated/l10n/app_localizations.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/smile_id_service.dart';
 import '../../../../core/services/smile_id_localization_resolver.dart';
+import '../../../../core/services/user_localization_resolver.dart';
+import '../../../../core/services/user_service.dart';
 import '../../../../core/utils/error_handler.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../widgets/kyc_verification_card.dart';
@@ -39,6 +44,7 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   String? _verificationResult;
   String? _userId;
   String? _loadingMessage;
+  SmileIdFiles? _smileIdFiles;
 
   @override
   void initState() {
@@ -76,23 +82,6 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       return;
     }
 
-    final user = ref.read(currentUserProvider);
-    final firstName = user?.firstName;
-    final lastName = user?.lastName;
-    final dobIso = _dateOfBirth!.toIso8601String().split('T').first; // YYYY-MM-DD
-
-    // Capture the NIN form data so the Cloud Function can later submit
-    // it to SmileID Enhanced KYC together with the selfie job ID.
-    final ninFormData = {
-      'country': widget.countryCode,
-      'idType': 'NIN_V2',
-      'idNumber': idNumber,
-      'firstName': firstName,
-      'lastName': lastName,
-      'dob': dobIso,
-    };
-    debugPrint('NIN form data captured: $ninFormData');
-
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
@@ -109,6 +98,12 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
       setState(() {
         _isCaptured = true;
         _verificationResult = result;
+        // Parse the SDK result into File handles for selfie + liveness frames.
+        // These are required by the canonical biometric KYC pattern
+        // (see _handleContinue): the upload uses _smileIdFiles.selfie and
+        // _smileIdFiles.livenessImages, the resulting storage paths get
+        // threaded into submitBiometricKycVerification.
+        _smileIdFiles = _smileIdService.parseResultFiles(result);
       });
       _showSuccess('Verification submitted successfully');
     }
@@ -157,11 +152,11 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
     });
 
     try {
-      // Phone verification step (optional for SmileID countries)
-      // Phone verification: only run for SmileID countries.
-      // Non-SmileID countries already verified their phone at /phone-otp
-      // before reaching this KYC screen. Running it again here causes Firebase
-      // to throttle the second OTP request for the same number.
+      // Phone verification step (optional for SmileID countries).
+      // Phone verification: only run for SmileID countries. Non-SmileID
+      // countries already verified their phone at /phone-otp before reaching
+      // this KYC screen. Running it again here causes Firebase to throttle
+      // the second OTP request for the same number.
       const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
       if (smileIdCountries.contains(widget.countryCode.toUpperCase())) {
         await context.push<bool>(
@@ -185,36 +180,130 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
         return;
       }
 
-      // Save the kyc/documents record so verification_pending_screen can
-      // poll for smileUserId and listen for kycStatus updates from the webhook.
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(firebaseUser.uid)
-          .collection('kyc')
-          .doc('documents')
-          .set({
-        'idType': 'NIN_V2',
-        'idNumber': _idNumberController.text.trim(),
-        'dateOfBirth': _dateOfBirth!.toIso8601String(),
-        'submittedAt': FieldValue.serverTimestamp(),
-        'status': 'pending_review',
-        'smileIdVerified': false,
-        'smileUserId': _userId,
-        if (_verificationResult != null) 'smileIdResult': _verificationResult,
-      }, SetOptions(merge: true));
+      // Extract the Smile ID job ID from the on-device SDK result.
+      // Used as the per-attempt media scope for the upload (so retries
+      // don't overwrite previous attempts) and as the smileJobId field on
+      // the user doc (used by polling/audit). If the result can't be parsed,
+      // the upload falls back to the legacy flat-path layout and we skip the
+      // user-doc smileJobId field -- both are non-fatal.
+      String? smileJobId;
+      if (_verificationResult != null && _verificationResult != 'already_enrolled_pending') {
+        try {
+          final jsonResult = json.decode(_verificationResult!);
+          smileJobId = jsonResult['smile_job_id']?.toString() ?? jsonResult['smileJobId']?.toString();
+          if (smileJobId == null) {
+            final selfieFile = jsonResult['selfieFile']?.toString() ?? '';
+            final jobMatch = RegExp(r'job-[a-f0-9\-]+').firstMatch(selfieFile);
+            if (jobMatch != null) smileJobId = jobMatch.group(0);
+          }
+        } catch (_) {}
+      }
+
+      // Audit 4.3 fix: align Nigeria NIN to the canonical biometric KYC
+      // pattern. Previously this screen wrote the kyc/documents subdoc
+      // directly and never called completeKycVerification or
+      // submitBiometricKycVerification (the misleading "Phase 4b" comment
+      // claimed the CF would finalize the status, but no CF was ever
+      // invoked from this screen). Now it goes through the same flow as
+      // BVN: UserService.uploadKycDocuments -> submitBiometricKycVerification
+      // -> completeKycVerification -> navigate, with proper failure handling
+      // at each step.
+      //
+      // Note: unlike PR A's BVN canonical, this screen also passes idNumber
+      // to uploadKycDocuments so the NIN value is persisted in the
+      // kyc/documents Firestore doc as part of the upload. BVN should be
+      // brought up to this in a future cleanup pass.
+      final userService = UserService();
+      final result = await userService.uploadKycDocuments(
+        idType: 'NIN_V2',
+        idNumber: _idNumberController.text.trim(),
+        dateOfBirth: _dateOfBirth!,
+        selfie: _smileIdFiles?.selfie,
+        livenessImages: _smileIdFiles?.livenessImages,
+        mediaScope: smileJobId,
+        idFront: null,
+        idBack: null,
+        smileIdVerified: false,
+        smileIdResult: _verificationResult,
+      );
 
       if (!mounted) return;
 
-      // Phase 4b: kycCompleted is server-only. completeKycVerification CF
-      // sets it atomically with kycStatus=verified.
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(firebaseUser.uid)
-          .update({
-        'dateOfBirth': _dateOfBirth!.toIso8601String(),
-      });
+      if (!result.success) {
+        _showError(resolveUserResultError(loc, result));
+        return;
+      }
+
+      // Verify the upload produced the storage paths required by the
+      // server-side BIOMETRIC_KYC submission. If the SDK didn't capture
+      // liveness frames or the upload didn't populate them, fail closed
+      // -- the verification cannot succeed downstream without these.
+      final paths = result.kycMediaPaths;
+      if (paths == null ||
+          paths.selfieStoragePath == null ||
+          paths.livenessStoragePaths.isEmpty) {
+        _showError('Verification media incomplete. Please try again.');
+        return;
+      }
+
+      if (result.user != null) {
+        ref.read(authNotifierProvider.notifier).updateUser(result.user!);
+      }
+
+      // Save smileUserId + smileJobId to the user doc (preserved from
+      // the prior NIN flow; same pattern as BVN canonical).
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .update({
+          'smileUserId': _userId,
+          if (smileJobId != null) 'smileJobId': smileJobId,
+        });
+      } catch (e) {
+        debugPrint('Error saving SmileID job info: $e');
+      }
+
+      // Submit Biometric KYC via server-side API.
+      //
+      // Per audit 4.1 Phase 2 design decision 2 (reordered): this call runs
+      // BEFORE completeKycVerification so user.kycStatus only becomes
+      // 'pending_review' if Smile ID actually accepted the submission.
+      //
+      // Per audit 4.1 Phase 2 design decision 3 (fail-closed): if submission
+      // fails, surface the error and stay on this screen so the user can
+      // retry. Do NOT navigate to the verification-pending screen because
+      // there is no in-flight Smile ID job to wait on.
+      try {
+        final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
+        await submitKyc.call({
+          'smileUserId': _userId,
+          'country': widget.countryCode,
+          'idType': 'NIN_V2',
+          'idNumber': _idNumberController.text.trim(),
+          'selfieStoragePath': paths.selfieStoragePath,
+          'livenessStoragePaths': paths.livenessStoragePaths,
+          'dob': _dateOfBirth!.toIso8601String(),
+        });
+      } catch (e) {
+        if (!mounted) return;
+        _showError('Verification submission failed. Please try again.');
+        debugPrint('submitBiometricKycVerification failed: $e');
+        return;
+      }
 
       if (!mounted) return;
+
+      // Submission succeeded -> safe to mark KYC as pending_review.
+      // If completeKycVerification itself fails (rare), proceed anyway: the
+      // Smile ID webhook will finalize user.kycStatus when the BIOMETRIC_KYC
+      // result arrives, so the user is not left stranded.
+      try {
+        final completeKyc = FirebaseFunctions.instance.httpsCallable('completeKycVerification');
+        await completeKyc.call();
+      } catch (e) {
+        debugPrint('completeKycVerification failed after submit succeeded: $e');
+      }
 
       try {
         await ref.read(authNotifierProvider.notifier).refreshUser();
