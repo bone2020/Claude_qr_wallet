@@ -317,9 +317,30 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
         }
       } catch (e) {
-        // On error, allow navigation — server-side enforcement (Issue 1)
-        // is the primary guard for financial operations
-        debugPrint('Route guard: KYC check failed: $e');
+        // Audit 4.4 fix: fail closed on KYC read errors.
+        //
+        // Previously this catch swallowed any KYC-state-read failure
+        // (Firestore unreachable, transient permission issue, parse
+        // error, etc.) and fell through to `return null;` -- which
+        // tells GoRouter to allow the requested navigation. The
+        // original rationale was that server-side enforcement
+        // (Cloud Functions + Firestore rules) is the primary guard
+        // for financial operations, which is true for write paths
+        // but does not stop the client from LOADING screens
+        // containing sensitive state (wallet balances, account
+        // details, transaction history) before any server-side
+        // write attempt is made.
+        //
+        // The safe default when KYC state cannot be read is to
+        // treat the user as unverified and route them back to the
+        // KYC entry point. They can retry from there once the
+        // underlying error (network, permissions, transient
+        // Firestore failure) clears. This aligns with the catch at
+        // ~line 223 above, which is already fail-closed by the
+        // same logic ("redirect to the picker, which is the safe
+        // default").
+        debugPrint('Route guard: KYC check failed, failing closed to /kyc: $e');
+        return AppRoutes.kyc;
       }
 
       return null;
