@@ -10,7 +10,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../models/user_model.dart';
-import '../../models/wallet_model.dart';
 import '../utils/error_handler.dart';
 import '../utils/error_handler_localization_resolver.dart';
 import 'auth_localization_resolver.dart';
@@ -550,22 +549,6 @@ class AuthService {
   // ============================================================
   // HELPER METHODS
   // ============================================================
-
-  /// Generate unique wallet ID using cryptographically secure random values
-  /// Uses alphanumeric format with ~59 bits entropy (30^12 ≈ 5.3 × 10^17)
-  /// Collision probability is negligible — no Firestore uniqueness check needed
-  String _generateUniqueWalletId() {
-    // Alphanumeric charset (excludes confusing chars: 0, 1, I, L, O)
-    const charset = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-    final random = Random.secure();
-
-    String generatePart(int length) {
-      return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
-    }
-
-    // Generate: QRW-XXXX-XXXX-XXXX (12 random chars from 30-char set)
-    return 'QRW-${generatePart(4)}-${generatePart(4)}-${generatePart(4)}';
-  }
 
   /// Maps a FirebaseAuthException code to an [AuthErrorKey] enum value.
   AuthErrorKey _classifyAuthCode(String code) {

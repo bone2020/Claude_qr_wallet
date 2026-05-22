@@ -12,7 +12,6 @@ import 'transaction_localization_resolver.dart';
 import 'wallet_localization_resolver.dart';
 import '../utils/error_handler_localization_resolver.dart';
 import '../utils/network_retry.dart';
-import 'exchange_rate_service.dart';
 
 /// Wallet service handling all wallet and transaction operations
 class WalletService {
@@ -450,15 +449,6 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
     final bytes = List<int>.generate(12, (_) => random.nextInt(256));
     final randomPart = base64Url.encode(bytes).replaceAll('=', '');
     return 'idem_${operation}_${DateTime.now().millisecondsSinceEpoch}_$randomPart';
-  }
-
-  /// Generate unique transaction ID (cryptographically secure)
-  String _generateTransactionId() {
-    final random = Random.secure();
-    final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
-    final randomBytes = List<int>.generate(8, (_) => random.nextInt(256));
-    final randomPart = base64Url.encode(randomBytes).replaceAll('=', '');
-    return 'TXN_${timestamp}_$randomPart';
   }
 }
 

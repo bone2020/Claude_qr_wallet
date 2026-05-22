@@ -149,6 +149,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
+  // Foundation for social sign-up (Google) — wired into sign-up flow when
+  // activated. Implementation is complete; only the build() invocation
+  // is currently absent.
+  // ignore: unused_element
   Future<void> _handleGoogleSignUp() async {
     setState(() => _isLoading = true);
 
@@ -192,6 +196,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
+  // Foundation for social sign-up (Apple) — currently shows a "coming soon"
+  // snackbar pending Apple sign-in integration.
+  // ignore: unused_element
   void _handleAppleSignUp() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

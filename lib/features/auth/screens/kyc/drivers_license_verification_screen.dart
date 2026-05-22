@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/document/smile_id_document_verification.dart';
 
 import '../../../../core/constants/constants.dart';
@@ -52,7 +50,6 @@ class _DriversLicenseVerificationScreenState extends ConsumerState<DriversLicens
   }
 
   void _generateUserId() {
-    final user = ref.read(currentUserProvider);
     _userId = _smileIdService.generateUserId();
   }
 

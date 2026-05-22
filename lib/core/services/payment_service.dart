@@ -5,12 +5,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import '../utils/error_handler.dart';
-import 'wallet_service.dart';
 import 'momo_service.dart';
 
 /// Payment service handling Paystack integration via Cloud Functions
 class PaymentService {
-  final WalletService _walletService = WalletService();
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
   final MomoService _momoService = MomoService();
 
@@ -27,6 +25,7 @@ class PaymentService {
   );
 
   /// Validates that a Paystack key has been provided via --dart-define
+  // ignore: unused_element
   static void _validateKey() {
     if (_publicKey.isEmpty) {
       throw Exception(
@@ -393,12 +392,6 @@ class PaymentService {
   // ============================================================
   // HELPERS
   // ============================================================
-
-  String _generateReference() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = Random.secure().nextInt(999999).toString().padLeft(6, '0');
-    return 'QRW_${timestamp}_$random';
-  }
 
   /// Generate a unique idempotency key for financial operations
   String _generateIdempotencyKey(String operation) {
