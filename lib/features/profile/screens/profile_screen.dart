@@ -392,7 +392,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       final bioService = BiometricService();
                       final canCheck = await bioService.canCheckBiometrics();
                       if (!canCheck) {
-                        if (mounted) {
+                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(AppLocalizations.of(context).noBiometricsEnrolledToast),

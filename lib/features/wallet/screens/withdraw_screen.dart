@@ -463,7 +463,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                               otp: otp,
                             );
 
-                            if (!mounted) return;
+                            if (!context.mounted) return;
 
                             if (result.success) {
                               Navigator.of(context).pop(true);
