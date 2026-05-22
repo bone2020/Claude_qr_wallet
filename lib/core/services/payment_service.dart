@@ -24,9 +24,10 @@ class PaymentService {
     defaultValue: '',
   );
 
-  /// Validates that a Paystack key has been provided via --dart-define
-  // ignore: unused_element
-  static void _validateKey() {
+  /// Validates that a Paystack key has been provided via --dart-define.
+  /// Called from main() at app boot so misconfigured builds fail
+  /// immediately with a clear error instead of at first payment attempt.
+  static void validateKey() {
     if (_publicKey.isEmpty) {
       throw Exception(
         'PAYSTACK_PUBLIC_KEY not configured. '

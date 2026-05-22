@@ -19,6 +19,11 @@ import 'providers/providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Fail-fast: ensure Paystack public key was supplied via --dart-define
+  // at build time. Builds without it cannot process payments; surfacing
+  // the error at boot beats surfacing it at first payment attempt.
+  PaymentService.validateKey();
+
   // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
