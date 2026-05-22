@@ -755,7 +755,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
             inactiveThumbColor: AppColors.textSecondaryDark,
             inactiveTrackColor: AppColors.inputBorderDark,

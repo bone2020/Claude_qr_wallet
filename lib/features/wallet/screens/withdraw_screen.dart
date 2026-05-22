@@ -971,7 +971,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
                 )
               : DropdownButtonFormField<Bank>(
                   isExpanded: true,
-                  value: _selectedBank,
+                  initialValue: _selectedBank,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
@@ -1153,7 +1153,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
             border: Border.all(color: AppColors.inputBorderDark),
           ),
           child: DropdownButtonFormField<MobileMoneyProvider>(
-            value: _selectedMomoProvider,
+            initialValue: _selectedMomoProvider,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
