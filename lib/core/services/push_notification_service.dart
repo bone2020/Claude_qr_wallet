@@ -149,6 +149,7 @@ class PushNotificationService {
         return;
       }
 
+      if (!context.mounted) return;
       switch (action) {
         // Transaction notifications → go to notifications screen
         case 'deposit':

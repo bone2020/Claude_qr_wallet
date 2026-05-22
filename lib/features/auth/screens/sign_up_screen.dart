@@ -112,6 +112,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         // Send email verification
         await authNotifier.sendEmailVerification();
 
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context).accountCreatedVerifyEmail),
