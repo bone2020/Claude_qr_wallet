@@ -42,6 +42,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       try {
         // Reload user to get latest emailVerified status
         await currentUser.reload();
+        if (!context.mounted) return;
         final refreshedUser = FirebaseAuth.instance.currentUser;
 
         if (refreshedUser == null) {

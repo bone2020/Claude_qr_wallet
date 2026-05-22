@@ -261,6 +261,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     // If no PIN is set, skip verification
     if (storedPinHash == null || storedPinHash.isEmpty) return true;
 
+    if (!context.mounted) return false;
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

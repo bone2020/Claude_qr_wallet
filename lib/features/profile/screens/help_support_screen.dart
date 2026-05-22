@@ -84,7 +84,8 @@ User ID: $userId
 
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
-    } else if (context.mounted) {
+    } else {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -103,7 +104,8 @@ User ID: $userId
 
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else if (context.mounted) {
+    } else {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
