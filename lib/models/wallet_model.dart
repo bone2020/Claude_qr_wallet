@@ -73,7 +73,7 @@ class WalletModel {
       walletId: json['walletId'] as String,
       userId: json['userId'] as String,
       balance: (json['balance'] as num?)?.toInt() ?? 0,
-      currency: json['currency'] as String? ?? 'NGN',
+      currency: json['currency'] as String? ?? 'GHS',
       isActive: json['isActive'] as bool? ?? true,
       createdAt: json['createdAt'] is Timestamp ? (json['createdAt'] as Timestamp).toDate() : DateTime.parse(json['createdAt'] as String),
       updatedAt: json['updatedAt'] is Timestamp ? (json['updatedAt'] as Timestamp).toDate() : DateTime.parse(json['updatedAt'] as String),
