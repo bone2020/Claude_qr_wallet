@@ -139,7 +139,7 @@ class TransactionModel {
       receiverName: json['receiverName'] as String?,
       amount: (json['amount'] as num?)?.toInt() ?? 0,
       fee: (json['fee'] as num?)?.toInt() ?? 0,
-      currency: json['currency'] as String? ?? 'NGN',
+      currency: json['currency'] as String? ?? 'GHS',
       type: TransactionType.values.firstWhere(
         (e) => e.name == json['type'],
         orElse: () => TransactionType.deposit,

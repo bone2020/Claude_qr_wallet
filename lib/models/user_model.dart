@@ -96,7 +96,7 @@ class UserModel {
           ? DateTime.parse(json['dateOfBirth'] as String)
           : null,
       country: json['country'] as String?,
-      currency: json['currency'] as String? ?? 'NGN',
+      currency: json['currency'] as String? ?? 'GHS',
       businessLogoUrl: json['businessLogoUrl'] as String?,
       kycStatus: json['kycStatus'] as String?,
       accountBlocked: json['accountBlocked'] as bool? ?? false,
