@@ -140,7 +140,7 @@ class _FileDisputeScreenState extends ConsumerState<FileDisputeScreen> {
               Text(l10n.fileDisputeIssueTypeLabel, style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _issueType,
+                initialValue: _issueType,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: _issueTypes(context).entries
                     .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))

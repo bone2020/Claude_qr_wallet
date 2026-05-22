@@ -836,7 +836,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
             border: Border.all(color: AppColors.inputBorderDark),
           ),
           child: DropdownButtonFormField<MobileMoneyProvider>(
-            value: _selectedMomoProvider,
+            initialValue: _selectedMomoProvider,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,

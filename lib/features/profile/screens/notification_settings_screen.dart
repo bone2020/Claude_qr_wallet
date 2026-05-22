@@ -288,7 +288,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
           Switch(
             value: isImportant ? true : value,
             onChanged: isImportant ? null : onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             inactiveThumbColor: AppColors.textSecondaryDark,
             inactiveTrackColor: AppColors.surfaceElevatedDark,
           ),
