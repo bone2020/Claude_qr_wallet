@@ -10,7 +10,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 
 import '../../../core/constants/constants.dart';
 import '../../../generated/l10n/app_localizations.dart';
-import '../../../core/constants/african_countries.dart';
 import '../../../providers/auth_provider.dart';
 import '../../auth/widgets/custom_text_field.dart';
 

@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,7 +16,6 @@ import '../../../providers/currency_provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/services/auth_localization_resolver.dart';
 import '../../../../providers/wallet_provider.dart';
-import '../../../../providers/currency_provider.dart';
 import '../../../../core/services/push_notification_service.dart';
 import '../../../generated/l10n/app_localizations.dart';
 

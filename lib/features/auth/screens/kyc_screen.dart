@@ -10,7 +10,6 @@ import '../../../core/services/smile_id_service.dart';
 import '../../../core/services/smile_id_localization_resolver.dart';
 import '../../../providers/auth_provider.dart';
 import '../widgets/kyc_verification_card.dart';
-import 'package:qr_wallet/generated/l10n/app_localizations.dart';
 
 /// KYC Selection Screen - Choose ID type for verification
 class KycScreen extends ConsumerStatefulWidget {

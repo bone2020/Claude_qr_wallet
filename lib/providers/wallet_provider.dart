@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/services/currency_service.dart';
 import '../core/services/exchange_rate_service.dart';
 import '../core/services/services.dart';
 import '../core/services/transaction_localization_resolver.dart';

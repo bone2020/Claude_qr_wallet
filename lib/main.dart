@@ -16,7 +16,6 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/services.dart';
 import 'core/services/deep_link_service.dart';
-import 'core/services/push_notification_service.dart';
 import 'core/widgets/responsive_wrapper.dart';
 import 'generated/l10n/app_localizations.dart';
 import 'providers/providers.dart';
