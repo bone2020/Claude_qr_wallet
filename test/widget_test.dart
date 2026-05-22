@@ -1,21 +1,34 @@
-// Basic Flutter widget test for QR Wallet app
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Pure-logic tests for QR Wallet. Real boot-path smoke testing
+// requires mocking Hive + Firebase + auth state and is out of scope
+// for this file; track that work separately.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:qr_wallet/main.dart';
+import 'package:qr_wallet/core/services/currency_service.dart';
 
 void main() {
-  testWidgets('QR Wallet app smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const ProviderScope(child: QRWalletApp()));
+  group('CurrencyService', () {
+    test('default currency is GHS (audit 4.7)', () {
+      expect(CurrencyService.defaultCurrency.code, 'GHS');
+      expect(CurrencyService.defaultCurrency.symbol, 'GH₵');
+    });
 
-    // Verify that splash screen loads.
-    expect(find.text('QR Wallet'), findsOneWidget);
+    test('getCurrencyByCode returns matching currency', () {
+      final ghs = CurrencyService.getCurrencyByCode('GHS');
+      expect(ghs.code, 'GHS');
+      expect(ghs.name, 'Ghanaian Cedi');
+
+      final ngn = CurrencyService.getCurrencyByCode('NGN');
+      expect(ngn.code, 'NGN');
+      expect(ngn.name, 'Nigerian Naira');
+    });
+
+    test('getCurrencyByCode falls back to defaultCurrency for unknown codes', () {
+      final unknown = CurrencyService.getCurrencyByCode('XYZ_UNKNOWN');
+      expect(unknown.code, 'GHS');
+    });
+
+    test('getCurrencyByCode is case-insensitive', () {
+      expect(CurrencyService.getCurrencyByCode('ghs').code, 'GHS');
+    });
   });
 }
