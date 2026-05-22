@@ -781,7 +781,7 @@ class _WithdrawScreenState extends ConsumerState<WithdrawScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Iconsax.mobile,
                 size: 64,
                 color: AppColors.textTertiaryDark,

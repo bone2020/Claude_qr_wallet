@@ -274,8 +274,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.phone_android, color: AppColors.warning),
-            SizedBox(width: 12),
+            const Icon(Icons.phone_android, color: AppColors.warning),
+            const SizedBox(width: 12),
             Text(AppLocalizations.of(context).approvePaymentTitle),
           ],
         ),
@@ -564,7 +564,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Iconsax.mobile,
                 size: 64,
                 color: AppColors.textTertiaryDark,
@@ -763,7 +763,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Iconsax.security_safe,
             color: AppColors.primary,
             size: 24,
@@ -910,8 +910,8 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         child: Center(
           child: Column(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: AppDimensions.spaceMD),
+              const CircularProgressIndicator(),
+              const SizedBox(height: AppDimensions.spaceMD),
               Text(AppLocalizations.of(context).loadingAccountDetails),
             ],
           ),
@@ -929,7 +929,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         ),
         child: Column(
           children: [
-            Icon(
+            const Icon(
               Iconsax.bank,
               size: 48,
               color: AppColors.textTertiaryDark,
@@ -973,7 +973,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen>
         children: [
           Row(
             children: [
-              Icon(Iconsax.bank, color: Colors.white, size: 24),
+              const Icon(Iconsax.bank, color: Colors.white, size: 24),
               const SizedBox(width: AppDimensions.spaceSM),
               Text(
                 AppLocalizations.of(context).yourVirtualAccountLabel,

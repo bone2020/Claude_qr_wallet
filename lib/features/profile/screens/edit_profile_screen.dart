@@ -264,7 +264,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Icon(Icons.verified, size: 14, color: AppColors.success),
+                            const Icon(Icons.verified, size: 14, color: AppColors.success),
                             const SizedBox(width: 6),
                             Text(
                               AppLocalizations.of(context).nameVerifiedKycCannotChange,

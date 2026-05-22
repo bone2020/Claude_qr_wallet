@@ -343,7 +343,7 @@ class HomeScreen extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          Icon(
+          const Icon(
             Iconsax.receipt_text,
             size: 48,
             color: AppColors.textTertiaryDark,

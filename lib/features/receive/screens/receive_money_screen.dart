@@ -35,7 +35,7 @@ class _ReceiveMoneyScreenState extends ConsumerState<ReceiveMoneyScreen> {
       SnackBar(
         content: Text(AppLocalizations.of(context).walletIdCopied),
         backgroundColor: AppColors.success,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }

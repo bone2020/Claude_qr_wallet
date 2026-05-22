@@ -114,8 +114,8 @@ class PushNotificationService {
       message.hashCode,
       notification.title,
       notification.body,
-      NotificationDetails(
-        android: const AndroidNotificationDetails(
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
           'qr_wallet_transactions',
           'Transaction Notifications',
           channelDescription: 'Notifications for wallet transactions and account alerts',
@@ -124,7 +124,7 @@ class PushNotificationService {
           playSound: true,
           icon: '@mipmap/ic_launcher',
         ),
-        iOS: const DarwinNotificationDetails(
+        iOS: DarwinNotificationDetails(
           presentAlert: true,
           presentBadge: true,
           presentSound: true,
