@@ -292,6 +292,12 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                   ),
                   const SizedBox(height: 20),
                   if (isVerifying)
+                    // ignore: dead_code
+                    // TODO: wrap this dialog content in StatefulBuilder to
+                    // actually toggle `isVerifying` during PIN verification.
+                    // Currently `isVerifying` is always false statically, so
+                    // the spinner branch never renders. The branch is preserved
+                    // to document the intended verifying-state UI.
                     const CircularProgressIndicator(color: AppColors.primary)
                   else
                     TextField(

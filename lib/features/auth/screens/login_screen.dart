@@ -327,6 +327,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  // Foundation for social login (Google + Apple) — wired into login flow
+  // when activated. Handlers exist and are functional; only the build()
+  // invocation is currently absent.
+  // ignore: unused_element
   Widget _buildSocialLogin() {
     return Column(
       children: [

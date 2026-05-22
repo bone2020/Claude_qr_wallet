@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:smile_id/smile_id.dart';
 import 'package:smile_id/products/selfie/smile_id_smart_selfie_enrollment.dart';
 
 import '../../../../core/constants/constants.dart';
@@ -59,7 +58,6 @@ class _NinVerificationScreenState extends ConsumerState<NinVerificationScreen> {
   }
 
   void _generateUserId() {
-    final user = ref.read(currentUserProvider);
     _userId = _smileIdService.generateUserId();
   }
 

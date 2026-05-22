@@ -8,8 +8,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:cloud_functions/cloud_functions.dart';
-
 import '../../../core/constants/constants.dart';
 import '../../../core/router/app_router.dart';
 import '../../../providers/currency_provider.dart';
