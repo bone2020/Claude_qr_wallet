@@ -44,7 +44,7 @@ class BalanceCard extends StatelessWidget {
       SnackBar(
         content: Text(AppLocalizations.of(context).walletIdCopied),
         backgroundColor: AppColors.success,
-        duration: Duration(seconds: 2),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -100,7 +100,7 @@ class BalanceCard extends StatelessWidget {
                           style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
                         ),
                         const SizedBox(width: 6),
-                        Icon(
+                        const Icon(
                           Iconsax.copy,
                           size: 16,
                           color: AppColors.textSecondaryDark,
@@ -232,7 +232,7 @@ class BalanceCard extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Iconsax.copy,
                     size: 14,
                     color: AppColors.primary,

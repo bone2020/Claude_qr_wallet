@@ -145,7 +145,7 @@ class PhoneInputFieldState extends State<PhoneInputField> {
                       style: AppTextStyles.inputText(),
                     ),
                     const SizedBox(width: AppDimensions.spaceXXS),
-                    Icon(
+                    const Icon(
                       Icons.keyboard_arrow_down,
                       color: AppColors.textSecondaryDark,
                       size: 18,

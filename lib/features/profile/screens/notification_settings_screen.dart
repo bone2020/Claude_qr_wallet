@@ -88,7 +88,7 @@ class _NotificationSettingsScreenState extends ConsumerState<NotificationSetting
           SnackBar(
             content: Text(AppLocalizations.of(context).settingsSavedToast),
             backgroundColor: AppColors.success,
-            duration: Duration(seconds: 1),
+            duration: const Duration(seconds: 1),
           ),
         );
       }

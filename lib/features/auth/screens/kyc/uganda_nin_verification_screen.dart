@@ -444,7 +444,7 @@ class _SmileIdSmartSelfieScreen extends StatelessWidget {
         allowAgentMode: false,
         showAttribution: true,
         showInstructions: true,
-        extraPartnerParams: {
+        extraPartnerParams: const {
           "callback_url": _smileIdCallbackUrl,
         },
         onSuccess: (result) {

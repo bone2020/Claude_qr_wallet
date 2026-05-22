@@ -120,7 +120,7 @@ class TransactionDetailsScreen extends ConsumerWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.receipt_long_outlined,
                 size: 64,
                 color: AppColors.textTertiaryDark,

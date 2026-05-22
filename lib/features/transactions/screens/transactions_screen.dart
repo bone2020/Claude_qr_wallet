@@ -114,7 +114,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
             Tab(text: AppLocalizations.of(context).sent),
             Tab(text: AppLocalizations.of(context).received),
             Tab(text: AppLocalizations.of(context).pending),
-            Tab(text: 'Failed'),
+            const Tab(text: 'Failed'),
           ],
         ),
       ),
@@ -239,7 +239,7 @@ class _TransactionsScreenState extends ConsumerState<TransactionsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
+          const Icon(
             Icons.receipt_long_outlined,
             size: 64,
             color: AppColors.textTertiaryDark,
