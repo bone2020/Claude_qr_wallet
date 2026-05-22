@@ -75,7 +75,7 @@ class HomeScreen extends ConsumerWidget {
                     final data = snapshot.data?.data() as Map<String, dynamic>?;
                     final isBlocked = data != null && data['accountBlocked'] == true;
                     if (!isBlocked) return const SizedBox.shrink();
-                    final blockedBy = data?['accountBlockedBy'] as String?;
+                    final blockedBy = data['accountBlockedBy'] as String?;
                     return Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),

@@ -267,7 +267,7 @@ class TransactionModel {
   String formattedAmount(String currentWalletId, String symbol) {
     final isReceived = isCredit(currentWalletId);
     final sign = isReceived ? '+' : '-';
-    return '$sign$symbol${displayAmount}';
+    return '$sign$symbol$displayAmount';
   }
 
   /// Get counterparty name or method for deposits/withdrawals
