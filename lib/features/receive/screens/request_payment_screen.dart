@@ -144,7 +144,7 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
       final file = File('${directory.path}/$fileName');
       await file.writeAsBytes(imageBytes);
 
-      if (!context.mounted) return;
+      if (!mounted) return;
       final shareText = AppLocalizations.of(context).payRequestShareText(_currencySymbol, amount, _userName);
       await Share.shareXFiles(
         [XFile(file.path)],
