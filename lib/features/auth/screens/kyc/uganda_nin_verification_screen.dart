@@ -40,7 +40,6 @@ class UgandaNinVerificationScreen extends ConsumerStatefulWidget {
 class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificationScreen> {
   final _smileIdService = SmileIDService.instance;
   final _ninController = TextEditingController();
-  final _cardNumberController = TextEditingController();
 
   DateTime? _dateOfBirth;
   bool _isLoading = false;
@@ -58,7 +57,6 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   @override
   void dispose() {
     _ninController.dispose();
-    _cardNumberController.dispose();
     super.dispose();
   }
 
@@ -69,7 +67,6 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
   Future<void> _startVerification() async {
     final loc = AppLocalizations.of(context);
     final nin = _ninController.text.trim();
-    final cardNumber = _cardNumberController.text.trim();
 
     // Validate NIN
     final validation = _smileIdService.validateIdNumber(nin, 'UGANDA_NIN', 'UG');
@@ -78,12 +75,6 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
       _showError(key != null
           ? resolveIdValidationErrorMessage(loc, key)
           : loc.invalidIdNumberFallback);
-      return;
-    }
-
-    // Validate Card Number
-    if (cardNumber.isEmpty) {
-      _showError(loc.kycErrorPleaseEnterCardNumber);
       return;
     }
 
@@ -250,13 +241,6 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
       // fails, surface the error and stay on this screen so the user can
       // retry. Do NOT navigate to the verification-pending screen because
       // there is no in-flight Smile ID job to wait on.
-      //
-      // Pre-existing gap (NOT addressed by this PR): the screen captures
-      // a Card Number via _cardNumberController as Uganda's required
-      // secondary identifier, but does NOT currently pass it as
-      // 'secondary_id_number' in the submit payload. A future cleanup
-      // can thread it through once we confirm the backend's
-      // submitBiometricKycVerification callable accepts that parameter.
       try {
         final submitKyc = FirebaseFunctions.instance.httpsCallable('submitBiometricKycVerification');
         await submitKyc.call({
@@ -354,16 +338,6 @@ class _UgandaNinVerificationScreenState extends ConsumerState<UgandaNinVerificat
                       hint: 'Enter your 14-character NIN',
                       helperText: AppLocalizations.of(context).ugandaNinHelperText,
                     ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
-
-                    const SizedBox(height: AppDimensions.spaceLG),
-
-                    // Card Number Input
-                    KycIdNumberInput(
-                      controller: _cardNumberController,
-                      label: 'Card Number',
-                      hint: 'Enter the card number on your National ID',
-                      helperText: AppLocalizations.of(context).ugandaNinCardNumberHelperText,
-                    ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
 
                     const SizedBox(height: AppDimensions.spaceXL),
 
