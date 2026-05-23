@@ -6039,15 +6039,41 @@ exports.adminSendRecoveryOTP = functions
   .https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin');
 
-  const { targetUid } = data;
-  if (!targetUid) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  const { phoneNumber: inputPhone } = data;
+  if (!inputPhone || typeof inputPhone !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'phoneNumber is required.');
   }
 
-  const userDoc = await db.collection('users').doc(targetUid).get();
-  if (!userDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'User not found.');
+  const normalizedPhone = inputPhone.trim();
+  if (!/^\+\d{7,15}$/.test(normalizedPhone)) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'phoneNumber must be in E.164 format (e.g., +233241234567).'
+    );
   }
+
+  // Resolve phone → user via Firestore (source of truth for user phoneNumber)
+  const userQuery = await db.collection('users')
+    .where('phoneNumber', '==', normalizedPhone)
+    .limit(2)
+    .get();
+
+  if (userQuery.empty) {
+    throw new functions.https.HttpsError('not-found', 'No user found with that phone number.');
+  }
+  if (userQuery.size > 1) {
+    logStructured(LOG_LEVELS.ERROR, 'Multiple users found with same phoneNumber during recovery', {
+      phoneNumber: normalizedPhone.substring(0, 4) + '****',
+      count: userQuery.size,
+    });
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      'Multiple users found with that phone number. Contact engineering.'
+    );
+  }
+
+  const userDoc = userQuery.docs[0];
+  const targetUid = userDoc.id;
 
   const userData = userDoc.data();
   const phoneNumber = userData.phoneNumber;
@@ -6108,7 +6134,7 @@ exports.adminSendRecoveryOTP = functions
     userId: caller.uid,
     operation: 'adminSendRecoveryOTP',
     result: 'success',
-    metadata: { targetUid, callerRole: caller.role },
+    metadata: { targetUid, inputPhoneMasked: normalizedPhone.substring(0, 4) + '****', callerRole: caller.role },
     ipHash: hashIp(context),
   });
 
@@ -6135,6 +6161,7 @@ exports.adminSendRecoveryOTP = functions
     message: 'Recovery OTP sent to user\'s phone via SMS. User should share the code they receive.',
     phoneNumber: maskedPhone,
     expiresInMinutes: 10,
+    targetUid,
   };
 });
 
