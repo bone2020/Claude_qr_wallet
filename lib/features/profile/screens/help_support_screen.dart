@@ -73,6 +73,7 @@ Device: $deviceInfo
 User ID: $userId
 ''';
 
+    if (!context.mounted) return;
     final uri = Uri(
       scheme: 'mailto',
       path: _supportEmail,
