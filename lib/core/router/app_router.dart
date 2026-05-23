@@ -162,6 +162,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.signUp,
         AppRoutes.login,
         AppRoutes.forgotPassword,
+        // Reachable post-deletion when the user is no longer signed in, so
+        // the redirect can't pre-empt the "account deleted" confirmation.
+        AppRoutes.deleteAccountSuccess,
       };
 
       // Routes that require auth but NOT KYC completion
