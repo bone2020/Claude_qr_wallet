@@ -3260,7 +3260,50 @@ exports.exportUserData = functions.runWith({ enforceAppCheck: true }).https.onCa
  * Delete user account and all associated data (GDPR Article 17 — Right to Erasure).
  * Requires re-authentication confirmation.
  */
-exports.deleteUserData = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+// ============================================================
+// USER ACCOUNT DELETION
+// ============================================================
+//
+// Soft-delete pattern: user-facing data is fully removed, but a complete
+// snapshot is preserved in `compliance_archive/{userId}` with 7-year retention
+// for AML record-keeping and fraud-investigation needs. Audit logs are NOT
+// anonymized — the userId stays intact so deleted-user activity remains
+// traceable for compliance and fraud purposes.
+//
+// Phase 1: super_admin / admin_manager / finance / admin_supervisor roles
+// read the archive via admin Cloud Functions (Phase 2). Until those land,
+// reads go through the Firebase console.
+//
+// Storage files (profile_photos, kyc_documents, qr_codes, receipts) are
+// MOVED (copy + delete) to a separate GCS bucket `qr-wallet-1993-compliance`
+// that is locked at the bucket level — no client SDK can reach it.
+
+const USER_SUBCOLLECTIONS = [
+  'transactions',
+  'notifications',
+  'kyc',
+  'verifications',
+  'fcm_tokens',
+  'linkedBankAccounts',
+];
+
+const USER_STORAGE_TYPES = [
+  'profile_photos',
+  'kyc_documents',
+  'qr_codes',
+  'receipts',
+];
+
+const COMPLIANCE_BUCKET_NAME = 'qr-wallet-1993-compliance';
+
+const SUBCOLLECTION_PAGE_SIZE = 400;
+const DISPUTE_OPEN_STATUSES = ['filed', 'investigating', 'supervisor_review'];
+const DEBT_OPEN_STATUSES = ['active', 'partially_paid'];
+
+exports.deleteUserData = functions.runWith({
+  enforceAppCheck: true,
+  timeoutSeconds: 300,
+}).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3276,76 +3319,247 @@ exports.deleteUserData = functions.runWith({ enforceAppCheck: true }).https.onCa
   logSecurityEvent('user_data_deletion_requested', 'high', { userId });
 
   try {
-    // Check for pending transactions
+    // --------------------------------------------------------
+    // GUARDS — block deletion if any of these find a blocker
+    // --------------------------------------------------------
+
+    // Pending withdrawals
     const pendingWithdrawals = await db.collection('withdrawals')
       .where('userId', '==', userId)
       .where('status', '==', 'pending')
       .limit(1)
       .get();
-
     if (!pendingWithdrawals.empty) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with pending withdrawals. Please wait for them to complete.');
     }
 
+    // Pending MoMo transactions
     const pendingMomo = await db.collection('momo_transactions')
       .where('userId', '==', userId)
       .where('status', '==', 'pending')
       .limit(1)
       .get();
-
     if (!pendingMomo.empty) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with pending MoMo transactions. Please wait for them to complete.');
     }
 
-    // Check wallet balance
+    // Wallet balance must be zero
     const walletDoc = await db.collection('wallets').doc(userId).get();
-    if (walletDoc.exists && walletDoc.data().balance > 0) {
+    if (walletDoc.exists && (walletDoc.data().balance || 0) > 0) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with remaining balance. Please withdraw all funds first.');
     }
 
-    // Delete user sub-collections
-    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc'];
-    for (const subCol of subCollections) {
-      const docs = await db.collection('users').doc(userId).collection(subCol).limit(500).get();
-      const batch = db.batch();
-      docs.forEach(doc => batch.delete(doc.ref));
-      if (!docs.empty) await batch.commit();
+    // Open disputes — user as filer
+    const openDisputesFiled = await db.collection('disputes')
+      .where('filedBy.uid', '==', userId)
+      .where('status', 'in', DISPUTE_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDisputesFiled.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with open disputes you filed. Please wait for them to be resolved.');
+    }
+
+    // Open disputes — user as recipient
+    const openDisputesAgainst = await db.collection('disputes')
+      .where('recipientUid', '==', userId)
+      .where('status', 'in', DISPUTE_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDisputesAgainst.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with open disputes filed against you. Please wait for them to be resolved.');
+    }
+
+    // Outstanding debts — user owes money (recipientUid is the legacy/overloaded "who owes" field)
+    const openDebtsOwed = await db.collection('wallet_debts')
+      .where('recipientUid', '==', userId)
+      .where('status', 'in', DEBT_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDebtsOwed.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account while you have outstanding debts. Please wait for them to be settled.');
+    }
+
+    // Outstanding debts — user is owed money (filerUid)
+    const openDebtsOwedTo = await db.collection('wallet_debts')
+      .where('filerUid', '==', userId)
+      .where('status', 'in', DEBT_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDebtsOwedTo.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account while a debt recovery is in progress in your favor. Please wait for it to complete.');
+    }
+
+    // --------------------------------------------------------
+    // ARCHIVE — snapshot everything to compliance_archive
+    // --------------------------------------------------------
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User account not found.');
+    }
+    const userData = userDoc.data();
+    const walletData = walletDoc.exists ? walletDoc.data() : null;
+
+    // 7-year retention end
+    const retainUntilDate = new Date();
+    retainUntilDate.setFullYear(retainUntilDate.getFullYear() + 7);
+
+    const archiveRef = db.collection('compliance_archive').doc(userId);
+    await archiveRef.set({
+      ...userData,
+      walletDataAtDeletion: walletData,
+      originalUserId: userId,
+      archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      retainUntil: admin.firestore.Timestamp.fromDate(retainUntilDate),
+      deletionReason: 'user_self_delete',
+    });
+
+    // Copy each user subcollection to archive subcollection (paginated)
+    for (const subCol of USER_SUBCOLLECTIONS) {
+      let lastDoc = null;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = db.collection('users').doc(userId).collection(subCol)
+          .orderBy(admin.firestore.FieldPath.documentId())
+          .limit(SUBCOLLECTION_PAGE_SIZE);
+        if (lastDoc) query = query.startAfter(lastDoc);
+        const snap = await query.get();
+        if (snap.empty) break;
+
+        const batch = db.batch();
+        snap.forEach(doc => {
+          batch.set(archiveRef.collection(subCol).doc(doc.id), doc.data());
+        });
+        await batch.commit();
+
+        if (snap.size < SUBCOLLECTION_PAGE_SIZE) break;
+        lastDoc = snap.docs[snap.docs.length - 1];
+      }
+    }
+
+    // Copy related disputes (user as filer OR recipient) to archive — deduplicated
+    const disputesFiledBy = await db.collection('disputes').where('filedBy.uid', '==', userId).get();
+    const disputesAgainst = await db.collection('disputes').where('recipientUid', '==', userId).get();
+    const seenDisputeIds = new Set();
+    for (const doc of [...disputesFiledBy.docs, ...disputesAgainst.docs]) {
+      if (seenDisputeIds.has(doc.id)) continue;
+      seenDisputeIds.add(doc.id);
+      await archiveRef.collection('related_disputes').doc(doc.id).set(doc.data());
+    }
+
+    // Copy related wallet_debts (user as recipient OR filer) to archive — deduplicated
+    const debtsAsRecipient = await db.collection('wallet_debts').where('recipientUid', '==', userId).get();
+    const debtsAsFiler = await db.collection('wallet_debts').where('filerUid', '==', userId).get();
+    const seenDebtIds = new Set();
+    for (const doc of [...debtsAsRecipient.docs, ...debtsAsFiler.docs]) {
+      if (seenDebtIds.has(doc.id)) continue;
+      seenDebtIds.add(doc.id);
+      await archiveRef.collection('related_wallet_debts').doc(doc.id).set(doc.data());
+    }
+
+    // --------------------------------------------------------
+    // STORAGE — move user files to compliance bucket
+    // --------------------------------------------------------
+
+    const sourceBucket = admin.storage().bucket();
+    const complianceBucket = admin.storage().bucket(COMPLIANCE_BUCKET_NAME);
+
+    for (const storageType of USER_STORAGE_TYPES) {
+      const prefix = `${storageType}/${userId}/`;
+      const [files] = await sourceBucket.getFiles({ prefix });
+      for (const file of files) {
+        const relativePath = file.name.substring(prefix.length);
+        // Destination layout: {userId}/{storageType}/{relativePath}
+        // e.g. abc123/kyc_documents/passport.jpg
+        const destinationPath = `${userId}/${storageType}/${relativePath}`;
+        try {
+          await file.copy(complianceBucket.file(destinationPath));
+          await file.delete();
+        } catch (storageError) {
+          // 404 = already deleted/missing; continue
+          if (storageError.code === 404) continue;
+          // Otherwise log and continue — do NOT block deletion on storage errors
+          logError('Storage move failed during account deletion', {
+            userId,
+            sourcePath: file.name,
+            destinationPath,
+            error: storageError.message,
+          });
+        }
+      }
+    }
+
+    // --------------------------------------------------------
+    // DELETE — remove originals after archive is in place
+    // --------------------------------------------------------
+
+    // Delete user subcollections (paginated — handles users with >500 docs)
+    for (const subCol of USER_SUBCOLLECTIONS) {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const snap = await db.collection('users').doc(userId).collection(subCol)
+          .limit(SUBCOLLECTION_PAGE_SIZE).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        if (snap.size < SUBCOLLECTION_PAGE_SIZE) break;
+      }
     }
 
     // Delete user document
     await db.collection('users').doc(userId).delete();
 
-    // Delete wallet
+    // Delete wallet document (if it existed)
     if (walletDoc.exists) {
       await db.collection('wallets').doc(userId).delete();
     }
 
-    // Anonymize audit logs (retain for compliance but remove PII)
-    const auditLogs = await db.collection('audit_logs')
-      .where('userId', '==', userId).limit(500).get();
-    if (!auditLogs.empty) {
-      const batch = db.batch();
-      auditLogs.forEach(doc => {
-        batch.update(doc.ref, {
-          userId: 'DELETED_USER',
-          anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-      await batch.commit();
-    }
+    // NOTE: audit_logs are intentionally NOT anonymized.
+    // The userId stays intact so fraud investigators can still trace activity
+    // by this deleted user via the compliance_archive reference. This is the
+    // critical traceability fix flagged in the cross-check audit (2026-05-21).
 
-    // Delete Firebase Auth account
+    // Delete the Firebase Auth user last
     await admin.auth().deleteUser(userId);
 
-    logSecurityEvent('user_data_deleted', 'high', { userId: 'DELETED_USER' });
+    // Record success in audit_logs with userId intact (the whole point)
+    await auditLog({
+      userId,
+      operation: 'deleteUserData',
+      result: 'success',
+      metadata: {
+        archiveRef: `compliance_archive/${userId}`,
+        retainUntil: retainUntilDate.toISOString(),
+        deletionReason: 'user_self_delete',
+      },
+    });
+
+    logSecurityEvent('user_archived_for_compliance', 'high', {
+      userId,
+      archiveRef: `compliance_archive/${userId}`,
+    });
 
     return { success: true, message: 'Account and all associated data have been deleted.' };
   } catch (error) {
+    // Audit every failed attempt with userId intact (fraud signal)
+    await auditLog({
+      userId,
+      operation: 'deleteUserData',
+      result: 'failure',
+      error: error.message || 'unknown',
+      metadata: { code: error.code || 'unknown' },
+    });
+
     if (error.code && error.code.startsWith('functions/')) {
-      throw error; // Re-throw our own errors
+      throw error;
     }
     logError('User data deletion failed', { userId, error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Account deletion failed. Please contact support.');
