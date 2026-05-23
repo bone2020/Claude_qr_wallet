@@ -3,8 +3,8 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
 function RecoveryPage() {
-  const [targetUid, setTargetUid] = useState('');
-  const [otp, setOtp] = useState('');
+  const [targetPhone, setTargetPhone] = useState('');
+  const [resolvedUid, setResolvedUid] = useState('');
   const [otpInput, setOtpInput] = useState('');
   const [phonePreview, setPhonePreview] = useState('');
   const [expiresIn, setExpiresIn] = useState(0);
@@ -15,7 +15,8 @@ function RecoveryPage() {
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
-    if (!targetUid.trim()) return;
+    const phone = targetPhone.trim();
+    if (!phone) return;
 
     setError('');
     setMessage('');
@@ -23,12 +24,12 @@ function RecoveryPage() {
 
     try {
       const adminSendRecoveryOTP = httpsCallable(functions, 'adminSendRecoveryOTP');
-      const result = await adminSendRecoveryOTP({ targetUid: targetUid.trim() });
-      setOtp(result.data.otp);
+      const result = await adminSendRecoveryOTP({ phoneNumber: phone });
+      setResolvedUid(result.data.targetUid);
       setPhonePreview(result.data.phoneNumber);
       setExpiresIn(result.data.expiresInMinutes);
       setStep('otp_sent');
-      setMessage('OTP generated successfully.');
+      setMessage('OTP sent to user\'s phone via SMS.');
     } catch (err) {
       setError(err.message || 'Failed to send OTP.');
     } finally {
@@ -46,7 +47,7 @@ function RecoveryPage() {
 
     try {
       const adminVerifyRecoveryOTP = httpsCallable(functions, 'adminVerifyRecoveryOTP');
-      await adminVerifyRecoveryOTP({ targetUid: targetUid.trim(), otp: otpInput.trim() });
+      await adminVerifyRecoveryOTP({ targetUid: resolvedUid, otp: otpInput.trim() });
       setStep('verified');
       setMessage('OTP verified successfully. User identity confirmed.');
     } catch (err) {
@@ -57,8 +58,8 @@ function RecoveryPage() {
   };
 
   const handleReset = () => {
-    setTargetUid('');
-    setOtp('');
+    setTargetPhone('');
+    setResolvedUid('');
     setOtpInput('');
     setPhonePreview('');
     setExpiresIn(0);
@@ -85,16 +86,17 @@ function RecoveryPage() {
 
       {step === 'search' && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Step 1: Generate Recovery OTP</h3>
+          <h3 className="text-lg font-semibold mb-4">Step 1: Send Recovery OTP</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Enter the user&apos;s UID to generate a recovery OTP. The OTP will be sent to their registered phone number.
+            Enter the user&apos;s phone number in E.164 format (e.g., +233241234567). An OTP will be sent to that number via SMS for the user to read back to you.
           </p>
           <form onSubmit={handleSendOTP} className="flex gap-4">
             <input
-              type="text"
-              value={targetUid}
-              onChange={(e) => setTargetUid(e.target.value)}
-              placeholder="User UID"
+              type="tel"
+              value={targetPhone}
+              onChange={(e) => setTargetPhone(e.target.value)}
+              placeholder="+233241234567"
+              autoComplete="off"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
             <button
@@ -102,7 +104,7 @@ function RecoveryPage() {
               disabled={loading}
               className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Generating...' : 'Generate OTP'}
+              {loading ? 'Sending...' : 'Send OTP'}
             </button>
           </form>
         </div>
@@ -111,21 +113,18 @@ function RecoveryPage() {
       {step === 'otp_sent' && (
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">OTP Generated</h3>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-yellow-800">
-                <strong>OTP:</strong> <span className="font-mono text-lg">{otp}</span>
+            <h3 className="text-lg font-semibold mb-4">OTP Sent</h3>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                An OTP has been sent via SMS to <strong>{phonePreview}</strong>.
               </p>
-              <p className="text-sm text-yellow-800 mt-1">
-                <strong>Phone:</strong> {phonePreview}
+              <p className="text-sm text-blue-800 mt-1">
+                Expires in <strong>{expiresIn} minutes</strong>.
               </p>
-              <p className="text-sm text-yellow-800 mt-1">
-                <strong>Expires in:</strong> {expiresIn} minutes
+              <p className="text-sm text-blue-800 mt-2">
+                Ask the user to read back the code they received, then enter it below to verify.
               </p>
             </div>
-            <p className="text-sm text-gray-500">
-              Communicate this OTP to the user through a secure channel. Then verify it below.
-            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -137,6 +136,7 @@ function RecoveryPage() {
                 onChange={(e) => setOtpInput(e.target.value)}
                 placeholder="Enter OTP from user"
                 maxLength={6}
+                inputMode="numeric"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
               <button
