@@ -145,7 +145,12 @@ class _DeleteAccountConfirmationScreenState
 
       if (!mounted) return;
       // Use go (not push) so the back button can't return here mid-deletion.
-      context.go(AppRoutes.deleteAccountProcessing);
+      // Forward confirmForfeit so the processing screen can pass it to the
+      // server when invoking deleteUserData.
+      context.go(
+        AppRoutes.deleteAccountProcessing,
+        extra: <String, dynamic>{'confirmForfeit': widget.confirmForfeit},
+      );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       String message = 'Re-authentication failed. Please try again.';

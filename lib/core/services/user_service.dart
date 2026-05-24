@@ -505,7 +505,7 @@ class UserService {
   /// On success, the caller is responsible for signing out and navigating
   /// away from authenticated screens — the auth account is gone, but the
   /// Flutter app's cached auth state may not have noticed yet.
-  Future<UserResult> requestAccountDeletion() async {
+  Future<UserResult> requestAccountDeletion({bool confirmForfeit = false}) async {
     if (_userId == null) {
       return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
@@ -520,6 +520,10 @@ class UserService {
       );
       await callable.call(<String, dynamic>{
         'confirmDeletion': 'DELETE_MY_ACCOUNT',
+        // confirmForfeit is only honored server-side when the user's balance
+        // is below MIN_WITHDRAWAL_THRESHOLD; setting it on a zero-balance or
+        // above-threshold account is harmless.
+        if (confirmForfeit) 'confirmForfeit': true,
       });
       return UserResult.success(null);
     } on FirebaseFunctionsException catch (e) {

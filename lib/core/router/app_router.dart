@@ -51,6 +51,7 @@ import '../../features/profile/screens/theme_settings_screen.dart';
 import '../../features/profile/screens/language_settings_screen.dart';
 import '../../features/profile/screens/delete_account_explainer_screen.dart';
 import '../../features/profile/screens/delete_account_preflight_screen.dart';
+import '../../features/profile/screens/delete_account_forfeit_consent_screen.dart';
 import '../../features/profile/screens/delete_account_confirmation_screen.dart';
 import '../../features/profile/screens/delete_account_processing_screen.dart';
 import '../../features/profile/screens/delete_account_success_screen.dart';
@@ -117,6 +118,7 @@ class AppRoutes {
   // Account deletion flow (Piece 6) — all authenticated-only.
   static const String deleteAccountExplainer = '/delete-account/explainer';
   static const String deleteAccountPreflight = '/delete-account/preflight';
+  static const String deleteAccountForfeitConsent = '/delete-account/forfeit-consent';
   static const String deleteAccountConfirm = '/delete-account/confirm';
   static const String deleteAccountProcessing = '/delete-account/processing';
   static const String deleteAccountSuccess = '/delete-account/success';
@@ -858,6 +860,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extras = state.extra as Map<String, dynamic>?;
           return DeleteAccountPreflightScreen(
             blockerMessage: extras?['blockerMessage'] as String?,
+          );
+        },
+      ),
+
+      // [2.5] Forfeit consent (only when balance > 0 AND < transfer minimum)
+      GoRoute(
+        path: AppRoutes.deleteAccountForfeitConsent,
+        name: 'deleteAccountForfeitConsent',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountForfeitConsentScreen(
+            balanceMinor: extras['balanceMinor'] as num? ?? 0,
+            currencySymbol: extras['currencySymbol'] as String? ?? '',
           );
         },
       ),

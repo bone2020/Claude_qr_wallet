@@ -41,7 +41,8 @@ class _DeleteAccountProcessingScreenState
     if (_hasStarted) return;
     _hasStarted = true;
 
-    final result = await UserService().requestAccountDeletion();
+    final result =
+        await UserService().requestAccountDeletion(confirmForfeit: widget.confirmForfeit);
     if (!mounted) return;
 
     if (result.success) {

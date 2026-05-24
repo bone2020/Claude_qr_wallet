@@ -25,6 +25,12 @@ class DeleteAccountPreflightScreen extends ConsumerStatefulWidget {
 
 class _DeleteAccountPreflightScreenState
     extends ConsumerState<DeleteAccountPreflightScreen> {
+  /// Minimum withdrawal amount in MINOR units (e.g. 10000 = 100.00 major units).
+  /// MUST stay in sync with MIN_WITHDRAWAL_THRESHOLD in functions/index.js.
+  /// Balances strictly below this cannot be withdrawn — the user is offered
+  /// the forfeiture-consent flow instead of being blocked.
+  static const num _minWithdrawalThresholdMinor = 10000;
+
   bool _isChecking = true;
   String? _blockerMessage;
   bool _canProceed = false;
@@ -48,24 +54,48 @@ class _DeleteAccountPreflightScreenState
       return;
     }
 
-    // Initial entry: client-side wallet balance check.
+    // Initial entry: client-side wallet balance check, three-way:
+    //   balance == 0                              → straight to confirmation
+    //   0 < balance < _minWithdrawalThresholdMinor → forfeit-consent screen
+    //   balance >= _minWithdrawalThresholdMinor   → block, show Withdraw button
     final wallet = ref.read(walletNotifierProvider);
-    final balanceMinor = wallet.balance;
-    if (balanceMinor > 0) {
-      final amount = (balanceMinor / 100).toStringAsFixed(2);
-      setState(() {
-        _blockerMessage =
-            'You still have a balance of ${wallet.currencySymbol}$amount. '
-            'Please withdraw all funds before deleting your account.';
-        _balanceBlocker = true;
-        _isChecking = false;
-      });
-    } else {
+    final num balanceMinor = wallet.balance;
+
+    if (balanceMinor <= 0) {
       setState(() {
         _canProceed = true;
         _isChecking = false;
       });
+      return;
     }
+
+    if (balanceMinor < _minWithdrawalThresholdMinor) {
+      // Sub-threshold: navigate to forfeit-consent screen. Use a post-frame
+      // callback so navigation happens after build, not during initState.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.pushReplacement(
+          AppRoutes.deleteAccountForfeitConsent,
+          extra: <String, dynamic>{
+            'balanceMinor': balanceMinor,
+            'currencySymbol': wallet.currencySymbol,
+          },
+        );
+      });
+      // Stay in checking state briefly; the post-frame callback replaces
+      // this screen before the user sees anything.
+      return;
+    }
+
+    // balance >= threshold: block + redirect-to-withdraw (existing behavior).
+    final amount = (balanceMinor / 100).toStringAsFixed(2);
+    setState(() {
+      _blockerMessage =
+          'You still have a balance of ${wallet.currencySymbol}$amount. '
+          'Please withdraw all funds before deleting your account.';
+      _balanceBlocker = true;
+      _isChecking = false;
+    });
   }
 
   @override
