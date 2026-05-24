@@ -3340,10 +3340,35 @@ const MIN_WITHDRAWAL_THRESHOLD = 10000;
 async function sweepBalanceToPlatform(userId, amount, currency) {
   const forfeitureId = `forfeiture_${userId}_${Date.now()}`;
 
-  // Fetch live exchange rates for USD conversion (same pattern as fee collection)
-  const rates = await fetchRates();
-  const exchangeRate = rates[currency] || 1;
-  const amountInUSD = amount / exchangeRate;
+  // Read cached exchange rate from Firestore (populated by updateExchangeRatesDaily).
+  // If unavailable, missing the currency, or otherwise unusable, proceed WITHOUT
+  // USD conversion — the forfeiture is the critical Firestore-only operation; USD
+  // equivalents are auxiliary aggregates a backfill job can compute later. Never
+  // let an external-rate-API outage block account deletion.
+  let exchangeRate = null;
+  let amountInUSD = null;
+  let usdConversionPending = false;
+  try {
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    if (ratesDoc.exists) {
+      const data = ratesDoc.data() || {};
+      const rate = (data.rates || {})[currency];
+      if (typeof rate === 'number' && rate > 0) {
+        exchangeRate = rate;
+        amountInUSD = amount / rate;
+      }
+    }
+  } catch (err) {
+    logError('Failed to read cached exchange rates during forfeiture', {
+      userId, currency, error: err.message,
+    });
+  }
+  if (exchangeRate === null) {
+    usdConversionPending = true;
+    logError('Exchange rate unavailable for forfeiture — recording without USD conversion', {
+      userId, currency, amount, forfeitureId,
+    });
+  }
 
   await db.runTransaction(async (transaction) => {
     const userWalletRef = db.collection('wallets').doc(userId);
@@ -3371,30 +3396,36 @@ async function sweepBalanceToPlatform(userId, amount, currency) {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // 2. Update platform top-level USD aggregates
+    // 2. Update platform top-level aggregates. USD only updated when rate available.
     const platformWalletRef = db.collection('wallets').doc('platform');
-    transaction.update(platformWalletRef, {
-      totalBalanceUSD: admin.firestore.FieldValue.increment(amountInUSD),
+    const platformUpdate = {
       totalTransactions: admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (amountInUSD !== null) {
+      platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(amountInUSD);
+    }
+    transaction.update(platformWalletRef, platformUpdate);
 
-    // 3. Update per-currency platform balance (same shape as fee collection)
+    // 3. Update per-currency platform balance (native amount always; USD if available)
     const currencyBalanceRef = db.collection('wallets')
       .doc('platform')
       .collection('balances')
       .doc(currency);
-    transaction.set(currencyBalanceRef, {
+    const currencyUpdate = {
       currency,
       amount: admin.firestore.FieldValue.increment(amount),
-      usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
       txCount: admin.firestore.FieldValue.increment(1),
       lastTransactionAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    };
+    if (amountInUSD !== null) {
+      currencyUpdate.usdEquivalent = admin.firestore.FieldValue.increment(amountInUSD);
+    }
+    transaction.set(currencyBalanceRef, currencyUpdate, { merge: true });
 
-    // 4. Create forfeiture record (sibling of platform/fees/, distinct from
-    //    transaction-fee revenue so finance can reconcile by source).
+    // 4. Create forfeiture record. usdEquivalent/exchangeRate may be null;
+    //    usdConversionPending=true tells a future backfill job to compute them.
     const forfeitureRef = db.collection('wallets')
       .doc('platform')
       .collection('forfeitures')
@@ -3406,6 +3437,7 @@ async function sweepBalanceToPlatform(userId, amount, currency) {
       currency,
       usdEquivalent: amountInUSD,
       exchangeRate,
+      usdConversionPending,
       reason: 'account_deletion_sub_threshold_balance',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -3422,6 +3454,7 @@ async function sweepBalanceToPlatform(userId, amount, currency) {
       forfeitureId,
       usdEquivalent: amountInUSD,
       exchangeRate,
+      usdConversionPending,
     },
   });
 
@@ -3431,6 +3464,7 @@ async function sweepBalanceToPlatform(userId, amount, currency) {
     currency,
     usdEquivalent: amountInUSD,
     exchangeRate,
+    usdConversionPending,
   };
 }
 
