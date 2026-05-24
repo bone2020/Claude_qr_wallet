@@ -167,6 +167,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         // Reachable post-deletion when the user is no longer signed in, so
         // the redirect can't pre-empt the "account deleted" confirmation.
         AppRoutes.deleteAccountSuccess,
+        // Also reachable mid-deletion: once the server-side function calls
+        // admin.auth().deleteUser() the client's auth state goes null while
+        // the callable is still awaiting its 200 response. Without this entry
+        // the top-level redirect kicks the user off /delete-account-processing
+        // before the success-screen navigation can fire, and they land on
+        // /welcome with no confirmation that deletion succeeded.
+        AppRoutes.deleteAccountProcessing,
       };
 
       // Routes that require auth but NOT KYC completion
