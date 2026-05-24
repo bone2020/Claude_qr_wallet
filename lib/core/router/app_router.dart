@@ -866,14 +866,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.deleteAccountConfirm,
         name: 'deleteAccountConfirm',
-        builder: (context, state) => const DeleteAccountConfirmationScreen(),
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountConfirmationScreen(
+            confirmForfeit: extras['confirmForfeit'] as bool? ?? false,
+          );
+        },
       ),
 
       // [4] Processing (calls the Cloud Function; back navigation disabled)
       GoRoute(
         path: AppRoutes.deleteAccountProcessing,
         name: 'deleteAccountProcessing',
-        builder: (context, state) => const DeleteAccountProcessingScreen(),
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountProcessingScreen(
+            confirmForfeit: extras['confirmForfeit'] as bool? ?? false,
+          );
+        },
       ),
 
       // [5] Success (sign out + return to welcome)

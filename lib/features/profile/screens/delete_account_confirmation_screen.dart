@@ -15,7 +15,15 @@ import '../../auth/widgets/custom_text_field.dart';
 /// On success it navigates to Processing via `go` so the back button cannot
 /// return here mid-deletion.
 class DeleteAccountConfirmationScreen extends ConsumerStatefulWidget {
-  const DeleteAccountConfirmationScreen({super.key});
+  /// When true, the request to deleteUserData carries `confirmForfeit: true`
+  /// to authorise the server-side sub-threshold balance sweep. Set by the
+  /// forfeit-consent screen via route extra.
+  final bool confirmForfeit;
+
+  const DeleteAccountConfirmationScreen({
+    super.key,
+    this.confirmForfeit = false,
+  });
 
   @override
   ConsumerState<DeleteAccountConfirmationScreen> createState() =>

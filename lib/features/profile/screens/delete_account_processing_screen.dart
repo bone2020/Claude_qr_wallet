@@ -13,7 +13,14 @@ import '../../../core/services/user_localization_resolver.dart';
 /// with the server's blocker message. Back navigation is disabled so the user
 /// cannot leave mid-deletion.
 class DeleteAccountProcessingScreen extends ConsumerStatefulWidget {
-  const DeleteAccountProcessingScreen({super.key});
+  /// Forwarded from the confirmation screen via route extra. When true,
+  /// the server-side deletion accepts a sub-threshold balance sweep.
+  final bool confirmForfeit;
+
+  const DeleteAccountProcessingScreen({
+    super.key,
+    this.confirmForfeit = false,
+  });
 
   @override
   ConsumerState<DeleteAccountProcessingScreen> createState() =>
