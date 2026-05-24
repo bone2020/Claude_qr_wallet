@@ -3300,6 +3300,132 @@ const SUBCOLLECTION_PAGE_SIZE = 400;
 const DISPUTE_OPEN_STATUSES = ['filed', 'investigating', 'supervisor_review'];
 const DEBT_OPEN_STATUSES = ['active', 'partially_paid'];
 
+// Piece 9: Minimum balance amount (in user's local currency, flat across markets)
+// that a user can withdraw. If a deleting user's balance is below this and they
+// explicitly consent, the residual is swept to wallets/platform via
+// sweepBalanceToPlatform() rather than blocking deletion.
+const MIN_WITHDRAWAL_THRESHOLD = 100;
+
+/**
+ * Piece 9: Sweep a deleting user's sub-threshold residual balance to the
+ * platform wallet. Matches the existing fee-collection pattern used elsewhere
+ * in this file (transaction.update with FieldValue.increment, USD conversion
+ * via fetchRates(), per-currency subcollection at wallets/platform/balances,
+ * record in wallets/platform/forfeitures).
+ *
+ * Atomicity: all wallet/platform updates run inside a single Firestore
+ * runTransaction. If the transaction aborts, NO state changes. The audit_logs
+ * write happens after the transaction commits and is best-effort (auditLog()
+ * already swallows errors internally).
+ *
+ * Concurrency: re-reads the user's wallet balance inside the transaction and
+ * aborts if it changed since the caller read it. This prevents a race where
+ * an incoming transfer arrives between the caller's balance check and the
+ * sweep.
+ *
+ * @param {string} userId - Firebase Auth UID of the user being deleted.
+ * @param {number} amount - The residual balance to sweep (in user's currency).
+ * @param {string} currency - The user's wallet currency (e.g. 'KES', 'NGN').
+ * @returns {Object} Forfeiture record: { forfeitureId, amount, currency,
+ *                   usdEquivalent, exchangeRate }.
+ */
+async function sweepBalanceToPlatform(userId, amount, currency) {
+  const forfeitureId = `forfeiture_${userId}_${Date.now()}`;
+
+  // Fetch live exchange rates for USD conversion (same pattern as fee collection)
+  const rates = await fetchRates();
+  const exchangeRate = rates[currency] || 1;
+  const amountInUSD = amount / exchangeRate;
+
+  await db.runTransaction(async (transaction) => {
+    const userWalletRef = db.collection('wallets').doc(userId);
+    const freshWalletDoc = await transaction.get(userWalletRef);
+
+    if (!freshWalletDoc.exists) {
+      throw new Error('User wallet not found during forfeiture sweep');
+    }
+
+    const freshBalance = freshWalletDoc.data().balance || 0;
+    if (freshBalance !== amount) {
+      // Wallet balance changed between the caller's read and now — abort.
+      // The caller's guard logic will need to be re-evaluated against the
+      // fresh balance, so we surface a precondition failure.
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Wallet balance changed mid-sweep: expected ${amount}, found ${freshBalance}. Please retry.`
+      );
+    }
+
+    // 1. Decrement user wallet to zero
+    transaction.update(userWalletRef, {
+      balance: 0,
+      availableBalance: 0,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 2. Update platform top-level USD aggregates
+    const platformWalletRef = db.collection('wallets').doc('platform');
+    transaction.update(platformWalletRef, {
+      totalBalanceUSD: admin.firestore.FieldValue.increment(amountInUSD),
+      totalTransactions: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 3. Update per-currency platform balance (same shape as fee collection)
+    const currencyBalanceRef = db.collection('wallets')
+      .doc('platform')
+      .collection('balances')
+      .doc(currency);
+    transaction.set(currencyBalanceRef, {
+      currency,
+      amount: admin.firestore.FieldValue.increment(amount),
+      usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
+      txCount: admin.firestore.FieldValue.increment(1),
+      lastTransactionAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // 4. Create forfeiture record (sibling of platform/fees/, distinct from
+    //    transaction-fee revenue so finance can reconcile by source).
+    const forfeitureRef = db.collection('wallets')
+      .doc('platform')
+      .collection('forfeitures')
+      .doc(forfeitureId);
+    transaction.set(forfeitureRef, {
+      id: forfeitureId,
+      userId,
+      originalAmount: amount,
+      currency,
+      usdEquivalent: amountInUSD,
+      exchangeRate,
+      reason: 'account_deletion_sub_threshold_balance',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // Audit trail — never blocks the main operation (auditLog swallows errors)
+  await auditLog({
+    action: 'account_deletion_forfeiture',
+    userId,
+    severity: 'high',
+    amount,
+    currency,
+    metadata: {
+      forfeitureId,
+      usdEquivalent: amountInUSD,
+      exchangeRate,
+    },
+  });
+
+  return {
+    forfeitureId,
+    amount,
+    currency,
+    usdEquivalent: amountInUSD,
+    exchangeRate,
+  };
+}
+
 exports.deleteUserData = functions.runWith({
   enforceAppCheck: true,
   timeoutSeconds: 300,
@@ -3345,11 +3471,30 @@ exports.deleteUserData = functions.runWith({
         'Cannot delete account with pending MoMo transactions. Please wait for them to complete.');
     }
 
-    // Wallet balance must be zero
+    // Wallet balance — three branches:
+    //   balance == 0                              → proceed normally
+    //   0 < balance < MIN_WITHDRAWAL_THRESHOLD    → require explicit confirmForfeit,
+    //                                                then sweep to platform wallet
+    //   balance >= MIN_WITHDRAWAL_THRESHOLD       → block, user must withdraw first
+    //
+    // The sweep itself happens AFTER all guards pass (below, before archive) so
+    // that a failed guard doesn't strand the user's money.
     const walletDoc = await db.collection('wallets').doc(userId).get();
-    if (walletDoc.exists && (walletDoc.data().balance || 0) > 0) {
+    const currentBalance = walletDoc.exists ? (walletDoc.data().balance || 0) : 0;
+    const walletCurrency = walletDoc.exists ? (walletDoc.data().currency || 'USD') : 'USD';
+
+    if (currentBalance >= MIN_WITHDRAWAL_THRESHOLD) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with remaining balance. Please withdraw all funds first.');
+    }
+
+    if (currentBalance > 0 && data.confirmForfeit !== true) {
+      // Defense in depth: the client should route the user through the
+      // forfeiture-consent screen before calling this function with
+      // confirmForfeit: true. A malicious or stale client that skips that
+      // step gets rejected here.
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Remaining balance below transfer minimum requires forfeit confirmation.');
     }
 
     // Open disputes — user as filer
@@ -3397,6 +3542,17 @@ exports.deleteUserData = functions.runWith({
     }
 
     // --------------------------------------------------------
+    // SWEEP — forfeit sub-threshold residual balance to platform
+    // --------------------------------------------------------
+    // Runs only when currentBalance > 0 (which, given the guards above, means
+    // 0 < currentBalance < MIN_WITHDRAWAL_THRESHOLD AND confirmForfeit === true).
+    // For zero-balance deletions this block is a no-op.
+    let forfeitureResult = null;
+    if (currentBalance > 0) {
+      forfeitureResult = await sweepBalanceToPlatform(userId, currentBalance, walletCurrency);
+    }
+
+    // --------------------------------------------------------
     // ARCHIVE — snapshot everything to compliance_archive
     // --------------------------------------------------------
 
@@ -3415,6 +3571,10 @@ exports.deleteUserData = functions.runWith({
     await archiveRef.set({
       ...userData,
       walletDataAtDeletion: walletData,
+      // Piece 9: if a sub-threshold balance was swept to platform at deletion,
+      // record what happened so the archive snapshot reconciles cleanly with
+      // the platform forfeitures subcollection.
+      balanceForfeitureAtDeletion: forfeitureResult,
       originalUserId: userId,
       archivedAt: admin.firestore.FieldValue.serverTimestamp(),
       retainUntil: admin.firestore.Timestamp.fromDate(retainUntilDate),
