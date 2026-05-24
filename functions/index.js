@@ -3300,11 +3300,19 @@ const SUBCOLLECTION_PAGE_SIZE = 400;
 const DISPUTE_OPEN_STATUSES = ['filed', 'investigating', 'supervisor_review'];
 const DEBT_OPEN_STATUSES = ['active', 'partially_paid'];
 
-// Piece 9: Minimum balance amount (in user's local currency, flat across markets)
-// that a user can withdraw. If a deleting user's balance is below this and they
-// explicitly consent, the residual is swept to wallets/platform via
-// sweepBalanceToPlatform() rather than blocking deletion.
-const MIN_WITHDRAWAL_THRESHOLD = 100;
+// Piece 9: Minimum balance threshold in MINOR units (cents/centimes/etc.).
+// Wallet balances are stored as minor-unit values (e.g. 289 = 2.89 major
+// units), so the threshold must also be in minor units. 10000 minor units
+// = 100.00 major units (e.g. KSh 100.00, NGN 100.00, GHS 100.00). Flat
+// across all markets per product decision.
+//
+// If a deleting user's balance is below this and they explicitly consent,
+// the residual is swept to wallets/platform via sweepBalanceToPlatform()
+// rather than blocking deletion.
+//
+// MUST stay in sync with `_minWithdrawalThresholdMinor` in
+// lib/features/profile/screens/delete_account_preflight_screen.dart.
+const MIN_WITHDRAWAL_THRESHOLD = 10000;
 
 /**
  * Piece 9: Sweep a deleting user's sub-threshold residual balance to the
