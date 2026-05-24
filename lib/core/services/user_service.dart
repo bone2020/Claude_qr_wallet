@@ -511,6 +511,21 @@ class UserService {
     }
 
     try {
+      // Diagnostic: capture auth state immediately before the callable.
+      // If the call ever fails with `unauthenticated` again, these
+      // prints distinguish "no current user" / "stale token" / other
+      // causes without another round trip of guesswork.
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('requestAccountDeletion: currentUser is null at call time');
+        return UserResult.failure(UserErrorKey.userNotAuthenticated);
+      }
+      final tokenResult = await currentUser.getIdTokenResult(false);
+      debugPrint('requestAccountDeletion: uid=${currentUser.uid} '
+          'tokenIssued=${tokenResult.issuedAtTime} '
+          'tokenExpires=${tokenResult.expirationTime} '
+          'authTime=${tokenResult.authTime}');
+
       final callable = FirebaseFunctions.instance.httpsCallable(
         'deleteUserData',
         options: HttpsCallableOptions(

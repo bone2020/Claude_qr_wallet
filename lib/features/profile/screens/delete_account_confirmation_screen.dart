@@ -138,6 +138,14 @@ class _DeleteAccountConfirmationScreenState
           password: _passwordController.text,
         );
         await user.reauthenticateWithCredential(credential);
+
+        // Force a fresh ID token so the next httpsCallable invocation
+        // (deleteUserData, called from the processing screen) carries
+        // the post-reauth token. Without this, cloud_functions may
+        // attach a stale/cached pre-reauth token that the Functions
+        // gateway rejects with `unauthenticated` — the function body
+        // never executes and nothing is logged on the server.
+        await user.getIdToken(true);
       }
       // TODO(Phase 2): implement proper re-authentication for 'phone',
       // 'google.com' and 'apple.com' providers. Phase 1 relies on the
