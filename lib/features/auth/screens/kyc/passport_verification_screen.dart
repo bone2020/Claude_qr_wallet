@@ -116,24 +116,6 @@ class _PassportVerificationScreenState extends ConsumerState<PassportVerificatio
     setState(() => _isLoading = true);
 
    try {
-      // Phone verification step (optional for SmileID countries)
-      // Phone verification: only run for SmileID countries.
-      // Non-SmileID countries already verified their phone at /phone-otp
-      // before reaching this KYC screen. Running it again here causes Firebase
-      // to throttle the second OTP request for the same number.
-      const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
-      if (smileIdCountries.contains(widget.countryCode.toUpperCase())) {
-        await context.push<bool>(
-          AppRoutes.kycPhoneVerification,
-          extra: {
-            'countryCode': widget.countryCode,
-            'documentVerified': true, // SmileID already verified, skip is allowed
-          },
-        );
-
-        if (!mounted) return;
-      }
-
       final userService = UserService();
       final result = await userService.uploadKycDocuments(
         idType: 'PASSPORT',
