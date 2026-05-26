@@ -481,48 +481,74 @@ class UserService {
   // ACCOUNT DELETION
   // ============================================================
 
-  /// Delete user account
-  Future<UserResult> deleteAccount() async {
+  /// Request account deletion via the server-side Cloud Function.
+  ///
+  /// This calls the `deleteUserData` Cloud Function which:
+  ///   - Validates all blockers (pending withdrawals, MoMo, balance > 0,
+  ///     open disputes, outstanding debts) and refuses if any are present
+  ///   - Snapshots all user data into `compliance_archive/{userId}` with
+  ///     7-year retention (AML compliance)
+  ///   - Moves storage files (profile photos, KYC docs, QR codes, receipts)
+  ///     to the locked `qr-wallet-1993-compliance` bucket
+  ///   - Deletes the original Firestore data, wallet, and Firebase Auth user
+  ///   - Keeps audit log entries intact (with userId) for fraud traceability
+  ///
+  /// Returns:
+  ///   - [UserResult.success] (with null data) if deletion completed
+  ///   - [UserResult.failure] with [UserErrorKey.userNotAuthenticated] if
+  ///     called while signed out
+  ///   - [UserResult.serverFailure] carrying the server's human-readable
+  ///     message if a server guard refused the deletion (the caller can
+  ///     display this directly or pattern-match it to offer a specific
+  ///     remediation action like "go to withdraw")
+  ///
+  /// On success, the caller is responsible for signing out and navigating
+  /// away from authenticated screens — the auth account is gone, but the
+  /// Flutter app's cached auth state may not have noticed yet.
+  Future<UserResult> requestAccountDeletion({bool confirmForfeit = false}) async {
     if (_userId == null) {
       return UserResult.failure(UserErrorKey.userNotAuthenticated);
     }
 
     try {
-      final userId = _userId!;
-
-      // Delete user data from Firestore
-      await _firestore.collection('users').doc(userId).delete();
-      await _firestore.collection('wallets').doc(userId).delete();
-
-      // Delete storage files (best effort - continue deletion even if these fail)
-      try {
-        await _storage.ref().child('profile_photos').child('$userId.jpg').delete();
-      } on FirebaseException catch (e) {
-        // Only ignore 'object-not-found' errors - file may not exist
-        if (e.code != 'object-not-found') {
-          // Log unexpected storage errors but continue with account deletion
-          // ignore: avoid_print
-          debugPrint('Warning: Failed to delete profile photo during account deletion: ${e.code} - ${e.message}');
-        }
+      // Diagnostic: capture auth state immediately before the callable.
+      // If the call ever fails with `unauthenticated` again, these
+      // prints distinguish "no current user" / "stale token" / other
+      // causes without another round trip of guesswork.
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('requestAccountDeletion: currentUser is null at call time');
+        return UserResult.failure(UserErrorKey.userNotAuthenticated);
       }
+      final tokenResult = await currentUser.getIdTokenResult(false);
+      debugPrint('requestAccountDeletion: uid=${currentUser.uid} '
+          'tokenIssued=${tokenResult.issuedAtTime} '
+          'tokenExpires=${tokenResult.expirationTime} '
+          'authTime=${tokenResult.authTime}');
 
-      try {
-        await _storage.ref().child('kyc_documents').child(userId).delete();
-      } on FirebaseException catch (e) {
-        // Only ignore 'object-not-found' errors - folder may not exist
-        if (e.code != 'object-not-found') {
-          // Log unexpected storage errors but continue with account deletion
-          // ignore: avoid_print
-          debugPrint('Warning: Failed to delete KYC documents during account deletion: ${e.code} - ${e.message}');
-        }
-      }
-
-      // Delete Firebase Auth account
-      await _auth.currentUser?.delete();
-
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'deleteUserData',
+        options: HttpsCallableOptions(
+          // Server timeout is 300s; give the client a bit more headroom.
+          timeout: const Duration(seconds: 330),
+        ),
+      );
+      await callable.call(<String, dynamic>{
+        'confirmDeletion': 'DELETE_MY_ACCOUNT',
+        // confirmForfeit is only honored server-side when the user's balance
+        // is below MIN_WITHDRAWAL_THRESHOLD; setting it on a zero-balance or
+        // above-threshold account is harmless.
+        if (confirmForfeit) 'confirmForfeit': true,
+      });
       return UserResult.success(null);
+    } on FirebaseFunctionsException catch (e) {
+      // Server returns user-facing messages from throwAppError(...). Pass them
+      // through to the UI verbatim — they're already worded for end users.
+      debugPrint('requestAccountDeletion FF error: ${e.code} - ${e.message}');
+      final message = e.message ?? 'Account deletion failed. Please try again.';
+      return UserResult.serverFailure(message);
     } catch (e) {
-      debugPrint('user_service error: $e');
+      debugPrint('user_service requestAccountDeletion error: $e');
       return UserResult.genericFailure(ErrorHandler.classifyUserError(e));
     }
   }
@@ -560,6 +586,11 @@ class UserResult {
   final UserModel? user;
   final UserErrorKey? errorKey;
   final GenericErrorKey? genericErrorKey;
+
+  /// Human-readable message returned directly from a server Cloud Function
+  /// (e.g. a deleteUserData guard refusal). Already worded for end users —
+  /// display verbatim. Null for all enum-key-based results.
+  final String? serverMessage;
   final KycMediaPaths? kycMediaPaths;
 
   UserResult._({
@@ -567,6 +598,7 @@ class UserResult {
     this.user,
     this.errorKey,
     this.genericErrorKey,
+    this.serverMessage,
     this.kycMediaPaths,
   });
 
@@ -584,6 +616,13 @@ class UserResult {
 
   factory UserResult.genericFailure(GenericErrorKey genericErrorKey) {
     return UserResult._(success: false, genericErrorKey: genericErrorKey);
+  }
+
+  /// Failure carrying a human-readable message produced by the server
+  /// (passed through verbatim to the UI). Used when a Cloud Function returns
+  /// an already-user-facing error, e.g. deleteUserData guard refusals.
+  factory UserResult.serverFailure(String message) {
+    return UserResult._(success: false, serverMessage: message);
   }
 }
 

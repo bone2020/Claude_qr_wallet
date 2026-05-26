@@ -49,6 +49,12 @@ import '../../features/profile/screens/notification_settings_screen.dart';
 import '../../features/profile/screens/linked_accounts_screen.dart';
 import '../../features/profile/screens/theme_settings_screen.dart';
 import '../../features/profile/screens/language_settings_screen.dart';
+import '../../features/profile/screens/delete_account_explainer_screen.dart';
+import '../../features/profile/screens/delete_account_preflight_screen.dart';
+import '../../features/profile/screens/delete_account_forfeit_consent_screen.dart';
+import '../../features/profile/screens/delete_account_confirmation_screen.dart';
+import '../../features/profile/screens/delete_account_processing_screen.dart';
+import '../../features/profile/screens/delete_account_success_screen.dart';
 import '../../features/wallet/screens/add_money_screen.dart';
 import '../../features/wallet/screens/withdraw_screen.dart';
 import '../../features/wallet/screens/payment_result_screen.dart';
@@ -108,6 +114,14 @@ class AppRoutes {
   static const String appLock = '/app-lock';
   static const String resetPin = '/reset-pin';
   static const String verificationPending = '/verification-pending';
+
+  // Account deletion flow (Piece 6) — all authenticated-only.
+  static const String deleteAccountExplainer = '/delete-account/explainer';
+  static const String deleteAccountPreflight = '/delete-account/preflight';
+  static const String deleteAccountForfeitConsent = '/delete-account/forfeit-consent';
+  static const String deleteAccountConfirm = '/delete-account/confirm';
+  static const String deleteAccountProcessing = '/delete-account/processing';
+  static const String deleteAccountSuccess = '/delete-account/success';
 }
 
 /// Global navigator key for accessing navigation outside of widget tree
@@ -150,6 +164,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.signUp,
         AppRoutes.login,
         AppRoutes.forgotPassword,
+        // Reachable post-deletion when the user is no longer signed in, so
+        // the redirect can't pre-empt the "account deleted" confirmation.
+        AppRoutes.deleteAccountSuccess,
+        // Also reachable mid-deletion: once the server-side function calls
+        // admin.auth().deleteUser() the client's auth state goes null while
+        // the callable is still awaiting its 200 response. Without this entry
+        // the top-level redirect kicks the user off /delete-account-processing
+        // before the success-screen navigation can fire, and they land on
+        // /welcome with no confirmation that deletion succeeded.
+        AppRoutes.deleteAccountProcessing,
       };
 
       // Routes that require auth but NOT KYC completion
@@ -819,6 +843,76 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.notifications,
         name: 'notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // ============================================================
+      // ACCOUNT DELETION FLOW (Piece 6)
+      // Authenticated-only by default: these paths are not in the
+      // publicRoutes or verificationRoutes sets, so the redirect logic
+      // requires a signed-in (and KYC-verified) user to reach them.
+      // ============================================================
+
+      // [1] Explainer
+      GoRoute(
+        path: AppRoutes.deleteAccountExplainer,
+        name: 'deleteAccountExplainer',
+        builder: (context, state) => const DeleteAccountExplainerScreen(),
+      ),
+
+      // [2] Preflight (wallet balance check / server blocker display)
+      GoRoute(
+        path: AppRoutes.deleteAccountPreflight,
+        name: 'deleteAccountPreflight',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return DeleteAccountPreflightScreen(
+            blockerMessage: extras?['blockerMessage'] as String?,
+          );
+        },
+      ),
+
+      // [2.5] Forfeit consent (only when balance > 0 AND < transfer minimum)
+      GoRoute(
+        path: AppRoutes.deleteAccountForfeitConsent,
+        name: 'deleteAccountForfeitConsent',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountForfeitConsentScreen(
+            balanceMinor: extras['balanceMinor'] as num? ?? 0,
+            currencySymbol: extras['currencySymbol'] as String? ?? '',
+          );
+        },
+      ),
+
+      // [3] Confirmation (type DELETE + re-auth)
+      GoRoute(
+        path: AppRoutes.deleteAccountConfirm,
+        name: 'deleteAccountConfirm',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountConfirmationScreen(
+            confirmForfeit: extras['confirmForfeit'] as bool? ?? false,
+          );
+        },
+      ),
+
+      // [4] Processing (calls the Cloud Function; back navigation disabled)
+      GoRoute(
+        path: AppRoutes.deleteAccountProcessing,
+        name: 'deleteAccountProcessing',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>? ?? {};
+          return DeleteAccountProcessingScreen(
+            confirmForfeit: extras['confirmForfeit'] as bool? ?? false,
+          );
+        },
+      ),
+
+      // [5] Success (sign out + return to welcome)
+      GoRoute(
+        path: AppRoutes.deleteAccountSuccess,
+        name: 'deleteAccountSuccess',
+        builder: (context, state) => const DeleteAccountSuccessScreen(),
       ),
     ],
 

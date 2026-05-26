@@ -3260,7 +3260,218 @@ exports.exportUserData = functions.runWith({ enforceAppCheck: true }).https.onCa
  * Delete user account and all associated data (GDPR Article 17 — Right to Erasure).
  * Requires re-authentication confirmation.
  */
-exports.deleteUserData = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+// ============================================================
+// USER ACCOUNT DELETION
+// ============================================================
+//
+// Soft-delete pattern: user-facing data is fully removed, but a complete
+// snapshot is preserved in `compliance_archive/{userId}` with 7-year retention
+// for AML record-keeping and fraud-investigation needs. Audit logs are NOT
+// anonymized — the userId stays intact so deleted-user activity remains
+// traceable for compliance and fraud purposes.
+//
+// Phase 1: super_admin / admin_manager / finance / admin_supervisor roles
+// read the archive via admin Cloud Functions (Phase 2). Until those land,
+// reads go through the Firebase console.
+//
+// Storage files (profile_photos, kyc_documents, qr_codes, receipts) are
+// MOVED (copy + delete) to a separate GCS bucket `qr-wallet-1993-compliance`
+// that is locked at the bucket level — no client SDK can reach it.
+
+const USER_SUBCOLLECTIONS = [
+  'transactions',
+  'notifications',
+  'kyc',
+  'verifications',
+  'fcm_tokens',
+  'linkedBankAccounts',
+];
+
+const USER_STORAGE_TYPES = [
+  'profile_photos',
+  'kyc_documents',
+  'qr_codes',
+  'receipts',
+];
+
+const COMPLIANCE_BUCKET_NAME = 'qr-wallet-1993-compliance';
+
+const SUBCOLLECTION_PAGE_SIZE = 400;
+const DISPUTE_OPEN_STATUSES = ['filed', 'investigating', 'supervisor_review'];
+const DEBT_OPEN_STATUSES = ['active', 'partially_paid'];
+
+// Piece 9: Minimum balance threshold in MINOR units (cents/centimes/etc.).
+// Wallet balances are stored as minor-unit values (e.g. 289 = 2.89 major
+// units), so the threshold must also be in minor units. 10000 minor units
+// = 100.00 major units (e.g. KSh 100.00, NGN 100.00, GHS 100.00). Flat
+// across all markets per product decision.
+//
+// If a deleting user's balance is below this and they explicitly consent,
+// the residual is swept to wallets/platform via sweepBalanceToPlatform()
+// rather than blocking deletion.
+//
+// MUST stay in sync with `_minWithdrawalThresholdMinor` in
+// lib/features/profile/screens/delete_account_preflight_screen.dart.
+const MIN_WITHDRAWAL_THRESHOLD = 10000;
+
+/**
+ * Piece 9: Sweep a deleting user's sub-threshold residual balance to the
+ * platform wallet. Matches the existing fee-collection pattern used elsewhere
+ * in this file (transaction.update with FieldValue.increment, USD conversion
+ * via fetchRates(), per-currency subcollection at wallets/platform/balances,
+ * record in wallets/platform/forfeitures).
+ *
+ * Atomicity: all wallet/platform updates run inside a single Firestore
+ * runTransaction. If the transaction aborts, NO state changes. The audit_logs
+ * write happens after the transaction commits and is best-effort (auditLog()
+ * already swallows errors internally).
+ *
+ * Concurrency: re-reads the user's wallet balance inside the transaction and
+ * aborts if it changed since the caller read it. This prevents a race where
+ * an incoming transfer arrives between the caller's balance check and the
+ * sweep.
+ *
+ * @param {string} userId - Firebase Auth UID of the user being deleted.
+ * @param {number} amount - The residual balance to sweep (in user's currency).
+ * @param {string} currency - The user's wallet currency (e.g. 'KES', 'NGN').
+ * @returns {Object} Forfeiture record: { forfeitureId, amount, currency,
+ *                   usdEquivalent, exchangeRate }.
+ */
+async function sweepBalanceToPlatform(userId, amount, currency) {
+  const forfeitureId = `forfeiture_${userId}_${Date.now()}`;
+
+  // Read cached exchange rate from Firestore (populated by updateExchangeRatesDaily).
+  // If unavailable, missing the currency, or otherwise unusable, proceed WITHOUT
+  // USD conversion — the forfeiture is the critical Firestore-only operation; USD
+  // equivalents are auxiliary aggregates a backfill job can compute later. Never
+  // let an external-rate-API outage block account deletion.
+  let exchangeRate = null;
+  let amountInUSD = null;
+  let usdConversionPending = false;
+  try {
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    if (ratesDoc.exists) {
+      const data = ratesDoc.data() || {};
+      const rate = (data.rates || {})[currency];
+      if (typeof rate === 'number' && rate > 0) {
+        exchangeRate = rate;
+        amountInUSD = amount / rate;
+      }
+    }
+  } catch (err) {
+    logError('Failed to read cached exchange rates during forfeiture', {
+      userId, currency, error: err.message,
+    });
+  }
+  if (exchangeRate === null) {
+    usdConversionPending = true;
+    logError('Exchange rate unavailable for forfeiture — recording without USD conversion', {
+      userId, currency, amount, forfeitureId,
+    });
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const userWalletRef = db.collection('wallets').doc(userId);
+    const freshWalletDoc = await transaction.get(userWalletRef);
+
+    if (!freshWalletDoc.exists) {
+      throw new Error('User wallet not found during forfeiture sweep');
+    }
+
+    const freshBalance = freshWalletDoc.data().balance || 0;
+    if (freshBalance !== amount) {
+      // Wallet balance changed between the caller's read and now — abort.
+      // The caller's guard logic will need to be re-evaluated against the
+      // fresh balance, so we surface a precondition failure.
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Wallet balance changed mid-sweep: expected ${amount}, found ${freshBalance}. Please retry.`
+      );
+    }
+
+    // 1. Decrement user wallet to zero
+    transaction.update(userWalletRef, {
+      balance: 0,
+      availableBalance: 0,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 2. Update platform top-level aggregates. USD only updated when rate available.
+    const platformWalletRef = db.collection('wallets').doc('platform');
+    const platformUpdate = {
+      totalTransactions: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (amountInUSD !== null) {
+      platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(amountInUSD);
+    }
+    transaction.update(platformWalletRef, platformUpdate);
+
+    // 3. Update per-currency platform balance (native amount always; USD if available)
+    const currencyBalanceRef = db.collection('wallets')
+      .doc('platform')
+      .collection('balances')
+      .doc(currency);
+    const currencyUpdate = {
+      currency,
+      amount: admin.firestore.FieldValue.increment(amount),
+      txCount: admin.firestore.FieldValue.increment(1),
+      lastTransactionAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (amountInUSD !== null) {
+      currencyUpdate.usdEquivalent = admin.firestore.FieldValue.increment(amountInUSD);
+    }
+    transaction.set(currencyBalanceRef, currencyUpdate, { merge: true });
+
+    // 4. Create forfeiture record. usdEquivalent/exchangeRate may be null;
+    //    usdConversionPending=true tells a future backfill job to compute them.
+    const forfeitureRef = db.collection('wallets')
+      .doc('platform')
+      .collection('forfeitures')
+      .doc(forfeitureId);
+    transaction.set(forfeitureRef, {
+      id: forfeitureId,
+      userId,
+      originalAmount: amount,
+      currency,
+      usdEquivalent: amountInUSD,
+      exchangeRate,
+      usdConversionPending,
+      reason: 'account_deletion_sub_threshold_balance',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+
+  // Audit trail — never blocks the main operation (auditLog swallows errors)
+  await auditLog({
+    action: 'account_deletion_forfeiture',
+    userId,
+    severity: 'high',
+    amount,
+    currency,
+    metadata: {
+      forfeitureId,
+      usdEquivalent: amountInUSD,
+      exchangeRate,
+      usdConversionPending,
+    },
+  });
+
+  return {
+    forfeitureId,
+    amount,
+    currency,
+    usdEquivalent: amountInUSD,
+    exchangeRate,
+    usdConversionPending,
+  };
+}
+
+exports.deleteUserData = functions.runWith({
+  enforceAppCheck: true,
+  timeoutSeconds: 300,
+}).https.onCall(async (data, context) => {
   if (!context.auth) {
     throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
   }
@@ -3276,76 +3487,281 @@ exports.deleteUserData = functions.runWith({ enforceAppCheck: true }).https.onCa
   logSecurityEvent('user_data_deletion_requested', 'high', { userId });
 
   try {
-    // Check for pending transactions
+    // --------------------------------------------------------
+    // GUARDS — block deletion if any of these find a blocker
+    // --------------------------------------------------------
+
+    // Pending withdrawals
     const pendingWithdrawals = await db.collection('withdrawals')
       .where('userId', '==', userId)
       .where('status', '==', 'pending')
       .limit(1)
       .get();
-
     if (!pendingWithdrawals.empty) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with pending withdrawals. Please wait for them to complete.');
     }
 
+    // Pending MoMo transactions
     const pendingMomo = await db.collection('momo_transactions')
       .where('userId', '==', userId)
       .where('status', '==', 'pending')
       .limit(1)
       .get();
-
     if (!pendingMomo.empty) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with pending MoMo transactions. Please wait for them to complete.');
     }
 
-    // Check wallet balance
+    // Wallet balance — three branches:
+    //   balance == 0                              → proceed normally
+    //   0 < balance < MIN_WITHDRAWAL_THRESHOLD    → require explicit confirmForfeit,
+    //                                                then sweep to platform wallet
+    //   balance >= MIN_WITHDRAWAL_THRESHOLD       → block, user must withdraw first
+    //
+    // The sweep itself happens AFTER all guards pass (below, before archive) so
+    // that a failed guard doesn't strand the user's money.
     const walletDoc = await db.collection('wallets').doc(userId).get();
-    if (walletDoc.exists && walletDoc.data().balance > 0) {
+    const currentBalance = walletDoc.exists ? (walletDoc.data().balance || 0) : 0;
+    const walletCurrency = walletDoc.exists ? (walletDoc.data().currency || 'USD') : 'USD';
+
+    if (currentBalance >= MIN_WITHDRAWAL_THRESHOLD) {
       throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
         'Cannot delete account with remaining balance. Please withdraw all funds first.');
     }
 
-    // Delete user sub-collections
-    const subCollections = ['transactions', 'notifications', 'linkedAccounts', 'bankAccounts', 'cards', 'kyc'];
-    for (const subCol of subCollections) {
-      const docs = await db.collection('users').doc(userId).collection(subCol).limit(500).get();
-      const batch = db.batch();
-      docs.forEach(doc => batch.delete(doc.ref));
-      if (!docs.empty) await batch.commit();
+    if (currentBalance > 0 && data.confirmForfeit !== true) {
+      // Defense in depth: the client should route the user through the
+      // forfeiture-consent screen before calling this function with
+      // confirmForfeit: true. A malicious or stale client that skips that
+      // step gets rejected here.
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Remaining balance below transfer minimum requires forfeit confirmation.');
+    }
+
+    // Open disputes — user as filer
+    const openDisputesFiled = await db.collection('disputes')
+      .where('filedBy.uid', '==', userId)
+      .where('status', 'in', DISPUTE_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDisputesFiled.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with open disputes you filed. Please wait for them to be resolved.');
+    }
+
+    // Open disputes — user as recipient
+    const openDisputesAgainst = await db.collection('disputes')
+      .where('recipientUid', '==', userId)
+      .where('status', 'in', DISPUTE_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDisputesAgainst.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account with open disputes filed against you. Please wait for them to be resolved.');
+    }
+
+    // Outstanding debts — user owes money (recipientUid is the legacy/overloaded "who owes" field)
+    const openDebtsOwed = await db.collection('wallet_debts')
+      .where('recipientUid', '==', userId)
+      .where('status', 'in', DEBT_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDebtsOwed.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account while you have outstanding debts. Please wait for them to be settled.');
+    }
+
+    // Outstanding debts — user is owed money (filerUid)
+    const openDebtsOwedTo = await db.collection('wallet_debts')
+      .where('filerUid', '==', userId)
+      .where('status', 'in', DEBT_OPEN_STATUSES)
+      .limit(1)
+      .get();
+    if (!openDebtsOwedTo.empty) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED,
+        'Cannot delete account while a debt recovery is in progress in your favor. Please wait for it to complete.');
+    }
+
+    // --------------------------------------------------------
+    // SWEEP — forfeit sub-threshold residual balance to platform
+    // --------------------------------------------------------
+    // Runs only when currentBalance > 0 (which, given the guards above, means
+    // 0 < currentBalance < MIN_WITHDRAWAL_THRESHOLD AND confirmForfeit === true).
+    // For zero-balance deletions this block is a no-op.
+    let forfeitureResult = null;
+    if (currentBalance > 0) {
+      forfeitureResult = await sweepBalanceToPlatform(userId, currentBalance, walletCurrency);
+    }
+
+    // --------------------------------------------------------
+    // ARCHIVE — snapshot everything to compliance_archive
+    // --------------------------------------------------------
+
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'User account not found.');
+    }
+    const userData = userDoc.data();
+    const walletData = walletDoc.exists ? walletDoc.data() : null;
+
+    // 7-year retention end
+    const retainUntilDate = new Date();
+    retainUntilDate.setFullYear(retainUntilDate.getFullYear() + 7);
+
+    const archiveRef = db.collection('compliance_archive').doc(userId);
+    await archiveRef.set({
+      ...userData,
+      walletDataAtDeletion: walletData,
+      // Piece 9: if a sub-threshold balance was swept to platform at deletion,
+      // record what happened so the archive snapshot reconciles cleanly with
+      // the platform forfeitures subcollection.
+      balanceForfeitureAtDeletion: forfeitureResult,
+      originalUserId: userId,
+      archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      retainUntil: admin.firestore.Timestamp.fromDate(retainUntilDate),
+      deletionReason: 'user_self_delete',
+    });
+
+    // Copy each user subcollection to archive subcollection (paginated)
+    for (const subCol of USER_SUBCOLLECTIONS) {
+      let lastDoc = null;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let query = db.collection('users').doc(userId).collection(subCol)
+          .orderBy(admin.firestore.FieldPath.documentId())
+          .limit(SUBCOLLECTION_PAGE_SIZE);
+        if (lastDoc) query = query.startAfter(lastDoc);
+        const snap = await query.get();
+        if (snap.empty) break;
+
+        const batch = db.batch();
+        snap.forEach(doc => {
+          batch.set(archiveRef.collection(subCol).doc(doc.id), doc.data());
+        });
+        await batch.commit();
+
+        if (snap.size < SUBCOLLECTION_PAGE_SIZE) break;
+        lastDoc = snap.docs[snap.docs.length - 1];
+      }
+    }
+
+    // Copy related disputes (user as filer OR recipient) to archive — deduplicated
+    const disputesFiledBy = await db.collection('disputes').where('filedBy.uid', '==', userId).get();
+    const disputesAgainst = await db.collection('disputes').where('recipientUid', '==', userId).get();
+    const seenDisputeIds = new Set();
+    for (const doc of [...disputesFiledBy.docs, ...disputesAgainst.docs]) {
+      if (seenDisputeIds.has(doc.id)) continue;
+      seenDisputeIds.add(doc.id);
+      await archiveRef.collection('related_disputes').doc(doc.id).set(doc.data());
+    }
+
+    // Copy related wallet_debts (user as recipient OR filer) to archive — deduplicated
+    const debtsAsRecipient = await db.collection('wallet_debts').where('recipientUid', '==', userId).get();
+    const debtsAsFiler = await db.collection('wallet_debts').where('filerUid', '==', userId).get();
+    const seenDebtIds = new Set();
+    for (const doc of [...debtsAsRecipient.docs, ...debtsAsFiler.docs]) {
+      if (seenDebtIds.has(doc.id)) continue;
+      seenDebtIds.add(doc.id);
+      await archiveRef.collection('related_wallet_debts').doc(doc.id).set(doc.data());
+    }
+
+    // --------------------------------------------------------
+    // STORAGE — move user files to compliance bucket
+    // --------------------------------------------------------
+
+    const sourceBucket = admin.storage().bucket();
+    const complianceBucket = admin.storage().bucket(COMPLIANCE_BUCKET_NAME);
+
+    for (const storageType of USER_STORAGE_TYPES) {
+      const prefix = `${storageType}/${userId}/`;
+      const [files] = await sourceBucket.getFiles({ prefix });
+      for (const file of files) {
+        const relativePath = file.name.substring(prefix.length);
+        // Destination layout: {userId}/{storageType}/{relativePath}
+        // e.g. abc123/kyc_documents/passport.jpg
+        const destinationPath = `${userId}/${storageType}/${relativePath}`;
+        try {
+          await file.copy(complianceBucket.file(destinationPath));
+          await file.delete();
+        } catch (storageError) {
+          // 404 = already deleted/missing; continue
+          if (storageError.code === 404) continue;
+          // Otherwise log and continue — do NOT block deletion on storage errors
+          logError('Storage move failed during account deletion', {
+            userId,
+            sourcePath: file.name,
+            destinationPath,
+            error: storageError.message,
+          });
+        }
+      }
+    }
+
+    // --------------------------------------------------------
+    // DELETE — remove originals after archive is in place
+    // --------------------------------------------------------
+
+    // Delete user subcollections (paginated — handles users with >500 docs)
+    for (const subCol of USER_SUBCOLLECTIONS) {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const snap = await db.collection('users').doc(userId).collection(subCol)
+          .limit(SUBCOLLECTION_PAGE_SIZE).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        if (snap.size < SUBCOLLECTION_PAGE_SIZE) break;
+      }
     }
 
     // Delete user document
     await db.collection('users').doc(userId).delete();
 
-    // Delete wallet
+    // Delete wallet document (if it existed)
     if (walletDoc.exists) {
       await db.collection('wallets').doc(userId).delete();
     }
 
-    // Anonymize audit logs (retain for compliance but remove PII)
-    const auditLogs = await db.collection('audit_logs')
-      .where('userId', '==', userId).limit(500).get();
-    if (!auditLogs.empty) {
-      const batch = db.batch();
-      auditLogs.forEach(doc => {
-        batch.update(doc.ref, {
-          userId: 'DELETED_USER',
-          anonymizedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-      await batch.commit();
-    }
+    // NOTE: audit_logs are intentionally NOT anonymized.
+    // The userId stays intact so fraud investigators can still trace activity
+    // by this deleted user via the compliance_archive reference. This is the
+    // critical traceability fix flagged in the cross-check audit (2026-05-21).
 
-    // Delete Firebase Auth account
+    // Delete the Firebase Auth user last
     await admin.auth().deleteUser(userId);
 
-    logSecurityEvent('user_data_deleted', 'high', { userId: 'DELETED_USER' });
+    // Record success in audit_logs with userId intact (the whole point)
+    await auditLog({
+      userId,
+      operation: 'deleteUserData',
+      result: 'success',
+      metadata: {
+        archiveRef: `compliance_archive/${userId}`,
+        retainUntil: retainUntilDate.toISOString(),
+        deletionReason: 'user_self_delete',
+      },
+    });
+
+    logSecurityEvent('user_archived_for_compliance', 'high', {
+      userId,
+      archiveRef: `compliance_archive/${userId}`,
+    });
 
     return { success: true, message: 'Account and all associated data have been deleted.' };
   } catch (error) {
+    // Audit every failed attempt with userId intact (fraud signal)
+    await auditLog({
+      userId,
+      operation: 'deleteUserData',
+      result: 'failure',
+      error: error.message || 'unknown',
+      metadata: { code: error.code || 'unknown' },
+    });
+
     if (error.code && error.code.startsWith('functions/')) {
-      throw error; // Re-throw our own errors
+      throw error;
     }
     logError('User data deletion failed', { userId, error: error.message });
     throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Account deletion failed. Please contact support.');

@@ -546,6 +546,63 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ).animate().fadeIn(delay: 450.ms, duration: 400.ms),
 
+            const SizedBox(height: AppDimensions.spaceLG),
+
+            // Delete account (destructive — bottom of the menu list)
+            const Divider(color: AppColors.inputBorderDark),
+            const SizedBox(height: AppDimensions.spaceXS),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => context.push(AppRoutes.deleteAccountExplainer),
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.spaceMD),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius:
+                              BorderRadius.circular(AppDimensions.radiusSM),
+                        ),
+                        child: const Icon(
+                          Icons.delete_forever_outlined,
+                          color: AppColors.error,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.spaceMD),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Delete my account',
+                              style:
+                                  AppTextStyles.bodyMedium(color: AppColors.error),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Permanently delete your account and data',
+                              style: AppTextStyles.bodySmall(
+                                  color: AppColors.textTertiaryDark),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.error,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ).animate().fadeIn(delay: 500.ms, duration: 400.ms),
+
             const SizedBox(height: AppDimensions.spaceXXL),
 
             // Logout Button

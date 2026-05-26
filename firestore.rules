@@ -370,5 +370,21 @@ service cloud.firestore {
             || resource.data.filerUid == request.auth.uid);
       allow write: if false;
     }
+
+    // compliance_archive — Cloud Functions only. NO client access at all.
+    //
+    // Stores soft-deleted user records for 7-year AML/fraud retention.
+    // All writes happen via deleteUserData (Cloud Function, Admin SDK).
+    // Phase 1: authorized admin roles read via the Firebase console.
+    // Phase 2 will add admin Cloud Functions for searchable lookups with
+    // tiered field visibility (admin_supervisor sees limited fields;
+    // finance, admin_manager, super_admin see everything).
+    match /compliance_archive/{userId} {
+      allow read, write: if false;
+
+      match /{subcoll}/{doc} {
+        allow read, write: if false;
+      }
+    }
   }
 }
