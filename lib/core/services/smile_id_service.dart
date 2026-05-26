@@ -44,8 +44,15 @@ class SmileIDService {
     'KE': [
       {'value': 'NATIONAL_ID', 'label': 'National ID', 'requiresNumber': false, 'smileIdType': 'NATIONAL_ID'},
       {'value': 'VOTERS_ID', 'label': "Voter's ID", 'requiresNumber': false, 'smileIdType': 'VOTER_ID'},
+      {'value': 'DRIVERS_LICENSE', 'label': "Driver's License", 'requiresNumber': false, 'smileIdType': 'DRIVERS_LICENSE'},
       {'value': 'PASSPORT', 'label': 'International Passport', 'requiresNumber': false, 'smileIdType': 'PASSPORT'},
-      {'value': 'ALIEN_ID', 'label': 'Alien ID', 'requiresNumber': false, 'smileIdType': 'ALIEN_CARD'},
+      // Alien Card temporarily hidden — Smile ID classifies ALIEN_CARD as a
+      // database-lookup product (Backed by ID Authority), which requires
+      // entitlement activation on partner 8244. Same pending-entitlement
+      // status as Uganda NIN, Nigeria NIN/BVN, Ghana SSNIT, and Zambia TPIN.
+      // Uncomment once entitlement is active AND a routing case for ALIEN_ID
+      // is added in kyc_screen.dart::_navigateToVerification.
+      // {'value': 'ALIEN_ID', 'label': 'Alien ID', 'requiresNumber': false, 'smileIdType': 'ALIEN_CARD'},
     ],
     'ZA': [
       // ZA NATIONAL_ID: was 'requiresNumber: true' (SmileID BiometricKYC database
