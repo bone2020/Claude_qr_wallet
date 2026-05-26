@@ -11309,19 +11309,22 @@ exports.smileIdWebhook = functions
       }, { merge: true });
 
     // Verification passed: face match + valid result code.
-    // 0220/0120 = document/enhanced-doc verification success (selfie matched ID document).
-    // 1012 = Biometric KYC success (selfie matched government ID record).
     //
-    // INTENTIONALLY EXCLUDED:
-    // 0810 = SmartSelfie enrollment success. Enrollment by itself only
-    // confirms a selfie was captured; it does NOT match the user against
-    // any government ID or document. KYC requires identity verification,
-    // not just face capture. The on-device SmartSelfie enrollment is the
-    // first step; submitBiometricKycVerification (which submits a
-    // BIOMETRIC_KYC job that produces a 1012 result on success) is what
-    // actually verifies identity. See cross-check audit section 4.1
-    // (2026-05-21).
+    // Accepted result codes (all paths that confirm "selfie matches ID"):
+    //   - 0810 = Document Verification success. Smile confirms the document
+    //     is genuine AND the selfie matches the photo on the document
+    //     (Selfie_To_ID_Card_Compare action present).
+    //   - 0220 / 0120 = document / enhanced-doc verification success
+    //     (selfie matched ID document).
+    //   - 1012 = BIOMETRIC_KYC success (selfie matched government ID record).
+    //
+    // Note: SmartSelfie enrollment alone also returns 0810 but does NOT
+    // produce a Selfie_To_ID_Card_Compare action. The separate
+    // faceMatchPassed gate below requires selfiePass (or a human-reviewer
+    // override), so SmartSelfie-enrollment-only callbacks cannot satisfy
+    // this verification path even though they share the 0810 code.
     const validResultCode =
+      resultCode === '0810' ||
       resultCode === '0220' ||
       resultCode === '0120' ||
       resultCode === '1012';
@@ -11540,31 +11543,32 @@ exports.checkSmileIdJobStatus = functions
     const livenessCheck = actions.Liveness_Check || actions.liveness_check || '';
     const docCheck = actions.Document_Verification || actions.document_verification || '';
 
-    // Determine if verification passed. Mirrors smileIdWebhook so this
-    // poll path cannot be used to bypass the webhook's tightened gate.
+    // Determine if verification passed. Mirrors smileIdWebhook.
     //
-    // KYC requires:
-    //   - Valid result code: 0220 (document verification), 0120 (document
-    //     verification), or 1012 (BIOMETRIC_KYC -- selfie matched government
-    //     ID). 0810 (SmartSelfie enrollment success) is INTENTIONALLY
-    //     EXCLUDED; enrollment alone does not match the user against any
-    //     government ID.
+    // KYC requires ALL of:
+    //   - Valid result code (any path that confirms "selfie matches ID"):
+    //     - 0810 = Document Verification success (selfie matched ID
+    //       document).
+    //     - 0220 / 0120 = document / enhanced-doc verification success
+    //       (selfie matched ID document).
+    //     - 1012 = BIOMETRIC_KYC success (selfie matched government ID).
     //   - Strict liveness pass (no empty/missing liveness signal).
-    //   - Selfie-against-ID compare passed (Selfie_To_ID_Card_Compare), or
-    //     Smile ID human reviewer confirmed the match.
+    //   - Selfie-against-ID compare passed (Selfie_To_ID_Card_Compare),
+    //     or Smile ID human reviewer confirmed the match.
     //
-    // Before this change, this poll accepted resultCode '0810' alone, plus
-    // a fallback that passed when docCheck was empty -- both of which the
-    // SmartSelfie enrollment path triggers. That bypassed the BIOMETRIC_KYC
-    // government-ID match required by Option A (cross-check audit section
-    // 4.1, 2026-05-21).
+    // Note: SmartSelfie enrollment alone also returns 0810 but does NOT
+    // produce a Selfie_To_ID_Card_Compare action, so the selfieIdMatchPass
+    // gate below will fail it. Only Document Verification (which performs
+    // the selfie-to-ID-document compare) and BIOMETRIC_KYC (which performs
+    // the selfie-to-government-ID compare) can satisfy all three gates.
     const selfieToIdCompare = actions.Selfie_To_ID_Card_Compare || actions.selfie_to_id_card_compare || '';
     const humanReview = actions.Human_Review_Compare || actions.human_review_compare || '';
     const isApprovedPassStr = (s) => {
       const lower = String(s || '').toLowerCase();
       return lower === 'pass' || lower === 'passed' || lower === 'completed';
     };
-    const validResultCode = resultCode === '0220' ||
+    const validResultCode = resultCode === '0810' ||
+                            resultCode === '0220' ||
                             resultCode === '0120' ||
                             resultCode === '1012';
     const livenessPass = isApprovedPassStr(livenessCheck);
