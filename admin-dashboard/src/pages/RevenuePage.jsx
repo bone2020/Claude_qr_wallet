@@ -1880,6 +1880,25 @@ function RevenuePage() {
     isAuditor,
   } = useAuth();
 
+  // Access gate — only finance, admin_manager, and super_admin may view this page.
+  // Server-side adminGetPlatformWallet enforces the same check; this early-return
+  // gives unauthorized users a clean message instead of a broken page.
+  if (!isFinance) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Access Restricted</h2>
+          <p className="text-sm text-gray-600">
+            The Revenue page is available only to Finance, Admin Manager, and Super Admin roles.
+          </p>
+          <p className="text-xs text-gray-400 mt-3">
+            Contact your administrator if you believe you need access.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [platformWallet, setPlatformWallet] = useState(null);
   const [platformBalances, setPlatformBalances] = useState([]);
   const [proposals, setProposals] = useState([]);

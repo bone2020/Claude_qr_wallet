@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 function Sidebar() {
-  const { user, role, logout, isAdmin, isAdminSupervisor, isAuditor } = useAuth();
+  const { user, role, logout, isAdmin, isAdminSupervisor, isAuditor, isFinance } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -33,9 +33,9 @@ function Sidebar() {
         <NavLink to="/recovery" className={linkClass}>Account Recovery</NavLink>
         <NavLink to="/activity" className={linkClass}>Activity Log</NavLink>
 
+       {isFinance && <NavLink to="/revenue" className={linkClass}>Revenue</NavLink>}
         {isAdmin && (
           <>
-            <NavLink to="/revenue" className={linkClass}>Revenue</NavLink>
             <NavLink to="/reports" className={linkClass}>Reports</NavLink>
             <NavLink to="/audit" className={linkClass}>Audit Logs</NavLink>
             <NavLink to="/admins" className={linkClass}>Admin Management</NavLink>
