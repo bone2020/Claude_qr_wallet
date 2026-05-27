@@ -23,7 +23,6 @@ import '../../features/auth/screens/kyc/national_id_verification_screen.dart';
 import '../../features/auth/screens/kyc/ssnit_verification_screen.dart';
 import '../../features/auth/screens/kyc/uganda_nin_verification_screen.dart';
 import '../../features/auth/screens/app_lock_screen.dart';
-import '../../features/auth/screens/kyc/phone_verification_screen.dart';
 import '../../features/auth/screens/kyc/verification_pending_screen.dart';
 
 import '../../features/auth/screens/forgot_password_screen.dart';
@@ -82,7 +81,6 @@ class AppRoutes {
   static const String kycNationalId = '/kyc-national-id';
   static const String kycSsnit = '/kyc-ssnit';
   static const String kycUgandaNin = '/kyc-uganda-nin';
-  static const String kycPhoneVerification = '/kyc-phone-verification';
   static const String main = '/main';
   static const String home = '/home';
   static const String sendMoney = '/send-money';
@@ -190,7 +188,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         AppRoutes.kycNationalId,
         AppRoutes.kycSsnit,
         AppRoutes.kycUgandaNin,
-        AppRoutes.kycPhoneVerification,
         AppRoutes.verificationPending,
         AppRoutes.appLock,
       };
@@ -214,6 +211,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             }
 
             if (kycStatus != 'verified') {
+              // Unified flow: phone OTP must come before KYC for all countries.
+              final phoneVerified = data['phoneVerified'] == true;
+              if (!phoneVerified) {
+                return AppRoutes.phoneOtp;
+              }
               return AppRoutes.kyc;
             }
           }
@@ -311,22 +313,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
 
         if (kycStatus != 'verified') {
-          // Countries with Smile ID KYC configured — must complete Smile ID
-          const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
-          final userCountry = (data['country'] as String?)?.toUpperCase().trim() ?? 'GH';
-
-          if (smileIdCountries.contains(userCountry)) {
-            return AppRoutes.kyc;
-          }
-
-          // Non-Smile-ID countries: check if phone is verified
+          // Unified flow: phone OTP must come before KYC for all countries
+          // (both Smile-ID and non-Smile-ID). Phone OTP completes first;
+          // the user then lands on /kyc for face/document verification.
           final phoneVerified = data['phoneVerified'] == true;
           if (!phoneVerified) {
             return AppRoutes.phoneOtp;
           }
-
-          // Phone + email verified — send to manual KYC for document upload
-          // ManualKycScreen will handle phone verification + document upload + wallet creation
           return AppRoutes.kyc;
         }
 
@@ -564,22 +557,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extras = state.extra as Map<String, dynamic>?;
           return UgandaNinVerificationScreen(
             countryCode: extras?['countryCode'] ?? 'UG',
-          );
-        },
-      ),
-
-      // KYC Phone Verification
-      GoRoute(
-        path: AppRoutes.kycPhoneVerification,
-        name: 'kycPhoneVerification',
-        builder: (context, state) {
-          final extras = state.extra as Map<String, dynamic>?;
-          return PhoneVerificationScreen(
-            countryCode: extras?['countryCode'] ?? 'GH',
-            firstName: extras?['firstName'],
-            lastName: extras?['lastName'],
-            idNumber: extras?['idNumber'],
-            documentVerified: extras?['documentVerified'] ?? false,
           );
         },
       ),

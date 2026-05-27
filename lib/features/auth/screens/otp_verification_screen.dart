@@ -108,21 +108,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           ),
         );
 
-        // Route based on country — Smile ID countries go to KYC,
-        // others go to phone verification then home
-        const smileIdCountries = ['GH', 'NG', 'KE', 'ZA', 'CI', 'UG', 'ZM', 'ZW'];
+        // Unified flow: all countries verify phone before KYC.
         final user = ref.read(currentUserProvider);
-        final countryCode = (user?.country ?? 'GH').toUpperCase().trim();
-
-        if (smileIdCountries.contains(countryCode)) {
-          context.go(AppRoutes.kyc);
-        } else {
-          // Non-Smile-ID country — verify phone number
-          context.go(
-            AppRoutes.phoneOtp,
-            extra: {'phoneNumber': user?.phoneNumber ?? widget.phoneNumber ?? ''},
-          );
-        }
+        context.go(
+          AppRoutes.phoneOtp,
+          extra: {'phoneNumber': user?.phoneNumber ?? widget.phoneNumber ?? ''},
+        );
       } else if (showError) {
         setState(() {
           _errorMessage = 'Email not verified yet. Please check your inbox and click the verification link.';
