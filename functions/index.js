@@ -1206,10 +1206,50 @@ exports.verifyPayment = functions
     const amount = amountInKobo; // Keep in minor units (pesewas/kobo) for consistency
     const currency = paymentData.currency;
 
+    // ─────────────────────────────────────────────────────────────
+    // OWNERSHIP BINDING (P1 fix — Finding 1)
+    // Confirm this payment reference actually belongs to the caller
+    // BEFORE crediting any wallet. Without this, any authenticated
+    // user who obtains a valid reference could redirect the deposit
+    // into their own wallet. The owner of a reference is fixed at
+    // initialization and never changes, so this read is safe to
+    // perform outside the credit transaction below.
+    // ─────────────────────────────────────────────────────────────
+    const pendingSnap = await db.collection('pending_transactions').doc(reference).get();
+
+    if (pendingSnap.exists) {
+      const pending = pendingSnap.data();
+      if (pending.userId !== userId) {
+        logSecurityEvent('verify_payment_owner_mismatch', 'high', {
+          reference,
+          caller: userId,
+          owner: pending.userId,
+          ...correlation.toAuditContext(),
+        });
+        throwAppError(
+          ERROR_CODES.AUTH_PERMISSION_DENIED,
+          'This payment reference does not belong to your account.'
+        );
+      }
+    } else {
+      const metaUserId = paymentData.metadata && paymentData.metadata.userId;
+      if (!metaUserId || metaUserId !== userId) {
+        logSecurityEvent('verify_payment_owner_unprovable', 'high', {
+          reference,
+          caller: userId,
+          metaUserId: metaUserId || null,
+          ...correlation.toAuditContext(),
+        });
+        throwAppError(
+          ERROR_CODES.AUTH_PERMISSION_DENIED,
+          'Unable to confirm this payment belongs to your account.'
+        );
+      }
+    }
+
     // Secondary idempotency: paymentRef check is performed INSIDE the transaction below
     // (H-01 fix) to prevent a race between verifyPayment and paystackWebhook.
     const paymentRef = db.collection('payments').doc(reference);
-
     // Get user's wallet
     const walletSnapshot = await db.collection('wallets')
       .where('userId', '==', userId)
