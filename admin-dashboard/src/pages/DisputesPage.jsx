@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import DocumentUploadWidget from '../components/DocumentUploadWidget';
+import { formatCurrency, formatDate } from '../utils/format';
 
 const tabActive =
   'border-b-2 border-indigo-600 text-indigo-600 py-4 px-1 font-medium text-sm whitespace-nowrap';
@@ -24,14 +25,6 @@ const STATUS_OPTIONS = [
   'closed_returned',
   'closed_stuck',
 ];
-
-const currencySymbols = {
-  NGN: '₦', GHS: 'GH₵', KES: 'KSh', ZAR: 'R', UGX: 'USh',
-  RWF: 'FRw', TZS: 'TSh', EGP: 'E£', USD: '$', GBP: '£', EUR: '€',
-};
-
-const symbol = (c) => currencySymbols[c] || c || '';
-const formatDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 
 const statusBadgeClass = (status) => {
   switch (status) {
@@ -115,7 +108,7 @@ function DisputeDetailsModal({ dispute, onClose }) {
           <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
         </DetailsRow>
         <DetailsRow label="Disputed Amount">
-          {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+          {formatCurrency(dispute.amount ?? dispute.disputedAmount, dispute.currency)} {dispute.currency}
         </DetailsRow>
         <DetailsRow label="Original Transaction">
           <span className="font-mono text-xs">{dispute.transactionId || '—'}</span>
@@ -136,12 +129,12 @@ function DisputeDetailsModal({ dispute, onClose }) {
         {/* Phase 5i E2: escrow tracking, release flow, and closing remarks fields. */}
         <DetailsRow label="Amount in Escrow">
           {dispute.amountInEscrow != null
-            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            ? `${formatCurrency(dispute.amountInEscrow, dispute.disputedCurrency)} ${dispute.disputedCurrency || ''}`
             : '—'}
         </DetailsRow>
         <DetailsRow label="Amount Owed">
           {dispute.amountOwed != null
-            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountOwed / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            ? `${formatCurrency(dispute.amountOwed, dispute.disputedCurrency)} ${dispute.disputedCurrency || ''}`
             : '—'}
         </DetailsRow>
         <DetailsRow label="Decision Direction">{dispute.decisionDirection || '—'}</DetailsRow>
@@ -315,7 +308,7 @@ function InvestigationModal({ dispute, onClose, onSubmitted }) {
           <span className="font-mono text-xs">{dispute.transactionId || '—'}</span>
         </DetailsRow>
         <DetailsRow label="Disputed Amount">
-          {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+          {formatCurrency(dispute.amount ?? dispute.disputedAmount, dispute.currency)} {dispute.currency}
         </DetailsRow>
         <DetailsRow label="Description">{dispute.description}</DetailsRow>
       </div>
@@ -472,7 +465,7 @@ function AllDisputesTab({ canAssign }) {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
@@ -595,7 +588,7 @@ function MyAssignedCasesTab({ currentUid }) {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
@@ -686,7 +679,7 @@ function DecisionActionModal({
             <label className="text-sm text-gray-700 font-medium">Refund Amount</label>
             {amountMax != null && (
               <span className="text-xs text-gray-500">
-                max recoverable: {symbol(amountCurrency)}{Number(amountMax).toFixed(2)} {amountCurrency}
+                max recoverable: {formatCurrency(amountMax, amountCurrency)} {amountCurrency}
               </span>
             )}
           </div>
@@ -759,7 +752,7 @@ function SupervisorReviewModal({ dispute, onClose, onDecided }) {
             <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
           </DetailsRow>
           <DetailsRow label="Disputed Amount">
-            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+            {formatCurrency(dispute.amount ?? dispute.disputedAmount, dispute.currency)} {dispute.currency}
           </DetailsRow>
           <DetailsRow label="Description">{dispute.description}</DetailsRow>
           <DetailsRow label="Assigned Admin">
@@ -832,10 +825,10 @@ function ManagerDecisionModal({ dispute, onClose, onDecided }) {
             <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
           </DetailsRow>
           <DetailsRow label="Disputed Amount">
-            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+            {formatCurrency(dispute.amount ?? dispute.disputedAmount, dispute.currency)} {dispute.currency}
           </DetailsRow>
           <DetailsRow label="Currently Held">
-            {symbol(dispute.currency)}{Number(recoverable || 0).toFixed(2)} {dispute.currency}
+            {formatCurrency(recoverable || 0, dispute.currency)} {dispute.currency}
           </DetailsRow>
           <DetailsRow label="Description">{dispute.description}</DetailsRow>
           <DetailsRow label="Investigation Findings">
@@ -976,7 +969,7 @@ function SupervisorReviewTab() {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-700">
@@ -1066,11 +1059,11 @@ function ManagerDecisionTab() {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-gray-700">
-                      {symbol(d.currency)}{Number(d.currentHoldAmount ?? 0).toFixed(2)}
+                      {formatCurrency(d.currentHoldAmount ?? 0, d.currency)}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-700">
                       {d.supervisorDecision?.decision || '—'}
@@ -1115,10 +1108,10 @@ function EscalatedReviewModal({ dispute, onClose, onDecided }) {
             <div className="text-xs text-gray-500">{dispute.recipient?.email || dispute.recipientEmail || ''}</div>
           </DetailsRow>
           <DetailsRow label="Disputed Amount">
-            {symbol(dispute.currency)}{(dispute.amount ?? dispute.disputedAmount)?.toFixed?.(2)} {dispute.currency}
+            {formatCurrency(dispute.amount ?? dispute.disputedAmount, dispute.currency)} {dispute.currency}
           </DetailsRow>
           <DetailsRow label="Currently Held">
-            {symbol(dispute.currency)}{Number(recoverable || 0).toFixed(2)} {dispute.currency}
+            {formatCurrency(recoverable || 0, dispute.currency)} {dispute.currency}
           </DetailsRow>
           <DetailsRow label="Description">{dispute.description}</DetailsRow>
           <DetailsRow label="Investigation Findings">
@@ -1264,11 +1257,11 @@ function EscalatedTab() {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm text-gray-700">
-                      {symbol(d.currency)}{Number(d.currentHoldAmount ?? 0).toFixed(2)}
+                      {formatCurrency(d.currentHoldAmount ?? 0, d.currency)}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-700">
                       {d.managerDecision?.decision || '—'}
@@ -1377,7 +1370,7 @@ function StuckTab() {
                       <div className="text-xs text-gray-400">{d.recipient?.email || d.recipientEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(d.currency)}{(d.amount ?? d.disputedAmount)?.toFixed?.(2)}
+                      {formatCurrency(d.amount ?? d.disputedAmount, d.currency)}
                       <div className="text-xs text-gray-400">{d.currency}</div>
                     </td>
                     <td className="px-3 py-2"><StatusBadge status={d.status} /></td>
@@ -1459,7 +1452,7 @@ function ProposeReleaseModal({ dispute, onClose, onProposed }) {
         </DetailsRow>
         <DetailsRow label="Amount in Escrow">
           {dispute.amountInEscrow != null
-            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            ? `${formatCurrency(dispute.amountInEscrow, dispute.disputedCurrency)} ${dispute.disputedCurrency || ''}`
             : '—'}
         </DetailsRow>
         <DetailsRow label="Manager's Decision Direction">{dispute.decisionDirection || '—'}</DetailsRow>
@@ -1633,7 +1626,7 @@ function AwaitingReleaseTab() {
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
                       {d.amountInEscrow != null
-                        ? `${symbol(d.disputedCurrency)}${(d.amountInEscrow / 100).toFixed(2)}`
+                        ? `${formatCurrency(d.amountInEscrow, d.disputedCurrency)}`
                         : '—'}
                       <div className="text-xs text-gray-400">{d.disputedCurrency || ''}</div>
                     </td>
@@ -1708,7 +1701,7 @@ function ConfirmReleaseModal({ dispute, onClose, onConfirmed }) {
         <DetailsRow label="Proposal Expires">{formatDate(proposal.expiresAt)}</DetailsRow>
         <DetailsRow label="Amount in Escrow">
           {dispute.amountInEscrow != null
-            ? `${symbol(dispute.disputedCurrency)}${(dispute.amountInEscrow / 100).toFixed(2)} ${dispute.disputedCurrency || ''}`
+            ? `${formatCurrency(dispute.amountInEscrow, dispute.disputedCurrency)} ${dispute.disputedCurrency || ''}`
             : '—'}
         </DetailsRow>
       </div>
@@ -1904,7 +1897,7 @@ function PendingProposalTab() {
                     <td className="px-3 py-2 text-xs text-gray-700">{proposal.releaseDirection || '—'}</td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
                       {d.amountInEscrow != null
-                        ? `${symbol(d.disputedCurrency)}${(d.amountInEscrow / 100).toFixed(2)}`
+                        ? `${formatCurrency(d.amountInEscrow, d.disputedCurrency)}`
                         : '—'}
                       <div className="text-xs text-gray-400">{d.disputedCurrency || ''}</div>
                     </td>

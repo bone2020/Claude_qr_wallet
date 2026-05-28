@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency, formatDate } from '../utils/format';
 
 const severityColors = {
   high: 'bg-red-100 text-red-700 border-red-200',
@@ -73,10 +74,6 @@ function FraudAlertsPage() {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString();
-  };
 
   if (loading) {
     return (
@@ -192,7 +189,7 @@ function FraudAlertsPage() {
               </div>
 
               <div className="text-sm text-gray-900 mb-3">
-                <span className="font-medium">{alert.transactionType}</span>: {alert.currency} {alert.amount?.toFixed(2)}
+                <span className="font-medium">{alert.transactionType}</span>: {formatCurrency(alert.amount, alert.currency)}
               </div>
 
               {/* Alert Rules */}

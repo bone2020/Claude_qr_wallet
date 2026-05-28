@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils/format';
 
 function UserDetailsPage() {
   const { uid } = useParams();
@@ -166,7 +167,7 @@ function UserDetailsPage() {
             <div>
               <p className="text-sm text-gray-500">Balance</p>
               <p className="text-2xl font-bold text-green-600">
-                {wallet.currency} {wallet.balance?.toFixed(2)}
+                {formatCurrency(wallet.balance, wallet.currency)}
               </p>
             </div>
             <div>
@@ -233,7 +234,7 @@ function UserDetailsPage() {
                 {transactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2 text-sm">{tx.type}</td>
-                    <td className="px-4 py-2 text-sm font-medium">{tx.amount?.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-sm font-medium">{formatCurrency(tx.amount, tx.currency)}</td>
                     <td className="px-4 py-2 text-sm">{tx.currency}</td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-1 text-xs rounded-full ${

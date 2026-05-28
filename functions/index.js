@@ -2822,6 +2822,27 @@ function hashIp(context) {
 }
 
 /**
+ * Recursively convert Firestore Timestamp values inside an object/array
+ * to ISO 8601 strings. Used to normalize endpoint responses so the
+ * admin dashboard receives JSON-safe dates instead of {_seconds, _nanoseconds}.
+ *
+ * Idempotent and safe on nested structures (e.g., evidence arrays in disputes).
+ */
+function convertFirestoreTimestamps(value) {
+  if (value === null || value === undefined) return value;
+  if (value instanceof admin.firestore.Timestamp) return value.toDate().toISOString();
+  if (Array.isArray(value)) return value.map(convertFirestoreTimestamps);
+  if (typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value)) {
+      out[key] = convertFirestoreTimestamps(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
  * Writes an immutable audit log entry to the audit_logs collection.
  * Creates a tamper-resistant record of all financial operations.
  * The audit_logs collection is Cloud Functions-only (client access blocked by Firestore rules).
@@ -6197,7 +6218,7 @@ exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https
       currency: txData.currency || '',
       status: txData.status || '',
       description: txData.description || '',
-      createdAt: txData.createdAt,
+      createdAt: txData.createdAt?.toDate?.()?.toISOString() || null,
     };
   });
 
@@ -6212,8 +6233,8 @@ exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https
     accountBlocked: userData.accountBlocked || false,
     accountBlockedBy: userData.accountBlockedBy || null,
     role: userData.role || null,
-    createdAt: userData.createdAt,
-    lastLoginAt: userData.lastLoginAt || null,
+    createdAt: userData.createdAt?.toDate?.()?.toISOString() || null,
+    lastLoginAt: userData.lastLoginAt?.toDate?.()?.toISOString() || null,
     countryCode: userData.country || '',
     currencyCode: userData.currency || '',
     profileImageUrl: userData.profileImageUrl || null,
@@ -6245,10 +6266,10 @@ exports.adminGetUserDetails = functions.runWith({ enforceAppCheck: true }).https
       resultCode: kycData.resultCode || null,
       resultText: kycData.resultText || null,
       actions: kycData.actions || null,
-      verifiedAt: kycData.verifiedAt || null,
-      failedAt: kycData.failedAt || null,
+      verifiedAt: kycData.verifiedAt?.toDate?.()?.toISOString() || null,
+      failedAt: kycData.failedAt?.toDate?.()?.toISOString() || null,
       verificationMethod: kycData.verificationMethod || null,
-      submittedAt: kycData.submittedAt || null,
+      submittedAt: kycData.submittedAt?.toDate?.()?.toISOString() || null,
       country: kycData.country || null,
       idType: kycData.idType || null,
     };
@@ -16560,7 +16581,7 @@ exports.adminListDisputes = functions.runWith({ enforceAppCheck: true }).https.o
     const isAuditor = caller.role === 'auditor';
     const disputes = snap.docs.map(doc => {
       const d = doc.data();
-      return { ...d, _readOnly: isAuditor || undefined };
+      return convertFirestoreTimestamps({ ...d, _readOnly: isAuditor || undefined });
     });
 
     return { success: true, disputes, count: disputes.length, hasMore: disputes.length === limit };

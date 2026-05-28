@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToCSV } from '../utils/csvExport';
+import { formatCurrency, formatDate, currencySymbol } from '../utils/format';
 
 const typeColors = {
   send: 'bg-red-100 text-red-700',
@@ -16,11 +17,6 @@ const statusColors = {
   completed: 'bg-green-100 text-green-700',
   failed: 'bg-red-100 text-red-700',
   pending: 'bg-yellow-100 text-yellow-700',
-};
-
-const currencySymbols = {
-  NGN: '\u20A6', GHS: 'GH\u20B5', KES: 'KSh', ZAR: 'R', UGX: 'USh',
-  RWF: 'FRw', TZS: 'TSh', EGP: 'E\u00A3', USD: '$', GBP: '\u00A3', EUR: '\u20AC',
 };
 
 function TransactionsPage() {
@@ -129,13 +125,6 @@ function TransactionsPage() {
       { key: 'id', label: 'Transaction ID' },
     ]);
   };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString();
-  };
-
-  const getSymbol = (currency) => currencySymbols[currency] || currency || '';
 
   if (loading) {
     return (
@@ -293,10 +282,10 @@ function TransactionsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-900">
-                        {getSymbol(tx.currency)}{tx.amount?.toFixed(2)}
+                        {formatCurrency(tx.amount, tx.currency || tx.senderCurrency)}
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-gray-400">
-                        {tx.fee > 0 ? `${getSymbol(tx.currency)}${tx.fee.toFixed(2)}` : '-'}
+                        {tx.fee > 0 ? formatCurrency(tx.fee, tx.currency || tx.senderCurrency) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {tx.senderName && tx.receiverName
@@ -355,7 +344,7 @@ function TransactionsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-medium text-gray-900">
-                      {getSymbol(f.currency)}{f.amount?.toFixed(2)}
+                      {formatCurrency(f.amount, f.currency || f.senderCurrency)}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {f.senderName || '-'} \u2192 {f.receiverName || '-'}
@@ -419,9 +408,9 @@ function TransactionsPage() {
                 .sort(([, a], [, b]) => b.amount - a.amount)
                 .map(([currency, data]) => (
                   <tr key={currency} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">{getSymbol(currency)} {currency}</td>
-                    <td className="px-6 py-4 text-right text-gray-900">{getSymbol(currency)}{data.amount?.toFixed(2)}</td>
-                    <td className="px-6 py-4 text-right text-green-600">{getSymbol(currency)}{data.fees?.toFixed(2)}</td>
+                    <td className="px-6 py-4 font-medium text-gray-900">{currencySymbol(currency)} {currency}</td>
+                    <td className="px-6 py-4 text-right text-gray-900">{formatCurrency(data.amount, currency)}</td>
+                    <td className="px-6 py-4 text-right text-green-600">{formatCurrency(data.fees, currency)}</td>
                     <td className="px-6 py-4 text-right text-gray-500">{data.count}</td>
                   </tr>
                 ))}

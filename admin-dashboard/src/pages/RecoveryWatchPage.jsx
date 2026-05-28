@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDate } from '../utils/format';
 
 const STATUS_OPTIONS = [
   'all',
@@ -26,7 +27,6 @@ const currencySymbols = {
 };
 
 const symbol = (c) => currencySymbols[c] || c || '';
-const formatDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—');
 
 const ageLabel = (iso) => {
   if (!iso) return '—';

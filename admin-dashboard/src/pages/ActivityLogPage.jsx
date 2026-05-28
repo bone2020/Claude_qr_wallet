@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToCSV } from '../utils/csvExport';
+import { formatDate } from '../utils/format';
 
 const actionLabels = {
   login: { label: 'Login', color: 'bg-blue-100 text-blue-700' },
@@ -55,12 +56,6 @@ function ActivityLogPage() {
       { key: 'targetInfo', label: 'Target Info' },
       { key: 'ip', label: 'IP Address' },
     ]);
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    return date.toLocaleString();
   };
 
   if (loading) {
