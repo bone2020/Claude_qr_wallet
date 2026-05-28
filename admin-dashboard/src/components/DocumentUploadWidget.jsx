@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { v4 as uuidv4 } from 'uuid';
 import { functions } from '../firebase';
+import { formatDate } from '../utils/format';
 
 const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -9,8 +10,6 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 const SINGLE_TYPES = ['invoice', 'receipt'];
 
 const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
-
-const formatDate = (dateStr) => (dateStr ? new Date(dateStr).toLocaleString() : '—');
 
 const stripBase64Prefix = (dataUrl) => {
   const idx = dataUrl.indexOf(',');

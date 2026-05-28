@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 import { exportToCSV } from '../utils/csvExport';
+import { formatDate } from '../utils/format';
 
 function AuditLogPage() {
   const [logs, setLogs] = useState([]);
@@ -36,11 +37,6 @@ function AuditLogPage() {
       { key: 'error', label: 'Error' },
       { key: 'metadata', label: 'Metadata' },
     ]);
-  };
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString();
   };
 
   const resultColors = {

@@ -5,11 +5,7 @@ import { functions } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { exportToCSV } from '../utils/csvExport';
 import DocumentUploadWidget from '../components/DocumentUploadWidget';
-
-const currencySymbols = {
-  NGN: '₦', GHS: 'GH₵', KES: 'KSh', ZAR: 'R', UGX: 'USh',
-  RWF: 'FRw', TZS: 'TSh', EGP: 'E£', USD: '$', GBP: '£', EUR: '€',
-};
+import { formatCurrency, formatDate, currencySymbol } from '../utils/format';
 
 const PROPOSAL_CURRENCIES = ['NGN', 'GHS', 'KES', 'ZAR', 'UGX', 'RWF', 'TZS', 'EGP', 'USD'];
 const PROPOSAL_COUNTRIES = [
@@ -18,9 +14,6 @@ const PROPOSAL_COUNTRIES = [
   { value: 'kenya', label: 'Kenya' },
   { value: 'south-africa', label: 'South Africa' },
 ];
-
-const formatDate = (dateStr) => (dateStr ? new Date(dateStr).toLocaleString() : 'N/A');
-const symbol = (currency) => currencySymbols[currency] || currency;
 
 const STATUS_STYLES = {
   proposed: 'bg-blue-100 text-blue-700',
@@ -83,7 +76,7 @@ function PlatformWalletCard({ wallet, balances }) {
         <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
           <p className="text-gray-500 text-xs uppercase">Total Revenue (USD)</p>
           <p className="text-2xl font-bold text-green-600 mt-1">
-            ${wallet?.totalBalanceUSD?.toFixed(2) || '0.00'}
+            {formatCurrency(wallet?.totalBalanceUSD, 'USD', { unit: 'major' })}
           </p>
         </div>
         <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
@@ -122,13 +115,13 @@ function PlatformWalletCard({ wallet, balances }) {
               balances.map((b) => (
                 <tr key={b.currency} className="hover:bg-gray-50">
                   <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                    {symbol(b.currency)} {b.currency}
+                    {currencySymbol(b.currency)} {b.currency}
                   </td>
                   <td className="px-4 py-2 text-right text-sm font-bold text-gray-900">
-                    {symbol(b.currency)}{b.amount?.toFixed(2) || '0.00'}
+                    {formatCurrency(b.amount, b.currency, { unit: 'major' })}
                   </td>
                   <td className="px-4 py-2 text-right text-sm text-green-600">
-                    ${b.usdEquivalent?.toFixed(2) || '0.00'}
+                    {formatCurrency(b.usdEquivalent, 'USD', { unit: 'major' })}
                   </td>
                   <td className="px-4 py-2 text-right text-sm text-gray-500">{b.txCount || 0}</td>
                   <td className="px-4 py-2 text-sm text-gray-400">{formatDate(b.lastTransactionAt)}</td>
@@ -725,7 +718,7 @@ function MyProposalsList({ proposals, currentUid, onChanged }) {
                 return (
                   <tr key={id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(p.currency)}{p.amount?.toFixed(2) || '0.00'}
+                      {formatCurrency(p.amount, p.currency, { unit: 'major' })}
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-700">{p.currency}</td>
                     <td className="px-3 py-2 text-sm text-gray-700">
@@ -923,10 +916,10 @@ function ApprovalModal({ proposal, onClose, onApproved, onRejected }) {
           <div>
             <p className="text-gray-500 text-xs uppercase">Amount</p>
             <p className="font-medium text-gray-900">
-              {symbol(proposal.currency)}{proposal.amount?.toFixed(2)} {proposal.currency}
+              {formatCurrency(proposal.amount, proposal.currency, { unit: 'major' })} {proposal.currency}
             </p>
             {proposal.usdEquivalent != null && (
-              <p className="text-xs text-gray-500">≈ ${proposal.usdEquivalent.toFixed(2)} USD</p>
+              <p className="text-xs text-gray-500">≈ {formatCurrency(proposal.usdEquivalent, 'USD', { unit: 'major' })} USD</p>
             )}
           </div>
           <div>
@@ -1103,7 +1096,7 @@ function PendingApprovalsList({ proposals, onChanged }) {
                       {p.proposedBy?.name || p.proposedByName || '—'}
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(p.currency)}{p.amount?.toFixed(2)}
+                      {formatCurrency(p.amount, p.currency, { unit: 'major' })}
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-700">
                       {p.accountName || p.recipient?.accountName || '—'}
@@ -1184,7 +1177,7 @@ function OtpModal({ proposal, onClose, onFinalized }) {
         <div className="flex justify-between">
           <span className="text-gray-500">Amount</span>
           <span className="font-medium">
-            {symbol(proposal.currency)}{proposal.amount?.toFixed(2)} {proposal.currency}
+            {formatCurrency(proposal.amount, proposal.currency, { unit: 'major' })} {proposal.currency}
           </span>
         </div>
         <div className="flex justify-between text-xs text-gray-400">
@@ -1264,7 +1257,7 @@ function AwaitingOtpList({ proposals, onChanged }) {
                   <tr key={id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-xs font-mono text-gray-600">{id}</td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(p.currency)}{p.amount?.toFixed(2)}
+                      {formatCurrency(p.amount, p.currency, { unit: 'major' })}
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-700">
                       {p.accountName || p.recipient?.accountName || '—'}
@@ -1628,7 +1621,7 @@ function EmergencyTransferForm({ onSubmitted }) {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Amount</span>
-              <span className="font-medium">{symbol(currency)}{Number(amount).toFixed(2)} {currency}</span>
+              <span className="font-medium">{formatCurrency(amount, currency, { unit: 'major' })} {currency}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Purpose</span>
@@ -1790,7 +1783,7 @@ function TransfersHistory({ proposals, currentUid, lockMine }) {
                       <div className="text-xs text-gray-400">{p.proposedBy?.email || p.proposedByEmail || ''}</div>
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-medium text-gray-900">
-                      {symbol(p.currency)}{p.amount?.toFixed(2)}
+                      {formatCurrency(p.amount, p.currency, { unit: 'major' })}
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-700">{p.currency}</td>
                     <td className="px-3 py-2 text-sm text-gray-700">
