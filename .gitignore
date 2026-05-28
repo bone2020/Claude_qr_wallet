@@ -65,3 +65,17 @@ admin-dashboard/node_modules/
 
 # Generated reports / audit docs (one-off artifacts)
 CURRENT_PROJECT_AUDIT_REPORT.md
+
+# Code-generation / migration scripts (one-time use, never source)
+PHASE_*.py
+patch_*.py
+phase_*.py
+
+# Local utility script
+run.sh
+
+# Flutter DevTools per-machine settings
+devtools_options.yaml
+
+# One-off audit reports (archived separately)
+FULL_FINTECH_AUDIT_REPORT_*.md
