@@ -10416,7 +10416,7 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
 
       const senderData = senderWallet.data();
       const validatedSender = validateWalletDocument(senderData, 'sendMoney sender wallet');
-      const senderBalance = validatedSender.balance;
+      const senderBalance = senderData.availableBalance ?? (senderData.balance - (senderData.heldBalance || 0));
 
       // Check if sender account is blocked
       const senderUserDoc = await transaction.get(db.collection('users').doc(senderUid));
