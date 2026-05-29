@@ -523,9 +523,9 @@ class _RequestPaymentScreenState extends ConsumerState<RequestPaymentScreen> {
                 QrImageView(
                   data: _qrData,
                   version: QrVersions.auto,
-                  size: 250,
+                  size: 320,
                   backgroundColor: Colors.white,
-                  errorCorrectionLevel: QrErrorCorrectLevel.H,
+                  errorCorrectionLevel: QrErrorCorrectLevel.M,
                   embeddedImage: _businessLogoUrl != null && _businessLogoUrl!.isNotEmpty
                       ? NetworkImage(_businessLogoUrl!) as ImageProvider
                       : const AssetImage('assets/images/app_logo.png'),
