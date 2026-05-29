@@ -1731,8 +1731,9 @@ exports.initiateWithdrawal = functions
     const walletData = walletDoc.data();
     const validated = validateWalletDocument(walletData, 'initiateWithdrawal wallet');
 
-    // Check balance
-    if (validated.balance < amount) {
+    // Best-effort available-balance check before the Paystack call (definitive atomic check happens inside runTransaction below).
+    const available = walletData.availableBalance ?? (walletData.balance - (walletData.heldBalance || 0));
+    if (available < amount) {
       throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
@@ -1769,11 +1770,18 @@ exports.initiateWithdrawal = functions
 
     const recipientCode = recipientResponse.data.recipient_code;
 
-    // Debit wallet first
+   // Debit wallet first
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
       const freshData = freshWallet.data();
       validateWalletDocument(freshData, 'initiateWithdrawal fresh wallet');
+
+      // Atomic available-balance gate (closes the race window during the Paystack API call above).
+      const freshAvailable = freshData.availableBalance ?? (freshData.balance - (freshData.heldBalance || 0));
+      if (freshAvailable < amount) {
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, 'Balance changed. Please try again.');
+      }
+
       const currentBalance = freshData.balance;
       const newBalance = safeSubtract(currentBalance, amount, 'initiateWithdrawal debit');
 
