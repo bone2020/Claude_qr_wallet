@@ -11239,19 +11239,6 @@ exports.momoTransfer = functions
         statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
       });
 
-      // Store pending withdrawal
-      transaction.set(db.collection('momo_transactions').doc(referenceId), {
-        type: 'disbursement',
-        userId: userId,
-        amount: amount,
-        currency: currency || 'EUR',
-        phoneNumber: validatedPhone,
-        status: TRANSACTION_STATES.PENDING,
-        referenceId: referenceId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        statusHistory: [{ from: null, to: TRANSACTION_STATES.PENDING, timestamp: timestamps.firestoreNow() }],
-      });
-
       // Record in user's transactions subcollection for UI display
       transaction.set(db.collection('users').doc(userId).collection('transactions').doc(referenceId), {
         id: referenceId,
