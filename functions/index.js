@@ -3406,6 +3406,31 @@ const MIN_WITHDRAWAL_THRESHOLD = 10000;
  * @returns {Object} Forfeiture record: { forfeitureId, amount, currency,
  *                   usdEquivalent, exchangeRate }.
  */
+
+/**
+ * Resolve a usable exchange rate for `currency` from a `rates` map (typically
+ * the `.rates` field of the `app_config/exchange_rates` doc).
+ *
+ * Returns a positive finite number on success, or `null` when the rate is
+ * missing, zero, negative, NaN, Infinity, or otherwise unusable. NEVER returns
+ * 1 as a silent fallback — every call site must explicitly decide what to do
+ * when `null` is returned:
+ *
+ *   - Spend paths / cap checks → REFUSE the operation (throw a clear error).
+ *   - USD-aggregate bookkeeping → skip the USD update and mark the record
+ *     with `usdConversionPending: true` (gold reference: sweepBalanceToPlatform).
+ *
+ * Replaces the dangerous `rates[currency] || 1` anti-pattern that silently
+ * treated all currencies as 1:1 when rates were missing.
+ */
+function resolveRate(rates, currency) {
+  const rate = rates?.[currency];
+  if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
+    return rate;
+  }
+  return null;
+}
+
 async function sweepBalanceToPlatform(userId, amount, currency) {
   const forfeitureId = `forfeiture_${userId}_${Date.now()}`;
 
@@ -7587,10 +7612,16 @@ exports.adminProposeTransfer = functions.runWith({ enforceAppCheck: true }).http
   const perTransferUSD = limitsDoc.exists ? (limitsDoc.data().perTransferUSD || DEFAULT_PER_TRANSFER_USD) : DEFAULT_PER_TRANSFER_USD;
   const financeDailyUSD = limitsDoc.exists ? (limitsDoc.data().financeDailyUSD || DEFAULT_FINANCE_DAILY_USD) : DEFAULT_FINANCE_DAILY_USD;
 
-  // Compute USD equivalent
+  // Compute USD equivalent for cap enforcement (no real rate => cannot evaluate caps; refuse)
   const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-  const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
-  const exchangeRate = rates[currency] || 1;
+  const rates = ratesDoc.exists ? (ratesDoc.data().rates || {}) : {};
+  const exchangeRate = resolveRate(rates, currency);
+  if (exchangeRate === null) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Exchange rate for ${currency} is currently unavailable; the per-transfer and daily USD caps cannot be evaluated. Please try again shortly.`
+    );
+  }
   const amountInUSD = amount / exchangeRate;
 
   // Per-transfer cap
