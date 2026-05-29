@@ -11193,22 +11193,31 @@ exports.momoTransfer = functions
       throwAppError(ERROR_CODES.WALLET_NOT_FOUND);
     }
 
-    const walletDoc = walletSnapshot.docs[0];
+   const walletDoc = walletSnapshot.docs[0];
     const walletData = walletDoc.data();
     const validated = validateWalletDocument(walletData, 'momoTransfer wallet');
 
-    if (validated.balance < amount) {
+    // Best-effort available-balance check before entering the transaction (definitive atomic check happens inside runTransaction below).
+    const available = walletData.availableBalance ?? (walletData.balance - (walletData.heldBalance || 0));
+    if (available < amount) {
       throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS);
     }
 
     // Generate unique reference ID
     const referenceId = crypto.randomUUID();
 
-    // Debit wallet first
+   // Debit wallet first
     await db.runTransaction(async (transaction) => {
       const freshWallet = await transaction.get(walletDoc.ref);
       const freshData = freshWallet.data();
       validateWalletDocument(freshData, 'momoTransfer fresh wallet');
+
+      // Atomic available-balance gate (closes any race window where a hold could be placed between the outside check above and this debit).
+      const freshAvailable = freshData.availableBalance ?? (freshData.balance - (freshData.heldBalance || 0));
+      if (freshAvailable < amount) {
+        throwAppError(ERROR_CODES.WALLET_INSUFFICIENT_FUNDS, 'Balance changed. Please try again.');
+      }
+
       const newBalance = safeSubtract(freshData.balance, amount, 'momoTransfer debit');
 
       transaction.update(walletDoc.ref, {
