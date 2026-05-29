@@ -7357,11 +7357,17 @@ exports.adminInitiateTransfer = functions
         `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
     }
 
-    // Get exchange rate for USD equivalent
+    // Get exchange rate for USD equivalent bookkeeping (auxiliary; never block on rate unavailability — gold reference: sweepBalanceToPlatform)
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
-    const exchangeRate = rates[currency] || 1;
-    const amountInUSD = amount / exchangeRate;
+    const rates = ratesDoc.exists ? (ratesDoc.data().rates || {}) : {};
+    const exchangeRate = resolveRate(rates, currency);
+    const amountInUSD = exchangeRate !== null ? amount / exchangeRate : null;
+    const usdConversionPending = exchangeRate === null;
+    if (usdConversionPending) {
+      logError('Exchange rate unavailable for admin platform withdrawal — proceeding without USD aggregates', {
+        currency, amount,
+      });
+    }
 
     // Get caller email before transaction
     const callerEmail = (await admin.auth().getUser(caller.uid)).email || 'unknown';
@@ -7398,19 +7404,27 @@ exports.adminInitiateTransfer = functions
         throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
       }
 
+      // Build balance-doc update; only include usdEquivalent if rate is available
+      const balanceUpdate = {
+        amount: admin.firestore.FieldValue.increment(-amount),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+      if (amountInUSD !== null) {
+        balanceUpdate.usdEquivalent = admin.firestore.FieldValue.increment(-amountInUSD);
+      }
       transaction.update(
         db.collection('wallets').doc('platform').collection('balances').doc(currency),
-        {
-          amount: admin.firestore.FieldValue.increment(-amount),
-          usdEquivalent: admin.firestore.FieldValue.increment(-amountInUSD),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        }
+        balanceUpdate
       );
 
-      transaction.update(db.collection('wallets').doc('platform'), {
-        totalBalanceUSD: admin.firestore.FieldValue.increment(-amountInUSD),
+      // Build platform-doc update; only include totalBalanceUSD if rate is available
+      const platformUpdate = {
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+      if (amountInUSD !== null) {
+        platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(-amountInUSD);
+      }
+      transaction.update(db.collection('wallets').doc('platform'), platformUpdate);
 
       transaction.set(withdrawalRef, {
         id: reference,
@@ -7419,6 +7433,7 @@ exports.adminInitiateTransfer = functions
         currency,
         usdEquivalent: amountInUSD,
         exchangeRate,
+        usdConversionPending,
         purpose,
         notes: notes || null,
         bankCode,
