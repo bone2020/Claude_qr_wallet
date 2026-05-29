@@ -35,15 +35,24 @@ class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   }
 
   void _onDetect(BarcodeCapture capture) {
+    debugPrint('[QR_SCAN] _onDetect fired. barcodes.length=${capture.barcodes.length}, _isProcessing=$_isProcessing');
     if (_isProcessing) return;
 
     final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
+    if (barcodes.isEmpty) {
+      debugPrint('[QR_SCAN] returning - barcodes empty');
+      return;
+    }
 
     final String? code = barcodes.first.rawValue;
-    if (code == null || code.isEmpty) return;
+    debugPrint('[QR_SCAN] code=${code == null ? "<null>" : code.length > 80 ? "${code.substring(0, 80)}... (len=${code.length})" : code}');
+    if (code == null || code.isEmpty) {
+      debugPrint('[QR_SCAN] returning - code is null or empty');
+      return;
+    }
 
     setState(() => _isProcessing = true);
+    debugPrint('[QR_SCAN] calling _processQrCode');
 
     // Parse QR code data
     _processQrCode(code);
