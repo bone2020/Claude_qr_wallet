@@ -79,3 +79,4 @@ devtools_options.yaml
 
 # One-off audit reports (archived separately)
 FULL_FINTECH_AUDIT_REPORT_*.md
+docs/*AUDIT*.docx
