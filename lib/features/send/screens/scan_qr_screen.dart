@@ -20,9 +20,10 @@ class ScanQrScreen extends ConsumerStatefulWidget {
 
 class _ScanQrScreenState extends ConsumerState<ScanQrScreen> {
   final MobileScannerController _scannerController = MobileScannerController(
-    detectionSpeed: DetectionSpeed.normal,
+    detectionSpeed: DetectionSpeed.noDuplicates,
     facing: CameraFacing.back,
     torchEnabled: false,
+    formats: const [BarcodeFormat.qrCode],
   );
 
   bool _isProcessing = false;
