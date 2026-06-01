@@ -8782,7 +8782,16 @@ exports.adminEditProposal = functions.runWith({ enforceAppCheck: true }).https.o
     if (updateData.amount !== undefined) {
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
       const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
-      const exchangeRate = rates[proposal.currency] || 1;
+      // NEW-2: usdEquivalent is summed into platform transfer daily-cap checks. A missing
+      // rate must NOT fall back to 1:1 here — writing a 1:1 value would silently poison the
+      // cap math downstream. Refuse the amount edit until a real rate is available.
+      const exchangeRate = resolveRate(rates, proposal.currency);
+      if (exchangeRate === null) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Exchange rate for ${proposal.currency} is currently unavailable; the proposal amount cannot be re-evaluated against the USD cap. Please try again shortly.`
+        );
+      }
       updateData.usdEquivalent = updateData.amount / exchangeRate;
       updateData.exchangeRate = exchangeRate;
     }
