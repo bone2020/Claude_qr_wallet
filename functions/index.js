@@ -7308,7 +7308,17 @@ exports.adminInitiateTransfer = functions
   // Compute USD equivalent NOW (before caps check). Reuses logic from later in function.
   const ratesDocForCaps = await db.collection('app_config').doc('exchange_rates').get();
   const ratesForCaps = ratesDocForCaps.exists ? ratesDocForCaps.data().rates : {};
-  const exchangeRateForCaps = ratesForCaps[currency] || 1;
+  // NEW-2: this USD value GATES the per-transfer and daily caps and is persisted +
+  // summed into future cap checks. A missing rate must NOT fall back to 1:1, which
+  // silently breaks the USD cap. Refuse instead — a cap cannot be enforced with an
+  // unreliable USD value.
+  const exchangeRateForCaps = resolveRate(ratesForCaps, currency);
+  if (exchangeRateForCaps === null) {
+    throw new functions.https.HttpsError(
+      'failed-precondition',
+      `Exchange rate for ${currency} is currently unavailable; this transfer cannot be evaluated against the USD cap. Please try again shortly.`
+    );
+  }
   const amountInUSDForCaps = amount / exchangeRateForCaps;
 
   // Per-transfer cap
@@ -9260,7 +9270,17 @@ exports.adminEmergencyTransfer = functions.runWith({ enforceAppCheck: true }).ht
     // Compute USD equivalent
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
     const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
-    const exchangeRate = rates[currency] || 1;
+    // NEW-2: usdEquivalent GATES the emergency daily cap and is persisted into the
+    // proposal doc + summed into future emergency-cap checks. A missing rate must NOT
+    // fall back to 1:1 (which silently breaks the cap). Refuse — an emergency does not
+    // justify bypassing the safeguard that the cap exists to enforce.
+    const exchangeRate = resolveRate(rates, currency);
+    if (exchangeRate === null) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Exchange rate for ${currency} is currently unavailable; this emergency transfer cannot be evaluated against the USD cap. Please try again shortly.`
+      );
+    }
     const usdEquivalent = amount / exchangeRate;
 
     // Emergency daily cap check
