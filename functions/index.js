@@ -14912,7 +14912,20 @@ exports.userFileDispute = functions
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
     const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
     const txCurrency = tx.currency || 'NGN';
-    const exchangeRate = rates[txCurrency] || 1;
+    // NEW-2: this rate sets the dispute fee actually deducted from the user's wallet
+    // (usdEquivalent -> tiered calculateDisputeFee -> feeInSourceCurrency -> wallet debit)
+    // AND is recorded as the dispute's USD value for the company's books. The fee is
+    // charged once, at filing — there is no later point to correct it. A missing rate
+    // must NOT fall back to 1:1 (which both mis-charges the user in local currency and
+    // corrupts the USD accounting). Refuse filing until a real rate is available;
+    // rate outages are transient and the user can retry.
+    const exchangeRate = resolveRate(rates, txCurrency);
+    if (exchangeRate === null) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        `Exchange rate for ${txCurrency} is currently unavailable; the dispute fee cannot be calculated right now. Please try again shortly.`
+      );
+    }
     const usdEquivalent = disputedAmount / exchangeRate;
     const fee = calculateDisputeFee(usdEquivalent);
 
