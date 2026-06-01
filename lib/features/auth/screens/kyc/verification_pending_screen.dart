@@ -31,6 +31,13 @@ class _VerificationPendingScreenState
   bool _isPolling = false;
   String? _smileUserId;
   String? _smileJobId;
+
+  // KYC-stuck fix: bound the polling so a job that never reaches a terminal state
+  // (Smile ID stall/outage, or a kycStatus that never flips) can't trap the user on an
+  // endless spinner. The Firestore listener is left alive so a late completion still navigates.
+  DateTime? _pollStartedAt;
+  bool _timedOut = false;
+  static const Duration _pollTimeout = Duration(minutes: 3);
  
   @override
   void initState() {
@@ -82,8 +89,23 @@ class _VerificationPendingScreenState
   }
  
   void _startPolling() {
+    _pollStartedAt = DateTime.now();
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       if (_isPolling) return;
+
+      // Ceiling: once we've waited past _pollTimeout, stop polling and offer an escape.
+      // (The kycStatus listener keeps running, so a late completion can still auto-navigate.)
+      if (!_timedOut &&
+          _pollStartedAt != null &&
+          DateTime.now().difference(_pollStartedAt!) > _pollTimeout) {
+        timer.cancel();
+        if (mounted && !_isTransitioning) {
+          _timedOut = true;
+          _showTimeoutDialog();
+        }
+        return;
+      }
+
       if (_smileUserId == null || _smileJobId == null) {
         await _loadSmileJobInfo();
         if (_smileUserId == null || _smileJobId == null) return;
@@ -161,6 +183,39 @@ class _VerificationPendingScreenState
     });
   }
  
+  void _showTimeoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+        ),
+        content: Text(
+          AppLocalizations.of(context).smileIdResultCouldNotComplete,
+          style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryDark),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.go(AppRoutes.kyc);
+              },
+              child: Text(
+                AppLocalizations.of(context).tryAgainButton,
+                style: AppTextStyles.labelLarge(color: AppColors.backgroundDark),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showFailedDialog() {
     showDialog(
       context: context,
