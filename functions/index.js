@@ -10577,9 +10577,17 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
       let txExchangeRate = null;
 
       if (isCrossCountry) {
-        const senderRate = rates[senderCurrency] || 1;
-        const recipientRate = rates[recipientCurrency] || 1;
-        txExchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+        // NEW-2: this conversion sets the amount actually credited to the recipient.
+        // A missing rate must NOT silently fall back to 1:1 — refuse instead.
+        const senderRate = resolveRate(rates, senderCurrency);
+        const recipientRate = resolveRate(rates, recipientCurrency);
+        if (senderRate === null || recipientRate === null) {
+          throw new functions.https.HttpsError(
+            'failed-precondition',
+            `Exchange rate for ${senderCurrency}->${recipientCurrency} is currently unavailable; this cross-currency transfer cannot proceed. Please try again shortly.`
+          );
+        }
+        txExchangeRate = recipientRate / senderRate;
         creditAmount = Math.round(amount * txExchangeRate);
       }
 
@@ -10595,28 +10603,42 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
       // ============================================
       // senderCurrency already declared above
       // rates already fetched above for currency conversion
-      const exchangeRate = rates[senderCurrency] || 1;
-      const feeInUSD = fee / exchangeRate;
+      // NEW-2: fee USD value is auxiliary bookkeeping only — never block the transfer on a
+      // missing rate (gold reference: sweepBalanceToPlatform mark-pending pattern).
+      const exchangeRate = resolveRate(rates, senderCurrency);
+      const feeInUSD = exchangeRate !== null ? fee / exchangeRate : null;
+      const usdConversionPending = exchangeRate === null;
+      if (usdConversionPending) {
+        logError('Exchange rate unavailable for sendMoney fee — proceeding without USD aggregates', {
+          currency: senderCurrency, fee,
+        });
+      }
       
       // Update platform wallet USD balance
       const platformWalletRef = db.collection('wallets').doc('platform');
-      transaction.update(platformWalletRef, {
-        totalBalanceUSD: admin.firestore.FieldValue.increment(feeInUSD),
+      const platformUpdate = {
         totalTransactions: admin.firestore.FieldValue.increment(1),
         totalFeesCollected: admin.firestore.FieldValue.increment(1),
         updatedAt: timestamps.serverTimestamp()
-      });
+      };
+      if (feeInUSD !== null) {
+        platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(feeInUSD);
+      }
+      transaction.update(platformWalletRef, platformUpdate);
       
       // Update currency-specific balance
       const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
-      transaction.set(currencyBalanceRef, {
+      const currencyBalanceUpdate = {
         currency: senderCurrency,
         amount: admin.firestore.FieldValue.increment(fee),
-        usdEquivalent: admin.firestore.FieldValue.increment(feeInUSD),
         txCount: admin.firestore.FieldValue.increment(1),
         lastTransactionAt: timestamps.serverTimestamp(),
         updatedAt: timestamps.serverTimestamp()
-      }, { merge: true });
+      };
+      if (feeInUSD !== null) {
+        currencyBalanceUpdate.usdEquivalent = admin.firestore.FieldValue.increment(feeInUSD);
+      }
+      transaction.set(currencyBalanceRef, currencyBalanceUpdate, { merge: true });
       
       // Record fee in history
       const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
@@ -10626,6 +10648,7 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
         currency: senderCurrency,
         usdAmount: feeInUSD,
         exchangeRate: exchangeRate,
+        usdConversionPending: usdConversionPending,
         senderUid: senderUid,
         senderName: senderName,
         transferAmount: amount,
