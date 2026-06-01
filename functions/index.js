@@ -12967,9 +12967,17 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
     let txExchangeRate = null;
 
     if (isCrossCountry) {
-      const senderRate = rates[senderCurrency] || 1;
-      const recipientRate = rates[recipientCurrency] || 1;
-      txExchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
+      // NEW-2: this conversion sets the amount actually credited to the recipient.
+      // A missing rate must NOT silently fall back to 1:1 — refuse instead.
+      const senderRate = resolveRate(rates, senderCurrency);
+      const recipientRate = resolveRate(rates, recipientCurrency);
+      if (senderRate === null || recipientRate === null) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Exchange rate for ${senderCurrency}->${recipientCurrency} is currently unavailable; this cross-currency transfer cannot proceed. Please try again shortly.`
+        );
+      }
+      txExchangeRate = recipientRate / senderRate;
       creditAmount = Math.round(transferAmount * txExchangeRate);
     }
 
@@ -12991,26 +12999,40 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
     });
 
     // 11. Collect platform fee
-    const exchangeRate = rates[senderCurrency] || 1;
-    const feeInUSD = fee / exchangeRate;
+    // NEW-2: fee USD value is auxiliary bookkeeping only — never block the transfer on a
+    // missing rate (gold reference: sweepBalanceToPlatform mark-pending pattern).
+    const exchangeRate = resolveRate(rates, senderCurrency);
+    const feeInUSD = exchangeRate !== null ? fee / exchangeRate : null;
+    const usdConversionPending = exchangeRate === null;
+    if (usdConversionPending) {
+      logError('Exchange rate unavailable for convertHoldToTransfer fee — proceeding without USD aggregates', {
+        currency: senderCurrency, fee,
+      });
+    }
 
     const platformWalletRef = db.collection('wallets').doc('platform');
-    transaction.update(platformWalletRef, {
-      totalBalanceUSD: admin.firestore.FieldValue.increment(feeInUSD),
+    const platformUpdate = {
       totalTransactions: admin.firestore.FieldValue.increment(1),
       totalFeesCollected: admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+    if (feeInUSD !== null) {
+      platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(feeInUSD);
+    }
+    transaction.update(platformWalletRef, platformUpdate);
 
     const currencyBalanceRef = db.collection('wallets').doc('platform').collection('balances').doc(senderCurrency);
-    transaction.set(currencyBalanceRef, {
+    const currencyBalanceUpdate = {
       currency: senderCurrency,
       amount: admin.firestore.FieldValue.increment(fee),
-      usdEquivalent: admin.firestore.FieldValue.increment(feeInUSD),
       txCount: admin.firestore.FieldValue.increment(1),
       lastTransactionAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
+    };
+    if (feeInUSD !== null) {
+      currencyBalanceUpdate.usdEquivalent = admin.firestore.FieldValue.increment(feeInUSD);
+    }
+    transaction.set(currencyBalanceRef, currencyBalanceUpdate, { merge: true });
 
     const feeRecordRef = db.collection('wallets').doc('platform').collection('fees').doc(txId);
     transaction.set(feeRecordRef, {
@@ -13019,6 +13041,7 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
       currency: senderCurrency,
       usdAmount: feeInUSD,
       exchangeRate: exchangeRate,
+      usdConversionPending: usdConversionPending,
       senderUid: holdData.walletId,
       transferAmount: holdData.amount,
       holdId: holdId,
