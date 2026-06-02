@@ -6499,30 +6499,109 @@ exports.adminUnblockAccount = functions.runWith({ enforceAppCheck: true }).https
 
 /**
  * Admin update user email.
+ *
+ * Hardened (NEW-4): validates + normalizes input, confirms the target user
+ * exists in both Auth and Firestore (capturing the old email), maps Auth-side
+ * collisions / malformed input to clean client errors, and rolls back the Auth
+ * change if the Firestore write fails so the two systems never silently diverge.
  */
 exports.adminUpdateUserEmail = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'admin_supervisor');
 
   const { targetUid, newEmail } = data;
-  if (!targetUid || !newEmail) {
-    throw new functions.https.HttpsError('invalid-argument', 'targetUid and newEmail are required.');
+  if (!targetUid || typeof targetUid !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'targetUid is required.');
+  }
+  if (!newEmail || typeof newEmail !== 'string') {
+    throw new functions.https.HttpsError('invalid-argument', 'newEmail is required.');
   }
 
-  // Update in Firebase Auth
-  await admin.auth().updateUser(targetUid, { email: newEmail });
+  const cleanedEmail = newEmail.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanedEmail)) {
+    throw new functions.https.HttpsError('invalid-argument', 'newEmail is not a valid email address.');
+  }
 
-  // Update in Firestore
-  await db.collection('users').doc(targetUid).update({
-    email: newEmail,
-    emailUpdatedAt: timestamps.serverTimestamp(),
-    emailUpdatedBy: caller.uid,
-  });
+  // Confirm the target exists in Auth and capture the current email for
+  // rollback + audit.
+  let targetRecord;
+  try {
+    targetRecord = await admin.auth().getUser(targetUid);
+  } catch (err) {
+    if (err.code === 'auth/user-not-found') {
+      throw new functions.https.HttpsError('not-found', 'User not found.');
+    }
+    throw err;
+  }
+  const oldEmail = targetRecord.email || null;
+
+  // No-op guard: nothing to do if the email is unchanged (case-insensitive).
+  if (oldEmail && oldEmail.toLowerCase() === cleanedEmail.toLowerCase()) {
+    return { success: true, message: 'Email is already set to that address. No change made.' };
+  }
+
+  // Confirm the Firestore user doc exists BEFORE touching Auth, so a missing
+  // doc can never leave an orphaned Auth change.
+  const userDoc = await db.collection('users').doc(targetUid).get();
+  if (!userDoc.exists) {
+    throw new functions.https.HttpsError('not-found', 'User not found.');
+  }
+
+  // Update in Firebase Auth (map collisions / malformed input to clean errors).
+  try {
+    await admin.auth().updateUser(targetUid, { email: cleanedEmail });
+  } catch (err) {
+    if (err.code === 'auth/email-already-exists') {
+      throw new functions.https.HttpsError('already-exists', 'That email is already in use by another account.');
+    }
+    if (err.code === 'auth/invalid-email') {
+      throw new functions.https.HttpsError('invalid-argument', 'newEmail is not a valid email address.');
+    }
+    throw err;
+  }
+
+  // Update in Firestore. If this fails, roll back the Auth change so the two
+  // systems do not diverge.
+  try {
+    await db.collection('users').doc(targetUid).update({
+      email: cleanedEmail,
+      emailUpdatedAt: timestamps.serverTimestamp(),
+      emailUpdatedBy: caller.uid,
+    });
+  } catch (firestoreErr) {
+    if (oldEmail) {
+      try {
+        await admin.auth().updateUser(targetUid, { email: oldEmail });
+        logStructured(LOG_LEVELS.ERROR, 'adminUpdateUserEmail: Firestore write failed, Auth email rolled back', {
+          targetUid,
+          callerUid: caller.uid,
+          error: firestoreErr.message,
+        });
+      } catch (rollbackErr) {
+        logStructured(LOG_LEVELS.ERROR, 'adminUpdateUserEmail: Firestore write AND Auth rollback failed — manual repair required', {
+          targetUid,
+          callerUid: caller.uid,
+          oldEmail,
+          newEmail: cleanedEmail,
+          firestoreError: firestoreErr.message,
+          rollbackError: rollbackErr.message,
+        });
+      }
+    } else {
+      logStructured(LOG_LEVELS.ERROR, 'adminUpdateUserEmail: Firestore write failed and no prior email to roll back to — manual repair required', {
+        targetUid,
+        callerUid: caller.uid,
+        newEmail: cleanedEmail,
+        firestoreError: firestoreErr.message,
+      });
+    }
+    throw new functions.https.HttpsError('internal', 'Failed to update the email record. The change has been reverted; please retry.');
+  }
 
   await auditLog({
     userId: caller.uid,
     operation: 'adminUpdateUserEmail',
     result: 'success',
-    metadata: { targetUid, newEmail, callerRole: caller.role },
+    metadata: { targetUid, oldEmail, newEmail: cleanedEmail, callerRole: caller.role },
     ipHash: hashIp(context),
   });
 
@@ -6533,14 +6612,14 @@ exports.adminUpdateUserEmail = functions.runWith({ enforceAppCheck: true }).http
     role: caller.role,
     action: 'update_email',
     targetUserId: targetUid,
-    details: `Email changed to ${newEmail}`,
+    targetInfo: userDoc.data().fullName || 'Unknown',
+    details: `Email changed from ${oldEmail || 'none'} to ${cleanedEmail}`,
     ip: context.rawRequest?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, message: 'Email updated successfully.' };
 });
-
 /**
  * Admin send recovery OTP to a user's phone number.
  */
