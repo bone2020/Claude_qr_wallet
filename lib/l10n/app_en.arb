@@ -978,6 +978,10 @@
       }
     }
   },
+  "exchangeRateUnavailable": "Exchange rate temporarily unavailable. Please try again shortly.",
+  "@exchangeRateUnavailable": {
+    "description": "Shown on the send confirmation screen when the live exchange rate cannot be retrieved, so the transfer cannot be previewed or sent."
+  },
   "insufficientBalance": "Insufficient balance for this transfer",
   "@insufficientBalance": {
     "description": "Error caption on confirm send when balance check fails."

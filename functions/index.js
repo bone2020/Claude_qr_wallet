@@ -1020,7 +1020,7 @@ function fetchRates() {
 
 // Scheduled function - runs daily at midnight UTC
 exports.updateExchangeRatesDaily = functions.pubsub
-  .schedule('0 0 * * *')
+  .schedule('0 */4 * * *')
   .timeZone('UTC')
   .onRun(async (context) => {
     try {
@@ -10421,17 +10421,22 @@ exports.previewTransfer = functions.runWith({ enforceAppCheck: true }).https.onC
     // Cross-currency conversion if needed
     let creditAmount = amount;
     let exchangeRate = null;
+    let rateUnavailable = false;
 
     if (isCrossCountry) {
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
       const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
 
-      const senderRate = rates[senderCurrency] || 1;
-      const recipientRate = rates[recipientCurrency] || 1;
-
-      // Convert: sender currency -> USD -> recipient currency
-      exchangeRate = senderRate > 0 ? recipientRate / senderRate : 0;
-      creditAmount = Math.round(amount * exchangeRate);
+      const senderRate = resolveRate(rates, senderCurrency);
+      const recipientRate = resolveRate(rates, recipientCurrency);
+      if (senderRate === null || recipientRate === null) {
+        rateUnavailable = true;
+        exchangeRate = null;
+        creditAmount = null;
+      } else {
+        exchangeRate = recipientRate / senderRate;
+        creditAmount = Math.round(amount * exchangeRate);
+      }
     }
 
     return {
@@ -10443,6 +10448,7 @@ exports.previewTransfer = functions.runWith({ enforceAppCheck: true }).https.onC
       senderCurrency: senderCurrency,
       recipientCurrency: recipientCurrency,
       isCrossCountry: isCrossCountry,
+      rateUnavailable: rateUnavailable,
     };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;

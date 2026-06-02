@@ -64,6 +64,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   int? _serverTotalDebit;
   int? _serverCreditAmount;
   double? _serverExchangeRate;
+  bool _serverRateUnavailable = false;
   bool? _serverSufficient;
   bool _previewLoading = false;
   String? _previewError;
@@ -114,6 +115,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
   double? get _convertedAmount {
     if (_serverCreditAmount != null) return _serverCreditAmount! / 100.0;
+    // NEW-2: if the server reported the live rate unavailable, do NOT fall back to the
+    // client's hardcoded table for the send flow — return null so the UI shows "unavailable".
+    if (_serverRateUnavailable) return null;
     if (!_needsConversion || widget.recipientCurrency == null) return null;
     return ExchangeRateService.convert(
       amount: _amountMajor,
@@ -124,6 +128,9 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
 
   double? get _exchangeRate {
     if (_serverExchangeRate != null) return _serverExchangeRate;
+    // NEW-2: if the server reported the live rate unavailable, do NOT fall back to the
+    // client's hardcoded table for the send flow — return null so the UI shows "unavailable".
+    if (_serverRateUnavailable) return null;
     if (!_needsConversion || widget.recipientCurrency == null) return null;
     return ExchangeRateService.getExchangeRate(
       fromCurrency: _currencyCode,
@@ -184,6 +191,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
         _serverTotalDebit = data['totalDebit'] as int?;
         _serverCreditAmount = data['creditAmount'] as int?;
         _serverExchangeRate = (data['exchangeRate'] as num?)?.toDouble();
+        _serverRateUnavailable = data['rateUnavailable'] as bool? ?? false;
         _serverSufficient = data['sufficient'] as bool?;
         _previewLoading = false;
       });
@@ -804,6 +812,13 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 : '${_serverTotalDebit == null ? "~" : ""}$_currency${_formatAmount(_totalMajor)}',
             isTotal: true,
           ),
+          if (_serverRateUnavailable) ...[
+            const SizedBox(height: AppDimensions.spaceXS),
+            Text(
+              AppLocalizations.of(context).exchangeRateUnavailable,
+              style: AppTextStyles.caption(color: AppColors.error),
+            ),
+          ],
           if (_previewError != null) ...[
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
@@ -944,7 +959,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           width: double.infinity,
           height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _isLoading || _amountMajor <= 0 ? null : _handleSend,
+            onPressed: _isLoading || _amountMajor <= 0 || _serverRateUnavailable ? null : _handleSend,
             child: _isLoading
                 ? const SizedBox(
                     width: 24,
