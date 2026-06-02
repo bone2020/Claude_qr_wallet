@@ -773,6 +773,10 @@
   "amountSentTo": "تم إرسال {currency}{amount} إلى {recipient}",
   "paymentRequestLabel": "طلب الدفع",
   "feeApproximateError": "الرسوم تقريبية — {error}",
+  "exchangeRateUnavailable": "سعر الصرف غير متاح مؤقتًا. يرجى المحاولة مرة أخرى بعد قليل.",
+  "@exchangeRateUnavailable": {
+    "description": "Shown on the send confirmation screen when the live exchange rate cannot be retrieved, so the transfer cannot be previewed or sent."
+  },
   "insufficientBalance": "الرصيد غير كافٍ لهذا التحويل",
   "sellerRequestedLabel": "طلب البائع:",
   "recipientReceivesLabel": "يستلم المستلم:",

@@ -773,6 +773,10 @@
   "amountSentTo": "{currency}{amount} envoyé à {recipient}",
   "paymentRequestLabel": "Demande de paiement",
   "feeApproximateError": "Les frais sont approximatifs — {error}",
+  "exchangeRateUnavailable": "Taux de change temporairement indisponible. Veuillez réessayer dans un instant.",
+  "@exchangeRateUnavailable": {
+    "description": "Shown on the send confirmation screen when the live exchange rate cannot be retrieved, so the transfer cannot be previewed or sent."
+  },
   "insufficientBalance": "Solde insuffisant pour ce transfert",
   "sellerRequestedLabel": "Le vendeur a demandé :",
   "recipientReceivesLabel": "Le destinataire reçoit :",
