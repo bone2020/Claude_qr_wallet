@@ -17382,6 +17382,22 @@ exports.adminReleaseRecovery = functions.runWith({ enforceAppCheck: true }).http
         throw new functions.https.HttpsError('failed-precondition', 'Recovery was modified concurrently.');
       }
 
+      // NEW-3: this release moves recovery.amount 1:1 between the recipient and filer
+      // wallets with no FX conversion. That is only correct if both wallets and the
+      // recovery share a single currency. Refuse on any mismatch rather than silently
+      // mis-crediting on a disputed-funds path; genuine cross-currency recovery would
+      // need a deliberate FX design (rate source, timing, who bears the risk).
+      const recipCurrency = rSnap.exists ? rSnap.data().currency : null;
+      const filerCurrency = fSnap.exists ? fSnap.data().currency : null;
+      if (recipCurrency && recipCurrency !== recovery.currency) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Recipient wallet currency (${recipCurrency}) does not match recovery currency (${recovery.currency}). Cross-currency release is not supported.`);
+      }
+      if (filerCurrency && filerCurrency !== recovery.currency) {
+        throw new functions.https.HttpsError('failed-precondition',
+          `Filer wallet currency (${filerCurrency}) does not match recovery currency (${recovery.currency}). Cross-currency release is not supported.`);
+      }
+
       if (rSnap.exists) {
         transaction.update(recipientWalletRef, {
           heldBalance: admin.firestore.FieldValue.increment(-recovery.amount),
