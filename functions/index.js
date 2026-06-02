@@ -10653,11 +10653,14 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
       const platformWalletRef = db.collection('wallets').doc('platform');
       const platformUpdate = {
         totalTransactions: admin.firestore.FieldValue.increment(1),
-        totalFeesCollected: admin.firestore.FieldValue.increment(1),
         updatedAt: timestamps.serverTimestamp()
       };
       if (feeInUSD !== null) {
         platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(feeInUSD);
+        // Fix: totalFeesCollected is LIFETIME fee revenue in USD (distinct from the running
+        // totalBalanceUSD). Was incorrectly increment(1) (a tx count, duplicating
+        // totalTransactions). Guarded like totalBalanceUSD — skip when rate unavailable.
+        platformUpdate.totalFeesCollected = admin.firestore.FieldValue.increment(feeInUSD);
       }
       transaction.update(platformWalletRef, platformUpdate);
       
@@ -13048,11 +13051,14 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
     const platformWalletRef = db.collection('wallets').doc('platform');
     const platformUpdate = {
       totalTransactions: admin.firestore.FieldValue.increment(1),
-      totalFeesCollected: admin.firestore.FieldValue.increment(1),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     if (feeInUSD !== null) {
       platformUpdate.totalBalanceUSD = admin.firestore.FieldValue.increment(feeInUSD);
+      // Fix: totalFeesCollected is LIFETIME fee revenue in USD (distinct from the running
+      // totalBalanceUSD). Was incorrectly increment(1) (a tx count, duplicating
+      // totalTransactions). Guarded like totalBalanceUSD — skip when rate unavailable.
+      platformUpdate.totalFeesCollected = admin.firestore.FieldValue.increment(feeInUSD);
     }
     transaction.update(platformWalletRef, platformUpdate);
 
