@@ -712,6 +712,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get exchangeRateUnavailable =>
+      'Exchange rate temporarily unavailable. Please try again shortly.';
+
+  @override
   String get insufficientBalance => 'Insufficient balance for this transfer';
 
   @override

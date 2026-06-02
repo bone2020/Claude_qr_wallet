@@ -1444,6 +1444,12 @@ abstract class AppLocalizations {
   /// **'Fee is approximate — {error}'**
   String feeApproximateError(String error);
 
+  /// Shown on the send confirmation screen when the live exchange rate cannot be retrieved, so the transfer cannot be previewed or sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Exchange rate temporarily unavailable. Please try again shortly.'**
+  String get exchangeRateUnavailable;
+
   /// Error caption on confirm send when balance check fails.
   ///
   /// In en, this message translates to:

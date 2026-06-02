@@ -710,6 +710,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get exchangeRateUnavailable =>
+      'سعر الصرف غير متاح مؤقتًا. يرجى المحاولة مرة أخرى بعد قليل.';
+
+  @override
   String get insufficientBalance => 'الرصيد غير كافٍ لهذا التحويل';
 
   @override

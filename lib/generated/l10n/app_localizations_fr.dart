@@ -723,6 +723,10 @@ class AppLocalizationsFr extends AppLocalizations {
   }
 
   @override
+  String get exchangeRateUnavailable =>
+      'Taux de change temporairement indisponible. Veuillez réessayer dans un instant.';
+
+  @override
   String get insufficientBalance => 'Solde insuffisant pour ce transfert';
 
   @override
