@@ -11110,6 +11110,14 @@ exports.momoCheckStatus = functions
       if (txDoc.exists) {
         const txData = txDoc.data();
 
+        // Owner-scoping: a caller may only check/settle their OWN transaction.
+        // Without this, any authenticated user could supply another user's
+        // referenceId and trigger wallet credits/refunds and status writes on
+        // a transaction they do not own.
+        if (txData.userId !== userId) {
+          throwAppError(ERROR_CODES.AUTH_PERMISSION_DENIED, 'You can only check the status of your own transactions.');
+        }
+
         // If status changed to SUCCESSFUL, credit/debit wallet
         // Use normalizeStatus() to handle both old ('SUCCESSFUL') and new ('completed') stored formats
         if (status === 'SUCCESSFUL' && normalizeStatus(txData.status) !== 'completed') {
