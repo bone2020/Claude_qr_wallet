@@ -69,6 +69,11 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _previewLoading = false;
   String? _previewError;
 
+  // Merchant QR: server-authoritative conversion (buyer-pays computed server-side)
+  double? _merchantExchangeRate;
+  bool _merchantConvLoading = false;
+  bool _merchantRateUnavailable = false;
+
    /// Format exchange rate with enough decimal places to be meaningful
   String _formatRate(double rate) {
     if (rate == 0) return '0.00';
@@ -144,24 +149,8 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   // Original amount seller requested in their currency (major units)
   double get _sellerRequestedAmount => widget.amount / 100;
 
-  // Reverse rate: from seller's currency to buyer's currency
-  double? get _reverseExchangeRate {
-    if (!_needsConversion || widget.recipientCurrency == null) return null;
-    return ExchangeRateService.getExchangeRate(
-      fromCurrency: widget.recipientCurrency!,
-      toCurrency: _currencyCode,
-    );
-  }
-
-  // Amount buyer needs to pay in their currency (for merchant QR)
-  double? get _buyerPaysAmount {
-    if (!_isMerchantQR || widget.recipientCurrency == null) return null;
-    return ExchangeRateService.convert(
-      amount: _sellerRequestedAmount,
-      fromCurrency: widget.recipientCurrency!,
-      toCurrency: _currencyCode,
-    );
-  }
+  // Local reverse-rate getters removed: merchant-QR conversion is now
+  // server-authoritative via previewMerchantCharge / _fetchMerchantCharge.
 
   /// Fetch exact fee and conversion from server
   Future<void> _fetchPreview() async {
@@ -204,6 +193,52 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     }
   }
 
+  /// Fetch the authoritative buyer-pays amount for a merchant QR from the server
+  /// (fresh rates). Never falls back to a local rate — blocks the send instead.
+  Future<void> _fetchMerchantCharge() async {
+    setState(() {
+      _merchantConvLoading = true;
+      _merchantRateUnavailable = false;
+    });
+
+    try {
+      final callable = FirebaseFunctions.instance.httpsCallable('previewMerchantCharge');
+      final result = await callable.call<Map<String, dynamic>>({
+        'recipientWalletId': widget.recipientWalletId,
+        'requestedAmount': widget.amount,
+      }).timeout(const Duration(seconds: 15));
+
+      if (!mounted) return;
+
+      final data = result.data;
+      final rateUnavailable = data['rateUnavailable'] as bool? ?? false;
+      final buyerPays = (data['buyerPaysAmount'] as num?)?.toInt();
+
+      if (rateUnavailable || buyerPays == null) {
+        setState(() {
+          _merchantConvLoading = false;
+          _merchantRateUnavailable = true;
+        });
+        return;
+      }
+
+      setState(() {
+        _merchantConvLoading = false;
+        _merchantExchangeRate = (data['exchangeRate'] as num?)?.toDouble();
+        _amountController.text = (buyerPays / 100).toStringAsFixed(2);
+      });
+
+      // Fetch the fee/credit preview for the resolved amount.
+      await _fetchPreview();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _merchantConvLoading = false;
+        _merchantRateUnavailable = true;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -232,9 +267,11 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     // Convert merchant QR amount from seller's currency to buyer's currency
     if (!_hasConvertedMerchantAmount && widget.amountLocked && widget.amount > 0) {
       _hasConvertedMerchantAmount = true;
-      if (_isMerchantQR && _buyerPaysAmount != null) {
-        // Seller requested amount in their currency, convert to buyer's currency
-        _amountController.text = _buyerPaysAmount!.toStringAsFixed(2);
+      if (_isMerchantQR) {
+        // Server-authoritative conversion: fetch the buyer-pays amount from the
+        // server using fresh rates. Never convert locally — a stale phone rate
+        // must not determine the charged amount.
+        _fetchMerchantCharge();
       } else {
         // Same currency or no conversion needed
         _amountController.text = (widget.amount / 100).toStringAsFixed(2);
@@ -812,7 +849,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
                 : '${_serverTotalDebit == null ? "~" : ""}$_currency${_formatAmount(_totalMajor)}',
             isTotal: true,
           ),
-          if (_serverRateUnavailable) ...[
+          if (_serverRateUnavailable || _merchantRateUnavailable) ...[
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
               AppLocalizations.of(context).exchangeRateUnavailable,
@@ -849,7 +886,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     // For merchant QR: show "Seller requested X" in seller's currency
     // For regular send: show "Recipient receives X" in recipient's currency
     if (_isMerchantQR) {
-      final reverseRate = _reverseExchangeRate ?? 0;
+      final reverseRate = _merchantExchangeRate ?? 0;
       return Container(
         padding: const EdgeInsets.all(AppDimensions.spaceMD),
         decoration: BoxDecoration(
@@ -959,7 +996,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           width: double.infinity,
           height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _isLoading || _amountMajor <= 0 || _serverRateUnavailable ? null : _handleSend,
+            onPressed: _isLoading || _amountMajor <= 0 || _serverRateUnavailable || _merchantConvLoading || _merchantRateUnavailable ? null : _handleSend,
             child: _isLoading
                 ? const SizedBox(
                     width: 24,

@@ -10553,6 +10553,86 @@ exports.previewTransfer = functions.runWith({ enforceAppCheck: true }).https.onC
   }
 });
 
+exports.previewMerchantCharge = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throwAppError(ERROR_CODES.AUTH_UNAUTHENTICATED);
+  }
+
+  const senderUid = context.auth.uid;
+
+  // Reuse the previewTransfer rate-limit bucket (same kind of read-only quote).
+  await enforceRateLimit(senderUid, 'previewTransfer');
+
+  const { recipientWalletId, requestedAmount } = data;
+
+  if (!requestedAmount || typeof requestedAmount !== 'number' || requestedAmount <= 0) {
+    throwAppError(ERROR_CODES.TXN_AMOUNT_INVALID, 'Requested amount must be positive.');
+  }
+  if (!recipientWalletId || typeof recipientWalletId !== 'string') {
+    throwAppError(ERROR_CODES.SYSTEM_VALIDATION_FAILED, 'Recipient wallet ID is required.');
+  }
+
+  try {
+    const senderWalletDoc = await db.collection('wallets').doc(senderUid).get();
+    if (!senderWalletDoc.exists) {
+      throwAppError(ERROR_CODES.WALLET_NOT_FOUND, 'Sender wallet not found.');
+    }
+    const senderCurrency = senderWalletDoc.data().currency || 'GHS';
+
+    const recipientQuery = await db.collection('wallets')
+      .where('walletId', '==', recipientWalletId)
+      .limit(1)
+      .get();
+    if (recipientQuery.empty) {
+      throwAppError(ERROR_CODES.TXN_RECIPIENT_NOT_FOUND, 'Recipient not found.');
+    }
+    const recipientCurrency = recipientQuery.docs[0].data().currency || 'GHS';
+
+    // Same currency — buyer pays exactly the requested amount, no conversion.
+    if (senderCurrency === recipientCurrency) {
+      return {
+        buyerPaysAmount: Math.round(requestedAmount),
+        exchangeRate: 1,
+        rateUnavailable: false,
+        senderCurrency,
+        recipientCurrency,
+      };
+    }
+
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+
+    const senderRate = resolveRate(rates, senderCurrency);
+    const recipientRate = resolveRate(rates, recipientCurrency);
+    // Missing rate must NOT silently fall back to 1:1 — refuse, like previewTransfer/sendMoney.
+    if (senderRate === null || recipientRate === null) {
+      return {
+        buyerPaysAmount: null,
+        exchangeRate: null,
+        rateUnavailable: true,
+        senderCurrency,
+        recipientCurrency,
+      };
+    }
+
+    // requestedAmount is in the seller's (recipient) currency; convert to the buyer's (sender) currency.
+    const reverseRate = senderRate / recipientRate;
+    const buyerPaysAmount = Math.round(requestedAmount * reverseRate);
+
+    return {
+      buyerPaysAmount,
+      exchangeRate: reverseRate,
+      rateUnavailable: false,
+      senderCurrency,
+      recipientCurrency,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    logError('Preview merchant charge error', { error: error.message, senderUid });
+    throwAppError(ERROR_CODES.SYSTEM_INTERNAL_ERROR, 'Could not compute merchant charge. Please try again.');
+  }
+});
+
 exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   // 1. Check authentication
   if (!context.auth) {
