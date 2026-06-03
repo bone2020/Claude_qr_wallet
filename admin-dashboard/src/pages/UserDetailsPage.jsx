@@ -8,7 +8,7 @@ import { formatCurrency } from '../utils/format';
 function UserDetailsPage() {
   const { uid } = useParams();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAdminSupervisor } = useAuth();
   const [userData, setUserData] = useState(null);
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -17,6 +17,7 @@ function UserDetailsPage() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [blockReason, setBlockReason] = useState('');
+  const [newEmail, setNewEmail] = useState('');
 
   useEffect(() => {
     loadUserDetails();
@@ -62,6 +63,27 @@ function UserDetailsPage() {
       await loadUserDetails();
     } catch (err) {
       alert(err.message || 'Failed to unblock account.');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleUpdateEmail = async () => {
+    const trimmed = newEmail.trim();
+    if (!trimmed) {
+      alert('Please enter a new email address.');
+      return;
+    }
+    if (!window.confirm(`Change this user's email to "${trimmed}"? They will be notified of the change.`)) return;
+    setActionLoading('email');
+    try {
+      const adminUpdateUserEmail = httpsCallable(functions, 'adminUpdateUserEmail');
+      const result = await adminUpdateUserEmail({ targetUid: uid, newEmail: trimmed });
+      alert(result.data?.message || 'Email updated successfully.');
+      setNewEmail('');
+      await loadUserDetails();
+    } catch (err) {
+      alert(err.message || 'Failed to update email.');
     } finally {
       setActionLoading('');
     }
@@ -207,6 +229,29 @@ function UserDetailsPage() {
                 >
                   {actionLoading === 'block' ? 'Blocking...' : 'Block Account'}
                 </button>
+              </div>
+            )}
+
+            {isAdminSupervisor && (
+              <div className="pt-4 border-t border-gray-200">
+                <p className="text-sm font-medium text-gray-700 mb-2">Change Email</p>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="New email address..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    onClick={handleUpdateEmail}
+                    disabled={!!actionLoading}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {actionLoading === 'email' ? 'Updating...' : 'Update Email'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Current: {userData?.email || 'N/A'}</p>
               </div>
             )}
           </div>
