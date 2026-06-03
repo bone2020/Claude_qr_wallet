@@ -6597,6 +6597,23 @@ exports.adminUpdateUserEmail = functions.runWith({ enforceAppCheck: true }).http
     throw new functions.https.HttpsError('internal', 'Failed to update the email record. The change has been reverted; please retry.');
   }
 
+  // Notify the user that their email was changed (best-effort: a failed
+  // notification must not fail the operation, which has already succeeded).
+  try {
+    await sendPushNotification(targetUid, {
+      title: 'Email Address Changed',
+      body: 'Your account email was changed by an administrator. If you did not request this, contact support immediately.',
+      type: 'security',
+      data: { action: 'email_changed_by_admin' },
+    });
+  } catch (notifyErr) {
+    logStructured(LOG_LEVELS.ERROR, 'adminUpdateUserEmail: email updated but push notification failed', {
+      targetUid,
+      callerUid: caller.uid,
+      error: notifyErr.message,
+    });
+  }
+
   await auditLog({
     userId: caller.uid,
     operation: 'adminUpdateUserEmail',
