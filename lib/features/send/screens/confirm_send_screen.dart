@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -73,6 +74,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   double? _merchantExchangeRate;
   bool _merchantConvLoading = false;
   bool _merchantRateUnavailable = false;
+  Timer? _previewDebounce;
 
    /// Format exchange rate with enough decimal places to be meaningful
   String _formatRate(double rate) {
@@ -248,9 +250,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       _amountController.text = (widget.amount / 100).toStringAsFixed(0);
     }
 
-    // Debounced preview calls when amount changes
+   // Debounced preview. Mark stale immediately so Send stays disabled until
+    // fresh server values arrive — the button can never show a stale amount.
     _amountController.addListener(() {
-      Future.delayed(const Duration(milliseconds: 800), () {
+      _previewDebounce?.cancel();
+      if (!_previewLoading) {
+        setState(() => _previewLoading = true);
+      }
+      _previewDebounce = Timer(const Duration(milliseconds: 800), () {
         if (mounted) _fetchPreview();
       });
     });
@@ -911,7 +918,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             ),
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-               AppLocalizations.of(context).exchangeRateLine(widget.recipientCurrency ?? '', _formatRate(reverseRate), _currencyCode),
+               AppLocalizations.of(context).exchangeRateLine(_currencyCode, _formatRate(reverseRate > 0 ? 1 / reverseRate : 0), widget.recipientCurrency ?? ''),
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
             ),
           ],
@@ -996,7 +1003,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
           width: double.infinity,
           height: AppDimensions.buttonHeightLG,
           child: ElevatedButton(
-            onPressed: _isLoading || _amountMajor <= 0 || _serverRateUnavailable || _merchantConvLoading || _merchantRateUnavailable ? null : _handleSend,
+            onPressed: _isLoading || _previewLoading || _amountMajor <= 0 || _serverRateUnavailable || _merchantConvLoading || _merchantRateUnavailable ? null : _handleSend,
             child: _isLoading
                 ? const SizedBox(
                     width: 24,
