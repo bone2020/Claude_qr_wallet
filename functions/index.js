@@ -10420,21 +10420,23 @@ function generateSecureTransactionId() {
 
 /**
  * Calculate transaction fee using a tiered sliding scale.
- * Smaller amounts pay a higher percentage, larger amounts pay less.
+ * Larger amounts pay a higher percentage, smaller amounts pay less.
  * This keeps daily small transactions affordable while generating
  * fair revenue on larger transfers.
  *
  * Same Country Tiers:
- *   0 - 500 major units:     1.5%   (min fee: 50 minor units / 0.50 major)
- *   501 - 5,000:             1.0%
- *   5,001 - 50,000:          0.75%
- *   50,001+:                 0.5%
+ *   0 - 500 major units:     0.3%   (min fee: 50 minor units / 0.50 major)
+ *   501 - 5,000:             0.35%
+ *   5,001 - 20,000:          0.5%
+ *   20,001 - 50,000:         0.7%
+ *   50,001+:                 0.8%
  *
  * Cross Country Tiers:
- *   0 - 500 major units:     3.0%   (min fee: 100 minor units / 1.00 major)
- *   501 - 5,000:             2.0%
- *   5,001 - 50,000:          1.5%
- *   50,001+:                 1.0%
+ *   0 - 500 major units:     0.5%   (min fee: 400 minor units / 4.00 major)
+ *   501 - 5,000:             0.6%
+ *   5,001 - 20,000:          0.8%
+ *   20,001 - 50,000:         1.0%
+ *   50,001+:                 1.2%
  *
  * @param {number} amount - Amount in minor units (e.g. 150000 = 1500.00 major)
  * @param {boolean} isCrossCountry - true if sender and recipient have different currencies
@@ -10445,16 +10447,18 @@ function calculateFee(amount, isCrossCountry) {
   let rate;
 
   if (isCrossCountry) {
-    if (majorAmount <= 500) rate = 0.03;
-    else if (majorAmount <= 5000) rate = 0.02;
-    else if (majorAmount <= 50000) rate = 0.015;
-    else rate = 0.01;
-    return Math.round(Math.max(amount * rate, 100)); // min 100 minor units (1.00 major)
+    if (majorAmount <= 500) rate = 0.005;
+    else if (majorAmount <= 5000) rate = 0.006;
+    else if (majorAmount <= 20000) rate = 0.008;
+    else if (majorAmount <= 50000) rate = 0.01;
+    else rate = 0.012;
+    return Math.round(Math.max(amount * rate, 400)); // min 400 minor units (4.00 major)
   } else {
-    if (majorAmount <= 500) rate = 0.015;
-    else if (majorAmount <= 5000) rate = 0.01;
-    else if (majorAmount <= 50000) rate = 0.0075;
-    else rate = 0.005;
+    if (majorAmount <= 500) rate = 0.003;
+    else if (majorAmount <= 5000) rate = 0.0035;
+    else if (majorAmount <= 20000) rate = 0.005;
+    else if (majorAmount <= 50000) rate = 0.007;
+    else rate = 0.008;
     return Math.round(Math.max(amount * rate, 50)); // min 50 minor units (0.50 major)
   }
 }
