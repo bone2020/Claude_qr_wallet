@@ -44,6 +44,7 @@ function Sidebar() {
 
         {isAdmin && <NavLink to="/disputes" className={linkClass}>Disputes</NavLink>}
         {isAdminSupervisor && <NavLink to="/recovery-watch" className={linkClass}>Recovery Watch</NavLink>}
+        {isFinance && <NavLink to="/archive-restore" className={linkClass}>Archive Restore</NavLink>}
         {isAuditor && <NavLink to="/audit-export" className={linkClass}>Audit Export</NavLink>}
       </nav>
 

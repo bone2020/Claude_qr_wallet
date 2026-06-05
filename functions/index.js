@@ -14792,9 +14792,11 @@ exports.coldArchiveScheduled = functions.pubsub
  * Ref: Phase 2b agent commit 10/10
  */
 exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
-  const caller = await verifyAdmin(context, 'super_admin');
+  const caller = await verifyAdmin(context, 'finance');
 
-  const { collection, docId, overwrite } = data || {};
+  const { collection, docId, mode } = data || {};
+  const RESTORE_MODE = mode || 'safe';
+  const VALID_MODES = ['safe', 'overwrite', 'keep_both'];
   const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
   const ALLOWED_COLLECTIONS = ['audit_logs', 'admin_activity', 'platform_transfer_proposals'];
 
@@ -14805,47 +14807,111 @@ exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).h
   if (!docId || typeof docId !== 'string') {
     throw new functions.https.HttpsError('invalid-argument', 'docId is required.');
   }
+  if (!VALID_MODES.includes(RESTORE_MODE)) {
+    throw new functions.https.HttpsError('invalid-argument',
+      `mode must be one of: ${VALID_MODES.join(', ')}`);
+  }
+  // Replacing (overwriting) a live record is destructive and stays super_admin-only.
+  if (RESTORE_MODE === 'overwrite' && caller.role !== 'super_admin') {
+    throw new functions.https.HttpsError('permission-denied',
+      'Only super_admin may overwrite a live record. Use keep_both to keep it.');
+  }
 
   try {
     const bucket = admin.storage().bucket(ARCHIVE_BUCKET);
     const file = bucket.file(`${collection}/${docId}.json`);
+    const [archiveExists] = await file.exists();
+    if (!archiveExists) {
+      throw new functions.https.HttpsError('not-found',
+        `No archived copy found at ${collection}/${docId}.`);
+    }
     const [contents] = await file.download();
     const originalData = JSON.parse(contents.toString('utf8'));
 
     const callerRecord = await admin.auth().getUser(caller.uid);
     const callerEmail = callerRecord.email || 'unknown';
 
-    const targetRef = db.collection(collection).doc(docId);
+    // keep_both restores under a fresh id so any live doc is left untouched.
+    const targetDocId = RESTORE_MODE === 'keep_both'
+      ? `${docId}__restored_${Date.now()}`
+      : docId;
+    const targetRef = db.collection(collection).doc(targetDocId);
+
     const restorePayload = {
       ...originalData,
       restoredFromArchive: true,
       restoredAt: admin.firestore.FieldValue.serverTimestamp(),
       restoredBy: { uid: caller.uid, email: callerEmail },
     };
-    let wasOverwrite = false;
-    await db.runTransaction(async (transaction) => {
+    if (RESTORE_MODE === 'keep_both') {
+      restorePayload.restoredAsCopy = true;
+      restorePayload.restoredFromOriginalId = docId;
+    }
+
+    const txResult = await db.runTransaction(async (transaction) => {
       const existing = await transaction.get(targetRef);
-      if (existing.exists && overwrite !== true) {
-        throw new functions.https.HttpsError('already-exists',
-          `A live document already exists at ${collection}/${docId}. Pass overwrite: true to replace it.`);
+
+      // safe mode never overwrites: report the clash, write nothing, hand both back.
+      if (RESTORE_MODE === 'safe' && existing.exists) {
+        return { collision: true, existingData: existing.data() };
       }
-      wasOverwrite = existing.exists;
+      // keep_both target id should be unique; refuse rather than clobber if not.
+      if (RESTORE_MODE === 'keep_both' && existing.exists) {
+        throw new functions.https.HttpsError('already-exists',
+          `Generated restore id ${collection}/${targetDocId} already exists; aborting.`);
+      }
+
+      const wasOverwrite = existing.exists; // only reachable in overwrite mode
       transaction.set(targetRef, restorePayload);
+      return { collision: false, wasOverwrite };
     });
 
-    await db.collection('audit_logs').add({
-      userId: caller.uid,
-      operation: 'archive_restored',
-      result: 'success',
-      metadata: { collection, docId, overwrite: wasOverwrite },
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    if (txResult.collision) {
+      // Nothing was written. Return both versions for side-by-side comparison.
+      return {
+        success: false,
+        collision: true,
+        collection,
+        docId,
+        existingData: txResult.existingData,
+        archivedData: originalData,
+      };
+    }
 
-    return { success: true, collection, docId, restored: true };
+    // Audit the successful restore. The write has already committed, so a logging
+    // failure must NOT make the restore look failed — swallow it (and log server-side).
+    try {
+      await db.collection('audit_logs').add({
+        userId: caller.uid,
+        operation: 'archive_restored',
+        result: 'success',
+        metadata: {
+          collection,
+          docId,
+          targetDocId,
+          mode: RESTORE_MODE,
+          overwrite: txResult.wasOverwrite === true,
+        },
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (logErr) {
+      logError('adminRestoreFromArchive audit log failed (restore succeeded)', {
+        collection, docId, targetDocId, error: logErr.message,
+      });
+    }
+
+    return {
+      success: true,
+      restored: true,
+      collection,
+      docId,
+      targetDocId,
+      mode: RESTORE_MODE,
+    };
   } catch (error) {
     if (error instanceof functions.https.HttpsError) throw error;
     logError('adminRestoreFromArchive failed', { collection, docId, error: error.message });
-    throw new functions.https.HttpsError('internal', 'Failed to restore from archive: ' + error.message);
+    throw new functions.https.HttpsError('internal', 'Failed to restore from archive.');
   }
 });
 

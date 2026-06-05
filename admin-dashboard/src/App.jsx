@@ -18,6 +18,7 @@ import FraudAlertsPage from './pages/FraudAlertsPage';
 import DisputesPage from './pages/DisputesPage';
 import RecoveryWatchPage from './pages/RecoveryWatchPage';
 import AuditExportPage from './pages/AuditExportPage';
+import ArchiveRestorePage from './pages/ArchiveRestorePage';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
             <Route path="disputes" element={<DisputesPage />} />
             <Route path="recovery-watch" element={<RecoveryWatchPage />} />
             <Route path="audit-export" element={<AuditExportPage />} />
+            <Route path="archive-restore" element={<ArchiveRestorePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
