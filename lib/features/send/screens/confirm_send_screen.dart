@@ -94,16 +94,18 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
     int minFee;
 
     if (isCrossCountry) {
-      if (majorAmount <= 500) { rate = 0.03; }
-      else if (majorAmount <= 5000) { rate = 0.02; }
-      else if (majorAmount <= 50000) { rate = 0.015; }
-      else { rate = 0.01; }
-      minFee = 100;
+      if (majorAmount <= 500) { rate = 0.005; }
+      else if (majorAmount <= 5000) { rate = 0.006; }
+      else if (majorAmount <= 20000) { rate = 0.008; }
+      else if (majorAmount <= 50000) { rate = 0.01; }
+      else { rate = 0.012; }
+      minFee = 400;
     } else {
-      if (majorAmount <= 500) { rate = 0.015; }
-      else if (majorAmount <= 5000) { rate = 0.01; }
-      else if (majorAmount <= 50000) { rate = 0.0075; }
-      else { rate = 0.005; }
+      if (majorAmount <= 500) { rate = 0.003; }
+      else if (majorAmount <= 5000) { rate = 0.0035; }
+      else if (majorAmount <= 20000) { rate = 0.005; }
+      else if (majorAmount <= 50000) { rate = 0.007; }
+      else { rate = 0.008; }
       minFee = 50;
     }
     final fee = max((_amountMinor * rate).round(), minFee);
