@@ -14794,7 +14794,7 @@ exports.coldArchiveScheduled = functions.pubsub
 exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
   const caller = await verifyAdmin(context, 'super_admin');
 
-  const { collection, docId } = data || {};
+  const { collection, docId, overwrite } = data || {};
   const ARCHIVE_BUCKET = 'qr-wallet-1993-archive';
   const ALLOWED_COLLECTIONS = ['audit_logs', 'admin_activity', 'platform_transfer_proposals'];
 
@@ -14815,18 +14815,29 @@ exports.adminRestoreFromArchive = functions.runWith({ enforceAppCheck: true }).h
     const callerRecord = await admin.auth().getUser(caller.uid);
     const callerEmail = callerRecord.email || 'unknown';
 
-    await db.collection(collection).doc(docId).set({
+    const targetRef = db.collection(collection).doc(docId);
+    const restorePayload = {
       ...originalData,
       restoredFromArchive: true,
       restoredAt: admin.firestore.FieldValue.serverTimestamp(),
       restoredBy: { uid: caller.uid, email: callerEmail },
+    };
+    let wasOverwrite = false;
+    await db.runTransaction(async (transaction) => {
+      const existing = await transaction.get(targetRef);
+      if (existing.exists && overwrite !== true) {
+        throw new functions.https.HttpsError('already-exists',
+          `A live document already exists at ${collection}/${docId}. Pass overwrite: true to replace it.`);
+      }
+      wasOverwrite = existing.exists;
+      transaction.set(targetRef, restorePayload);
     });
 
     await db.collection('audit_logs').add({
       userId: caller.uid,
       operation: 'archive_restored',
       result: 'success',
-      metadata: { collection, docId },
+      metadata: { collection, docId, overwrite: wasOverwrite },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     });
 
