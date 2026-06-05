@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -401,6 +402,7 @@ class _SmileIdSmartSelfieScreen extends StatelessWidget {
         showInstructions: true,
         extraPartnerParams: const {
           "callback_url": _smileIdCallbackUrl,
+          if (kDebugMode) "sandbox_result": "0",
         },
         onSuccess: (result) {
           Navigator.pop(context, result);
