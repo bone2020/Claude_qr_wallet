@@ -11001,7 +11001,7 @@ const MOMO_CONFIG = {
     get apiUser()         { return MOMO_DISBURSEMENTS_API_USER_PARAM.value() || ''; },
     get apiKey()          { return MOMO_DISBURSEMENTS_API_KEY_PARAM.value() || ''; },
   },
-  environment: (() => {
+  get environment() {
     const momoEnv = MOMO_ENVIRONMENT.value();
     const appEnv = APP_ENVIRONMENT.value();
 
@@ -11022,7 +11022,7 @@ const MOMO_CONFIG = {
 
     logWarning('MoMo environment not set, defaulting to sandbox for development');
     return 'sandbox';
-  })(),
+  },
   // Phase 4f: Resolve MOMO_WEBHOOK_SECRET.value lazily at request time (not module
   // load time), and only embed the real string. Previously this stored the wrapper
   // Object directly in the callback URL, producing "?token=[object Object]" — which
@@ -11037,12 +11037,14 @@ const MOMO_CONFIG = {
       ? `${FUNCTIONS_BASE_URL}/momoWebhook?token=${secret}`
       : `${FUNCTIONS_BASE_URL}/momoWebhook`;
   },
+  // baseUrl resolves from environment lazily at runtime (avoids invoking
+  // MOMO_ENVIRONMENT/APP_ENVIRONMENT .value() at module load / deploy time).
+  get baseUrl() {
+    return this.environment === 'production'
+      ? 'proxy.momoapi.mtn.com'
+      : 'sandbox.momodeveloper.mtn.com';
+  },
 };
-
-// Set baseUrl based on resolved environment
-MOMO_CONFIG.baseUrl = MOMO_CONFIG.environment === 'production'
-  ? 'proxy.momoapi.mtn.com'
-  : 'sandbox.momodeveloper.mtn.com';
 
 // Helper function to get MTN MoMo access token
 async function getMomoAccessToken(product) {
