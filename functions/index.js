@@ -10970,9 +10970,9 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
       }),
       sendPushNotification(result.recipientUid, {
         title: 'Money Received',
-        body: `You received ${result.recipientCurrency || ''}${(amount / 100).toFixed(2)} from ${result.senderName || 'a wallet'}`,
+        body: `You received ${result.recipientCurrency || ''}${(result.creditAmount / 100).toFixed(2)} from ${result.senderName || 'a wallet'}`,
         type: 'transaction',
-        data: { action: 'money_received', amount: amount.toString(), transactionId: result.transactionId },
+        data: { action: 'money_received', amount: result.creditAmount.toString(), transactionId: result.transactionId },
       }),
     ]);
 

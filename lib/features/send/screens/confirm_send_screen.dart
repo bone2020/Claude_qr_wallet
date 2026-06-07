@@ -19,7 +19,6 @@ import '../../../core/services/transaction_localization_resolver.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../../../core/utils/error_handler.dart';
-import '../../../providers/currency_provider.dart';
 import '../../../providers/wallet_provider.dart';
 
 /// Confirm send screen showing transaction summary
@@ -70,10 +69,14 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   bool _previewLoading = false;
   String? _previewError;
 
-  // Merchant QR: server-authoritative conversion (buyer-pays computed server-side)
+  /// Merchant QR: server-authoritative conversion (buyer-pays computed server-side)
   double? _merchantExchangeRate;
   bool _merchantConvLoading = false;
   bool _merchantRateUnavailable = false;
+  // Recipient currency as resolved authoritatively by previewMerchantCharge.
+  // Display/gating use this so they no longer depend on the (possibly null)
+  // scan-time wallet lookup.
+  String? _serverRecipientCurrency;
   Timer? _previewDebounce;
 
    /// Format exchange rate with enough decimal places to be meaningful
@@ -113,12 +116,20 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
   double get _totalMajor => _serverTotalDebit != null ? _serverTotalDebit! / 100.0 : _amountMajor + _feeMajor;
 
-  String get _currency => ref.watch(currencyNotifierProvider).currency.symbol;
-  String get _currencyCode => ref.watch(currencyNotifierProvider).currency.code;
+  // Sender's own wallet currency — the authoritative source for what they're
+  // sending (matches the home screen and the balance actually debited). Not the
+  // currencyNotifierProvider display state, which defaults to GHS and can lag the wallet.
+  String get _currency => ref.watch(walletNotifierProvider).currencySymbol;
+  String get _currencyCode => ref.watch(walletNotifierProvider).currency;
+
+  // Authoritative recipient currency: prefer the value resolved server-side by
+  // previewMerchantCharge, falling back to the scan-time lookup (which can be null).
+  String? get _effectiveRecipientCurrency =>
+      _serverRecipientCurrency ?? widget.recipientCurrency;
 
   // Currency conversion
   bool get _needsConversion {
-    final recipientCurrency = widget.recipientCurrency;
+    final recipientCurrency = _effectiveRecipientCurrency;
     return recipientCurrency != null && recipientCurrency != _currencyCode;
   }
 
@@ -229,6 +240,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
       setState(() {
         _merchantConvLoading = false;
         _merchantExchangeRate = (data['exchangeRate'] as num?)?.toDouble();
+        _serverRecipientCurrency = data['recipientCurrency'] as String?;
         _amountController.text = (buyerPays / 100).toStringAsFixed(2);
       });
 
@@ -273,18 +285,16 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Convert merchant QR amount from seller's currency to buyer's currency
+    // Resolve the buyer-pays amount for any amount-locked (merchant/request) QR.
     if (!_hasConvertedMerchantAmount && widget.amountLocked && widget.amount > 0) {
       _hasConvertedMerchantAmount = true;
-      if (_isMerchantQR) {
-        // Server-authoritative conversion: fetch the buyer-pays amount from the
-        // server using fresh rates. Never convert locally — a stale phone rate
-        // must not determine the charged amount.
-        _fetchMerchantCharge();
-      } else {
-        // Same currency or no conversion needed
-        _amountController.text = (widget.amount / 100).toStringAsFixed(2);
-      }
+      // Always resolve server-side. previewMerchantCharge is authoritative for both
+      // currencies and the conversion (same-currency returns the requested amount
+      // unchanged), so the charged amount no longer depends on the client knowing
+      // recipientCurrency. That dependency could be null when the scan-time wallet
+      // lookup failed, which made the merchant receive the down-converted amount
+      // instead of the amount they requested.
+      _fetchMerchantCharge();
     }
   }
 
@@ -890,7 +900,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
   }
 
   Widget _buildConversionInfo() {
-    final recipientSymbol = widget.recipientCurrencySymbol ?? widget.recipientCurrency ?? '';
+   final recipientSymbol = widget.recipientCurrencySymbol ?? _effectiveRecipientCurrency ?? '';
 
     // For merchant QR: show "Seller requested X" in seller's currency
     // For regular send: show "Recipient receives X" in recipient's currency
@@ -920,7 +930,7 @@ class _ConfirmSendScreenState extends ConsumerState<ConfirmSendScreen> {
             ),
             const SizedBox(height: AppDimensions.spaceXS),
             Text(
-               AppLocalizations.of(context).exchangeRateLine(_currencyCode, _formatRate(reverseRate > 0 ? 1 / reverseRate : 0), widget.recipientCurrency ?? ''),
+               AppLocalizations.of(context).exchangeRateLine(_currencyCode, _formatRate(reverseRate > 0 ? 1 / reverseRate : 0), _effectiveRecipientCurrency ?? ''),
               style: AppTextStyles.caption(color: AppColors.textSecondaryDark),
             ),
           ],
