@@ -42,7 +42,7 @@ class ExchangeRateService {
     'LYD': 4.8,
     'MUR': 45.0,
     'MWK': 1700.0,
-    'SLL': 22000.0,
+    'SLE': 22.0,
     'LRD': 190.0,
     'GMD': 67.0,
     'GNF': 8600.0,

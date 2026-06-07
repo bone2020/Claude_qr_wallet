@@ -50,7 +50,7 @@ class AfricanCountryCodes {
     CountryCode(name: 'Malawi', code: 'MW', dialCode: '+265', flag: '🇲🇼', currency: 'MWK'),
     CountryCode(name: 'Benin', code: 'BJ', dialCode: '+229', flag: '🇧🇯', currency: 'XOF'),
     CountryCode(name: 'Togo', code: 'TG', dialCode: '+228', flag: '🇹🇬', currency: 'XOF'),
-    CountryCode(name: 'Sierra Leone', code: 'SL', dialCode: '+232', flag: '🇸🇱', currency: 'SLL'),
+    CountryCode(name: 'Sierra Leone', code: 'SL', dialCode: '+232', flag: '🇸🇱', currency: 'SLE'),
     CountryCode(name: 'Liberia', code: 'LR', dialCode: '+231', flag: '🇱🇷', currency: 'LRD'),
     CountryCode(name: 'Mauritius', code: 'MU', dialCode: '+230', flag: '🇲🇺', currency: 'MUR'),
     CountryCode(name: 'Congo (DRC)', code: 'CD', dialCode: '+243', flag: '🇨🇩', currency: 'CDF'),

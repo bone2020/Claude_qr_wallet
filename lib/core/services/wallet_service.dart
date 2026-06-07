@@ -132,7 +132,7 @@ Future<WalletLookupResult> lookupWallet(String walletId) async {
       'LYD': 'LD',
       'MUR': 'Rs',
       'MWK': 'MK',
-      'SLL': 'Le',
+      'SLE': 'Le',
       'LRD': 'L\$',
       'GMD': 'D',
       'GNF': 'FG',

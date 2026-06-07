@@ -315,7 +315,7 @@ class AfricanCountries {
       code: 'SL',
       dialCode: '+232',
       flag: '🇸🇱',
-      currencyCode: 'SLL',
+      currencyCode: 'SLE',
       currencySymbol: 'Le',
       currencyName: 'Sierra Leonean Leone',
     ),

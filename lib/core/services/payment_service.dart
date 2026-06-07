@@ -717,7 +717,7 @@ class MobileMoneyProvider {
       'LRD': 'liberia',
       'SZL': 'eswatini',
       'SSP': 'south sudan',
-      'SLL': 'sierra leone',
+      'SLE': 'sierra leone',
       'CDF': 'dr congo',
       'SDG': 'sudan',
     };

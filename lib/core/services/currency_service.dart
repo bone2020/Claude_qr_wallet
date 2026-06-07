@@ -17,7 +17,7 @@ class CurrencyService {
     CurrencyModel(code: 'MAD', symbol: 'DH', name: 'Moroccan Dirham', countryCode: '+212', flag: '🇲🇦'),
     CurrencyModel(code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc', countryCode: '+225', flag: '🇨🇮'),
     CurrencyModel(code: 'XAF', symbol: 'FCFA', name: 'Central African CFA Franc', countryCode: '+237', flag: '🇨🇲'),
-    CurrencyModel(code: 'SLL', symbol: 'Le', name: 'Sierra Leonean Leone', countryCode: '+232', flag: '🇸🇱'),
+    CurrencyModel(code: 'SLE', symbol: 'Le', name: 'Sierra Leonean Leone', countryCode: '+232', flag: '🇸🇱'),
     CurrencyModel(code: 'GNF', symbol: 'FG', name: 'Guinean Franc', countryCode: '+224', flag: '🇬🇳'),
     CurrencyModel(code: 'LRD', symbol: 'L\$', name: 'Liberian Dollar', countryCode: '+231', flag: '🇱🇷'),
     CurrencyModel(code: 'ZMW', symbol: 'ZK', name: 'Zambian Kwacha', countryCode: '+260', flag: '🇿🇲'),

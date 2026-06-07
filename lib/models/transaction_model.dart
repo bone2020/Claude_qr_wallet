@@ -328,7 +328,7 @@ class TransactionModel {
       'LYD': 'LD',
       'MUR': 'Rs',
       'MWK': 'MK',
-      'SLL': 'Le',
+      'SLE': 'Le',
       'LRD': 'L\$',
       'GMD': 'D',
       'GNF': 'FG',

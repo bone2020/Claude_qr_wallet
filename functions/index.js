@@ -586,7 +586,7 @@ const VALID_CURRENCIES = new Set([
   'GHS', 'NGN', 'KES', 'ZAR', 'TZS', 'UGX', 'RWF',
   'USD', 'EUR', 'GBP',
   'XOF', 'XAF', 'EGP',
-  'GNF', 'LRD', 'ZMW', 'ZWG', 'SZL', 'SSP', 'SLL', 'CDF',
+  'GNF', 'LRD', 'ZMW', 'ZWG', 'SZL', 'SSP', 'SLL', 'SLE', 'CDF',
 ]);
 
 /**
@@ -993,14 +993,17 @@ const CURRENCIES = [
 
 function fetchRates() {
   return new Promise((resolve, reject) => {
-    const url = 'https://api.exchangerate.host/latest?base=USD';
+    const url = 'https://open.er-api.com/v6/latest/USD';
     const req = https.get(url, { timeout: HTTP_TIMEOUT_MS }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.success !== false && json.rates) {
+          // open.er-api.com returns { result: 'success', rates: {...} }
+          // (also keep the legacy shape check for back-compat with any other provider).
+          const ok = (json.result === 'success') || (json.success !== false);
+          if (ok && json.rates) {
             resolve(json.rates);
           } else {
             reject(new Error('Exchange rate API returned error'));
@@ -1018,6 +1021,30 @@ function fetchRates() {
   });
 }
 
+/**
+ * Build the units-per-USD rates map written to app_config/exchange_rates.
+ *
+ * - Starts from USD: 1.0 (anchor).
+ * - Copies every code listed in CURRENCIES that the upstream feed returned.
+ * - Derives SLE from SLL (Sierra Leone redenominated 1000:1 in 2022).
+ *   The feed still publishes the retired SLL; SLE is not quoted directly.
+ *
+ * Shared by updateExchangeRatesDaily and updateExchangeRatesNow so the
+ * derivation cannot drift between the two writers.
+ */
+function buildRatesDoc(allRates) {
+  const rates = { 'USD': 1.0 };
+  for (const currency of CURRENCIES) {
+    if (allRates[currency]) {
+      rates[currency] = allRates[currency];
+    }
+  }
+  if (typeof rates.SLL === 'number' && rates.SLL > 0) {
+    rates.SLE = rates.SLL / 1000;
+  }
+  return rates;
+}
+
 // Scheduled function - runs daily at midnight UTC
 exports.updateExchangeRatesDaily = functions.pubsub
   .schedule('0 */4 * * *')
@@ -1027,18 +1054,13 @@ exports.updateExchangeRatesDaily = functions.pubsub
       logInfo('Fetching exchange rates');
       const allRates = await fetchRates();
 
-      const rates = { 'USD': 1.0 };
-      for (const currency of CURRENCIES) {
-        if (allRates[currency]) {
-          rates[currency] = allRates[currency];
-        }
-      }
+      const rates = buildRatesDoc(allRates);
 
       await db.collection('app_config').doc('exchange_rates').set({
         rates: rates,
         base: 'USD',
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        source: 'exchangerate.host'
+        source: 'open.er-api.com'
       });
 
       logInfo('Updated exchange rates', { count: Object.keys(rates).length });
@@ -1119,18 +1141,13 @@ exports.updateExchangeRatesNow = functions
 
     const allRates = await fetchRates();
 
-    const rates = { 'USD': 1.0 };
-    for (const currency of CURRENCIES) {
-      if (allRates[currency]) {
-        rates[currency] = allRates[currency];
-      }
-    }
+    const rates = buildRatesDoc(allRates);
 
     await db.collection('app_config').doc('exchange_rates').set({
       rates: rates,
       base: 'USD',
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: 'exchangerate.host'
+      source: 'open.er-api.com'
     });
 
     logInfo('Exchange rates updated successfully', {

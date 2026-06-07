@@ -199,7 +199,7 @@ WalletModel copyWith({
       'LYD': 'LD',     // Libyan Dinar
       'MUR': 'Rs',     // Mauritian Rupee
       'MWK': 'MK',     // Malawian Kwacha
-      'SLL': 'Le',     // Sierra Leonean Leone
+      'SLE': 'Le',     // Sierra Leonean Leone
       'LRD': 'L\$',    // Liberian Dollar
       'GMD': 'D',      // Gambian Dalasi
       'GNF': 'FG',     // Guinean Franc
