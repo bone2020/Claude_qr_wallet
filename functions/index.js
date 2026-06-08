@@ -7471,6 +7471,12 @@ exports.adminInitiateTransfer = functions
 
   // D-07: Wrap main body in idempotency to prevent double-submission
   return withIdempotency(idempotencyKey, 'adminInitiateTransfer', caller.uid, async () => {
+  // Platform fee balance (wallets/platform/balances/{currency}.amount) is stored
+  // in MINOR units (cents). `amount` here is whole units (the same value that's
+  // multiplied by 100 below for the Paystack payout). Convert once at this scope
+  // so both the try (pre-check / in-transaction check / debit) AND the catch
+  // refund see the same cents value.
+  const amountInMinor = Math.round(amount * 100);
   try {
     // Verify sufficient platform balance
     const balanceDoc = await db.collection('wallets').doc('platform')
@@ -7481,9 +7487,9 @@ exports.adminInitiateTransfer = functions
     }
 
     const currentBalance = balanceDoc.data().amount || 0;
-    if (currentBalance < amount) {
+    if (currentBalance < amountInMinor) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+        `Insufficient ${currency} balance. Available: ${(currentBalance / 100).toFixed(2)}, Requested: ${amount.toFixed(2)}`);
     }
 
     // Get exchange rate for USD equivalent bookkeeping (auxiliary; never block on rate unavailability — gold reference: sweepBalanceToPlatform)
@@ -7516,8 +7522,8 @@ exports.adminInitiateTransfer = functions
 
     const recipientCode = recipientResponse.data.recipient_code;
 
-    // Step 2: Deduct balance FIRST (atomic)
-    const amountInSmallestUnit = Math.round(amount * 100);
+    // Step 2: Deduct balance FIRST (atomic). amountInMinor declared above the
+    // try/catch is reused here in place of a second amountInSmallestUnit const.
     const reference = `PLT-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
 
     const withdrawalRef = db.collection('wallets').doc('platform')
@@ -7529,13 +7535,13 @@ exports.adminInitiateTransfer = functions
       );
       const freshAmount = freshBalance.data()?.amount || 0;
 
-      if (freshAmount < amount) {
+      if (freshAmount < amountInMinor) {
         throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
       }
 
       // Build balance-doc update; only include usdEquivalent if rate is available
       const balanceUpdate = {
-        amount: admin.firestore.FieldValue.increment(-amount),
+        amount: admin.firestore.FieldValue.increment(-amountInMinor),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       };
       if (amountInUSD !== null) {
@@ -7583,7 +7589,7 @@ exports.adminInitiateTransfer = functions
     try {
       const transferResponse = await paystackRequest('POST', '/transfer', {
         source: 'balance',
-        amount: amountInSmallestUnit,
+        amount: amountInMinor,
         recipient: recipientCode,
         reason: `Platform withdrawal: ${purpose}`,
         reference: reference,
@@ -7620,7 +7626,7 @@ exports.adminInitiateTransfer = functions
         transaction.update(
           db.collection('wallets').doc('platform').collection('balances').doc(currency),
           {
-            amount: admin.firestore.FieldValue.increment(amount),
+            amount: admin.firestore.FieldValue.increment(amountInMinor),
             usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }
@@ -8357,6 +8363,12 @@ exports.adminApproveTransfer = functions
     const amountInUSD = proposal.usdEquivalent;
     const reference = proposalId;
 
+    // Platform fee balance (wallets/platform/balances/{currency}.amount) is stored
+    // in MINOR units (cents). `amount` here is whole units (matches the value used
+    // for the Paystack payout below). Convert once at this scope so the pre-check,
+    // the in-transaction check, the debit, AND the catch refund all use cents.
+    const amountInMinor = Math.round(amount * 100);
+
     // Verify sufficient platform balance
     const balanceDoc = await db.collection('wallets').doc('platform')
       .collection('balances').doc(currency).get();
@@ -8366,9 +8378,9 @@ exports.adminApproveTransfer = functions
     }
 
     const currentBalance = balanceDoc.data().amount || 0;
-    if (currentBalance < amount) {
+    if (currentBalance < amountInMinor) {
       throw new functions.https.HttpsError('failed-precondition',
-        `Insufficient ${currency} balance. Available: ${currentBalance.toFixed(2)}, Requested: ${amount.toFixed(2)}`);
+        `Insufficient ${currency} balance. Available: ${(currentBalance / 100).toFixed(2)}, Requested: ${amount.toFixed(2)}`);
     }
 
     // Step 1: Create transfer recipient on Paystack
@@ -8386,8 +8398,8 @@ exports.adminApproveTransfer = functions
 
     const recipientCode = recipientResponse.data.recipient_code;
 
-    // Step 2: Deduct balance FIRST (atomic) + write withdrawal doc
-    const amountInSmallestUnit = Math.round(amount * 100);
+    // Step 2: Deduct balance FIRST (atomic) + write withdrawal doc.
+    // amountInMinor declared above is reused for the Paystack body below.
     const withdrawalRef = db.collection('wallets').doc('platform')
       .collection('withdrawals').doc(reference);
 
@@ -8397,14 +8409,14 @@ exports.adminApproveTransfer = functions
       );
       const freshAmount = freshBalance.data()?.amount || 0;
 
-      if (freshAmount < amount) {
+      if (freshAmount < amountInMinor) {
         throw new functions.https.HttpsError('failed-precondition', 'Insufficient balance (concurrent update).');
       }
 
       transaction.update(
         db.collection('wallets').doc('platform').collection('balances').doc(currency),
         {
-          amount: admin.firestore.FieldValue.increment(-amount),
+          amount: admin.firestore.FieldValue.increment(-amountInMinor),
           usdEquivalent: admin.firestore.FieldValue.increment(-amountInUSD),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }
@@ -8444,7 +8456,7 @@ exports.adminApproveTransfer = functions
     try {
       const transferResponse = await paystackRequest('POST', '/transfer', {
         source: 'balance',
-        amount: amountInSmallestUnit,
+        amount: amountInMinor,
         recipient: recipientCode,
         reason: `Platform withdrawal: ${purpose}`,
         reference: reference,
@@ -8478,7 +8490,7 @@ exports.adminApproveTransfer = functions
         transaction.update(
           db.collection('wallets').doc('platform').collection('balances').doc(currency),
           {
-            amount: admin.firestore.FieldValue.increment(amount),
+            amount: admin.firestore.FieldValue.increment(amountInMinor),
             usdEquivalent: admin.firestore.FieldValue.increment(amountInUSD),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           }
