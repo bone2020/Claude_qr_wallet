@@ -3159,6 +3159,12 @@ exports.createWalletForUser = functions.runWith({ enforceAppCheck: true }).https
       );
     }
 
+    // Validate currency against the supported whitelist before provisioning.
+    // The trimmed picker is the primary guard; this backstops a stale/old client
+    // so no wallet is created in an unsupported currency that would then fail
+    // every transaction.
+    const walletCurrency = validateCurrency(userData.currency || 'GHS');
+
     // Generate unique wallet ID
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
     const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -3175,7 +3181,7 @@ exports.createWalletForUser = functions.runWith({ enforceAppCheck: true }).https
       id: userId,
       userId: userId,
       walletId: walletId,
-      currency: userData.currency || 'GHS',
+      currency: walletCurrency,
       balance: 0,
       heldBalance: 0,
       availableBalance: 0,

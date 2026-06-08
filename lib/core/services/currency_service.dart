@@ -13,8 +13,6 @@ class CurrencyService {
     CurrencyModel(code: 'TZS', symbol: 'TSh', name: 'Tanzanian Shilling', countryCode: '+255', flag: '🇹🇿'),
     CurrencyModel(code: 'UGX', symbol: 'USh', name: 'Ugandan Shilling', countryCode: '+256', flag: '🇺🇬'),
     CurrencyModel(code: 'RWF', symbol: 'FRw', name: 'Rwandan Franc', countryCode: '+250', flag: '🇷🇼'),
-    CurrencyModel(code: 'ETB', symbol: 'Br', name: 'Ethiopian Birr', countryCode: '+251', flag: '🇪🇹'),
-    CurrencyModel(code: 'MAD', symbol: 'DH', name: 'Moroccan Dirham', countryCode: '+212', flag: '🇲🇦'),
     CurrencyModel(code: 'XOF', symbol: 'CFA', name: 'West African CFA Franc', countryCode: '+225', flag: '🇨🇮'),
     CurrencyModel(code: 'XAF', symbol: 'FCFA', name: 'Central African CFA Franc', countryCode: '+237', flag: '🇨🇲'),
     CurrencyModel(code: 'SLE', symbol: 'Le', name: 'Sierra Leonean Leone', countryCode: '+232', flag: '🇸🇱'),
@@ -25,7 +23,6 @@ class CurrencyService {
     CurrencyModel(code: 'SZL', symbol: 'E', name: 'Swazi Lilangeni', countryCode: '+268', flag: '🇸🇿'),
     CurrencyModel(code: 'SSP', symbol: 'SS£', name: 'South Sudanese Pound', countryCode: '+211', flag: '🇸🇸'),
     CurrencyModel(code: 'CDF', symbol: 'FC', name: 'Congolese Franc', countryCode: '+243', flag: '🇨🇩'),
-    CurrencyModel(code: 'SDG', symbol: 'LS', name: 'Sudanese Pound', countryCode: '+249', flag: '🇸🇩'),
     // International currencies
     CurrencyModel(code: 'USD', symbol: '\$', name: 'US Dollar', countryCode: '+1', flag: '🇺🇸'),
     CurrencyModel(code: 'GBP', symbol: '£', name: 'British Pound', countryCode: '+44', flag: '🇬🇧'),
