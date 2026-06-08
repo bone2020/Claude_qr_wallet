@@ -10844,7 +10844,7 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
       // NEW-2: fee USD value is auxiliary bookkeeping only — never block the transfer on a
       // missing rate (gold reference: sweepBalanceToPlatform mark-pending pattern).
       const exchangeRate = resolveRate(rates, senderCurrency);
-      const feeInUSD = exchangeRate !== null ? fee / exchangeRate : null;
+      const feeInUSD = exchangeRate !== null ? (fee / 100) / exchangeRate : null;
       const usdConversionPending = exchangeRate === null;
       if (usdConversionPending) {
         logError('Exchange rate unavailable for sendMoney fee — proceeding without USD aggregates', {
@@ -13253,7 +13253,7 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
     // NEW-2: fee USD value is auxiliary bookkeeping only — never block the transfer on a
     // missing rate (gold reference: sweepBalanceToPlatform mark-pending pattern).
     const exchangeRate = resolveRate(rates, senderCurrency);
-    const feeInUSD = exchangeRate !== null ? fee / exchangeRate : null;
+    const feeInUSD = exchangeRate !== null ? (fee / 100) / exchangeRate : null;
     const usdConversionPending = exchangeRate === null;
     if (usdConversionPending) {
       logError('Exchange rate unavailable for convertHoldToTransfer fee — proceeding without USD aggregates', {
@@ -15228,12 +15228,15 @@ exports.userFileDispute = functions
         `Exchange rate for ${txCurrency} is currently unavailable; the dispute fee cannot be calculated right now. Please try again shortly.`
       );
     }
-    const usdEquivalent = disputedAmount / exchangeRate;
+    // disputedAmount and wallet balances are in MINOR units (×100), per the
+    // codebase convention (sendMoney/createWalletForUser). Convert to MAJOR
+    // before deriving the USD value so calculateDisputeFee gets the right tier.
+    const usdEquivalent = (disputedAmount / 100) / exchangeRate;
     const fee = calculateDisputeFee(usdEquivalent);
 
-    // Fee in SOURCE CURRENCY (major units — same unit as wallet.availableBalance).
-    // Wallet balances are stored in major units per codebase convention (no *100).
-    const feeInSourceCurrency = fee * exchangeRate;
+    // fee is in USD. Convert to the source currency and express in MINOR units
+    // (×100) so the wallet debit below matches how balances are stored.
+    const feeInSourceCurrency = Math.round(fee * exchangeRate * 100);
 
     // Pre-check wallet balance to decide feeDeductedFrom. Actual deduction happens
     // inside the transaction below to be atomic with dispute doc creation.
