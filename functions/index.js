@@ -1083,6 +1083,27 @@ exports.updateExchangeRatesDaily = functions.pubsub
     }
   });
 
+exports.monitorExchangeRateFreshness = functions.pubsub
+  .schedule('every 60 minutes')
+  .timeZone('UTC')
+  .onRun(async () => {
+    const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
+    const ageMs = ratesDocAgeMs(ratesDoc);
+    const ageHours = Number.isFinite(ageMs) ? +(ageMs / 3.6e6).toFixed(1) : null;
+    const WARN_AGE_MS = 12 * 60 * 60 * 1000; // alarm threshold
+    const healthy = ageMs <= WARN_AGE_MS;
+    if (!healthy) {
+      logError('ALARM: exchange_rates feed stale', {
+        ageHours, warnAfterHours: 12, refuseAfterHours: MAX_RATES_AGE_MS / 3.6e6,
+      });
+    }
+    await db.collection('app_config').doc('exchange_rates_health').set({
+      healthy, ageHours, warnAfterHours: 12, refuseAfterHours: MAX_RATES_AGE_MS / 3.6e6,
+      lastChecked: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return null;
+  });
+
 // HTTP function - manual trigger (Admin-Only, Signature-Protected)
 exports.updateExchangeRatesNow = functions
   .runWith({ secrets: [ADMIN_EXCHANGE_RATE_SECRET] })
@@ -3458,6 +3479,35 @@ const MIN_WITHDRAWAL_THRESHOLD = 10000;
  * Replaces the dangerous `rates[currency] || 1` anti-pattern that silently
  * treated all currencies as 1:1 when rates were missing.
  */
+// ── Exchange-rate staleness guard ──
+// The feed (updateExchangeRatesDaily) refreshes app_config/exchange_rates every
+// 4h. It once died silently for ~5 months and conversions kept using stale
+// numbers. Past MAX_RATES_AGE_MS we treat the rates as UNAVAILABLE (return {}),
+// so resolveRate(...) yields null at every call site and each site's existing,
+// audited null policy fires: spend/cap paths refuse (throw), USD-aggregate
+// paths skip and mark usdConversionPending. We do NOT add per-site logic.
+const MAX_RATES_AGE_MS = 24 * 60 * 60 * 1000; // hard stop: 6 missed 4-hourly fetches
+
+function ratesDocAgeMs(ratesDoc) {
+  if (!ratesDoc || !ratesDoc.exists) return Infinity;
+  const ts = ratesDoc.data().updatedAt;
+  const ms = ts && typeof ts.toMillis === 'function' ? ts.toMillis() : null;
+  return ms === null ? Infinity : (Date.now() - ms);
+}
+
+function freshRatesOrEmpty(ratesDoc, context) {
+  const ageMs = ratesDocAgeMs(ratesDoc);
+  if (ageMs > MAX_RATES_AGE_MS) {
+    logError('Exchange rates stale/missing — treating as unavailable', {
+      context: context || 'unknown',
+      ageHours: Number.isFinite(ageMs) ? +(ageMs / 3.6e6).toFixed(1) : null,
+      maxAgeHours: MAX_RATES_AGE_MS / 3.6e6,
+    });
+    return {};
+  }
+  return (ratesDoc.exists && ratesDoc.data().rates) ? ratesDoc.data().rates : {};
+}
+
 function resolveRate(rates, currency) {
   const rate = rates?.[currency];
   if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) {
@@ -7438,7 +7488,7 @@ exports.adminInitiateTransfer = functions
 
   // Compute USD equivalent NOW (before caps check). Reuses logic from later in function.
   const ratesDocForCaps = await db.collection('app_config').doc('exchange_rates').get();
-  const ratesForCaps = ratesDocForCaps.exists ? ratesDocForCaps.data().rates : {};
+  const ratesForCaps = freshRatesOrEmpty(ratesDocForCaps, 'adminInitiateTransfer:caps');
   // NEW-2: this USD value GATES the per-transfer and daily caps and is persisted +
   // summed into future cap checks. A missing rate must NOT fall back to 1:1, which
   // silently breaks the USD cap. Refuse instead — a cap cannot be enforced with an
@@ -7506,7 +7556,7 @@ exports.adminInitiateTransfer = functions
 
     // Get exchange rate for USD equivalent bookkeeping (auxiliary; never block on rate unavailability — gold reference: sweepBalanceToPlatform)
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    const rates = ratesDoc.exists ? (ratesDoc.data().rates || {}) : {};
+    const rates = freshRatesOrEmpty(ratesDoc, 'adminInitiateTransfer:bookkeeping');
     const exchangeRate = resolveRate(rates, currency);
     const amountInUSD = exchangeRate !== null ? amount / exchangeRate : null;
     const usdConversionPending = exchangeRate === null;
@@ -7776,7 +7826,7 @@ exports.adminProposeTransfer = functions.runWith({ enforceAppCheck: true }).http
 
   // Compute USD equivalent for cap enforcement (no real rate => cannot evaluate caps; refuse)
   const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-  const rates = ratesDoc.exists ? (ratesDoc.data().rates || {}) : {};
+  const rates = freshRatesOrEmpty(ratesDoc, 'adminProposeTransfer');
   const exchangeRate = resolveRate(rates, currency);
   if (exchangeRate === null) {
     throw new functions.https.HttpsError(
@@ -8924,7 +8974,7 @@ exports.adminEditProposal = functions.runWith({ enforceAppCheck: true }).https.o
     // If amount changed, recompute usdEquivalent
     if (updateData.amount !== undefined) {
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-      const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+      const rates = freshRatesOrEmpty(ratesDoc, 'adminEditProposal');
       // NEW-2: usdEquivalent is summed into platform transfer daily-cap checks. A missing
       // rate must NOT fall back to 1:1 here — writing a 1:1 value would silently poison the
       // cap math downstream. Refuse the amount edit until a real rate is available.
@@ -9421,7 +9471,7 @@ exports.adminEmergencyTransfer = functions.runWith({ enforceAppCheck: true }).ht
   try {
     // Compute USD equivalent
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+    const rates = freshRatesOrEmpty(ratesDoc, 'adminEmergencyTransfer');
     // NEW-2: usdEquivalent GATES the emergency daily cap and is persisted into the
     // proposal doc + summed into future emergency-cap checks. A missing rate must NOT
     // fall back to 1:1 (which silently breaks the cap). Refuse — an emergency does not
@@ -10572,7 +10622,7 @@ exports.previewTransfer = functions.runWith({ enforceAppCheck: true }).https.onC
 
     if (isCrossCountry) {
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+      const rates = freshRatesOrEmpty(ratesDoc, 'previewTransfer');
 
       const senderRate = resolveRate(rates, senderCurrency);
       const recipientRate = resolveRate(rates, recipientCurrency);
@@ -10651,7 +10701,7 @@ exports.previewMerchantCharge = functions.runWith({ enforceAppCheck: true }).htt
     }
 
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+    const rates = freshRatesOrEmpty(ratesDoc, 'previewMerchantCharge');
 
     const senderRate = resolveRate(rates, senderCurrency);
     const recipientRate = resolveRate(rates, recipientCurrency);
@@ -10795,7 +10845,7 @@ exports.sendMoney = functions.runWith({ enforceAppCheck: true }).https.onCall(as
 
       // Fetch exchange rates (needed for currency conversion and fee collection)
       const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-      const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+      const rates = freshRatesOrEmpty(ratesDoc, 'sendMoney');
 
       // Get user names
       // senderUserDoc already fetched above for block check
@@ -13166,7 +13216,7 @@ exports.convertHoldToTransfer = functions.runWith({ enforceAppCheck: true }).htt
 
   // ── Fetch exchange rates (outside transaction, read-only) ──
   const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-  const rates = ratesDoc.exists ? ratesDoc.data().rates : {};
+  const rates = freshRatesOrEmpty(ratesDoc, 'convertHoldToTransfer');
 
   // ── Generate transaction ID ──
   const txId = generateSecureTransactionId();
@@ -15238,7 +15288,7 @@ exports.userFileDispute = functions
 
     // Compute fee
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    const rates = ratesDoc.exists ? ratesDoc.data().rates || {} : {};
+    const rates = freshRatesOrEmpty(ratesDoc, 'userFileDispute');
     const txCurrency = tx.currency || 'NGN';
     // NEW-2: this rate sets the dispute fee actually deducted from the user's wallet
     // (usdEquivalent -> tiered calculateDisputeFee -> feeInSourceCurrency -> wallet debit)
