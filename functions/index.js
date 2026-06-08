@@ -589,6 +589,18 @@ const VALID_CURRENCIES = new Set([
   'GNF', 'LRD', 'ZMW', 'ZWG', 'SZL', 'SSP', 'SLL', 'SLE', 'CDF',
 ]);
 
+// Internal amounts are stored as major×100 regardless of the currency's real
+// ISO 4217 exponent. MoMo APIs want the amount in the currency's true MAJOR
+// unit, formatted to its real decimals. These currencies have no minor unit:
+const ZERO_DECIMAL_CURRENCIES = new Set(['UGX', 'RWF', 'XOF', 'XAF', 'GNF']);
+function currencyDecimals(currency) {
+  return ZERO_DECIMAL_CURRENCIES.has(currency) ? 0 : 2;
+}
+// 100000 (UGX minor) -> "1000";  10000 (GHS minor) -> "100.00"
+function minorToMajorString(minorAmount, currency) {
+  return (minorAmount / 100).toFixed(currencyDecimals(currency));
+}
+
 /**
  * Validate that a currency code is in the whitelist.
  * @param {string} currency - Currency code to validate
@@ -11227,9 +11239,10 @@ exports.momoRequestToPay = functions
     const referenceId = crypto.randomUUID();
 
     // Create request to pay
+    const momoCurrency = MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : validatedCurrency;
     const response = await momoRequest('collections', 'POST', '/v1_0/requesttopay', {
-      amount: amount.toString(),
-      currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
+      amount: minorToMajorString(amount, momoCurrency),
+      currency: momoCurrency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payer: {
         partyIdType: 'MSISDN',
@@ -11398,7 +11411,7 @@ exports.momoCheckStatus = functions
           const checkNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
           await sendPushNotification(txData.userId, {
             title: `${checkNotifType} Successful`,
-            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+            body: `Your MTN MoMo ${checkNotifType.toLowerCase()} of ${txData.currency || ''} ${minorToMajorString(txData.amount || 0, txData.currency || 'EUR')} has been completed`,
             type: 'transaction',
             data: { action: txData.type === 'collection' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId },
           });
@@ -11586,9 +11599,10 @@ exports.momoTransfer = functions
     });
 
     // Create transfer request
+    const momoCurrency = MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : validatedCurrency;
     const response = await momoRequest('disbursements', 'POST', '/v1_0/transfer', {
-      amount: amount.toString(),
-      currency: MOMO_CONFIG.environment === 'sandbox' ? 'EUR' : currency, // Sandbox=EUR, Production=actual currency
+      amount: minorToMajorString(amount, momoCurrency),
+      currency: momoCurrency, // Sandbox=EUR, Production=actual currency
       externalId: referenceId,
       payee: {
         partyIdType: 'MSISDN',
@@ -11611,7 +11625,7 @@ exports.momoTransfer = functions
      // Send push notification for MoMo withdrawal
       await sendPushNotification(userId, {
         title: 'Withdrawal Initiated',
-        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${amount.toFixed(2)} is being processed`,
+        body: `Your MTN MoMo withdrawal of ${currency || 'EUR'} ${minorToMajorString(amount, validatedCurrency)} is being processed`,
         type: 'transaction',
         data: { action: 'withdrawal_initiated', amount: amount.toString(), referenceId },
       });
