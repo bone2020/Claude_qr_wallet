@@ -118,7 +118,7 @@ function PlatformWalletCard({ wallet, balances }) {
                     {currencySymbol(b.currency)} {b.currency}
                   </td>
                   <td className="px-4 py-2 text-right text-sm font-bold text-gray-900">
-                    {formatCurrency(b.amount, b.currency, { unit: 'major' })}
+                    {formatCurrency(b.amount, b.currency)}
                   </td>
                   <td className="px-4 py-2 text-right text-sm text-green-600">
                     {formatCurrency(b.usdEquivalent, 'USD', { unit: 'major' })}
