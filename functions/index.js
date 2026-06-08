@@ -3529,13 +3529,10 @@ async function sweepBalanceToPlatform(userId, amount, currency) {
   let usdConversionPending = false;
   try {
     const ratesDoc = await db.collection('app_config').doc('exchange_rates').get();
-    if (ratesDoc.exists) {
-      const data = ratesDoc.data() || {};
-      const rate = (data.rates || {})[currency];
-      if (typeof rate === 'number' && rate > 0) {
-        exchangeRate = rate;
-        amountInUSD = amount / rate;
-      }
+    const rate = resolveRate(freshRatesOrEmpty(ratesDoc, 'sweepBalanceToPlatform'), currency);
+    if (rate !== null) {
+      exchangeRate = rate;
+      amountInUSD = amount / rate;
     }
   } catch (err) {
     logError('Failed to read cached exchange rates during forfeiture', {
