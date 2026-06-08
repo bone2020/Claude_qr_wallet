@@ -11853,7 +11853,7 @@ exports.momoWebhook = functions
       const momoNotifType = txData.type === 'collection' ? 'Deposit' : 'Withdrawal';
       await sendPushNotification(txData.userId, {
         title: `${momoNotifType} Successful`,
-        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${txData.amount?.toFixed(2) || '0.00'} has been completed`,
+        body: `Your MTN MoMo ${momoNotifType.toLowerCase()} of ${txData.currency || ''} ${minorToMajorString(txData.amount || 0, txData.currency || 'EUR')} has been completed`,
         type: 'transaction',
         data: { action: momoNotifType === 'Deposit' ? 'deposit' : 'withdrawal_completed', amount: txData.amount?.toString(), referenceId: externalId },
       });
