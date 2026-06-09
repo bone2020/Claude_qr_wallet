@@ -7374,6 +7374,84 @@ exports.adminGetPlatformWithdrawals = functions.runWith({ enforceAppCheck: true 
   }
 });
 
+/**
+ * Admin: Get the Shop Afrik platform account overview.
+ *
+ * Reads the segregated Shop Afrik account (wallets/shop_afrik) and its
+ * per-currency bucket balances (wallets/shop_afrik/balances/{CCY}).
+ * Mirrors adminGetPlatformWallet but returns the three Shop Afrik buckets
+ * (escrowHeld / owedToSellers / commissionEarned) instead of a single amount,
+ * and never blends currencies into a single total (Shop Afrik plan §6).
+ *
+ * Bucket amounts are returned as RAW minor units (major×100), matching QR
+ * Wallet's storage convention. The dashboard formats them for display — do NOT
+ * format here (server-side ÷100 was the earlier RevenuePage double-divide bug).
+ *
+ * Auth: verifyAdmin(context, 'finance') — identical gate to adminGetPlatformWallet.
+ */
+exports.shopAfrikWalletGetOverview = functions.runWith({ enforceAppCheck: true }).https.onCall(async (data, context) => {
+  await verifyAdmin(context, 'finance');
+
+  // Seed timestamps are ISO strings; future live updates may be Firestore Timestamps.
+  const toIso = (v) => {
+    if (!v) return null;
+    if (typeof v === 'string') return v;
+    return v.toDate?.()?.toISOString?.() || null;
+  };
+
+  try {
+    const accountDoc = await db.collection('wallets').doc('shop_afrik').get();
+    if (!accountDoc.exists) {
+      return {
+        success: true,
+        account: null,
+        balances: [],
+        message: 'Shop Afrik account not found. Run scripts/setup_shop_afrik_wallet.js.',
+      };
+    }
+    const accountData = accountDoc.data();
+
+    // Do NOT orderBy a bucket field — there is no single `amount`, and ordering
+    // by a field some docs might lack would silently exclude them. Sort in JS.
+    const balancesSnapshot = await db.collection('wallets').doc('shop_afrik')
+      .collection('balances')
+      .get();
+
+    const balances = balancesSnapshot.docs
+      .map((doc) => {
+        const d = doc.data();
+        return {
+          currency: doc.id,
+          escrowHeld: d.escrowHeld || 0,
+          owedToSellers: d.owedToSellers || 0,
+          commissionEarned: d.commissionEarned || 0,
+          txCount: d.txCount || 0,
+          region: d.region || null,
+          country: d.country || null,
+          countries: d.countries || null,
+          lastTransactionAt: toIso(d.lastTransactionAt),
+          updatedAt: toIso(d.updatedAt),
+        };
+      })
+      .sort((a, b) => a.currency.localeCompare(b.currency));
+
+    return {
+      success: true,
+      account: {
+        walletId: accountData.walletId,
+        name: accountData.name,
+        type: accountData.type,
+        isActive: accountData.isActive,
+        updatedAt: toIso(accountData.updatedAt),
+      },
+      balances,
+    };
+  } catch (error) {
+    if (error instanceof functions.https.HttpsError) throw error;
+    throw new functions.https.HttpsError('internal', `Failed to get Shop Afrik overview: ${error.message}`);
+  }
+});
+
 // ============================================================
 // ADMIN BANK TRANSFERS
 // ============================================================
